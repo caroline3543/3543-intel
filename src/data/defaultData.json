@@ -1,0 +1,17 @@
+{
+  "_version": "1.0.0",
+  "_exported": null,
+  "_note": "Paste an exported player JSON here to hardcode your roster as seed data.",
+  "settings": {
+    "allianceName": "",
+    "allianceTag": "",
+    "stateId": "3543",
+    "lastUpdated": null
+  },
+  "players": [],
+  "teams": {},
+  "battlePlan": null,
+  "svsTimer": null,
+  "savedPlans": [],
+  "lastUpdated": null
+}
