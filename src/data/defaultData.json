@@ -9,7 +9,150 @@
     "language": "en",
     "lastUpdated": null
   },
-  "players": [],
+  "players": [
+    {
+      "id": "8a8wrr50xv7mppk003g",
+      "fid": "",
+      "username": "Kirito",
+      "alias": "",
+      "allianceTag": "INT",
+      "country": "United States",
+      "timezone": "",
+      "languages": [
+        "English",
+        "Spanish"
+      ],
+      "furnaceLevel": 5,
+      "infantryCampLevel": 5,
+      "lancerCampLevel": 5,
+      "marksmanCampLevel": 5,
+      "troops": {
+        "infantry": "FC5",
+        "lancer": "FC5",
+        "marksman": "FC5"
+      },
+      "heroes": [
+        "Mia",
+        "Reina",
+        "Seo-Yoon",
+        "Jessie",
+        "Jasser",
+        "Patrick",
+        "Bahiti",
+        "Lumak Bokan",
+        "Ling Xue"
+      ],
+      "hasNoneChecked": false,
+      "roles": [
+        "Joiner"
+      ],
+      "availability": {
+        "present": "available",
+        "timing": "early",
+        "lateBy": null,
+        "earlyBy": null,
+        "discord": "unknown"
+      },
+      "teamAssignment": null,
+      "notes": "",
+      "profileLastUpdated": "2026-05-28T13:59:45.876Z",
+      "createdAt": 1779976415356
+    },
+    {
+      "id": "749k5a3omksmppk88ge",
+      "fid": "",
+      "username": "Caroline",
+      "alias": "",
+      "allianceTag": "INT",
+      "country": "New Zealand",
+      "timezone": "Oceania",
+      "languages": [
+        "English"
+      ],
+      "furnaceLevel": 3,
+      "infantryCampLevel": null,
+      "lancerCampLevel": null,
+      "marksmanCampLevel": null,
+      "troops": {
+        "infantry": "FC3",
+        "lancer": "FC3",
+        "marksman": "FC3"
+      },
+      "heroes": [
+        "Mia",
+        "Patrick",
+        "Jessie",
+        "Jasser"
+      ],
+      "hasNoneChecked": false,
+      "roles": [
+        "Joiner"
+      ],
+      "availability": {
+        "present": "available",
+        "timing": "early",
+        "lateBy": null,
+        "earlyBy": null,
+        "discord": "yes"
+      },
+      "teamAssignment": null,
+      "notes": "",
+      "profileLastUpdated": "2026-05-28T14:01:42.268Z",
+      "createdAt": 1779976799438
+    },
+    {
+      "id": "x9g7ousg5dhmppkcag6",
+      "fid": "",
+      "username": "Erchomai",
+      "alias": "",
+      "allianceTag": "INT",
+      "country": "United States",
+      "timezone": "",
+      "languages": [
+        "English"
+      ],
+      "furnaceLevel": 5,
+      "infantryCampLevel": null,
+      "lancerCampLevel": null,
+      "marksmanCampLevel": null,
+      "troops": {
+        "infantry": "FC5",
+        "lancer": "FC5",
+        "marksman": "FC5"
+      },
+      "heroes": [
+        "Seo-Yoon",
+        "Jasser",
+        "Jessie",
+        "Patrick",
+        "Bahiti",
+        "Lumak Bokan",
+        "Ling Xue",
+        "Jeronimo",
+        "Philly",
+        "Mia",
+        "Logan",
+        "Lynn",
+        "Ahmose",
+        "Reina"
+      ],
+      "hasNoneChecked": false,
+      "roles": [
+        "Rally Lead"
+      ],
+      "availability": {
+        "present": "available",
+        "timing": "unknown",
+        "lateBy": null,
+        "earlyBy": null,
+        "discord": "yes"
+      },
+      "teamAssignment": null,
+      "notes": "",
+      "profileLastUpdated": "2026-05-28T14:05:20.917Z",
+      "createdAt": 1779976988646
+    }
+  ],
   "events": [],
   "schedules": [],
   "svs": {
@@ -17,5 +160,5 @@
     "lastUpdated": null
   },
   "notes": [],
-  "lastUpdated": null
+  "lastUpdated": "2026-05-28T14:05:21.553Z"
 }
