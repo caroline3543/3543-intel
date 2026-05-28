@@ -1,6 +1,6 @@
 import defaultData from './defaultData.json';
 
-const STORAGE_KEY = 'svs_rally_data';
+const STORAGE_KEY = 'wos_alliance_data';
 const CURRENT_VERSION = '1.0.0';
 
 export function loadData() {
@@ -22,41 +22,37 @@ export function saveData(data) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     return toSave;
   } catch (e) {
-    console.error('Failed to save', e);
+    console.error('Failed to save data', e);
     return data;
   }
 }
 
-// Export players only — not full app state
-export function exportPlayers(players, allianceTag) {
+export function exportData(data) {
   const exportObj = {
+    ...data,
     _version: CURRENT_VERSION,
     _exported: new Date().toISOString(),
-    _note: 'Player profiles exported from Sunfire Castle Rally Planner.',
-    players,
+    _note: 'Exported from WOS Alliance Manager. Import this file to restore your data.',
   };
   const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `svs-players-${allianceTag || 'export'}-${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `wos-alliance-${data.settings?.allianceTag || 'export'}-${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-// Import players from file — returns array of player objects
-export function importPlayers(file) {
+export function importData(file, mode = 'replace') {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const parsed = JSON.parse(e.target.result);
-        // Accept either { players: [...] } wrapper or a raw array
-        const players = Array.isArray(parsed) ? parsed : parsed.players;
-        if (!Array.isArray(players)) throw new Error('No players array found');
-        resolve(players);
+        const imported = JSON.parse(e.target.result);
+        const migrated = migrateIfNeeded(imported);
+        resolve(migrated);
       } catch (err) {
-        reject(new Error('Invalid file — expected exported player JSON'));
+        reject(new Error('Invalid JSON file'));
       }
     };
     reader.onerror = () => reject(new Error('Failed to read file'));
@@ -64,16 +60,10 @@ export function importPlayers(file) {
   });
 }
 
-// Merge incoming players into current by id — incoming wins on conflict
-export function mergePlayers(current, incoming) {
-  const map = new Map(current.map(p => [p.id, p]));
-  incoming.forEach(p => map.set(p.id, p));
-  return Array.from(map.values());
-}
-
 function migrateIfNeeded(data) {
-  // Add version migration cases here as schema evolves
-  // e.g. if (!data._version || data._version < '1.1.0') { ... }
+  const version = data._version || '0.0.0';
+  // Future migrations go here as version checks
+  // e.g. if (version < '1.1.0') { ...migrate... }
   return {
     ...structuredClone(defaultData),
     ...data,
@@ -81,17 +71,52 @@ function migrateIfNeeded(data) {
   };
 }
 
-// Unofficial WOS FID lookup — optional, fails gracefully
+export function mergeData(current, incoming) {
+  // Merge players by id - incoming wins on conflict
+  const playerMap = new Map(current.players.map(p => [p.id, p]));
+  incoming.players?.forEach(p => playerMap.set(p.id, p));
+
+  return {
+    ...current,
+    ...incoming,
+    players: Array.from(playerMap.values()),
+    events: [...(current.events || []), ...(incoming.events || [])].filter(
+      (e, i, arr) => arr.findIndex(x => x.id === e.id) === i
+    ),
+    notes: [...(current.notes || []), ...(incoming.notes || [])].filter(
+      (n, i, arr) => arr.findIndex(x => x.id === n.id) === i
+    ),
+  };
+}
+
+// WOS unofficial API lookup
 export async function lookupWosPlayer(fid) {
-  try {
-    const resp = await fetch(
-      `https://wos-giftcode-api.top/api/player?fid=${fid}`,
-      { signal: AbortSignal.timeout(5000) }
-    );
-    if (!resp.ok) return { success: false };
-    const json = await resp.json();
-    const raw = json?.data || json?.player || json;
-    if (!raw?.nickname && !raw?.username) return { success: false };
-    return {
-      success: true,
-      username:     raw.nickname      ||
+  // WOS uses a public leaderboard/profile endpoint - unofficial, may break
+  const endpoints = [
+    `https://wos-giftcode-api.top/api/player?fid=${fid}`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!resp.ok) continue;
+      const json = await resp.json();
+      // Normalize whatever shape comes back
+      if (json?.data || json?.nickname || json?.player) {
+        const raw = json.data || json.player || json;
+        return {
+          success: true,
+          username: raw.nickname || raw.username || raw.name || null,
+          furnaceLevel: raw.stove_lv || raw.furnace_level || raw.fc_level || null,
+          stateId: raw.kid || raw.state_id || raw.server_id || null,
+          avatarUrl: raw.avatar_image || raw.head_image || null,
+          allianceName: raw.alliance_name || null,
+          raw,
+        };
+      }
+    } catch (e) {
+      // Timeout or network error - silently continue
+    }
+  }
+  return { success: false };
+}
