@@ -1,12 +1,15 @@
 {
-  "_version": "1.0.0",
+  "_version": "2.0.0",
   "_exported": null,
-  "_note": "This is the default seed data. Export your app state and paste it here to hardcode your roster.",
+  "_note": "Paste an export here to hardcode your roster as seed data.",
   "settings": {
     "allianceName": "",
     "allianceTag": "",
     "stateId": "3543",
-    "language": "en",
+    "lastUpdated": null
+  },
+  "players": [],
+  "events": [],
     "lastUpdated": null
   },
   "players": [
