@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import JoinerRegistry from "./components/JoinerRegistry.jsx";
 import {
   loadData, saveData, exportData, importData, mergeData,
   newEvent, newSnapshot, newSvsPlan, newRally, newReinforcement,
