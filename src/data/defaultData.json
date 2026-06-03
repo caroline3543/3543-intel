@@ -1,16 +1,13 @@
 {
-  "_version": "3.0.0",
-  "_exported": null,
-  "_note": "Paste an export here to hardcode your roster as seed data.",
+  "_version": "3.1.0",
+  "lastUpdated": null,
   "settings": {
     "allianceName": "",
     "allianceTag": "",
-    "stateId": "3543",
-    "lastUpdated": null
+    "stateId": "3543"
   },
   "players": [],
   "events": [],
   "prepScores": [],
-  "svsPlans": [],
-  "lastUpdated": null
+  "svsPlans": []
 }
