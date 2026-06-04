@@ -6,6 +6,7 @@ import { newSvsPlan, newRally, newReinforcement, newAssignment } from '../../dat
 import { calcSendTime, calcImpactTime, parseHMS, formatHMS, secsToHuman, getRallyWarnings, getCounterWarnings } from '../../services/svsTimingService.js';
 import { SheetHandle, Field, Inp, Sel, Warning } from '../common/Primitives.jsx';
 import { uid } from '../../utils/dates.js';
+import { LiveRallyRoom } from './LiveRallyRoom.jsx';
 
 // ── Small countdown hook ───────────────────────────────────────
 function useCountdown(targetHMS) {
@@ -243,6 +244,7 @@ function PlanDetail({ plan, players, onUpdate, onBack }) {
 
 // ── BattleTab (main export) ────────────────────────────────────
 export function BattleTab({ plans, players, events, onSave, onDelete, showToast }) {
+  const [view, setView]             = useState('plans'); // 'plans' | 'liveRoom'
   const [activePlanId, setActivePlanId] = useState(null);
   const [createOpen, setCreateOpen]     = useState(false);
 
@@ -284,11 +286,21 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast 
 
   const statusColor = s => s==='live'?C.green:s==='completed'?C.muted:C.icy;
 
+  if (view === 'liveRoom') {
+    return <LiveRallyRoom onBack={() => setView('plans')} />;
+  }
+
   return (
     <div style={{ padding:'16px 20px 0' }}>
-      <button onClick={()=>setCreateOpen(true)} style={{ width:'100%', height:52, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer', marginBottom:20 }}>
-        ＋ New Plan
-      </button>
+      {/* Header row — New Plan + Live Room button */}
+      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+        <button onClick={()=>setCreateOpen(true)} style={{ flex:2, height:52, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>
+          ＋ New Plan
+        </button>
+        <button onClick={()=>setView('liveRoom')} style={{ flex:1, height:52, borderRadius:12, background:C.red+'22', border:`1px solid ${C.red}44`, color:C.red, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+          🔴 Live Room
+        </button>
+      </div>
 
       {plans.length===0&&(
         <div style={{ textAlign:'center', padding:'40px 20px' }}>
