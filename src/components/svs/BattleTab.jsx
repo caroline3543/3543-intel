@@ -287,7 +287,7 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast 
   const statusColor = s => s==='live'?C.green:s==='completed'?C.muted:C.icy;
 
   if (view === 'liveRoom') {
-    return <LiveRallyRoom onBack={() => setView('plans')} />;
+    return <LiveRallyRoom onBack={() => setView('plans')} players={players} />;
   }
 
   return (
