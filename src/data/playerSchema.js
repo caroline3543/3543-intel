@@ -93,41 +93,55 @@ export function newSvsPlan(overrides = {}) {
   return {
     id:              uid(),
     name:            '',
-    strategy:        'Counter Rally',
     allianceTag:     '',
     date:            new Date().toISOString().slice(0, 10),
     status:          'draft',
     notes:           '',
     postBattleNotes: '',
-    targetImpactTime:'',
-    rallies:         [],
-    reinforcements:  [],
-    assignments:     [],
-    timelineEvents:  [],
-    marchDb:         [],
-    isTemplate:      false,
-    templateName:    '',
+    rallySlots:      [],   // new structure — replaces rallies/reinforcements
     createdAt:       new Date().toISOString(),
     ...overrides,
   };
 }
 
-export function newRally(overrides = {}) {
+// A rally slot is one rally leader + their joiner assignments
+export function newRallySlot(overrides = {}) {
   return {
     id:           uid(),
-    label:        '',
-    leadPlayerId: null,
-    leadName:     '',
-    allianceTag:  '',
-    launchTime:   '',
-    marchDuration: 0,
-    impactTime:   '',
-    isStrong:     true,
-    isCounter:    false,
-    isDecoy:      false,
-    order:        1,
+    type:         'Main Rally',   // rally type
+    leaderId:     null,           // player id
+    leaderName:   '',
+    rallyDuration: 3,             // minutes: 1, 3, or 5
+    ratio:        '60/40/0',      // troop ratio preset
+    joiners:      [               // 4 priority joiner slots
+      newJoinerSlot(),
+      newJoinerSlot(),
+      newJoinerSlot(),
+      newJoinerSlot(),
+    ],
     notes:        '',
-    status:       'planned',
+    ...overrides,
+  };
+}
+
+export function newJoinerSlot(overrides = {}) {
+  return {
+    id:        uid(),
+    playerId:  null,
+    playerName:'',
+    heroName:  '',     // specific hero they must bring
+    confirmed: false,  // marked unavailable mid-battle
+    replacedBy:null,   // { playerId, playerName, heroName } if swapped
+    ...overrides,
+  };
+}
+
+// Legacy schemas kept for backward compat
+export function newRally(overrides = {}) {
+  return {
+    id: uid(), label:'', leadPlayerId:null, leadName:'', allianceTag:'',
+    launchTime:'', marchDuration:0, impactTime:'', isStrong:true,
+    isCounter:false, isDecoy:false, order:1, notes:'', status:'planned',
     ...overrides,
   };
 }
