@@ -6,46 +6,14 @@ import {
   parseImpactInput, validateImpactInput,
 } from '../../services/rallyTimingParser.js';
 
-// ── Constants ──────────────────────────────────────────────────
 const RALLY_TYPES = ['Main Rally','Counter Rally','Counter-Counter','Switch Fight','Garrison Entry','Reinforcement','Custom'];
 const RALLY_COLORS = {
   'Main Rally':'#F5A623','Counter Rally':'#FF453A','Counter-Counter':'#FF8C00',
   'Switch Fight':'#30D158','Garrison Entry':'#6B8CAE','Reinforcement':'#7BAE8C','Custom':'#A8C4D8',
 };
-
-// Timer identity — colours rotate, never reused until all 6 exhausted
-const TIMER_PALETTE = ['#F5A623','#FF453A','#30D158','#7B68EE','#FF69B4','#00CED1'];
-
-// Default emoji per rally type, no two active timers share one
-const TYPE_EMOJIS = {
-  'Main Rally':'⚔️','Counter Rally':'🛡️','Counter-Counter':'🔄',
-  'Switch Fight':'⚡','Garrison Entry':'🏰','Reinforcement':'🔰','Custom':'🎯',
-};
-const FALLBACK_EMOJIS = ['⚔️','🛡️','🔄','🏰','🔰','⚡','🎯','🔥','💥','🌊'];
-
-function assignTimerIdentity(existingTimers, type) {
-  // Assign colour — avoid colours used by active timers
-  const usedColors = new Set(existingTimers.map(t => t.timerColor).filter(Boolean));
-  const color = TIMER_PALETTE.find(c => !usedColors.has(c)) || TIMER_PALETTE[existingTimers.length % TIMER_PALETTE.length];
-
-  // Assign emoji — avoid emojis used by active timers
-  const usedEmojis = new Set(existingTimers.map(t => t.timerEmoji).filter(Boolean));
-  const preferred  = TYPE_EMOJIS[type];
-  const emoji = !usedEmojis.has(preferred)
-    ? preferred
-    : FALLBACK_EMOJIS.find(e => !usedEmojis.has(e)) || preferred;
-
-  // Assign number — next available slot 1–5
-  const usedNums = new Set(existingTimers.map(t => t.timerNumber).filter(Boolean));
-  let num = 1;
-  while (usedNums.has(num) && num <= 5) num++;
-
-  return { timerColor: color, timerEmoji: emoji, timerNumber: num };
-}
-const OFFSETS   = [-5,-2,-1,0,1,2,5];
-const STORAGE_KEY = 'svs_live_rally_room_v2';
+const OFFSETS       = [-5,-2,-1,0,1,2,5];
+const STORAGE_KEY   = 'svs_live_rally_room_v2';
 const RALLY_DURATIONS = [1,3,5];
-const RATIO_PRESETS = ['60/40/0','50/20/30','48/4/48','40/60/0','60/0/40','0/40/60','50/50/0'];
 
 const DEFAULT_MSG =
 `{type} — {name}
@@ -61,7 +29,7 @@ Join now. Do not solo.`;
 // ── Helpers ────────────────────────────────────────────────────
 function uid() { return Math.random().toString(36).slice(2)+Date.now().toString(36); }
 function utcNowSecs() { const n=new Date(); return n.getUTCHours()*3600+n.getUTCMinutes()*60+n.getUTCSeconds(); }
-function utcNowStr() { const n=new Date(); return [n.getUTCHours(),n.getUTCMinutes(),n.getUTCSeconds()].map(x=>String(x).padStart(2,'0')).join(':'); }
+function utcNowStr()  { const n=new Date(); return [n.getUTCHours(),n.getUTCMinutes(),n.getUTCSeconds()].map(x=>String(x).padStart(2,'0')).join(':'); }
 
 function secsToHHMMSS(s) {
   if (s==null||isNaN(s)) return '--:--:--';
@@ -69,54 +37,38 @@ function secsToHHMMSS(s) {
   const str=[Math.floor(abs/3600),Math.floor((abs%3600)/60),abs%60].map(x=>String(x).padStart(2,'0')).join(':');
   return s<0?`-${str}`:str;
 }
-
 function calcSendSecs(impactSecs,marchSecs,offset=0) {
   if (impactSecs==null||marchSecs==null) return null;
   return impactSecs - marchSecs + offset;
 }
-
 function calcRallyOpenSecs(impactSecs,marchSecs,rallyDurationMins) {
   if (impactSecs==null||marchSecs==null||rallyDurationMins==null) return null;
   return impactSecs - marchSecs - (rallyDurationMins*60);
 }
-
 function fmtSend(secs) {
   if (secs==null) return '--:--';
   const norm=((secs%86400)+86400)%86400;
   const h=Math.floor(norm/3600), m=Math.floor((norm%3600)/60), s=norm%60;
-  return s===0?`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return s===0
+    ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`
+    : `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-// ── Stage system — Leader-only phases ─────────────────────────
-// secsToOpen  = seconds until "open rally" time (impactTime - marchSecs - rallyDuration*60)
-// secsToImpact = seconds until rally hits target
+// ── Stage system ───────────────────────────────────────────────
 function getTimerStage(secsToOpen, secsToImpact) {
   if (secsToImpact == null) return null;
-
-  // Phase 5: Impact passed
-  if (secsToImpact <= 0) {
-    return { stage:'impact', label:'✓ Impact', color:'#30D158', bg:'#0A2A14' };
-  }
-
-  // Phase 4: Rally is open — counting down to impact
-  if (secsToOpen != null && secsToOpen <= 0) {
-    return { stage:'filling', label:'✓ Rally Open — Joiners Joining', color:'#30D158', bg:'#0A2A14' };
-  }
-
-  // No rally duration set — simplified phases only
+  if (secsToImpact <= 0)                         return { stage:'impact',    label:'✓ Impact',                   color:'#30D158', bg:'#0A2A14' };
+  if (secsToOpen != null && secsToOpen <= 0)     return { stage:'filling',   label:'✓ Rally Open — Joiners Joining', color:'#30D158', bg:'#0A2A14' };
   if (secsToOpen == null) {
-    if (secsToImpact <= 10) return { stage:'open_now',  label:'⚠ OPEN RALLY NOW',        color:'#FF453A', bg:'#3A0A0A' };
-    if (secsToImpact <= 30) return { stage:'prepare',   label:'Prepare To Open Rally',   color:'#FF8C00', bg:'#2A1500' };
-    if (secsToImpact <= 90) return { stage:'get_ready', label:'Get Ready',               color:'#A8C4D8', bg:'#0A1A2A' };
+    if (secsToImpact <= 10) return { stage:'open_now',  label:'⚠ OPEN RALLY NOW',      color:'#FF453A', bg:'#3A0A0A' };
+    if (secsToImpact <= 30) return { stage:'prepare',   label:'Prepare To Open Rally', color:'#FF8C00', bg:'#2A1500' };
+    if (secsToImpact <= 90) return { stage:'get_ready', label:'Get Ready',             color:'#A8C4D8', bg:'#0A1A2A' };
     return null;
   }
-
-  // Phase 3: Open rally now
-  if (secsToOpen <= 0)  return { stage:'open_now',  label:'⚠ OPEN RALLY NOW',        color:'#FF453A', bg:'#3A0A0A' };
-  // Phase 2: Prepare to open
-  if (secsToOpen <= 5)  return { stage:'prepare',   label:'Prepare To Open Rally',   color:'#FF8C00', bg:'#2A1500' };
-  if (secsToOpen <= 30) return { stage:'get_ready', label:'Get Ready',               color:'#A8C4D8', bg:'#0A1A2A' };
-  if (secsToOpen <= 120)return { stage:'standby',   label:'Stand By',                color:'#5A7A94', bg:C.card   };
+  if (secsToOpen <= 0)   return { stage:'open_now',  label:'⚠ OPEN RALLY NOW',      color:'#FF453A', bg:'#3A0A0A' };
+  if (secsToOpen <= 5)   return { stage:'prepare',   label:'Prepare To Open Rally', color:'#FF8C00', bg:'#2A1500' };
+  if (secsToOpen <= 30)  return { stage:'get_ready', label:'Get Ready',             color:'#A8C4D8', bg:'#0A1A2A' };
+  if (secsToOpen <= 120) return { stage:'standby',   label:'Stand By',              color:'#5A7A94', bg:C.card   };
   return null;
 }
 
@@ -142,18 +94,15 @@ function loadState() {
   } catch {}
   return null;
 }
-
 function saveState(s) { try { localStorage.setItem(STORAGE_KEY,JSON.stringify(s)); } catch {} }
 
 const DEFAULT_STATE = {
-  timers:   [],
-  archived: [],
-  marchRegistry: [],
-  calculator: { impactTimeRaw:'', impactSecs:null, rallyDuration:3, leaders:[], messageTemplate:DEFAULT_MSG },
+  timers:[], archived:[], marchRegistry:[],
+  calculator:{ impactTimeRaw:'', impactSecs:null, rallyDuration:3, leaders:[], messageTemplate:DEFAULT_MSG },
 };
 
 // ── Smart inputs ───────────────────────────────────────────────
-function MarchInput({ value, onChange, placeholder='e.g. 412' }) {
+function MarchInput({ value, onChange, placeholder='e.g. 118 = 1m 18s  or  1:18' }) {
   const [raw,setRaw]=useState('');
   const [prev,setPrev]=useState(null);
   const [err,setErr]=useState(null);
@@ -162,9 +111,9 @@ function MarchInput({ value, onChange, placeholder='e.g. 412' }) {
     setRaw(input);
     if (!input){ setPrev(null);setErr(null);onChange(null);return; }
     const v=validateMarchInput(input);
-    if(v.error)      {setErr(v.error);setPrev(null);onChange(null);}
-    else if(v.valid) {setErr(null);setPrev(fmtMarch(v.totalSecs));onChange(v.totalSecs);}
-    else             {setErr(null);setPrev(null);onChange(null);}
+    if(v.error)      { setErr(v.error);setPrev(null);onChange(null); }
+    else if(v.valid) { setErr(null);setPrev(fmtMarch(v.totalSecs));onChange(v.totalSecs); }
+    else             { setErr(null);setPrev(null);onChange(null); }
   }
   return (
     <div>
@@ -183,10 +132,10 @@ function ImpactInput({ value, onChange, large=false }) {
   const [past,setPast]=useState(false);
   function handle(input) {
     setRaw(input);
-    if(!input){setDisp(null);setErr(null);setPast(false);onChange(null,null);return;}
+    if(!input){ setDisp(null);setErr(null);setPast(false);onChange(null,null);return; }
     const v=validateImpactInput(input);
-    if(v.error)     {setErr(v.error);setDisp(null);setPast(false);onChange(null,null);}
-    else if(v.valid){setErr(null);setDisp(v.display);setPast(v.totalSecs<utcNowSecs());onChange(v.display,v.totalSecs);}
+    if(v.error)      { setErr(v.error);setDisp(null);setPast(false);onChange(null,null); }
+    else if(v.valid) { setErr(null);setDisp(v.display);setPast(v.totalSecs<utcNowSecs());onChange(v.display,v.totalSecs); }
   }
   return (
     <div>
@@ -224,29 +173,19 @@ function TimerCard({ timer, onEdit, onDelete, onLeaderMode, onUpdateJoiner }) {
 
   const parsed     = parseImpactInput(timer.impactTime);
   const impactSecs = parsed?.totalSecs??null;
-  const marchSecs  = calcSendSecs(impactSecs,timer.marchSecs,0);        // when rally auto-marches
-  const openSecs   = timer.rallyDuration
-    ? calcRallyOpenSecs(impactSecs,timer.marchSecs,timer.rallyDuration)  // when leader must open
-    : null;
-
+  const marchSecs  = calcSendSecs(impactSecs,timer.marchSecs,0);
+  const openSecs   = timer.rallyDuration ? calcRallyOpenSecs(impactSecs,timer.marchSecs,timer.rallyDuration) : null;
   const secsToOpen   = openSecs   != null ? openSecs   - now : null;
   const secsToImpact = impactSecs != null ? impactSecs - now : null;
-
   const stage      = getTimerStage(secsToOpen, secsToImpact);
-  const color      = timer.timerColor || RALLY_COLORS[timer.type] || C.gold;
-  const emoji      = timer.timerEmoji || TYPE_EMOJIS[timer.type] || '⚔️';
-  const num        = timer.timerNumber || '?';
+  const color      = RALLY_COLORS[timer.type] || C.gold;
   const cardBg     = stage?.bg ?? C.card;
 
-  // Progress bar: fills over last 5 min before open (or impact if no rally duration)
   const progressTarget = openSecs ?? impactSecs;
   const secsToTarget   = progressTarget != null ? progressTarget - now : null;
   const WINDOW   = 300;
   const progress = secsToTarget != null ? Math.max(0,Math.min(100,((WINDOW-Math.max(0,secsToTarget))/WINDOW)*100)) : 0;
 
-  // What to count down to — changes per phase
-  // Phase 1–3: count to rally open time
-  // Phase 4+: count to impact
   const isRallyOpen  = stage?.stage === 'filling' || stage?.stage === 'impact';
   const bigCountdown = isRallyOpen ? secsToImpact : (secsToOpen ?? secsToImpact);
   const bigLabel     = isRallyOpen
@@ -255,28 +194,20 @@ function TimerCard({ timer, onEdit, onDelete, onLeaderMode, onUpdateJoiner }) {
 
   return (
     <div style={{ background:cardBg, borderRadius:14, overflow:'hidden', marginBottom:12,
-      border:`2px solid ${color}`, boxShadow:`0 0 0 1px ${color}22`,
+      border:`1px solid ${stage?stage.color+'66':C.border}`,
+      boxShadow:stage&&stage.stage!=='standby'?`0 0 12px ${stage.color}22`:'none',
       transition:'background 600ms ease, border-color 600ms ease' }}>
-      {/* Progress bar */}
       <div style={{ height:3, background:C.border }}>
-        <div style={{ height:'100%', width:`${progress}%`, background:stage?stage.color:color, transition:'width 250ms linear, background 600ms ease' }}/>
+        <div style={{ height:'100%', width:`${progress}%`, background:stage?stage.color:color, transition:'width 250ms linear' }}/>
       </div>
-
       <div style={{ padding:'12px 14px' }}>
-        {/* Header — number, emoji, leader name, type */}
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            {/* Number + emoji badge */}
-            <div style={{ width:40, height:40, borderRadius:10, background:color+'22', border:`1.5px solid ${color}`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-              <div style={{ fontSize:16, lineHeight:1 }}>{emoji}</div>
-              <div style={{ fontSize:10, fontWeight:800, color, lineHeight:1 }}>{num}</div>
-            </div>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ width:10, height:10, borderRadius:'50%', background:color, flexShrink:0 }}/>
             <div>
-              <div style={{ fontSize:15, fontWeight:800, color:C.white }}>{timer.name || timer.type}</div>
+              <div style={{ fontSize:15, fontWeight:700, color:C.white }}>{timer.name||timer.type}</div>
               <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>
-                {timer.type}
-                {timer.rallyDuration && <span> · {timer.rallyDuration}min</span>}
-                {timer.ratio && <span> · {timer.ratio}</span>}
+                {timer.type}{timer.rallyDuration&&<span> · {timer.rallyDuration}min</span>}{timer.ratio&&<span> · {timer.ratio}</span>}
               </div>
             </div>
           </div>
@@ -287,7 +218,6 @@ function TimerCard({ timer, onEdit, onDelete, onLeaderMode, onUpdateJoiner }) {
           </div>
         </div>
 
-        {/* Stage message */}
         {stage&&(
           <div style={{ background:stage.color+'22', border:`1px solid ${stage.color}55`, borderRadius:8, padding:'7px 14px', marginBottom:8, textAlign:'center' }}>
             <div style={{ fontSize:stage.stage==='open_now'?18:14, fontWeight:800, color:stage.color, letterSpacing:stage.stage==='open_now'?'0.04em':0 }}>
@@ -296,7 +226,6 @@ function TimerCard({ timer, onEdit, onDelete, onLeaderMode, onUpdateJoiner }) {
           </div>
         )}
 
-        {/* Big countdown */}
         <div style={{ textAlign:'center', marginBottom:10 }}>
           <div style={{ fontSize:10, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>{bigLabel}</div>
           <div style={{ fontSize:48, fontWeight:900, color:stage?stage.color:C.white, fontVariantNumeric:'tabular-nums', lineHeight:1, letterSpacing:'0.02em' }}>
@@ -304,8 +233,7 @@ function TimerCard({ timer, onEdit, onDelete, onLeaderMode, onUpdateJoiner }) {
           </div>
         </div>
 
-        {/* Time grid — open / marches / impact */}
-        <div style={{ display:'grid', gridTemplateColumns:openSecs!=null?'1fr 1fr 1fr':'1fr 1fr', gap:6, marginBottom:timer.joiners?.length>0?10:0 }}>
+        <div style={{ display:'grid', gridTemplateColumns:openSecs!=null?'1fr 1fr 1fr':'1fr 1fr', gap:6, marginBottom:timer.joiners?.filter(j=>j.playerName).length>0?10:0 }}>
           {openSecs!=null&&(
             <div style={{ background:C.section, borderRadius:8, padding:'7px 10px', textAlign:'center' }}>
               <div style={{ fontSize:9, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>Open rally</div>
@@ -326,11 +254,10 @@ function TimerCard({ timer, onEdit, onDelete, onLeaderMode, onUpdateJoiner }) {
           </div>
         </div>
 
-        {/* Joiners — screen share view */}
         {timer.joiners?.filter(j=>j.playerName).length>0&&(
-          <div style={{ background:C.section, borderRadius:10, padding:'10px 12px', marginTop:8 }}>
+          <div style={{ background:C.section, borderRadius:10, padding:'10px 12px', marginTop:4 }}>
             <div style={{ fontSize:10, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
-              Priority joiners · {timer.ratio||''}
+              Priority joiners{timer.ratio?` · ${timer.ratio}`:''}
             </div>
             {timer.joiners.filter(j=>j.playerName).map((j,i)=>(
               <div key={j.id||i} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderBottom:i<timer.joiners.filter(x=>x.playerName).length-1?`1px solid ${C.border}22`:'none' }}>
@@ -341,9 +268,7 @@ function TimerCard({ timer, onEdit, onDelete, onLeaderMode, onUpdateJoiner }) {
                   </span>
                   {j.confirmed===false&&j.replacedBy&&<span style={{ fontSize:11, color:C.green }}> ← sub</span>}
                 </div>
-                {(j.replacedBy?.heroName||j.heroName)&&(
-                  <span style={{ fontSize:12, color:C.gold, fontWeight:600, flexShrink:0 }}>→ {j.replacedBy?.heroName||j.heroName}</span>
-                )}
+                {(j.replacedBy?.heroName||j.heroName)&&<span style={{ fontSize:12, color:C.gold, fontWeight:600, flexShrink:0 }}>→ {j.replacedBy?.heroName||j.heroName}</span>}
                 {onUpdateJoiner&&(
                   <button onClick={()=>onUpdateJoiner(timer.id,i,{confirmed:j.confirmed===false?true:false})}
                     style={{ fontSize:10, height:22, padding:'0 6px', borderRadius:6, border:`1px solid ${j.confirmed===false?C.green+'44':C.red+'44'}`, background:'none', color:j.confirmed===false?C.green:C.red, cursor:'pointer', flexShrink:0 }}>
@@ -365,19 +290,19 @@ function TimerCard({ timer, onEdit, onDelete, onLeaderMode, onUpdateJoiner }) {
 function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
   const [t,setT]=useState(()=>timer||newTimerObj());
   useEffect(()=>{
-    if(open){const base=timer?{...timer}:newTimerObj();if(!timer&&prefillImpact)base.impactTime=prefillImpact;setT(base);}
+    if(open){ const base=timer?{...timer}:newTimerObj(); if(!timer&&prefillImpact) base.impactTime=prefillImpact; setT(base); }
   },[open,timer?.id,prefillImpact]);
   useEffect(()=>{
-    if(!open)return;
-    function h(e){if(e.key==='Escape')onClose();}
-    document.addEventListener('keydown',h);return()=>document.removeEventListener('keydown',h);
+    if(!open) return;
+    function h(e){ if(e.key==='Escape') onClose(); }
+    document.addEventListener('keydown',h); return()=>document.removeEventListener('keydown',h);
   },[open,onClose]);
-  function upd(k,v){setT(prev=>({...prev,[k]:v}));}
-  const parsed=parseImpactInput(t.impactTime);
-  const impactSecs=parsed?.totalSecs??null;
-  const marchSecs=calcSendSecs(impactSecs,t.marchSecs,0);
-  const openSecs=t.rallyDuration?calcRallyOpenSecs(impactSecs,t.marchSecs,t.rallyDuration):null;
-  if(!open)return null;
+  function upd(k,v){ setT(prev=>({...prev,[k]:v})); }
+  const parsed   = parseImpactInput(t.impactTime);
+  const impactS  = parsed?.totalSecs??null;
+  const marchS   = calcSendSecs(impactS,t.marchSecs,0);
+  const openS    = t.rallyDuration ? calcRallyOpenSecs(impactS,t.marchSecs,t.rallyDuration) : null;
+  if(!open) return null;
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'#000c', zIndex:400, display:'flex', alignItems:'flex-end' }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', maxHeight:'90vh', overflowY:'auto', padding:'16px 20px 80px' }}>
@@ -394,9 +319,9 @@ function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
         <div style={{ marginBottom:14 }}>
           <label style={{ display:'block', fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Type</label>
           <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-            {RALLY_TYPES.map(type=>{const sel=t.type===type;const col=RALLY_COLORS[type];return(
+            {RALLY_TYPES.map(type=>{ const sel=t.type===type; const col=RALLY_COLORS[type]; return(
               <button key={type} onClick={()=>upd('type',type)} style={{ padding:'8px 14px', borderRadius:20, minHeight:36, border:`1px solid ${sel?col:C.border}`, background:sel?col+'22':C.section, color:sel?col:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>{type}</button>
-            );})}
+            );  })}
           </div>
         </div>
         <div style={{ marginBottom:14 }}>
@@ -404,8 +329,8 @@ function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
           <ImpactInput value={t.impactTime} onChange={(disp,secs)=>upd('impactTime',disp||'')} large/>
         </div>
         <div style={{ marginBottom:14 }}>
-          <label style={{ display:'block', fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>March time</label>
-          <MarchInput value={t.marchSecs} onChange={v=>upd('marchSecs',v)}/>
+          <label style={{ display:'block', fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>March time (minutes and seconds)</label>
+          <MarchInput value={t.marchSecs} onChange={v=>upd('marchSecs',v)} placeholder="e.g. 118 = 1m 18s  or  1:18"/>
         </div>
         <div style={{ marginBottom:14 }}>
           <label style={{ display:'block', fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Rally duration</label>
@@ -416,19 +341,19 @@ function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
             ))}
           </div>
         </div>
-        {openSecs!=null&&(
+        {openS!=null&&(
           <div style={{ background:C.section, borderRadius:10, padding:'12px 16px', marginBottom:14 }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, textAlign:'center' }}>
-              {[['Open rally at',fmtSend(openSecs),C.gold],['March at',fmtSend(marchSecs),C.icy],['Impact',t.impactTime,C.gold]].map(([l,v,c])=>(
+              {[['Open rally at',fmtSend(openS),C.gold],['Marches at',fmtSend(marchS),C.icy],['Impact',t.impactTime,C.gold]].map(([l,v,c])=>(
                 <div key={l}><div style={{ fontSize:10, color:C.muted, marginBottom:2 }}>{l}</div><div style={{ fontSize:14, fontWeight:700, color:c }}>{v} UTC</div></div>
               ))}
             </div>
           </div>
         )}
-        {!openSecs&&marchSecs!=null&&(
+        {!openS&&marchS!=null&&(
           <div style={{ background:C.section, borderRadius:10, padding:'12px 16px', marginBottom:14 }}>
-            <div style={{ fontSize:12, color:C.muted, marginBottom:4 }}>Send at</div>
-            <div style={{ fontSize:22, fontWeight:700, color:C.green }}>{fmtSend(marchSecs)} UTC</div>
+            <div style={{ fontSize:12, color:C.muted, marginBottom:4 }}>Marches at</div>
+            <div style={{ fontSize:22, fontWeight:700, color:C.green }}>{fmtSend(marchS)} UTC</div>
           </div>
         )}
         <div style={{ marginBottom:14 }}>
@@ -447,103 +372,110 @@ function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
 
 function newTimerObj(){ return {id:uid(),name:'',type:'Main Rally',impactTime:'',marchSecs:null,rallyDuration:3,ratio:'',notes:'',joiners:[]}; }
 
-// ── Leader Mode ────────────────────────────────────────────────
+// ── Leader Mode (Full screen) ──────────────────────────────────
 export function LeaderMode({ timer, allTimers=[], onClose }) {
   const [now,setNow]=useState(utcNowSecs());
   const lastStageRef=useRef(null);
   useEffect(()=>{const id=setInterval(()=>setNow(utcNowSecs()),250);return()=>clearInterval(id);},[]);
   useEffect(()=>{
-    function h(e){if(e.key==='Escape')onClose();}
-    document.addEventListener('keydown',h);return()=>document.removeEventListener('keydown',h);
+    function h(e){ if(e.key==='Escape') onClose(); }
+    document.addEventListener('keydown',h); return()=>document.removeEventListener('keydown',h);
   },[onClose]);
 
-  const parsed=parseImpactInput(timer.impactTime);
-  const impactSecs=parsed?.totalSecs??null;
-  const marchSecs=calcSendSecs(impactSecs,timer.marchSecs,0);
-  const openSecs=timer.rallyDuration?calcRallyOpenSecs(impactSecs,timer.marchSecs,timer.rallyDuration):null;
-  const secsToOpen=openSecs!=null?openSecs-now:null;
-  const secsToImpact=impactSecs!=null?impactSecs-now:null;
-  const stage=getTimerStage(secsToOpen,secsToImpact);
-  const color=RALLY_COLORS[timer.type]||C.gold;
-  const isRallyOpen=stage?.stage==='filling'||stage?.stage==='impact';
-  const bigCountdown=isRallyOpen?secsToImpact:(secsToOpen??secsToImpact);
-  const bigLabel=isRallyOpen?(stage?.stage==='impact'?'✓ Impact':'Impact in'):(openSecs!=null?'Open rally in':'Countdown');
+  const parsed     = parseImpactInput(timer.impactTime);
+  const impactSecs = parsed?.totalSecs??null;
+  const marchSecs  = calcSendSecs(impactSecs,timer.marchSecs,0);
+  const openSecs   = timer.rallyDuration ? calcRallyOpenSecs(impactSecs,timer.marchSecs,timer.rallyDuration) : null;
+  const secsToOpen   = openSecs   != null ? openSecs   - now : null;
+  const secsToImpact = impactSecs != null ? impactSecs - now : null;
+  const stage      = getTimerStage(secsToOpen, secsToImpact);
+  const color      = RALLY_COLORS[timer.type] || C.gold;
+  const isRallyOpen  = stage?.stage === 'filling' || stage?.stage === 'impact';
+  const bigCountdown = isRallyOpen ? secsToImpact : (secsToOpen ?? secsToImpact);
+  const bigLabel     = isRallyOpen
+    ? (stage?.stage === 'impact' ? '✓ Impact' : 'Impact in')
+    : (openSecs != null ? 'Open rally in' : 'Countdown');
 
   useEffect(()=>{
-    if(!stage)return;
+    if(!stage) return;
     if(stage.stage!==lastStageRef.current){
       lastStageRef.current=stage.stage;
-      if(stage.stage==='open_now') vibe([100,50,100,50,200]);
+      if(stage.stage==='open_now')  vibe([100,50,100,50,200]);
       else if(stage.stage==='prepare') vibe([50,30,50]);
       else if(stage.stage==='filling') vibe([30,20,30]);
       else vibe(20);
     }
   },[stage?.stage]);
 
-  const timerColor = timer.timerColor || RALLY_COLORS[timer.type] || C.gold;
-  const timerEmoji = timer.timerEmoji || TYPE_EMOJIS[timer.type] || '⚔️';
-
   return (
     <div style={{ position:'fixed', inset:0, background:'#050D1A', zIndex:900, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24, overflow:'auto' }}>
       <button onClick={onClose} style={{ position:'absolute', top:20, right:20, background:'none', border:'none', color:C.muted, fontSize:28, cursor:'pointer' }}>✕</button>
 
-      {/* Other timers strip */}
+      {/* Other active timers strip */}
       {allTimers.filter(t=>t.id!==timer.id).length>0&&(
         <div style={{ position:'absolute', top:16, left:16, right:60, display:'flex', gap:8, overflowX:'auto' }}>
           {allTimers.filter(t=>t.id!==timer.id).map(t=>{
-            const tParsed=parseImpactInput(t.impactTime);
-            const tImpact=tParsed?.totalSecs??null;
-            const tOpen=t.rallyDuration?calcRallyOpenSecs(tImpact,t.marchSecs,t.rallyDuration):null;
-            const tNow=utcNowSecs();
-            const tSecsToOpen=tOpen!=null?tOpen-tNow:null;
-            const tSecsToImpact=tImpact!=null?tImpact-tNow:null;
-            const tStage=getTimerStage(tSecsToOpen,tSecsToImpact);
-            const tColor=t.timerColor||RALLY_COLORS[t.type]||C.gold;
-            const tEmoji=t.timerEmoji||TYPE_EMOJIS[t.type]||'⚔️';
-            const tCountdown=tStage?.stage==='filling'||tStage?.stage==='impact'?tSecsToImpact:(tSecsToOpen??tSecsToImpact);
+            const tColor   = RALLY_COLORS[t.type]||C.gold;
+            const tParsed  = parseImpactInput(t.impactTime);
+            const tImpact  = tParsed?.totalSecs??null;
+            const tOpen    = t.rallyDuration ? calcRallyOpenSecs(tImpact,t.marchSecs,t.rallyDuration) : null;
+            const tNow     = utcNowSecs();
+            const tStage   = getTimerStage(tOpen!=null?tOpen-tNow:null, tImpact!=null?tImpact-tNow:null);
+            const tIsOpen  = tStage?.stage==='filling'||tStage?.stage==='impact';
+            const tCountdown = tIsOpen ? (tImpact!=null?tImpact-tNow:null) : (tOpen!=null?tOpen-tNow:(tImpact!=null?tImpact-tNow:null));
             return (
-              <div key={t.id} style={{ background:tColor+'22', border:`1.5px solid ${tColor}`, borderRadius:10, padding:'6px 10px', flexShrink:0, textAlign:'center' }}>
-                <div style={{ fontSize:14 }}>{tEmoji}</div>
-                <div style={{ fontSize:11, fontWeight:700, color:tColor }}>{t.timerNumber||'?'}</div>
-                <div style={{ fontSize:11, color:tStage?tStage.color:C.white, fontVariantNumeric:'tabular-nums', fontWeight:600 }}>
+              <div key={t.id} style={{ background:tColor+'22', border:`1.5px solid ${tColor}`, borderRadius:10, padding:'6px 10px', flexShrink:0, textAlign:'center', minWidth:72 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:tColor, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:80 }}>{t.name||t.type}</div>
+                <div style={{ fontSize:12, color:tStage?tStage.color:C.white, fontVariantNumeric:'tabular-nums', fontWeight:600 }}>
                   {tCountdown!=null?secsToHHMMSS(tCountdown):'--:--'}
                 </div>
-                {tStage&&<div style={{ fontSize:9, color:tStage.color, marginTop:1 }}>{tStage.label.replace('⚠ ','')}</div>}
+                {tStage&&<div style={{ fontSize:9, color:tStage.color, marginTop:1 }}>{tStage.label.replace('⚠ ','').replace('✓ ','')}</div>}
               </div>
             );
           })}
         </div>
       )}
 
-      <div style={{ fontSize:14, fontWeight:700, color:timerColor, textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:6 }}>
-        {timerEmoji} {timer.timerNumber} · {timer.name||timer.type}
-      </div>
+      <div style={{ fontSize:14, fontWeight:700, color, textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:6 }}>{timer.name||timer.type}</div>
       {timer.ratio&&<div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>Ratio: {timer.ratio}</div>}
-
       {stage&&<div style={{ fontSize:stage.stage==='open_now'?26:18, fontWeight:800, color:stage.color, marginBottom:16, textAlign:'center' }}>{stage.label}</div>}
 
       <div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>{bigLabel}</div>
-      <div style={{ fontSize:80, fontWeight:900, color:stage?stage.color:timerColor, fontVariantNumeric:'tabular-nums', letterSpacing:'0.04em', lineHeight:1, marginBottom:20, textAlign:'center' }}>
+      <div style={{ fontSize:80, fontWeight:900, color:stage?stage.color:color, fontVariantNumeric:'tabular-nums', letterSpacing:'0.04em', lineHeight:1, marginBottom:20, textAlign:'center' }}>
         {bigCountdown!=null?secsToHHMMSS(bigCountdown):'--:--:--'}
       </div>
 
       <div style={{ display:'flex', gap:20, marginBottom:20 }}>
-        {openSecs!=null&&<div style={{ textAlign:'center' }}><div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>Open rally</div><div style={{ fontSize:18, fontWeight:700, color:isRallyOpen?C.green:timerColor }}>{isRallyOpen?'✓ Opened':fmtSend(openSecs)+' UTC'}</div></div>}
-        {marchSecs!=null&&<div style={{ textAlign:'center' }}><div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>Marches at</div><div style={{ fontSize:18, fontWeight:700, color:C.icy }}>{fmtSend(marchSecs)} UTC</div></div>}
-        {timer.impactTime&&<div style={{ textAlign:'center' }}><div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>Impact</div><div style={{ fontSize:18, fontWeight:700, color:stage?.stage==='impact'?C.green:timerColor }}>{stage?.stage==='impact'?'✓ ':''}{timer.impactTime} UTC</div></div>}
+        {openSecs!=null&&(
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>Open rally</div>
+            <div style={{ fontSize:18, fontWeight:700, color:isRallyOpen?C.green:color }}>{isRallyOpen?'✓ Opened':fmtSend(openSecs)+' UTC'}</div>
+          </div>
+        )}
+        {marchSecs!=null&&(
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>Marches at</div>
+            <div style={{ fontSize:18, fontWeight:700, color:C.icy }}>{fmtSend(marchSecs)} UTC</div>
+          </div>
+        )}
+        {timer.impactTime&&(
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>Impact</div>
+            <div style={{ fontSize:18, fontWeight:700, color:stage?.stage==='impact'?C.green:color }}>{stage?.stage==='impact'?'✓ ':''}{timer.impactTime} UTC</div>
+          </div>
+        )}
       </div>
 
-      {/* Joiners — big for screen share */}
       {timer.joiners?.filter(j=>j.playerName).length>0&&(
         <div style={{ background:'#0A1628', borderRadius:12, padding:'12px 20px', marginBottom:16, width:'100%', maxWidth:360 }}>
           <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10, textAlign:'center' }}>Priority Joiners</div>
           {timer.joiners.filter(j=>j.playerName).map((j,i)=>(
             <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'6px 0', borderBottom:i<timer.joiners.filter(x=>x.playerName).length-1?`1px solid ${C.border}22`:'none' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:j.confirmed===false?C.muted:C.white, textDecoration:j.confirmed===false?'line-through':'none', flex:1 }}>
+              <div style={{ fontSize:14, fontWeight:700, color:j.confirmed===false?C.muted:C.white, textDecoration:j.confirmed===false?'line-through':'none', flex:1 }}>
                 {j.replacedBy?j.replacedBy.playerName:j.playerName}
                 {j.confirmed===false&&j.replacedBy&&<span style={{ color:C.green }}> ← {j.replacedBy.playerName}</span>}
               </div>
-              {(j.replacedBy?.heroName||j.heroName)&&<span style={{ fontSize:12, color:C.gold, fontWeight:700 }}>→ {j.replacedBy?.heroName||j.heroName}</span>}
+              {(j.replacedBy?.heroName||j.heroName)&&<span style={{ fontSize:13, color:C.gold, fontWeight:700 }}>→ {j.replacedBy?.heroName||j.heroName}</span>}
             </div>
           ))}
         </div>
@@ -564,12 +496,10 @@ function Calculator({ calc, onChange, registry, onStartTimers }) {
   useEffect(()=>{const id=setInterval(()=>setNow(utcNowSecs()),1000);return()=>clearInterval(id);},[]);
 
   const impactSecs=calc.impactSecs;
-
   function setImpact(disp,secs){ onChange({...calc,impactTimeRaw:disp||'',impactSecs:secs}); }
   function setRallyDuration(d){ onChange({...calc,rallyDuration:d,leaders:calc.leaders.map(l=>({...l,rallyDuration:d}))}); }
-
   function addFromRegistry(entry) {
-    if(calc.leaders.some(l=>l.registryId===entry.id))return;
+    if(calc.leaders.some(l=>l.registryId===entry.id)) return;
     onChange({...calc,leaders:[...calc.leaders,{id:uid(),registryId:entry.id,name:entry.name,type:entry.type||'Main Rally',marchSecs:entry.marchSecs,rallyDuration:calc.rallyDuration||3,offset:0,notes:''}]});
     vibe(8);
   }
@@ -577,17 +507,15 @@ function Calculator({ calc, onChange, registry, onStartTimers }) {
   function updRow(id,patch){ onChange({...calc,leaders:calc.leaders.map(l=>l.id===id?{...l,...patch}:l)}); }
 
   function copyMsg(leader) {
-    const impS=calc.impactSecs;
-    const openS=leader.marchSecs&&impS?calcRallyOpenSecs(impS,leader.marchSecs,leader.rallyDuration||3):null;
-    const sendS=calcSendSecs(impS,leader.marchSecs,leader.offset||0);
-
-    // Build joiners list from calculator leader's joiner assignments
-    const joinersText=(leader.joiners||[])
+    const impS  = calc.impactSecs;
+    const openS = leader.marchSecs&&impS ? calcRallyOpenSecs(impS,leader.marchSecs,leader.rallyDuration||3) : null;
+    const sendS = calcSendSecs(impS,leader.marchSecs,leader.offset||0);
+    const joinersText = (leader.joiners||[])
       .filter(j=>j.playerName)
       .map((j,i)=>`${i+1}. ${j.replacedBy?j.replacedBy.playerName:j.playerName} → ${j.replacedBy?.heroName||j.heroName||'TBD'}`)
       .join('\n') || 'Not yet assigned';
-
-    const text=(calc.messageTemplate||DEFAULT_MSG)
+    const template = leader.useCustomMsg&&leader.customMsg ? leader.customMsg : (calc.messageTemplate||DEFAULT_MSG);
+    const text = template
       .replace('{type}',   leader.type||'Rally')
       .replace('{name}',   leader.name||'')
       .replace('{impact}', calc.impactTimeRaw||'--:--')
@@ -595,23 +523,23 @@ function Calculator({ calc, onChange, registry, onStartTimers }) {
       .replace('{send}',   sendS!=null?fmtSend(sendS):'--:--')
       .replace('{joiners}',joinersText)
       .replace('{ratio}',  leader.ratio||'');
-    navigator.clipboard.writeText(text).then(()=>{setCopied(leader.id);setTimeout(()=>setCopied(null),2000);});
+    navigator.clipboard.writeText(text).then(()=>{ setCopied(leader.id); setTimeout(()=>setCopied(null),2000); });
     vibe(8);
   }
 
   function handleStartTimers() {
-    const ready=calc.leaders.filter(l=>l.marchSecs&&calc.impactSecs);
-    if(!ready.length)return;
-    const newTimers=ready.map(l=>({
-      id:uid(),name:l.name||l.type,type:l.type||'Main Rally',
-      impactTime:calc.impactTimeRaw,marchSecs:l.marchSecs,
+    const ready = calc.leaders.filter(l=>l.marchSecs&&calc.impactSecs);
+    if(!ready.length) return;
+    const newTimers = ready.map(l=>({
+      id:uid(), name:l.name||l.type, type:l.type||'Main Rally',
+      impactTime:calc.impactTimeRaw, marchSecs:l.marchSecs,
       rallyDuration:l.rallyDuration||calc.rallyDuration||3,
-      ratio:'',notes:l.notes||'',joiners:[],
+      ratio:'', notes:l.notes||'', joiners:[],
     }));
     onStartTimers(newTimers);
   }
 
-  const readyCount=calc.leaders.filter(l=>l.marchSecs&&impactSecs).length;
+  const readyCount = calc.leaders.filter(l=>l.marchSecs&&impactSecs).length;
 
   return (
     <div>
@@ -623,7 +551,6 @@ function Calculator({ calc, onChange, registry, onStartTimers }) {
         <ImpactInput value={calc.impactTimeRaw} onChange={setImpact} large/>
       </div>
 
-      {/* Rally duration — apply to all */}
       <div style={{ marginBottom:14 }}>
         <label style={{ display:'block', fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Rally duration <span style={{ fontWeight:400, color:C.muted }}>(apply to all)</span></label>
         <div style={{ display:'flex', gap:8 }}>
@@ -636,7 +563,6 @@ function Calculator({ calc, onChange, registry, onStartTimers }) {
         </div>
       </div>
 
-      {/* Registry chips */}
       {registry.filter(r=>r.marchSecs).length>0&&(
         <div style={{ marginBottom:14 }}>
           <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Saved leaders — tap to add</div>
@@ -654,7 +580,6 @@ function Calculator({ calc, onChange, registry, onStartTimers }) {
         </div>
       )}
 
-      {/* Compact table */}
       {calc.leaders.length>0&&(
         <div style={{ background:C.section, borderRadius:12, overflow:'hidden', marginBottom:14 }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 58px 80px 38px 44px', padding:'8px 14px', borderBottom:`1px solid ${C.border}` }}>
@@ -663,16 +588,16 @@ function Calculator({ calc, onChange, registry, onStartTimers }) {
             ))}
           </div>
           {calc.leaders.map((leader,i)=>{
-            const openS=leader.marchSecs&&impactSecs?calcRallyOpenSecs(impactSecs,leader.marchSecs,leader.rallyDuration||3):null;
-            const sendS=impactSecs&&leader.marchSecs?calcSendSecs(impactSecs,leader.marchSecs,leader.offset||0):null;
-            const isEditing=editingRow===i;
-            const color=RALLY_COLORS[leader.type]||C.gold;
+            const openS = leader.marchSecs&&impactSecs ? calcRallyOpenSecs(impactSecs,leader.marchSecs,leader.rallyDuration||3) : null;
+            const sendS = impactSecs&&leader.marchSecs ? calcSendSecs(impactSecs,leader.marchSecs,leader.offset||0) : null;
+            const isEditing = editingRow===i;
+            const lcolor = RALLY_COLORS[leader.type]||C.gold;
             return (
               <div key={leader.id} style={{ borderBottom:i<calc.leaders.length-1?`1px solid ${C.border}22`:'none' }}>
                 <div onClick={()=>setEditingRow(isEditing?null:i)} style={{ display:'grid', gridTemplateColumns:'1fr 58px 80px 38px 44px', padding:'10px 14px', cursor:'pointer', background:isEditing?C.card:'none', alignItems:'center' }}>
                   <div>
                     <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                      <div style={{ width:7, height:7, borderRadius:'50%', background:color, flexShrink:0 }}/>
+                      <div style={{ width:7, height:7, borderRadius:'50%', background:lcolor, flexShrink:0 }}/>
                       <div style={{ fontSize:14, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{leader.name||'—'}</div>
                     </div>
                     <div style={{ fontSize:10, color:C.muted, marginTop:1 }}>{leader.type} · {leader.rallyDuration||calc.rallyDuration||3}min</div>
@@ -718,18 +643,31 @@ function Calculator({ calc, onChange, registry, onStartTimers }) {
                       </div>
                     </div>
                     <div style={{ display:'flex', gap:6, marginBottom:8, overflowX:'auto', paddingBottom:2 }}>
-                      {RALLY_TYPES.slice(0,5).map(type=>{const sel=leader.type===type;const c=RALLY_COLORS[type];return(
+                      {RALLY_TYPES.slice(0,5).map(type=>{ const sel=leader.type===type; const c=RALLY_COLORS[type]; return(
                         <button key={type} onClick={()=>updRow(leader.id,{type})} style={{ padding:'5px 10px', borderRadius:12, whiteSpace:'nowrap', border:`1px solid ${sel?c:C.border}`, background:sel?c+'22':C.section, color:sel?c:C.muted, fontWeight:600, fontSize:11, cursor:'pointer', flexShrink:0 }}>{type}</button>
-                      );})}
+                      ); })}
                     </div>
                     <input value={leader.notes||''} onChange={e=>updRow(leader.id,{notes:e.target.value})} placeholder="Notes…"
                       style={{ width:'100%', background:C.section, border:`1px solid ${C.border}`, borderRadius:7, padding:'7px 10px', fontSize:12, color:C.icy, boxSizing:'border-box', fontFamily:'inherit' }}/>
+                    <div style={{ marginTop:8 }}>
+                      <button onClick={()=>updRow(leader.id,{useCustomMsg:!leader.useCustomMsg})} style={{ background:'none', border:'none', color:C.gold, fontSize:12, cursor:'pointer', padding:'2px 0' }}>
+                        {leader.useCustomMsg?'▾':'▸'} Custom message for this leader
+                      </button>
+                      {leader.useCustomMsg&&(
+                        <div style={{ marginTop:6 }}>
+                          <div style={{ fontSize:10, color:C.muted, marginBottom:4 }}>Variables: {'{type}'} {'{name}'} {'{impact}'} {'{open}'} {'{joiners}'} {'{ratio}'}</div>
+                          <textarea value={leader.customMsg||calc.messageTemplate||DEFAULT_MSG} onChange={e=>updRow(leader.id,{customMsg:e.target.value})}
+                            style={{ width:'100%', minHeight:100, background:C.card, border:`1px solid ${C.border}`, borderRadius:7, padding:'8px 10px', fontSize:12, color:C.white, resize:'vertical', boxSizing:'border-box', fontFamily:'monospace' }}/>
+                          <button onClick={()=>updRow(leader.id,{customMsg:calc.messageTemplate||DEFAULT_MSG})} style={{ fontSize:11, color:C.muted, background:'none', border:'none', cursor:'pointer', padding:'2px 0' }}>Reset to alliance default</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             );
           })}
-          <button onClick={()=>{onChange({...calc,leaders:[...calc.leaders,{id:uid(),name:'',type:'Main Rally',marchSecs:null,rallyDuration:calc.rallyDuration||3,offset:0,notes:''}]});setEditingRow(calc.leaders.length);}}
+          <button onClick={()=>{ onChange({...calc,leaders:[...calc.leaders,{id:uid(),name:'',type:'Main Rally',marchSecs:null,rallyDuration:calc.rallyDuration||3,offset:0,notes:''}]}); setEditingRow(calc.leaders.length); }}
             style={{ width:'100%', height:40, background:'none', border:'none', borderTop:`1px solid ${C.border}22`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
             ＋ Add manually
           </button>
@@ -742,8 +680,13 @@ function Calculator({ calc, onChange, registry, onStartTimers }) {
 
       {readyCount>0&&(
         <button onClick={handleStartTimers} style={{ width:'100%', height:56, borderRadius:12, background:C.red, color:'#fff', fontWeight:800, fontSize:17, border:'none', cursor:'pointer', marginBottom:12, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-          🔴 Start {readyCount} Timer{readyCount!==1?'s':''} → Live Room
+          🔴 Start {readyCount} Timer{readyCount!==1?'s':''} → Live Timers
         </button>
+      )}
+      {calc.leaders.length>0&&readyCount===0&&(
+        <div style={{ background:C.section, borderRadius:10, padding:'12px 16px', marginBottom:12, textAlign:'center' }}>
+          <div style={{ fontSize:13, color:C.muted }}>Each leader needs to enter their march time before timers can start.</div>
+        </div>
       )}
 
       <button onClick={()=>setShowTemplate(!showTemplate)} style={{ background:'none', border:'none', color:C.gold, fontSize:13, cursor:'pointer', padding:'4px 0', marginBottom:8 }}>
@@ -768,7 +711,7 @@ function MarchRegistry({ registry, onChange, players=[] }) {
   const rallyLeads=(players||[]).filter(p=>p.roles?.includes('Rally Lead'));
 
   function addFromRoster(player) {
-    if(registry.some(r=>r.name===player.username))return;
+    if(registry.some(r=>r.name===player.username)) return;
     onChange([...registry,{id:uid(),name:player.username,marchSecs:player.marchSecs||null,type:'Main Rally'}]);
     vibe(8);
   }
@@ -801,15 +744,14 @@ function MarchRegistry({ registry, onChange, players=[] }) {
             <div style={{ fontSize:15, fontWeight:700, color:C.white }}>{entry.name}</div>
             <div style={{ fontSize:13, color:entry.marchSecs?C.green:C.muted }}>{entry.marchSecs?fmtMarch(entry.marchSecs):'No march time set'}</div>
           </div>
-          <button onClick={()=>{setEditingEntry(entry);setEditOpen(true);}}
+          <button onClick={()=>{ setEditingEntry(entry); setEditOpen(true); }}
             style={{ height:36, padding:'0 14px', borderRadius:18, background:C.card, border:`1px solid ${C.border}`, color:C.icy, fontSize:13, cursor:'pointer' }}>✏️ Edit</button>
         </div>
       ))}
-      <button onClick={()=>{setEditingEntry(null);setEditOpen(true);}}
+      <button onClick={()=>{ setEditingEntry(null); setEditOpen(true); }}
         style={{ width:'100%', height:48, borderRadius:10, background:'none', border:`1px dashed ${C.border}`, color:C.muted, fontWeight:600, fontSize:14, cursor:'pointer', marginTop:4 }}>
         ＋ Add new leader
       </button>
-
       {editOpen&&(
         <div onClick={()=>setEditOpen(false)} style={{ position:'fixed', inset:0, background:'#000c', zIndex:500, display:'flex', alignItems:'flex-end' }}>
           <div onClick={e=>e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', padding:'16px 20px 80px' }}>
@@ -818,12 +760,7 @@ function MarchRegistry({ registry, onChange, players=[] }) {
               <div style={{ fontSize:18, fontWeight:700, color:C.white }}>{editingEntry?'Edit leader':'Add leader'}</div>
               <button onClick={()=>setEditOpen(false)} style={{ background:'none', border:'none', color:C.muted, fontSize:28, cursor:'pointer', lineHeight:1 }}>✕</button>
             </div>
-            <LeaderEditForm
-              entry={editingEntry}
-              onSave={e=>{saveEntry(e);setEditOpen(false);}}
-              onDelete={id=>{deleteEntry(id);setEditOpen(false);}}
-              onCancel={()=>setEditOpen(false)}
-            />
+            <LeaderEditForm entry={editingEntry} onSave={e=>{saveEntry(e);setEditOpen(false);}} onDelete={id=>{deleteEntry(id);setEditOpen(false);}} onCancel={()=>setEditOpen(false)}/>
           </div>
         </div>
       )}
@@ -834,7 +771,7 @@ function MarchRegistry({ registry, onChange, players=[] }) {
 function LeaderEditForm({ entry, onSave, onDelete, onCancel }) {
   const [l,setL]=useState(()=>entry||{id:uid(),name:'',marchSecs:null,type:'Main Rally'});
   const [confirmDel,setConfirmDel]=useState(false);
-  useEffect(()=>{if(entry)setL({...entry});else setL({id:uid(),name:'',marchSecs:null,type:'Main Rally'});},[entry?.id]);
+  useEffect(()=>{ if(entry) setL({...entry}); else setL({id:uid(),name:'',marchSecs:null,type:'Main Rally'}); },[entry?.id]);
   return (
     <div>
       <div style={{ marginBottom:14 }}>
@@ -866,9 +803,8 @@ function LeaderEditForm({ entry, onSave, onDelete, onCancel }) {
 
 // ── Archived Section ───────────────────────────────────────────
 function ArchivedSection({ archived, onClear }) {
-  const [open, setOpen]       = useState(false);
-  const [expanded, setExpanded] = useState(null);
-
+  const [open,setOpen]=useState(false);
+  const [expanded,setExpanded]=useState(null);
   return (
     <div style={{ marginTop:16 }}>
       <button onClick={()=>setOpen(!open)} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', background:'none', border:'none', padding:'8px 0', cursor:'pointer' }}>
@@ -879,13 +815,12 @@ function ArchivedSection({ archived, onClear }) {
         <div>
           {archived.slice().reverse().map(t=>{
             const isExp  = expanded===t.id;
-            const emoji  = t.timerEmoji||TYPE_EMOJIS[t.type]||'⚔️';
-            const tcolor = t.timerColor||RALLY_COLORS[t.type]||C.muted;
+            const tcolor = RALLY_COLORS[t.type]||C.muted;
             const aTime  = t.archivedAt ? new Date(t.archivedAt).toUTCString().slice(17,22)+' UTC' : '';
             return (
               <div key={t.id} style={{ background:C.section, borderRadius:10, marginBottom:6, overflow:'hidden', border:`1px solid ${tcolor}33` }}>
                 <div onClick={()=>setExpanded(isExp?null:t.id)} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', cursor:'pointer' }}>
-                  <span style={{ fontSize:16 }}>{emoji}</span>
+                  <div style={{ width:8, height:8, borderRadius:'50%', background:tcolor, flexShrink:0 }}/>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:700, color:C.muted }}>{t.name||t.type}</div>
                     <div style={{ fontSize:11, color:C.muted }}>✓ Impact {t.impactTime||''} UTC{aTime?` · ${aTime}`:''}</div>
@@ -930,8 +865,8 @@ function ArchivedSection({ archived, onClear }) {
 
 // ── LiveRallyRoom ──────────────────────────────────────────────
 export function LiveRallyRoom({ onBack, players=[], planData=null }) {
-  const [state,setState]           = useState(()=>loadState()||DEFAULT_STATE);
-  const [view,setView]             = useState('timers');
+  const [state,setState]         = useState(()=>loadState()||DEFAULT_STATE);
+  const [view,setView]           = useState('registry');
   const [editingTimer,setEditingTimer] = useState(null);
   const [sheetOpen,setSheetOpen]       = useState(false);
   const [prefillImpact,setPrefillImpact] = useState(null);
@@ -941,98 +876,51 @@ export function LiveRallyRoom({ onBack, players=[], planData=null }) {
 
   // Pre-populate calculator from Battle Plan (once only)
   useEffect(()=>{
-    if (!planData || planLoadedRef.current) return;
+    if (!planData||planLoadedRef.current) return;
     planLoadedRef.current=true;
     const slots=(planData.rallySlots||[]).filter(s=>s.leaderName);
     if (!slots.length) return;
-
-    const leaders=slots.map(s=>({
-      id:uid(),
-      name:s.leaderName,
-      type:s.type||'Main Rally',
-      marchSecs:null, // entered on the day
-      rallyDuration:s.rallyDuration||3,
-      offset:0,
-      notes:s.notes||'',
-      // carry joiner assignments through
-      joiners:s.joiners||[],
-      ratio:s.ratio||'',
-    }));
-
-    setState(prev=>({
-      ...prev,
-      calculator:{
-        ...prev.calculator,
-        leaders,
-        rallyDuration:slots[0]?.rallyDuration||3,
-      },
-    }));
+    const leaders=slots.map(s=>({ id:uid(), name:s.leaderName, type:s.type||'Main Rally', marchSecs:null, rallyDuration:s.rallyDuration||3, offset:0, notes:s.notes||'', joiners:s.joiners||[], ratio:s.ratio||'' }));
+    setState(prev=>({ ...prev, calculator:{ ...prev.calculator, leaders, rallyDuration:slots[0]?.rallyDuration||3 } }));
     setView('calc');
     showToast(`${slots.length} rally slots loaded from "${planData.name||'Battle Plan'}"`);
   },[planData]);
 
   useEffect(()=>{ saveState(state); },[state]);
 
-  // Auto-archive timers that have reached ✓ Impact (secsToImpact < -30 to give officers a moment)
+  // Auto-archive 30s after impact — checked every 10s
   useEffect(()=>{
-    const now = utcNowSecs();
-    const toArchive = state.timers.filter(t => {
-      const parsed = parseImpactInput(t.impactTime);
-      if (!parsed) return false;
-      return parsed.totalSecs - now < -30;
-    });
-    if (toArchive.length === 0) return;
-    setState(prev => ({
-      ...prev,
-      timers:   prev.timers.filter(t => !toArchive.find(a => a.id === t.id)),
-      archived: [...prev.archived, ...toArchive.map(t => ({...t, archivedAt: new Date().toISOString()}))],
-    }));
-  });
+    const id=setInterval(()=>{
+      const now=utcNowSecs();
+      setState(prev=>{
+        const toArchive=prev.timers.filter(t=>{ const p=parseImpactInput(t.impactTime); return p&&p.totalSecs-now<-30; });
+        if (toArchive.length===0) return prev;
+        return { ...prev, timers:prev.timers.filter(t=>!toArchive.find(a=>a.id===t.id)), archived:[...prev.archived,...toArchive.map(t=>({...t,archivedAt:new Date().toISOString()}))] };
+      });
+    },10000);
+    return()=>clearInterval(id);
+  },[]);
 
   function showToast(msg){ setToastMsg(msg); setTimeout(()=>setToastMsg(null),3000); }
 
   function saveTimer(t) {
-    setState(prev => ({
-      ...prev,
-      timers: prev.timers.some(x=>x.id===t.id)
-        ? prev.timers.map(x=>x.id===t.id?t:x)
-        : [...prev.timers, {
-            ...t,
-            ...assignTimerIdentity(prev.timers, t.type),
-          }],
-    }));
+    setState(prev=>({ ...prev, timers:prev.timers.some(x=>x.id===t.id)?prev.timers.map(x=>x.id===t.id?t:x):[...prev.timers,t] }));
   }
   function deleteTimer(id){ setState(prev=>({...prev,timers:prev.timers.filter(t=>t.id!==id)})); }
 
-  function updateJoiner(timerId, joinerIdx, patch) {
-    setState(prev=>({
-      ...prev,
-      timers:prev.timers.map(t=>{
-        if(t.id!==timerId)return t;
-        const joiners=[...(t.joiners||[])];
-        joiners[joinerIdx]={...joiners[joinerIdx],...patch};
-        return {...t,joiners};
-      }),
-    }));
+  function updateJoiner(timerId,joinerIdx,patch) {
+    setState(prev=>({ ...prev, timers:prev.timers.map(t=>{ if(t.id!==timerId)return t; const joiners=[...(t.joiners||[])]; joiners[joinerIdx]={...joiners[joinerIdx],...patch}; return {...t,joiners}; }) }));
   }
 
   function handleStartTimers(newTimers) {
     setState(prev=>{
       const slots=5-prev.timers.length;
-      if(slots<=0){showToast('Live Room is full — delete a timer first');return prev;}
+      if(slots<=0){ showToast('Live Room is full — delete a timer first'); return prev; }
       const toAdd=newTimers.slice(0,slots);
       if(toAdd.length<newTimers.length) showToast(`${toAdd.length} of ${newTimers.length} timers created — room full`);
       else showToast(`${toAdd.length} timer${toAdd.length!==1?'s':''} started ✓`);
-
-      // Build enriched timers one at a time, tracking identity as we go
-      const built = [];
-      for (const t of toAdd) {
-        const calcLeader = state.calculator.leaders.find(l=>l.name===t.name);
-        const withJoiners = calcLeader ? {...t, joiners:calcLeader.joiners||[], ratio:calcLeader.ratio||''} : t;
-        const identity = assignTimerIdentity([...prev.timers, ...built], t.type);
-        built.push({ ...withJoiners, ...identity });
-      }
-      return {...prev, timers:[...prev.timers, ...built]};
+      const built=toAdd.map(t=>{ const cl=state.calculator.leaders.find(l=>l.name===t.name); return cl?{...t,joiners:cl.joiners||[],ratio:cl.ratio||''}:t; });
+      return {...prev,timers:[...prev.timers,...built]};
     });
     setView('timers');
     vibe([10,40,10]);
@@ -1046,14 +934,13 @@ export function LiveRallyRoom({ onBack, players=[], planData=null }) {
           {toastMsg}
         </div>
       )}
-
       <div style={{ padding:'16px 20px 0' }}>
         <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', marginBottom:16, padding:0 }}>
           ← Back to Plans
         </button>
         <UTCClock/>
         <div style={{ display:'flex', gap:6, marginBottom:20 }}>
-          {[['timers','⏱ Live Timers'],['calc','🧮 Calculator'],['registry','💾 March Times']].map(([id,label])=>(
+          {[['registry','💾 March Times'],['calc','🧮 Calculator'],['timers','⏱ Live Timers']].map(([id,label])=>(
             <button key={id} onClick={()=>setView(id)}
               style={{ flex:1, height:44, borderRadius:20, whiteSpace:'nowrap', background:view===id?C.gold+'22':C.section, border:`1px solid ${view===id?C.gold:C.border}`, color:view===id?C.gold:C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}>
               {label}
@@ -1063,60 +950,57 @@ export function LiveRallyRoom({ onBack, players=[], planData=null }) {
 
         {view==='timers'&&(
           <div>
-            {state.timers.length<5&&(
-              <button onClick={()=>{setEditingTimer(null);setSheetOpen(true);}}
-                style={{ width:'100%', height:48, borderRadius:12, background:C.section, border:`1px dashed ${C.border}`, color:C.muted, fontWeight:600, fontSize:14, cursor:'pointer', marginBottom:16 }}>
-                ＋ New timer manually
-              </button>
-            )}
+            <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+              {state.timers.length<5&&(
+                <button onClick={()=>{ setEditingTimer(null); setSheetOpen(true); }}
+                  style={{ flex:1, height:48, borderRadius:12, background:C.section, border:`1px dashed ${C.border}`, color:C.muted, fontWeight:600, fontSize:14, cursor:'pointer' }}>
+                  ＋ New timer manually
+                </button>
+              )}
+              {state.timers.length>0&&(
+                <button onClick={()=>{ if(window.confirm('Clear all active timers?')) setState(prev=>({...prev,timers:[]})); }}
+                  style={{ height:48, padding:'0 16px', borderRadius:12, background:C.red+'18', border:`1px solid ${C.red}44`, color:C.red, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                  Clear all
+                </button>
+              )}
+            </div>
             {state.timers.length===0&&(
               <div style={{ textAlign:'center', padding:'32px 20px' }}>
                 <div style={{ fontSize:40, marginBottom:10 }}>⏱</div>
                 <div style={{ fontSize:15, fontWeight:700, color:C.white, marginBottom:6 }}>No active timers</div>
-                <div style={{ fontSize:13, color:C.muted, marginBottom:16 }}>Use the Calculator to set up send times, then press Start Timers.</div>
-                <button onClick={()=>setView('calc')} style={{ height:44, padding:'0 24px', borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:14, border:'none', cursor:'pointer' }}>Go to Calculator →</button>
+                <div style={{ fontSize:13, color:C.muted, marginBottom:20, lineHeight:1.6 }}>
+                  Timers are created from the Calculator once each leader enters their march time.
+                  <br/><span style={{ color:C.gold }}>1.</span> Add leaders in 💾 March Times
+                  <br/><span style={{ color:C.gold }}>2.</span> Set impact time in 🧮 Calculator
+                  <br/><span style={{ color:C.gold }}>3.</span> Each leader enters their march time
+                  <br/><span style={{ color:C.gold }}>4.</span> Press 🔴 Start Timers
+                </div>
+                <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
+                  <button onClick={()=>setView('registry')} style={{ height:44, padding:'0 18px', borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>💾 March Times</button>
+                  <button onClick={()=>setView('calc')} style={{ height:44, padding:'0 18px', borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:13, border:'none', cursor:'pointer' }}>🧮 Calculator →</button>
+                </div>
               </div>
             )}
             {state.timers.map(t=>(
-              <TimerCard key={t.id} timer={t} onEdit={t=>{setEditingTimer(t);setSheetOpen(true);}} onDelete={deleteTimer} onLeaderMode={setLeaderTimer} onUpdateJoiner={updateJoiner}/>
+              <TimerCard key={t.id} timer={t} onEdit={t=>{ setEditingTimer(t); setSheetOpen(true); }} onDelete={deleteTimer} onLeaderMode={setLeaderTimer} onUpdateJoiner={updateJoiner}/>
             ))}
             {state.timers.length>=5&&<div style={{ textAlign:'center', fontSize:13, color:C.muted, padding:'8px 0' }}>Maximum 5 timers. Delete one to add another.</div>}
-
-            {/* Archived timers */}
             {state.archived?.length>0&&(
-              <ArchivedSection
-                archived={state.archived}
-                onClear={()=>setState(prev=>({...prev,archived:[]}))}
-              />
+              <ArchivedSection archived={state.archived} onClear={()=>setState(prev=>({...prev,archived:[]}))}/>
             )}
           </div>
         )}
 
         {view==='calc'&&(
-          <Calculator
-            calc={state.calculator}
-            onChange={calculator=>setState(prev=>({...prev,calculator}))}
-            registry={state.marchRegistry}
-            onStartTimers={handleStartTimers}
-          />
+          <Calculator calc={state.calculator} onChange={calculator=>setState(prev=>({...prev,calculator}))} registry={state.marchRegistry} onStartTimers={handleStartTimers}/>
         )}
 
         {view==='registry'&&(
-          <MarchRegistry
-            registry={state.marchRegistry}
-            onChange={marchRegistry=>setState(prev=>({...prev,marchRegistry}))}
-            players={players}
-          />
+          <MarchRegistry registry={state.marchRegistry} onChange={marchRegistry=>setState(prev=>({...prev,marchRegistry}))} players={players}/>
         )}
       </div>
 
-      <TimerSheet
-        timer={editingTimer}
-        open={sheetOpen}
-        onClose={()=>{setSheetOpen(false);setEditingTimer(null);setPrefillImpact(null);}}
-        onSave={saveTimer}
-        prefillImpact={prefillImpact}
-      />
+      <TimerSheet timer={editingTimer} open={sheetOpen} onClose={()=>{ setSheetOpen(false); setEditingTimer(null); setPrefillImpact(null); }} onSave={saveTimer} prefillImpact={prefillImpact}/>
     </>
   );
 }

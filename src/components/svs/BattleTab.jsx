@@ -915,6 +915,14 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
 
   return (
     <div style={{ padding:'16px 20px 0' }}>
+      {/* Dev banner */}
+      <div style={{ background:'#2A1800', border:`1px solid ${C.gold}44`, borderRadius:10, padding:'10px 14px', marginBottom:16, display:'flex', alignItems:'center', gap:10 }}>
+        <span style={{ fontSize:18, flexShrink:0 }}>🚧</span>
+        <div>
+          <div style={{ fontSize:13, fontWeight:700, color:C.gold }}>Battle Planning — Under Development</div>
+          <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>Formation suggestions, joiner assignments and troop filtering are being actively built. Some features may be incomplete.</div>
+        </div>
+      </div>
       <div style={{ display:'flex', gap:8, marginBottom:20 }}>
         <button onClick={()=>setCreateOpen(true)} style={{ flex:2, height:52, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>＋ New Plan</button>
         <button onClick={()=>{setLiveRoomPlan(null);setView('liveRoom');}} style={{ flex:1, height:52, borderRadius:12, background:C.red+'22', border:`1px solid ${C.red}44`, color:C.red, fontWeight:700, fontSize:14, cursor:'pointer' }}>🔴 Live Room</button>

@@ -230,6 +230,16 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
   return (
     <div style={{ padding:'16px 20px 0' }}>
+      {/* Dev banner */}
+      {!activeEvent && (
+        <div style={{ background:'#0A1A2A', border:`1px solid #6B8CAE44`, borderRadius:10, padding:'10px 14px', marginBottom:16, display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:18, flexShrink:0 }}>🚧</span>
+          <div>
+            <div style={{ fontSize:13, fontWeight:700, color:'#6B8CAE' }}>Events — Under Development</div>
+            <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>Event tracking and attendance features are still being built.</div>
+          </div>
+        </div>
+      )}
       {activeEvent ? (
         <div>
           <button onClick={() => { setActiveEventId(null); setBulkMode(false); setBulkSel(new Set()); }} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', marginBottom:16, padding:0 }}>
