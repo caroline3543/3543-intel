@@ -3,7 +3,8 @@
  * Returns null if the player has no event history.
  */
 export function calcMetrics(player, events) {
-  const snaps = (events || []).flatMap(ev =>
+  const today = new Date().toISOString().slice(0, 10);
+  const snaps = (events || []).filter(ev => ev.date && ev.date <= today).flatMap(ev =>
     (ev.snapshots || []).filter(s => s.playerId === player.id)
   );
   if (!snaps.length) return null;
