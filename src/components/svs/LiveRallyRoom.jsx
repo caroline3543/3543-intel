@@ -38,7 +38,7 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
   useEffect(() => { saveVoiceSettings(voiceSettings); }, [voiceSettings]);
 
   // Wire up voice countdown — runs in background, zero re-renders
-  useVoiceCountdown(state.timers, voiceSettings.voiceOn, voiceSettings.cues);
+  useVoiceCountdown(state.timers, voiceSettings.voiceOn, voiceSettings.cues, voiceSettings.voiceURI, voiceSettings.rate, voiceSettings.pitch);
 
   // Pre-populate calculator from Battle Plan (once only)
   useEffect(() => {
@@ -127,6 +127,9 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
         onClose={() => setVoiceSheetOpen(false)}
         voiceOn={voiceSettings.voiceOn}
         cues={voiceSettings.cues}
+        voiceURI={voiceSettings.voiceURI}
+        rate={voiceSettings.rate}
+        pitch={voiceSettings.pitch}
         onChange={s => setVoiceSettings(s)}
       />
 
