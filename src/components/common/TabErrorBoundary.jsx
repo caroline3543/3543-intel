@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import * as Sentry from '@sentry/react';
 
 const C = {
   bg: '#0A1628', card: '#1E3A52', gold: '#F5A623',
@@ -18,6 +19,9 @@ export class TabErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[Sunfire] Tab crashed:', error, info);
+    Sentry.captureException(error, {
+      extra: { componentStack: info.componentStack, tab: this.props.tabName },
+    });
   }
 
   render() {
