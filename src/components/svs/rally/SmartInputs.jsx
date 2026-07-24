@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { C } from '../../../utils/constants.js';
 import {
   validateMarchInput, fmtMarch,
-  validateImpactInput, utcNowSecs,
+  validateImpactInput, nowEpochSecs,
 } from './rallyRoomHelpers.js';
 
 // ── MarchInput ─────────────────────────────────────────────────
 // Smart march-time input. Last 2 digits = seconds, rest = minutes.
+// Unchanged from before — march time is a DURATION, not a point in
+// time, so it was never part of the epoch-timestamp migration.
 // Props:
 //   value       – current marchSecs (number | null)
 //   onChange    – (marchSecs: number | null) => void
@@ -39,9 +41,15 @@ export function MarchInput({ value, onChange, placeholder = 'e.g. 118 = 1m 18s  
 
 // ── ImpactInput ────────────────────────────────────────────────
 // Smart UTC impact-time input.
+//
+// Updated for the epoch-timestamp migration: validateImpactInput now
+// returns `epochSecs` (a real timestamp) instead of `totalSecs`
+// (seconds-since-midnight), and "already passed today" is checked
+// against nowEpochSecs() instead of the old utcNowSecs().
+//
 // Props:
 //   value    – raw string (e.g. '22:00')
-//   onChange – (displayStr: string | null, totalSecs: number | null) => void
+//   onChange – (displayStr: string | null, epochSecs: number | null) => void
 //   large    – boolean — bigger font for Calculator primary field
 export function ImpactInput({ value, onChange, large = false }) {
   const [raw,  setRaw]  = useState(value || '');
@@ -54,7 +62,7 @@ export function ImpactInput({ value, onChange, large = false }) {
     if (!input) { setDisp(null); setErr(null); setPast(false); onChange(null, null); return; }
     const v = validateImpactInput(input);
     if (v.error)      { setErr(v.error); setDisp(null); setPast(false); onChange(null, null); }
-    else if (v.valid) { setErr(null); setDisp(v.display); setPast(v.totalSecs < utcNowSecs()); onChange(v.display, v.totalSecs); }
+    else if (v.valid) { setErr(null); setDisp(v.display); setPast(v.epochSecs < nowEpochSecs()); onChange(v.display, v.epochSecs); }
   }
 
   return (
