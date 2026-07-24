@@ -9,7 +9,7 @@
 export { saveToStorage as saveData, loadFromStorage as loadData, exportToFile as exportData, importFromFile as importData, mergeImportedData as mergeData } from '../services/exportImportService.js';
 
 // Schemas
-export { newPlayer, newEvent, newSnapshot, newSvsPlan, newRally, newReinforcement, newAssignment, newMarchEntry, newPrepEntry } from './playerSchema.js';
+export { newPlayer, newEvent, newSnapshot, newSvsPlan, newRally, newReinforcement, newAssignment, newMarchEntry } from './playerSchema.js';
 
 // Metrics
 export { calcMetrics, autoSuggestPlayers } from './metrics.js';
