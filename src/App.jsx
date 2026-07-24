@@ -4,14 +4,12 @@ import { importFromFile, exportToFile } from './services/exportImportService.js'
 import { C } from './utils/constants.js';
 import { vibe } from './utils/vibe.js';
 
-import { TutorialOverlay, TutorialModePicker } from './components/tutorial/TutorialOverlay.jsx';
 import { Toast } from './components/common/Primitives.jsx';
 import { DeleteConfirmModal } from './components/common/DeleteConfirmModal.jsx';
 
 import { RosterTab }    from './components/players/RosterTab.jsx';
 import { BattleTab }    from './components/svs/BattleTab.jsx';
 import { EventsTab }    from './components/events/EventsTab.jsx';
-import { ScoresTab }    from './components/stats/ScoresTab.jsx';
 import { IntelTab }     from './components/stats/IntelTab.jsx';
 import { TabErrorBoundary } from './components/common/TabErrorBoundary.jsx';
 import JoinerRegistry from './components/JoinerRegistry.jsx';
@@ -24,14 +22,13 @@ const TABS = [
   { icon:'⚔️', label:'Battle'  },   // 1
   { icon:'📅', label:'Events'  },   // 2
   { icon:'📊', label:'Intel'   },   // 3
-  { icon:'🎯', label:'Scores'  },   // 4
 ];
 
 const hdrBtn = { height:36, padding:'0 10px', borderRadius:20, background:'#152236', border:'1px solid #2A4A64', color:'#A8C4D8', fontSize:13, fontWeight:600, cursor:'pointer' };
 
 export default function App() {
   const state = useAppState();
-  const { data, players, events, svsPlans, prepScores, settings, toast, showToast, savePlayer, addPlayers, updatePlayers, deletePlayer, createEvent, updateEvent, deleteEvent, saveSvsPlans, deleteSvsPlan, updatePrepScores, saveSettings, applyImport } = state;
+  const { data, players, events, svsPlans, settings, toast, showToast, savePlayer, addPlayers, updatePlayers, deletePlayer, createEvent, updateEvent, deleteEvent, saveSvsPlans, deleteSvsPlan, saveSettings, applyImport } = state;
 
   const [tab, setTab]               = useState(0);
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem('svs_onboarded'));
@@ -39,23 +36,18 @@ export default function App() {
   const [dataPanel, setDataPanel]   = useState(false);
   const [settingsPanel, setSettingsPanel] = useState(false);
   const [joinerRegistryOpen, setJoinerRegistryOpen] = useState(false);
-  const [tutorialMode, setTutorialMode] = useState(null);
-  const [tutorialPicker, setTutorialPicker] = useState(false);
   const importFileRef = useRef();
 
   function handleGetStarted() {
     localStorage.setItem('svs_onboarded', '1');
     setShowLanding(false);
-    if (!players.length) setTimeout(() => setTutorialMode('beginner'), 400);
   }
 
   if (showLanding) {
     return (
       <>
-        <LandingPage hasData={players.length > 0} onGetStarted={handleGetStarted} onContinue={handleGetStarted} onImport={() => importFileRef.current?.click()} onTutorial={() => { localStorage.setItem('svs_onboarded','1'); setShowLanding(false); setTutorialPicker(true); }} />
+        <LandingPage hasData={players.length > 0} onGetStarted={handleGetStarted} onContinue={handleGetStarted} onImport={() => importFileRef.current?.click()} />
         <input type="file" accept=".json" ref={importFileRef} style={{ display:'none' }} onChange={async e => { const file=e.target.files?.[0]; if(!file)return; try { const imp=await importFromFile(file); applyImport(imp,'replace'); handleGetStarted(); } catch { showToast('Import failed','error'); } e.target.value=''; }} />
-        {tutorialPicker && <TutorialModePicker onSelect={m=>{setTutorialMode(m);setTutorialPicker(false);}} onClose={()=>setTutorialPicker(false)} />}
-        {tutorialMode  && <TutorialOverlay mode={tutorialMode} onFinish={()=>setTutorialMode(null)} onSkip={()=>setTutorialMode(null)} />}
         {toast && <Toast msg={toast.msg} type={toast.type} />}
       </>
     );
@@ -66,11 +58,10 @@ export default function App() {
       <div style={{ padding:'20px 20px 14px', borderBottom:'1px solid #2A4A64', position:'sticky', top:0, background:'#0A1628', zIndex:50 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
-            <div style={{ fontSize:20, fontWeight:700, color:'#FFFFFF' }}>🏰 {settings?.allianceName || 'Sunfire Command'}</div>
+            <div style={{ fontSize:20, fontWeight:700, color:'#FFFFFF' }}>🏰 {settings?.allianceName || '3543 Intel'}</div>
             <div style={{ fontSize:13, color:'#5A7A94' }}>{settings?.allianceTag ? `[${settings.allianceTag}] · ` : ''}State {settings?.stateId || '3543'} · {players.length} players</div>
           </div>
           <div style={{ display:'flex', gap:6 }}>
-            <button onClick={()=>setTutorialPicker(true)} style={hdrBtn}>📖</button>
             <button onClick={()=>setDataPanel(true)} style={hdrBtn}>📦</button>
             <button onClick={()=>setSettingsPanel(true)} style={hdrBtn}>⚙️</button>
           </div>
@@ -81,7 +72,6 @@ export default function App() {
       {tab===1 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} /></TabErrorBoundary>}
       {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} showToast={showToast} /></TabErrorBoundary>}
       {tab===3 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} /></TabErrorBoundary>}
-      {tab===4 && <TabErrorBoundary><ScoresTab prepScores={prepScores} players={players} onUpdate={updatePrepScores} showToast={showToast} /></TabErrorBoundary>}
 
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
       {dataPanel    && <DataPanel data={data} onImport={applyImport} onExport={()=>exportToFile(data,settings?.allianceTag)} onClose={()=>setDataPanel(false)} showToast={showToast} />}
@@ -95,11 +85,9 @@ export default function App() {
           />
         </div>
       )}
-      {tutorialPicker && <TutorialModePicker onSelect={m=>{setTutorialMode(m);setTutorialPicker(false);}} onClose={()=>setTutorialPicker(false)} />}
-      {tutorialMode   && <TutorialOverlay mode={tutorialMode} onFinish={()=>setTutorialMode(null)} onSkip={()=>setTutorialMode(null)} />}
       {toast && <Toast msg={toast.msg} type={toast.type} />}
 
-      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(5,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>
+      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(4,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>
         {TABS.map((t,i) => (
           <button key={i} onClick={()=>{setTab(i);vibe(8);}} style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color:tab===i?'#F5A623':'#5A7A94', gap:2, fontSize:9, fontWeight:600, transition:'color 150ms ease', WebkitTapHighlightColor:'transparent' }}>
             <span style={{ fontSize:19 }}>{t.icon}</span>{t.label}
