@@ -28,7 +28,13 @@ const hdrBtn = { height:36, padding:'0 10px', borderRadius:20, background:'#1522
 
 export default function App() {
   const state = useAppState();
-  const { data, players, events, svsPlans, settings, toast, showToast, savePlayer, addPlayers, updatePlayers, deletePlayer, createEvent, updateEvent, deleteEvent, saveSvsPlans, deleteSvsPlan, saveSettings, applyImport } = state;
+  const {
+    data, players, events, svsPlans, settings, toast, showToast,
+    savePlayer, addPlayers, updatePlayers, deletePlayer,
+    createEvent, updateEvent, deleteEvent,
+    saveSvsPlans, deleteSvsPlan, saveSettings, applyImport,
+    syncFromCloud, syncStatus, lastSyncedAt, isCloudConfigured,
+  } = state;
 
   const [tab, setTab]               = useState(0);
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem('svs_onboarded'));
@@ -46,7 +52,7 @@ export default function App() {
   if (showLanding) {
     return (
       <>
-        <LandingPage hasData={players.length > 0} onGetStarted={handleGetStarted} onContinue={handleGetStarted} onImport={() => importFileRef.current?.click()} />
+        <LandingPage hasData={players.length > 0} onGetStarted={handleGetStarted} onImport={() => importFileRef.current?.click()} />
         <input type="file" accept=".json" ref={importFileRef} style={{ display:'none' }} onChange={async e => { const file=e.target.files?.[0]; if(!file)return; try { const imp=await importFromFile(file); applyImport(imp,'replace'); handleGetStarted(); } catch { showToast('Import failed','error'); } e.target.value=''; }} />
         {toast && <Toast msg={toast.msg} type={toast.type} />}
       </>
@@ -74,7 +80,19 @@ export default function App() {
       {tab===3 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} /></TabErrorBoundary>}
 
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
-      {dataPanel    && <DataPanel data={data} onImport={applyImport} onExport={()=>exportToFile(data,settings?.allianceTag)} onClose={()=>setDataPanel(false)} showToast={showToast} />}
+      {dataPanel    && (
+        <DataPanel
+          data={data}
+          onImport={applyImport}
+          onExport={()=>exportToFile(data,settings?.allianceTag)}
+          onClose={()=>setDataPanel(false)}
+          showToast={showToast}
+          syncFromCloud={syncFromCloud}
+          syncStatus={syncStatus}
+          lastSyncedAt={lastSyncedAt}
+          isCloudConfigured={isCloudConfigured}
+        />
+      )}
       {settingsPanel && <SettingsPanel settings={settings} onSave={s=>{saveSettings(s);setSettingsPanel(false);vibe(8);}} onClose={()=>setSettingsPanel(false)} />}
       {joinerRegistryOpen && (
         <div style={{ position:'fixed', inset:0, zIndex:600, background:'#0A1628', display:'flex', flexDirection:'column', overflow:'hidden' }}>
