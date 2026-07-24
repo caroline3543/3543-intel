@@ -12,7 +12,6 @@ export function calcMetrics(player, events) {
   const attended  = snaps.filter(s => s.attendance.attended === true);
   const noShows   = snaps.filter(s => s.attendance.noShow);
   const voiceOn   = snaps.filter(s => s.voice.joined === true);
-  const rogue     = snaps.filter(s => s.combat.wentRogue);
 
   const ap = Math.round((attended.length / snaps.length) * 100);
   const vp = Math.round((voiceOn.length  / snaps.length) * 100);
@@ -29,10 +28,9 @@ export function calcMetrics(player, events) {
   }
 
   const reliabilityScore = Math.round(
-    ap * 0.5 +
-    vp * 0.2 +
-    Math.max(0, 100 - rogue.length * 20) * 0.2 +
-    Math.max(0, 100 - noShows.length * 10) * 0.1
+    ap * 0.6 +
+    vp * 0.25 +
+    Math.max(0, 100 - noShows.length * 10) * 0.15
   );
 
   return {
@@ -46,7 +44,6 @@ export function calcMetrics(player, events) {
     streak,
     consecutiveMisses,
     reliabilityScore,
-    wentRogue:         rogue.length,
   };
 }
 
