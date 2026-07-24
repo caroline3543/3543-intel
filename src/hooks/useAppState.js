@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { loadFromStorage, saveToStorage, mergeImportedData } from '../services/exportImportService.js';
+import {
+  pushPlayer, deletePlayerRemote, pushPlan, deletePlanRemote, pullAll, isCloudConfigured,
+} from '../services/cloudSyncService.js';
 import { newPlayer } from '../data/playerSchema.js';
 
 import defaultData from '../data/defaultData.json';
@@ -9,12 +12,14 @@ const TOAST_DURATION = 2800;
 /**
  * useAppState
  *
- * Central state hook for Sunfire Command.
+ * Central state hook for 3543 Intel.
  * App.jsx stays a thin coordinator — all state lives here.
  */
 export function useAppState() {
-  const [data, setData]   = useState(() => loadFromStorage(defaultData));
-  const [toast, setToast] = useState(null);
+  const [data, setData]           = useState(() => loadFromStorage(defaultData));
+  const [toast, setToast]         = useState(null);
+  const [syncStatus, setSyncStatus] = useState('idle'); // idle | syncing | error
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
 
   // Auto-save on every data change
   useEffect(() => { saveToStorage(data); }, [data]);
@@ -34,6 +39,8 @@ export function useAppState() {
     return () => window.removeEventListener('sunfire:storage-full', handler);
   }, [showToast]);
 
+  const allianceTag = () => data.settings?.allianceTag || '';
+
   // ── Player operations ─────────────────────────────────────
   const savePlayer = useCallback((player) => {
     setData(prev => {
@@ -46,6 +53,7 @@ export function useAppState() {
         lastUpdated: new Date().toISOString(),
       };
     });
+    pushPlayer(player, allianceTag()); // fire-and-forget cloud push
     showToast('Player saved ✓');
   }, [showToast]);
 
@@ -55,6 +63,7 @@ export function useAppState() {
       players: [...prev.players, ...newPlayers],
       lastUpdated: new Date().toISOString(),
     }));
+    newPlayers.forEach(p => pushPlayer(p, allianceTag()));
     if (newPlayers.length) showToast(`${newPlayers.length} player${newPlayers.length !== 1 ? 's' : ''} added ✓`);
   }, [showToast]);
 
@@ -67,6 +76,7 @@ export function useAppState() {
       }),
       lastUpdated: new Date().toISOString(),
     }));
+    updatedPlayers.forEach(p => pushPlayer(p, allianceTag()));
     if (updatedPlayers.length) showToast(`${updatedPlayers.length} updated ✓`);
   }, [showToast]);
 
@@ -76,6 +86,7 @@ export function useAppState() {
       players: prev.players.filter(p => p.id !== id),
       lastUpdated: new Date().toISOString(),
     }));
+    deletePlayerRemote(id);
     showToast('Player removed');
   }, [showToast]);
 
@@ -107,8 +118,12 @@ export function useAppState() {
   }, [showToast]);
 
   // ── SvS plan operations ───────────────────────────────────
+  // Note: saveSvsPlans replaces the whole array (existing behavior), so on
+  // every call we push every plan in it — fine at this data volume (a
+  // handful of plans per alliance), and guarantees nothing gets missed.
   const saveSvsPlans = useCallback((plans) => {
     setData(prev => ({ ...prev, svsPlans: plans, lastUpdated: new Date().toISOString() }));
+    plans.forEach(p => pushPlan(p, allianceTag()));
   }, []);
 
   const deleteSvsPlan = useCallback((id) => {
@@ -117,6 +132,7 @@ export function useAppState() {
       svsPlans: (prev.svsPlans || []).filter(p => p.id !== id),
       lastUpdated: new Date().toISOString(),
     }));
+    deletePlanRemote(id);
     showToast('Plan deleted');
   }, [showToast]);
 
@@ -137,6 +153,31 @@ export function useAppState() {
       return { ...prev, ...imported, lastUpdated: new Date().toISOString() };
     });
     showToast(`Imported (${mode}) ✓`);
+  }, [showToast]);
+
+  // ── Cloud sync (manual pull — "🔄 Sync" button) ───────────
+  // Pulls the latest players + plans from Supabase and merges them into
+  // local data using the same merge logic as file import, so nothing
+  // gets silently overwritten either direction.
+  const syncFromCloud = useCallback(async () => {
+    if (!isCloudConfigured()) {
+      showToast('Cloud sync not set up yet', 'error');
+      return;
+    }
+    setSyncStatus('syncing');
+    const remote = await pullAll();
+    if (!remote) {
+      setSyncStatus('error');
+      showToast('Sync failed — check your connection', 'error');
+      return;
+    }
+    setData(prev => ({
+      ...mergeImportedData(prev, remote),
+      lastUpdated: new Date().toISOString(),
+    }));
+    setSyncStatus('idle');
+    setLastSyncedAt(new Date().toISOString());
+    showToast('Synced ✓');
   }, [showToast]);
 
   // ── Derived state (computed, not stored) ──────────────────
@@ -184,5 +225,11 @@ export function useAppState() {
 
     // Import
     applyImport,
+
+    // Cloud sync
+    syncFromCloud,
+    syncStatus,
+    lastSyncedAt,
+    isCloudConfigured: isCloudConfigured(),
   };
 }
