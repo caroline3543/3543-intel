@@ -3,12 +3,15 @@ import { C } from '../../../utils/constants.js';
 import { vibe } from '../../../utils/vibe.js';
 import {
   RALLY_TYPES, RALLY_COLORS, RALLY_DURATIONS,
-  uid, parseImpactInput, calcSendSecs, calcRallyOpenSecs, fmtSend,
+  uid, nowEpochSecs, parseImpactInput, fmtSend,
 } from './rallyRoomHelpers.js';
 import { MarchInput, ImpactInput } from './SmartInputs.jsx';
 
 // ── ArchivedSection ────────────────────────────────────────────
 // Collapsed "✓ Completed" section at the bottom of the Live Timers tab.
+// By the time timers reach here they've already passed through
+// normalizeTimer() (in loadState), so every entry is unified-schema —
+// no old-shape fallback needed.
 // Props:
 //   archived – archived timer objects array
 //   onClear  – () => void
@@ -28,16 +31,18 @@ export function ArchivedSection({ archived, onClear }) {
         <div>
           {archived.slice().reverse().map(t => {
             const isExp  = expanded === t.id;
-            const tcolor = RALLY_COLORS[t.type] || C.muted;
+            const tcolor = RALLY_COLORS[t.rallyType] || C.muted;
             const aTime  = t.archivedAt ? new Date(t.archivedAt).toUTCString().slice(17, 22) + ' UTC' : '';
+            const impactDisplay = t.impactAtUtc != null ? fmtSend(t.impactAtUtc) : '—';
+            const durationMins  = t.rallyDurationSecs ? Math.round(t.rallyDurationSecs / 60) : null;
             return (
               <div key={t.id} style={{ background:C.section, borderRadius:10, marginBottom:6, overflow:'hidden', border:`1px solid ${tcolor}33` }}>
                 <div onClick={() => setExpanded(isExp ? null : t.id)}
                   style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', cursor:'pointer' }}>
                   <div style={{ width:8, height:8, borderRadius:'50%', background:tcolor, flexShrink:0 }}/>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:C.muted }}>{t.name || t.type}</div>
-                    <div style={{ fontSize:11, color:C.muted }}>✓ Impact {t.impactTime || ''} UTC{aTime ? ` · ${aTime}` : ''}</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:C.muted }}>{t.leaderName || t.rallyType}</div>
+                    <div style={{ fontSize:11, color:C.muted }}>✓ Impact {impactDisplay} UTC{aTime ? ` · ${aTime}` : ''}</div>
                   </div>
                   <span style={{ color:C.muted, fontSize:12 }}>{isExp ? '▲' : '▼'}</span>
                 </div>
@@ -45,7 +50,7 @@ export function ArchivedSection({ archived, onClear }) {
                 {isExp && (
                   <div style={{ padding:'0 14px 12px', borderTop:`1px solid ${C.border}22` }}>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, margin:'8px 0' }}>
-                      {[['Type',t.type],['Duration',t.rallyDuration?`${t.rallyDuration}min`:'—'],['Ratio',t.ratio||'—'],['Impact',`${t.impactTime||'—'} UTC`]].map(([l,v]) => (
+                      {[['Type',t.rallyType],['Duration',durationMins?`${durationMins}min`:'—'],['Ratio',t.ratio||'—'],['Impact',`${impactDisplay} UTC`]].map(([l,v]) => (
                         <div key={l} style={{ background:C.card, borderRadius:8, padding:'6px 10px' }}>
                           <div style={{ fontSize:10, color:C.muted }}>{l}</div>
                           <div style={{ fontSize:13, fontWeight:600, color:C.icy }}>{v}</div>
@@ -80,21 +85,28 @@ export function ArchivedSection({ archived, onClear }) {
 
 // ── TimerSheet ─────────────────────────────────────────────────
 // Bottom-sheet to create or edit a timer manually.
+//
+// Internally edits a simple "draft" shape (name/type/impactTime string/
+// marchSecs/rallyDuration in minutes/notes) — the form fields people
+// actually type into. On open, an existing unified-schema timer is
+// converted TO this draft shape; on Save, the draft is converted BACK
+// into the unified schema (openRallyAtUtc/marchesAtUtc/impactAtUtc etc.)
+// that TimerCard/LeaderMode/useVoiceCountdown all expect. This sheet is
+// impact-time only (unchanged scope from before — it never had a
+// countdown-mode option) — it's a lightweight manual-entry escape
+// hatch, not a second Calculator.
+//
 // Props:
-//   timer         – existing timer object | null (null = new timer)
+//   timer         – existing unified-schema timer object | null (null = new)
 //   open          – boolean
 //   onClose       – () => void
-//   onSave        – (timer) => void
+//   onSave        – (timer) => void — receives a unified-schema object
 //   prefillImpact – string | null — pre-fill impact field for new timers
 export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
-  const [t, setT] = useState(() => timer || newTimerObj());
+  const [t, setT] = useState(() => draftFromTimer(timer, prefillImpact));
 
   useEffect(() => {
-    if (open) {
-      const base = timer ? { ...timer } : newTimerObj();
-      if (!timer && prefillImpact) base.impactTime = prefillImpact;
-      setT(base);
-    }
+    if (open) setT(draftFromTimer(timer, prefillImpact));
   }, [open, timer?.id, prefillImpact]);
 
   useEffect(() => {
@@ -106,10 +118,36 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
 
   function upd(k, v) { setT(prev => ({ ...prev, [k]:v })); }
 
-  const parsed  = parseImpactInput(t.impactTime);
-  const impactS = parsed?.totalSecs ?? null;
-  const marchS  = calcSendSecs(impactS, t.marchSecs, 0);
-  const openS   = t.rallyDuration ? calcRallyOpenSecs(impactS, t.marchSecs, t.rallyDuration) : null;
+  const parsed          = parseImpactInput(t.impactTime);
+  const impactEpochSecs = parsed?.epochSecs ?? null;
+  const rallyDurMins    = t.rallyDuration || null;
+  const openRallyAtUtc  = (impactEpochSecs != null && t.marchSecs != null && rallyDurMins)
+    ? impactEpochSecs - t.marchSecs - (rallyDurMins * 60)
+    : null;
+  const marchesAtUtc    = openRallyAtUtc != null ? openRallyAtUtc + rallyDurMins * 60 : null;
+
+  function handleSave() {
+    const built = {
+      ...(t._original || {}), // preserve joiners/ratio/leaderId/createdAtUtc when editing
+      id: t.id,
+      leaderName: t.name,
+      rallyType: t.type,
+      timingMode: 'impact',
+      referenceTimeUtc: impactEpochSecs,
+      countdownDurationSecs: null,
+      marchSecs: t.marchSecs,
+      rallyDurationSecs: rallyDurMins ? rallyDurMins * 60 : null,
+      offsetSecs: t._original?.offsetSecs || 0,
+      openRallyAtUtc, marchesAtUtc, impactAtUtc: impactEpochSecs,
+      createdAtUtc: t._original?.createdAtUtc ?? nowEpochSecs(),
+      notes: t.notes || '',
+      ratio: t._original?.ratio || '',
+      joiners: t._original?.joiners || [],
+    };
+    onSave(built);
+    onClose();
+    vibe(8);
+  }
 
   if (!open) return null;
 
@@ -146,7 +184,7 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
 
         <div style={{ marginBottom:14 }}>
           <label style={{ display:'block', fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Target impact time (UTC)</label>
-          <ImpactInput value={t.impactTime} onChange={(disp, secs) => upd('impactTime', disp || '')} large/>
+          <ImpactInput value={t.impactTime} onChange={(disp) => upd('impactTime', disp || '')} large/>
         </div>
 
         <div style={{ marginBottom:14 }}>
@@ -168,10 +206,10 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
           </div>
         </div>
 
-        {openS != null && (
+        {openRallyAtUtc != null && (
           <div style={{ background:C.section, borderRadius:10, padding:'12px 16px', marginBottom:14 }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, textAlign:'center' }}>
-              {[['Open rally at', fmtSend(openS), C.gold],['Marches at', fmtSend(marchS), C.icy],['Impact', t.impactTime, C.gold]].map(([l,v,c]) => (
+              {[['Open rally', fmtSend(openRallyAtUtc), C.gold],['Rally marches', fmtSend(marchesAtUtc), C.icy],['Impact', t.impactTime, C.gold]].map(([l,v,c]) => (
                 <div key={l}>
                   <div style={{ fontSize:10, color:C.muted, marginBottom:2 }}>{l}</div>
                   <div style={{ fontSize:14, fontWeight:700, color:c }}>{v} UTC</div>
@@ -180,10 +218,10 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
             </div>
           </div>
         )}
-        {!openS && marchS != null && (
+        {!openRallyAtUtc && impactEpochSecs != null && t.marchSecs != null && (
           <div style={{ background:C.section, borderRadius:10, padding:'12px 16px', marginBottom:14 }}>
-            <div style={{ fontSize:12, color:C.muted, marginBottom:4 }}>Marches at</div>
-            <div style={{ fontSize:22, fontWeight:700, color:C.green }}>{fmtSend(marchS)} UTC</div>
+            <div style={{ fontSize:12, color:C.muted, marginBottom:4 }}>Rally marches</div>
+            <div style={{ fontSize:22, fontWeight:700, color:C.green }}>{fmtSend(impactEpochSecs - t.marchSecs)} UTC</div>
           </div>
         )}
 
@@ -195,7 +233,7 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
 
         <div style={{ display:'flex', gap:10 }}>
           <button onClick={onClose} style={{ flex:1, height:52, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:16, cursor:'pointer' }}>Cancel</button>
-          <button onClick={() => { onSave(t); onClose(); vibe(8); }}
+          <button onClick={handleSave}
             style={{ flex:2, height:52, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:16, border:'none', cursor:'pointer' }}>Save timer</button>
         </div>
       </div>
@@ -203,6 +241,26 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
   );
 }
 
-function newTimerObj() {
-  return { id:uid(), name:'', type:'Main Rally', impactTime:'', marchSecs:null, rallyDuration:3, ratio:'', notes:'', joiners:[] };
+// Converts a unified-schema timer (or null, for a fresh one) into the
+// simple draft shape this sheet's form fields edit. `_original` is kept
+// around so Save can preserve fields this form doesn't expose (joiners,
+// ratio, leaderId, createdAtUtc).
+function draftFromTimer(timer, prefillImpact) {
+  if (!timer) {
+    return {
+      id: uid(), name:'', type:'Main Rally',
+      impactTime: prefillImpact || '', marchSecs:null, rallyDuration:3, notes:'',
+      _original: null,
+    };
+  }
+  return {
+    id: timer.id,
+    name: timer.leaderName || '',
+    type: timer.rallyType || 'Main Rally',
+    impactTime: timer.impactAtUtc != null ? fmtSend(timer.impactAtUtc) : '',
+    marchSecs: timer.marchSecs ?? null,
+    rallyDuration: timer.rallyDurationSecs ? Math.round(timer.rallyDurationSecs / 60) : null,
+    notes: timer.notes || '',
+    _original: timer,
+  };
 }
