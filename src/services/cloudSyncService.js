@@ -17,14 +17,14 @@ export async function pushPlayer(player, allianceTag = '') {
   const { error } = await supabase
     .from('players')
     .upsert({ id: player.id, alliance_tag: allianceTag, data: player, updated_at: new Date().toISOString() });
-  if (error) { console.error('[3543 Intel] pushPlayer failed', error); return false; }
+  if (error) { console.error('[Sync] pushPlayer failed', error); return false; }
   return true;
 }
 
 export async function deletePlayerRemote(id) {
   if (!supabase) return false;
   const { error } = await supabase.from('players').delete().eq('id', id);
-  if (error) { console.error('[3543 Intel] deletePlayerRemote failed', error); return false; }
+  if (error) { console.error('[Sync] deletePlayerRemote failed', error); return false; }
   return true;
 }
 
@@ -33,14 +33,14 @@ export async function pushPlan(plan, allianceTag = '') {
   const { error } = await supabase
     .from('svs_plans')
     .upsert({ id: plan.id, alliance_tag: allianceTag, data: plan, updated_at: new Date().toISOString() });
-  if (error) { console.error('[3543 Intel] pushPlan failed', error); return false; }
+  if (error) { console.error('[Sync] pushPlan failed', error); return false; }
   return true;
 }
 
 export async function deletePlanRemote(id) {
   if (!supabase) return false;
   const { error } = await supabase.from('svs_plans').delete().eq('id', id);
-  if (error) { console.error('[3543 Intel] deletePlanRemote failed', error); return false; }
+  if (error) { console.error('[Sync] deletePlanRemote failed', error); return false; }
   return true;
 }
 
@@ -53,7 +53,7 @@ export async function pullAll() {
     supabase.from('svs_plans').select('data'),
   ]);
   if (playersRes.error || plansRes.error) {
-    console.error('[3543 Intel] pullAll failed', playersRes.error || plansRes.error);
+    console.error('[Sync] pullAll failed', playersRes.error || plansRes.error);
     return null;
   }
   return {

@@ -21,10 +21,10 @@ export function SettingsPanel({ settings, onSave, onClose }) {
           <Inp value={s.allianceName} onChange={v => upd('allianceName', v)} placeholder="Alliance name" />
         </Field>
         <Field label="Alliance Tag">
-          <Inp value={s.allianceTag} onChange={v => upd('allianceTag', v)} placeholder="R3K" />
+          <Inp value={s.allianceTag} onChange={v => upd('allianceTag', v)} placeholder="e.g. ABC" />
         </Field>
         <Field label="State ID">
-          <Inp value={s.stateId} onChange={v => upd('stateId', v)} placeholder="3543" inputMode="numeric" />
+          <Inp value={s.stateId} onChange={v => upd('stateId', v)} placeholder="e.g. 1234" inputMode="numeric" />
         </Field>
 
         {/* Generation setting */}

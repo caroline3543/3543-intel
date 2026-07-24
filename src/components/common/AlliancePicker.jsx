@@ -15,7 +15,7 @@ import { C } from '../../utils/constants.js';
  */
 
 // Default quick-select chips — shown when no existing tags are available
-const DEFAULT_CHIPS = ['INT', 'SOV', 'LEO', '420', 'WWS'];
+const DEFAULT_CHIPS = [];
 
 export function AlliancePicker({ value, onChange, existingTags = [], placeholder = 'Or type a custom tag…' }) {
   const [inputVal, setInputVal] = useState('');

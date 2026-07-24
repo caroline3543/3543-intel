@@ -121,7 +121,7 @@ function migrateIfNeeded(data) {
   if (!m.events)     m.events     = [];
   if (!m.prepScores) m.prepScores = [];
   if (!m.svsPlans)   m.svsPlans   = [];
-  if (!m.settings)   m.settings   = { allianceName:'', allianceTag:'', stateId:'3543' };
+  if (!m.settings)   m.settings   = { allianceName:'', allianceTag:'', stateId:'' };
 
   m.players = (m.players || []).map(p => ({
     ...p,
