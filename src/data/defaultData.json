@@ -1,11 +1,11 @@
 {
   "_version": "3.1.0",
-  "_note": "Fresh install — add your alliance roster to get started.",
+  "_note": "Fresh install \u2014 add your alliance roster to get started.",
   "lastUpdated": null,
   "settings": {
     "allianceName": "",
     "allianceTag": "",
-    "stateId": "3543"
+    "stateId": ""
   },
   "players": [],
   "events": [],

@@ -58,8 +58,8 @@ export default function App() {
       <div style={{ padding:'20px 20px 14px', borderBottom:'1px solid #2A4A64', position:'sticky', top:0, background:'#0A1628', zIndex:50 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
-            <div style={{ fontSize:20, fontWeight:700, color:'#FFFFFF' }}>🏰 {settings?.allianceName || '3543 Intel'}</div>
-            <div style={{ fontSize:13, color:'#5A7A94' }}>{settings?.allianceTag ? `[${settings.allianceTag}] · ` : ''}State {settings?.stateId || '3543'} · {players.length} players</div>
+            <div style={{ fontSize:20, fontWeight:700, color:'#FFFFFF' }}>🏰 {settings?.allianceName || 'My Alliance'}</div>
+            <div style={{ fontSize:13, color:'#5A7A94' }}>{settings?.allianceTag ? `[${settings.allianceTag}] · ` : ''}{settings?.stateId ? `State ${settings.stateId} · ` : ''}{players.length} players</div>
           </div>
           <div style={{ display:'flex', gap:6 }}>
             <button onClick={()=>setDataPanel(true)} style={hdrBtn}>📦</button>
