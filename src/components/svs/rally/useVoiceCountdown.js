@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { parseImpactInput, calcRallyOpenSecs, utcNowSecs } from './rallyRoomHelpers.js';
+import { nowEpochSecs } from './rallyRoomHelpers.js';
 
 // ── useVoiceCountdown ──────────────────────────────────────────
 // Drives all SpeechSynthesis announcements for active rally timers.
@@ -11,6 +11,11 @@ import { parseImpactInput, calcRallyOpenSecs, utcNowSecs } from './rallyRoomHelp
 //   - speechSynthesis.cancel() before each new utterance so cues don't queue.
 //   - iOS/Android: speech works in background provided the *first* call
 //     happened during a user gesture. Start Timers button satisfies this.
+//
+// Unified timer schema: reads timer.openRallyAtUtc directly. The old
+// version branched on `timer.asap` (reading asapLaunchAt) vs. else
+// (re-deriving from impactTime/marchSecs/rallyDuration) — that split is
+// gone now that every timer carries the same pre-computed fields.
 //
 // Args:
 //   timers   – active timer objects array (from LiveRallyRoom state)
@@ -78,24 +83,11 @@ export function useVoiceCountdown(timers, voiceOn, cues) {
       const { timers: ts, voiceOn: on, cues: c } = argsRef.current;
       if (!on || !ts.length) return;
 
-      const now = utcNowSecs();
+      const now = nowEpochSecs();
 
       for (const timer of ts) {
-        // ASAP timers use asapLaunchAt directly
-        let targetSecs;
-        if (timer.asap && timer.asapLaunchAt != null) {
-          targetSecs = timer.asapLaunchAt;
-        } else {
-          if (!timer.impactTime || timer.marchSecs == null) continue;
-          const parsed = parseImpactInput(timer.impactTime);
-          if (!parsed) continue;
-          const impactSecs = parsed.totalSecs;
-          const openSecs   = timer.rallyDuration
-            ? calcRallyOpenSecs(impactSecs, timer.marchSecs, timer.rallyDuration)
-            : null;
-          targetSecs = openSecs ?? impactSecs;
-        }
-
+        if (timer.openRallyAtUtc == null) continue;
+        const targetSecs = timer.openRallyAtUtc;
         const secsLeft = Math.round(targetSecs - now);
 
         for (const { key, secs } of CUE_SCHEDULE) {

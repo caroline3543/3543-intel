@@ -8,7 +8,7 @@
 // ── March time parser ──────────────────────────────────────────
 // Last 2 digits = seconds, everything before = minutes.
 // 412 → 4m 12s, 45 → 0m 45s, 105 → 1m 05s
-// Returns total seconds, or null if invalid.
+// Returns total seconds (a DURATION, not a point in time), or null if invalid.
 
 export function parseMarchInput(raw) {
   if (!raw && raw !== 0) return null;
@@ -77,9 +77,22 @@ export function fmtMarchCompact(totalSecs) {
 
 // ── Impact time parser ─────────────────────────────────────────
 // Accepts: 2200, 22:00, 220030, 22:00:30
-// Returns: { h, m, s, totalSecs, display } or null
-
-export function parseImpactInput(raw) {
+//
+// Returns a REAL EPOCH TIMESTAMP (epochSecs), not seconds-since-midnight.
+// The parsed h:m:s is anchored to the UTC calendar date of `refEpochSecs`
+// (defaults to "now"). This is the same date the app already implicitly
+// assumed — we're just making the assumption explicit and giving callers
+// a timestamp that survives being compared against "now" correctly,
+// instead of a bare 0–86399 value that silently breaks at UTC midnight.
+//
+// NOTE: this does NOT auto-roll a "already passed today" time to
+// tomorrow — same behavior as before, just now expressed as a real
+// timestamp so the "already passed" comparison itself is more robust.
+// Auto-rollover would be a UX change beyond this pass's scope; flagged
+// as a possible follow-up, not implemented here.
+//
+// Returns: { h, m, s, epochSecs, display } or null
+export function parseImpactInput(raw, refEpochSecs) {
   if (!raw) return null;
   const str = String(raw).trim();
 
@@ -124,17 +137,22 @@ export function parseImpactInput(raw) {
   if (m < 0 || m > 59) return null;
   if (s < 0 || s > 59) return null;
 
-  const totalSecs = h * 3600 + m * 60 + s;
-  const display   = s > 0
+  const ref     = refEpochSecs != null ? refEpochSecs : Math.floor(Date.now() / 1000);
+  const refDate = new Date(ref * 1000);
+  const epochSecs = Math.floor(
+    Date.UTC(refDate.getUTCFullYear(), refDate.getUTCMonth(), refDate.getUTCDate(), h, m, s) / 1000
+  );
+
+  const display = s > 0
     ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
     : `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 
-  return { h, m, s, totalSecs, display };
+  return { h, m, s, epochSecs, display };
 }
 
-export function validateImpactInput(raw) {
+export function validateImpactInput(raw, refEpochSecs) {
   if (!raw) return { valid: false, error: null };
-  const result = parseImpactInput(raw);
+  const result = parseImpactInput(raw, refEpochSecs);
   if (!result) return { valid: false, error: 'Enter a valid UTC time — e.g. 2200 or 22:00' };
   return { valid: true, error: null, ...result };
 }
