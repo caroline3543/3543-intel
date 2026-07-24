@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { C, ROLES, ROLE_COLORS, ROLE_ICONS } from '../../utils/constants.js';
-import { PlayerCard }    from './PlayerCard.jsx';
-import { ProfileView }   from './ProfileView.jsx';
-import { PlayerSheet }   from './PlayerSheet.jsx';
-import { BatchAddSheet } from './BatchAddSheet.jsx';
+import { C } from '../../utils/constants.js';
+import { PlayerCard }       from './PlayerCard.jsx';
+import { ProfileView }      from './ProfileView.jsx';
+import { PlayerSheet }      from './PlayerSheet.jsx';
+import { BatchAddSheet }    from './BatchAddSheet.jsx';
+import { RoleManagerSheet } from './RoleManagerSheet.jsx';
 
-export function RosterTab({ players, events, onSavePlayer, onAddPlayers, onUpdatePlayers, onDeletePlayer, onGoToIntel }) {
+export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePlayer, onAddPlayers, onUpdatePlayers, onDeletePlayer, onGoToIntel }) {
   const [rosterView, setRosterView]       = useState('list');
   const [search, setSearch]               = useState('');
   const [filterRole, setFilterRole]       = useState('All');
@@ -14,6 +15,7 @@ export function RosterTab({ players, events, onSavePlayer, onAddPlayers, onUpdat
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [sheetOpen, setSheetOpen]         = useState(false);
   const [batchOpen, setBatchOpen]         = useState(false);
+  const [roleManagerOpen, setRoleManagerOpen] = useState(false);
 
   const filteredPlayers = players.filter(p => {
     const t = (p.username||p.alias||'').toLowerCase();
@@ -72,10 +74,11 @@ export function RosterTab({ players, events, onSavePlayer, onAddPlayers, onUpdat
               </div>
             );
           })()}
-          <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
-            {['All',...ROLES].map(r => (
+          <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4, alignItems:'center' }}>
+            {['All',...roles.map(r=>r.name)].map(r => (
               <button key={r} onClick={() => setFilterRole(r)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===r?C.gold+'22':C.section, border:`1px solid ${filterRole===r?C.gold:C.border}`, color:filterRole===r?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{r}</button>
             ))}
+            <button onClick={() => setRoleManagerOpen(true)} style={{ padding:'0 10px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', flexShrink:0 }}>⚙ Roles</button>
           </div>
           {players.length > 0 && (
             <div style={{ fontSize:13, color:C.muted, marginBottom:12 }}>
@@ -97,14 +100,14 @@ export function RosterTab({ players, events, onSavePlayer, onAddPlayers, onUpdat
             <div style={{ textAlign:'center', padding:'40px 20px', color:C.muted }}>No results for "{search||filterRole}"</div>
           )}
           {filteredPlayers.map(p => (
-            <PlayerCard key={p.id} player={p} onClick={() => openProfile(p)} onDelete={onDeletePlayer} events={events}/>
+            <PlayerCard key={p.id} player={p} roles={roles} onClick={() => openProfile(p)} onDelete={onDeletePlayer} events={events}/>
           ))}
         </>
       )}
 
       {rosterView==='roles' && (() => {
         const avail  = players.filter(p => p.availability?.present==='available');
-        const byRole = ROLES.map(role => ({ role, members:avail.filter(p => p.roles?.includes(role)) })).filter(g => g.members.length > 0);
+        const byRole = roles.map(roleDef => ({ roleDef, members:avail.filter(p => p.roles?.includes(roleDef.name)) })).filter(g => g.members.length > 0);
         return (
           <div>
             <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
@@ -113,10 +116,10 @@ export function RosterTab({ players, events, onSavePlayer, onAddPlayers, onUpdat
                 {avail.length} <span style={{ fontSize:16, color:C.muted }}>of {players.length}</span>
               </div>
             </div>
-            {byRole.map(({ role, members }) => (
-              <div key={role} style={{ marginBottom:16 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:ROLE_COLORS[role], textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
-                  {ROLE_ICONS[role]} {role} · {members.length}
+            {byRole.map(({ roleDef, members }) => (
+              <div key={roleDef.id} style={{ marginBottom:16 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:roleDef.color, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
+                  {roleDef.icon} {roleDef.name} · {members.length}
                 </div>
                 {members.map(m => (
                   <div key={m.id} onClick={() => openProfile(m)} style={{ background:C.card, borderRadius:10, padding:'10px 14px', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
@@ -144,6 +147,7 @@ export function RosterTab({ players, events, onSavePlayer, onAddPlayers, onUpdat
 
       <ProfileView
         player={viewingPlayer}
+        roles={roles}
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         onEdit={() => { setProfileOpen(false); openEdit(viewingPlayer); }}
@@ -152,6 +156,7 @@ export function RosterTab({ players, events, onSavePlayer, onAddPlayers, onUpdat
       <PlayerSheet
         open={sheetOpen}
         player={editingPlayer}
+        roles={roles}
         onClose={() => { setSheetOpen(false); setEditingPlayer(null); }}
         onSave={onSavePlayer}
         existingTags={[...new Set(players.map(p=>p.allianceTag).filter(Boolean))]}
@@ -164,6 +169,14 @@ export function RosterTab({ players, events, onSavePlayer, onAddPlayers, onUpdat
         members={players}
         onAddNew={onAddPlayers}
         onUpdateExisting={onUpdatePlayers}
+      />
+      <RoleManagerSheet
+        open={roleManagerOpen}
+        onClose={() => setRoleManagerOpen(false)}
+        roles={roles}
+        onSaveCustomRoles={onSaveCustomRoles}
+        players={players}
+        onUpdatePlayers={onUpdatePlayers}
       />
     </div>
   );

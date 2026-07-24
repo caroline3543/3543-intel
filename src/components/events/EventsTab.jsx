@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { C, EVENT_TYPES, EVENT_ICONS, PERF_TAGS } from '../../utils/constants.js';
+import { C, EVENT_TYPES, EVENT_ICONS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { fmtDateShort } from '../../utils/dates.js';
 import { newEvent, newSnapshot } from '../../data/playerSchema.js';
@@ -102,7 +102,6 @@ function SnapshotEditor({ snapshot, playerName, open, onClose, onSave }) {
   function updA(p) { setS(prev => ({ ...prev, attendance: { ...prev.attendance, ...p } })); }
   function updV(p) { setS(prev => ({ ...prev, voice: { ...prev.voice, ...p } })); }
   function updC(p) { setS(prev => ({ ...prev, combat: { ...prev.combat, ...p } })); }
-  function setTag(t) { setS(prev => ({ ...prev, performanceTag: prev.performanceTag===t?null:t })); }
 
   if (!open || !snapshot) return null;
 
@@ -116,16 +115,6 @@ function SnapshotEditor({ snapshot, playerName, open, onClose, onSave }) {
             <div style={{ fontSize:13, color:C.muted }}>Event record</div>
           </div>
           <button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, fontSize:28, cursor:'pointer', lineHeight:1, padding:'0 4px' }}>✕</button>
-        </div>
-        <div style={{ marginBottom:20 }}>
-          <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Performance Tag</div>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {PERF_TAGS.map(t => (
-              <button key={t.key} onClick={() => setTag(t.key)} style={{ padding:'8px 14px', borderRadius:20, minHeight:36, border:`1px solid ${s.performanceTag===t.key?t.color:C.border}`, background:s.performanceTag===t.key?t.color+'18':C.section, color:s.performanceTag===t.key?t.color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
-                {t.label}
-              </button>
-            ))}
-          </div>
         </div>
         <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
           <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:12 }}>📅 Attendance</div>
@@ -149,8 +138,6 @@ function SnapshotEditor({ snapshot, playerName, open, onClose, onSave }) {
           <ToggleRow label="Joined rallies"      value={s.combat?.joinedRallies}      onChange={v=>updC({joinedRallies:v})}/>
           <ToggleRow label="Led rallies"         value={s.combat?.ledRallies}         onChange={v=>updC({ledRallies:v})}         colorOn={C.gold} colorOff={C.muted}/>
           <ToggleRow label="Defended structures" value={s.combat?.defendedStructures} onChange={v=>updC({defendedStructures:v})}/>
-          <ToggleRow label="Followed the plan"     value={s.combat?.followedOrders}     onChange={v=>updC({followedOrders:v})}     tristate={true}/>
-          <ToggleRow label="Ignored orders ⚠️"       value={s.combat?.wentRogue}          onChange={v=>updC({wentRogue:v})}         colorOn={C.red} colorOff={C.muted}/>
         </div>
         <div style={{ marginBottom:20 }}>
           <label style={{ fontSize:12, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', display:'block', marginBottom:8 }}>Officer Notes</label>
@@ -283,17 +270,6 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                           </div>
                         ))}
                       </div>
-                      {(()=>{
-                        const rogues = (activeEvent.snapshots||[]).filter(s=>s.combat?.wentRogue);
-                        const stars  = (activeEvent.snapshots||[]).filter(s=>s.performanceTag==='strong');
-                        const eventPlayerMap = Object.fromEntries(eventPlayers.map(p=>[p.id,p]));
-                        return (
-                          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                            {stars.length>0&&<div style={{ fontSize:12, color:C.gold }}>⭐ Strong: {stars.map(s=>eventPlayerMap[s.playerId]?.username||'?').join(', ')}</div>}
-                            {rogues.length>0&&<div style={{ fontSize:12, color:C.red }}>⚠️ Ignored orders: {rogues.map(s=>eventPlayerMap[s.playerId]?.username||'?').join(', ')}</div>}
-                          </div>
-                        );
-                      })()}
                     </div>
                   )}
                 </div>
@@ -314,7 +290,6 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                 const snap = getSnap(activeEvent, player.id);
                 const dn = player.username||player.alias||'Unknown';
                 const isSel = bulkSel.has(player.id);
-                const tagInfo = PERF_TAGS.find(t => t.key===snap?.performanceTag);
                 return (
                   <div key={player.id} onClick={() => { if (bulkMode) { const n=new Set(bulkSel); isSel?n.delete(player.id):n.add(player.id); setBulkSel(n); } else openSnap(activeEvent, player); }} style={{ background:isSel?C.gold+'18':C.card, borderRadius:10, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${isSel?C.gold:C.border+'44'}`, WebkitTapHighlightColor:'transparent' }}>
                     {bulkMode && <div style={{ width:22, height:22, borderRadius:'50%', border:`2px solid ${isSel?C.gold:C.border}`, background:isSel?C.gold:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{isSel && <span style={{ fontSize:12, color:C.bg, fontWeight:700 }}>✓</span>}</div>}
@@ -326,8 +301,6 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                         {snap?.attendance?.noShow && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.red+'18', color:C.red, fontWeight:600 }}>✗</span>}
                         {snap?.attendance?.late && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, fontWeight:600 }}>🕐</span>}
                         {snap?.voice?.joined===true && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.icy+'18', color:C.icy, fontWeight:600 }}>🎙️</span>}
-                        {snap?.combat?.wentRogue && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.red+'18', color:C.red, fontWeight:600 }}>⚠️</span>}
-                        {tagInfo && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:tagInfo.color+'18', color:tagInfo.color, fontWeight:600 }}>{tagInfo.label}</span>}
                       </div>
                     </div>
                     {!bulkMode && <span style={{ fontSize:18, color:C.muted }}>›</span>}

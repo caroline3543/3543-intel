@@ -82,10 +82,9 @@ export function newSnapshot(playerId, playerProfile, eventId) {
     },
     combat: {
       joinedRallies: false, ledRallies: false,
-      defendedStructures: false, followedOrders: null, wentRogue: false,
+      defendedStructures: false,
     },
     notes:          '',
-    performanceTag: null,
   };
 }
 

@@ -4,6 +4,7 @@ import {
   pushPlayer, deletePlayerRemote, pushPlan, deletePlanRemote, pullAll, isCloudConfigured,
 } from '../services/cloudSyncService.js';
 import { newPlayer } from '../data/playerSchema.js';
+import { withBuiltinRole } from '../utils/roles.js';
 
 import defaultData from '../data/defaultData.json';
 
@@ -12,7 +13,7 @@ const TOAST_DURATION = 2800;
 /**
  * useAppState
  *
- * Central state hook for 3543 Intel.
+ * Central state hook for the app.
  * App.jsx stays a thin coordinator — all state lives here.
  */
 export function useAppState() {
@@ -146,6 +147,15 @@ export function useAppState() {
     setData(prev => ({ ...prev, settings, lastUpdated: new Date().toISOString() }));
   }, []);
 
+  // ── Player roles ──────────────────────────────────────────
+  // "Rally Lead" is the only built-in role (see utils/roles.js) — every
+  // other role is alliance-defined. saveCustomRoles replaces the whole
+  // custom-roles array, same pattern as saveSvsPlans; create/rename/
+  // delete/reorder in the UI all go through this one setter.
+  const saveCustomRoles = useCallback((customRoles) => {
+    setData(prev => ({ ...prev, customRoles, lastUpdated: new Date().toISOString() }));
+  }, []);
+
   // ── Import ────────────────────────────────────────────────
   const applyImport = useCallback((imported, mode) => {
     setData(prev => {
@@ -181,11 +191,13 @@ export function useAppState() {
   }, [showToast]);
 
   // ── Derived state (computed, not stored) ──────────────────
-  const players    = data.players    || [];
-  const events     = data.events     || [];
-  const svsPlans   = data.svsPlans   || [];
-  const prepScores = data.prepScores || [];
-  const settings   = data.settings   || {};
+  const players     = data.players     || [];
+  const events      = data.events      || [];
+  const svsPlans    = data.svsPlans    || [];
+  const prepScores  = data.prepScores  || [];
+  const settings    = data.settings    || {};
+  const customRoles = data.customRoles || [];
+  const roles       = withBuiltinRole(customRoles);
 
   return {
     // Raw data
@@ -222,6 +234,10 @@ export function useAppState() {
 
     // Settings
     saveSettings,
+
+    // Player roles
+    roles,
+    saveCustomRoles,
 
     // Import
     applyImport,

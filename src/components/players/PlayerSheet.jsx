@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { C, ROLES, ROLE_COLORS, ROLE_ICONS, LANGUAGES, COUNTRIES, EVENT_TYPES, EVENT_ICONS } from '../../utils/constants.js';
+import { C, LANGUAGES, COUNTRIES, EVENT_TYPES, EVENT_ICONS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { newPlayer } from '../../data/playerSchema.js';
 import { Field, Inp, Sel, TierPill, SheetHandle } from '../common/Primitives.jsx';
@@ -233,7 +233,7 @@ function EventAvailabilitySection({ p, updA, existingEvents }) {
 }
 
 // ── PlayerSheet ────────────────────────────────────────────────
-export function PlayerSheet({ player, open, onClose, onSave, existingTags=[], existingEvents=[], onGoToIntel }) {
+export function PlayerSheet({ player, roles=[], open, onClose, onSave, existingTags=[], existingEvents=[], onGoToIntel }) {
   const [p, setP]               = useState(() => player || newPlayer());
   const [activeTab, setActiveTab] = useState('identity');
 
@@ -326,9 +326,9 @@ export function PlayerSheet({ player, open, onClose, onSave, existingTags=[], ex
             <Field label="🏹 Marksman"><TierPill value={p.troops.marksman} onChange={v=>updT('marksman',v)} color={C.mar}/></Field>
             <Field label="Role in SvS" hint="Select all that apply">
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                {ROLES.map(role => {
-                  const sel=p.roles?.includes(role); const c=ROLE_COLORS[role];
-                  return <button key={role} onClick={()=>{const cur=p.roles||[];upd('roles',sel?cur.filter(r=>r!==role):[...cur,role]);}} style={{ padding:'12px 14px', borderRadius:12, minHeight:48, textAlign:'left', position:'relative', border:`1px solid ${sel?c:C.border}`, background:sel?c+'18':C.section, color:sel?c:C.muted, fontWeight:600, fontSize:14, cursor:'pointer' }}>{sel&&<span style={{ position:'absolute', top:8, right:10, fontSize:12 }}>✓</span>}{ROLE_ICONS[role]} {role}</button>;
+                {roles.map(roleDef => {
+                  const role=roleDef.name; const sel=p.roles?.includes(role); const c=roleDef.color;
+                  return <button key={roleDef.id} onClick={()=>{const cur=p.roles||[];upd('roles',sel?cur.filter(r=>r!==role):[...cur,role]);}} style={{ padding:'12px 14px', borderRadius:12, minHeight:48, textAlign:'left', position:'relative', border:`1px solid ${sel?c:C.border}`, background:sel?c+'18':C.section, color:sel?c:C.muted, fontWeight:600, fontSize:14, cursor:'pointer' }}>{sel&&<span style={{ position:'absolute', top:8, right:10, fontSize:12 }}>✓</span>}{roleDef.icon} {role}</button>;
                 })}
               </div>
             </Field>

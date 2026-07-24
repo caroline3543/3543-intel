@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { C, ROLE_COLORS, ROLE_ICONS } from '../../utils/constants.js';
+import { C } from '../../utils/constants.js';
+import { roleColor, roleIcon } from '../../utils/roles.js';
 import { fmtDateShort } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
 import { ReliabilityBadge, SheetHandle } from '../common/Primitives.jsx';
@@ -27,7 +28,7 @@ function Row({ label, value }) {
   );
 }
 
-export function ProfileView({ player, open, onClose, onEdit, events }) {
+export function ProfileView({ player, roles = [], open, onClose, onEdit, events }) {
   useEffect(() => {
     if (!open) return;
     function handler(e) { if (e.key === 'Escape') onClose(); }
@@ -38,7 +39,7 @@ export function ProfileView({ player, open, onClose, onEdit, events }) {
   if (!open||!player) return null;
 
   const dn      = player.username||player.alias||'Unknown';
-  const rc      = ROLE_COLORS[player.roles?.[0]]||C.muted;
+  const rc      = roleColor(player.roles?.[0], roles);
   const metrics = calcMetrics(player, events||[]);
   const joiners = (player.joinerHeroes||[]).filter(jh=>jh.skillLevel>=5);
   const snaps   = (events||[])
@@ -76,11 +77,14 @@ export function ProfileView({ player, open, onClose, onEdit, events }) {
         {player.roles?.length>0 && (
           <Section title="Role in SvS">
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {player.roles.map(r=>(
-                <span key={r} style={{ padding:'8px 16px', borderRadius:20, background:ROLE_COLORS[r]+'22', border:`1px solid ${ROLE_COLORS[r]}44`, color:ROLE_COLORS[r], fontWeight:700, fontSize:14 }}>
-                  {ROLE_ICONS[r]} {r}
-                </span>
-              ))}
+              {player.roles.map(r=>{
+                const rColor = roleColor(r, roles);
+                return (
+                  <span key={r} style={{ padding:'8px 16px', borderRadius:20, background:rColor+'22', border:`1px solid ${rColor}44`, color:rColor, fontWeight:700, fontSize:14 }}>
+                    {roleIcon(r, roles)} {r}
+                  </span>
+                );
+              })}
             </div>
           </Section>
         )}

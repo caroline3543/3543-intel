@@ -16,25 +16,9 @@ export const C = {
 
 export const TIER_OPTIONS = ['T10','FC1','FC2','FC3','FC4','FC5','T11','T12'];
 
-export const ROLES = ['Rally Lead','Attack Team','Joiner','Garrison','Flexible','Reserve'];
-
-export const ROLE_COLORS = {
-  'Rally Lead':  C.gold,
-  'Attack Team': C.red,
-  'Joiner':      C.mar,
-  'Garrison':    C.inf,
-  'Flexible':    C.lan,
-  'Reserve':     C.muted,
-};
-
-export const ROLE_ICONS = {
-  'Rally Lead':  '👑',
-  'Attack Team': '⚔️',
-  'Joiner':      '🏹',
-  'Garrison':    '🛡️',
-  'Flexible':    '🔄',
-  'Reserve':     '⏸️',
-};
+// NOTE: player roles are no longer a fixed list. "Rally Lead" is the only
+// permanent, built-in role (see src/utils/roles.js) — every other role is
+// created by the alliance itself and stored in app data, not here.
 
 export const EVENT_ICONS = {
   'SvS':                      '⚔️',
@@ -46,14 +30,6 @@ export const EVENT_ICONS = {
   'Transfer Season':           '🚀',
   'Custom':                    '📋',
 };
-
-export const PERF_TAGS = [
-  { key: 'strong',    label: '⭐ Strong',    color: C.gold  },
-  { key: 'reliable',  label: '✓ Reliable',   color: C.green },
-  { key: 'improving', label: '↑ Improving',  color: C.icy   },
-  { key: 'issue',     label: '⚠️ Issue',     color: C.red   },
-  { key: 'noshow',    label: '✗ No-show',    color: C.muted },
-];
 
 export const TIMEZONES = [
   'Oceania','Southeast Asia','East Asia','South Asia','Middle East',

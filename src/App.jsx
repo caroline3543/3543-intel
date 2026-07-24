@@ -34,6 +34,7 @@ export default function App() {
     createEvent, updateEvent, deleteEvent,
     saveSvsPlans, deleteSvsPlan, saveSettings, applyImport,
     syncFromCloud, syncStatus, lastSyncedAt, isCloudConfigured,
+    roles, saveCustomRoles,
   } = state;
 
   const [tab, setTab]               = useState(0);
@@ -74,7 +75,7 @@ export default function App() {
         </div>
       </div>
 
-      {tab===0 && <TabErrorBoundary><RosterTab players={players} events={events} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(3)} /></TabErrorBoundary>}
+      {tab===0 && <TabErrorBoundary><RosterTab players={players} events={events} roles={roles} onSaveCustomRoles={saveCustomRoles} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(3)} /></TabErrorBoundary>}
       {tab===1 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} /></TabErrorBoundary>}
       {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} showToast={showToast} /></TabErrorBoundary>}
       {tab===3 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} /></TabErrorBoundary>}

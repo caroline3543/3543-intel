@@ -1,4 +1,5 @@
-import { C, ROLE_COLORS } from '../../utils/constants.js';
+import { C } from '../../utils/constants.js';
+import { roleColor } from '../../utils/roles.js';
 import { fmtDate } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
 
@@ -6,9 +7,9 @@ function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
 }
 
-export function PlayerCard({ player, onClick, onDelete, events }) {
+export function PlayerCard({ player, roles = [], onClick, onDelete, events }) {
   const dn      = player.username||player.alias||'Unknown';
-  const rc      = ROLE_COLORS[player.roles?.[0]]||C.muted;
+  const rc      = roleColor(player.roles?.[0], roles);
   const metrics = calcMetrics(player, events||[]);
   const joiners = (player.joinerHeroes||[]).filter(jh=>jh.skillLevel>=5).map(jh=>jh.hero);
 
