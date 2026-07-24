@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { C } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
-import { parseImpactInput } from '../../services/rallyTimingParser.js';
 import {
-  uid, utcNowSecs, loadState, saveState,
-  DEFAULT_MSG,
+  uid, nowEpochSecs, loadState, saveState,
+  DEFAULT_MSG, COUNTDOWN_DEFAULT,
 } from './rally/rallyRoomHelpers.js';
 import { UTCClock }        from './rally/UTCClock.jsx';
 import { TimerCard }       from './rally/TimerCard.jsx';
@@ -17,7 +16,10 @@ import { VoiceSettingsSheet } from './rally/VoiceSettingsSheet.jsx';
 
 const DEFAULT_STATE = {
   timers:[], archived:[], marchRegistry:[],
-  calculator:{ impactTimeRaw:'', impactSecs:null, rallyDuration:3, leaders:[], messageTemplate:DEFAULT_MSG },
+  calculator:{
+    timingMode:'impact', impactTimeRaw:'', impactEpochSecs:null,
+    countdownSecs:COUNTDOWN_DEFAULT, rallyDuration:3, leaders:[], messageTemplate:DEFAULT_MSG,
+  },
 };
 
 // ── LiveRallyRoom ──────────────────────────────────────────────
@@ -59,16 +61,14 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
   // Persist on every state change
   useEffect(() => { saveState(state); }, [state]);
 
-  // Auto-archive 30s after impact — checked every 10s
+  // Auto-archive 30s after impact — checked every 10s.
+  // Unified schema: every timer stores impactAtUtc directly, so this is
+  // now a single check instead of branching on ASAP vs. scheduled shape.
   useEffect(() => {
     const id = setInterval(() => {
-      const now = utcNowSecs();
+      const now = nowEpochSecs();
       setState(prev => {
-        const toArchive = prev.timers.filter(t => {
-          if (t.asap && t.asapLaunchAt != null) return t.asapLaunchAt - now < -30;
-          const p = parseImpactInput(t.impactTime);
-          return p && p.totalSecs - now < -30;
-        });
+        const toArchive = prev.timers.filter(t => t.impactAtUtc != null && (t.impactAtUtc - now) < -30);
         if (toArchive.length === 0) return prev;
         return {
           ...prev,
@@ -106,8 +106,10 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
       const toAdd = newTimers.slice(0, slots);
       if (toAdd.length < newTimers.length) showToast(`${toAdd.length} of ${newTimers.length} timers created — room full`);
       else showToast(`${toAdd.length} timer${toAdd.length !== 1 ? 's' : ''} started ✓`);
+      // Carry joiner/ratio assignments over from the calculator's leader
+      // row, matched by leaderName (the unified timer schema's field).
       const built = toAdd.map(t => {
-        const cl = state.calculator.leaders.find(l => l.name === t.name);
+        const cl = state.calculator.leaders.find(l => l.name === t.leaderName);
         return cl ? { ...t, joiners:cl.joiners||[], ratio:cl.ratio||'' } : t;
       });
       return { ...prev, timers:[...prev.timers, ...built] };
@@ -202,9 +204,9 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
                 <div style={{ fontSize:13, color:C.muted, marginBottom:20, lineHeight:1.6 }}>
                   Timers are created from the Calculator once each leader enters their march time.
                   <br/><span style={{ color:C.gold }}>1.</span> Add leaders in 💾 March Times
-                  <br/><span style={{ color:C.gold }}>2.</span> Set impact time in 🧮 Calculator
+                  <br/><span style={{ color:C.gold }}>2.</span> Pick a timing mode in 🧮 Calculator
                   <br/><span style={{ color:C.gold }}>3.</span> Each leader enters their march time
-                  <br/><span style={{ color:C.gold }}>4.</span> Press 🔴 Start Timers
+                  <br/><span style={{ color:C.gold }}>4.</span> Press Start Timers
                 </div>
                 <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
                   <button onClick={() => setView('registry')} style={{ height:44, padding:'0 18px', borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>💾 March Times</button>
