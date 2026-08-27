@@ -40,6 +40,31 @@ export function PlanDetail({ plan, players, onUpdate, onBack, onGoLive, onGoToMe
   const slots      = plan.rallySlots || [];
   const readySlots = slots.filter(s => s.leaderName);
 
+  // ── Plan-wide priority-joiner exclusivity ─────────────────────
+  // A priority joiner should only be usable in ONE rally slot across
+  // the whole battle plan/event, not just unique within one slot's own
+  // 4 joiners. For each slot, this is everyone assigned as a joiner in
+  // every OTHER slot — passed down so RallySlotCard can widen its own
+  // exclusion set beyond "this slot only".
+  function assignedInOtherSlots(currentSlotId) {
+    const ids = new Set();
+    slots.forEach(s => {
+      if (s.id === currentSlotId) return;
+      (s.joiners || []).forEach(j => { if (j.playerId) ids.add(j.playerId); });
+    });
+    return ids;
+  }
+
+  // ── Unallocated backups ────────────────────────────────────────
+  // Available roster members not currently used as a priority joiner
+  // ANYWHERE in this plan — quick reference for who can sub in if
+  // someone drops offline mid-event.
+  const allAssignedPlanWide = new Set();
+  slots.forEach(s => (s.joiners || []).forEach(j => { if (j.playerId) allAssignedPlanWide.add(j.playerId); }));
+  const unallocated = players.filter(p =>
+    p.availability?.present === 'available' && !allAssignedPlanWide.has(p.id)
+  );
+
   return (
     <div style={{ padding:'16px 20px 0', paddingBottom:readySlots.length > 0 ? 120 : 20 }}>
       {/* Back + breadcrumb */}
@@ -95,6 +120,7 @@ export function PlanDetail({ plan, players, onUpdate, onBack, onGoLive, onGoToMe
           onMoveDown={() => moveSlot(i, 1)}
           onGoToMembers={onGoToMembers}
           maxGeneration={maxGeneration}
+          assignedInOtherSlots={assignedInOtherSlots(slot.id)}
         />
       ))}
 
@@ -102,6 +128,29 @@ export function PlanDetail({ plan, players, onUpdate, onBack, onGoLive, onGoToMe
         <button onClick={addSlot} style={{ width:'100%', height:48, borderRadius:12, background:'none', border:`1px dashed ${C.border}`, color:C.muted, fontWeight:600, fontSize:14, cursor:'pointer', marginBottom:16 }}>
           ＋ Add rally slot
         </button>
+      )}
+
+      {/* Unallocated — available as backups */}
+      {slots.length > 0 && (
+        <div style={{ background:C.section, borderRadius:12, padding:14, marginBottom:16 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:C.icy, marginBottom:2 }}>🔁 Unallocated — available as backups</div>
+          <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>Available members not used as a priority joiner anywhere in this plan — sub one in if someone drops.</div>
+          {unallocated.length === 0 ? (
+            <div style={{ fontSize:12, color:C.muted }}>Everyone available is already allocated somewhere in this plan.</div>
+          ) : (
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {unallocated.map(p => {
+                const heroes = (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero);
+                return (
+                  <div key={p.id} style={{ padding:'6px 12px', borderRadius:16, background:C.card, border:`1px solid ${C.border}` }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:C.white }}>{p.username || p.alias || '?'}</span>
+                    {heroes.length > 0 && <span style={{ fontSize:11, color:C.gold, marginLeft:6 }}>{heroes.slice(0,2).join(', ')}{heroes.length > 2 ? ` +${heroes.length-2}` : ''}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Sticky Go Live bar */}

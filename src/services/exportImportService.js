@@ -39,7 +39,7 @@ export function exportToFile(data, allianceTag) {
   const obj = {
     _version: CURRENT_VERSION,
     _exported: new Date().toISOString(),
-    _note: 'Exported from Alliance Manager.',
+    _note: 'Exported from Caroline.',
     ...data,
   };
   const url = URL.createObjectURL(

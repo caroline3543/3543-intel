@@ -21,10 +21,15 @@ import { JoinerSlotRow }   from './JoinerSlotRow.jsx';
 //   onMoveDown    – () => void
 //   onGoToMembers – () => void  (navigation shortcut)
 //   maxGeneration – number from Settings
+//   assignedInOtherSlots – Set of playerIds already used as a priority
+//                          joiner in a DIFFERENT slot in this same plan
+//                          (plan-wide exclusivity — a priority joiner
+//                          can only be used in one rally per event)
 export function RallySlotCard({
   slot, index, players, totalSlots,
   onUpdate, onDelete, onMoveUp, onMoveDown,
   onGoToMembers, maxGeneration = 6,
+  assignedInOtherSlots,
 }) {
   const [open, setOpen]               = useState(index === 0);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -34,7 +39,13 @@ export function RallySlotCard({
   const filledJoiners = slot.joiners.filter(j => j.playerName && j.heroName).length;
   const allJoinersFilled = filledJoiners === 4;
 
-  const allAssignedIds = new Set(slot.joiners.filter(j => j.playerId).map(j => j.playerId));
+  // Priority-joiner exclusivity is plan-wide, not just within this
+  // slot's own 4 joiners — merge in anyone already assigned elsewhere
+  // in the same battle plan (passed down from PlanDetail).
+  const allAssignedIds = new Set([
+    ...slot.joiners.filter(j => j.playerId).map(j => j.playerId),
+    ...(assignedInOtherSlots || []),
+  ]);
 
   function upd(patch) { onUpdate({ ...slot, ...patch }); }
   function updJoiner(i, patch) {

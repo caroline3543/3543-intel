@@ -315,7 +315,7 @@ function buildCoverSheet(data) {
   const now      = new Date().toLocaleString();
   const alliance = data.settings?.allianceName || data.settings?.allianceTag || 'Alliance';
   const rows = [
-    [cell('ALLIANCE MANAGER', { font: { bold: true, sz: 18, name: 'Arial', color: { rgb: 'F5A623' } } })],
+    [cell('CAROLINE', { font: { bold: true, sz: 18, name: 'Arial', color: { rgb: 'F5A623' } } })],
     [cell(alliance, { font: { bold: true, sz: 14, name: 'Arial', color: { rgb: 'FFFFFF' } } })],
     [],
     [cell('Exported:', SUBHEADER_STYLE), cell(now, ROW_STYLE)],
