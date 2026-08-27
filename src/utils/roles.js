@@ -31,6 +31,7 @@ export function newRoleDef(name, existingCustomCount = 0) {
     color:   ROLE_COLOR_PALETTE[existingCustomCount % ROLE_COLOR_PALETTE.length],
     icon:    DEFAULT_ROLE_ICON,
     builtin: false,
+    updatedAt: new Date().toISOString(),
   };
 }
 

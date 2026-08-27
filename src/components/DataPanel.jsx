@@ -3,25 +3,46 @@ import { C } from '../utils/constants.js';
 import { SheetHandle } from './common/Primitives.jsx';
 import { exportWorkbook } from '../services/exportXlsx.js';
 
-export function DataPanel({ data, onImport, onExport, onClose, showToast }) {
+function formatSyncTime(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${hh}:${mm} UTC`;
+}
+
+export function DataPanel({
+  data, onImport, onExport, onClose, showToast,
+  syncFromCloud, syncStatus, lastSyncedAt, isCloudConfigured,
+}) {
   const fileRef = useRef();
   const [mode, setMode]         = useState('replace');
   const [msg, setMsg]           = useState(null);
   const [xlsxLoading, setXlsxLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setImporting(true);
     try {
-      const { importFromFile } = await import('../services/exportImportService.js');
-      const imp = await importFromFile(file);
+      const isXlsx = /\.xlsx$/i.test(file.name);
+      let imp;
+      if (isXlsx) {
+        const { importFromXlsxFile } = await import('../services/xlsxImportService.js');
+        imp = await importFromXlsxFile(file);
+      } else {
+        const { importFromFile } = await import('../services/exportImportService.js');
+        imp = await importFromFile(file);
+      }
       onImport(imp, mode);
-      setMsg({ text:'✓ Imported successfully', type:'success' });
+      setMsg({ text: `✓ Imported from ${isXlsx ? 'spreadsheet' : 'JSON'} successfully`, type:'success' });
       setTimeout(() => setMsg(null), 3000);
     } catch (err) {
       setMsg({ text:`Failed: ${err.message}`, type:'error' });
       setTimeout(() => setMsg(null), 4000);
     }
+    setImporting(false);
     e.target.value = '';
   }
 
@@ -44,6 +65,7 @@ export function DataPanel({ data, onImport, onExport, onClose, showToast }) {
   const memberCount   = (data.players||[]).length;
   const hasJoiners    = (data.players||[]).some(p=>(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5));
   const joinerEvents  = (data.events||[]).filter(e=>['SvS','SvS Castle Battle','Internal Sunfire Castle'].includes(e.type));
+  const syncing       = syncStatus === 'syncing';
 
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'#000c', zIndex:300, display:'flex', alignItems:'flex-end' }}>
@@ -70,6 +92,43 @@ export function DataPanel({ data, onImport, onExport, onClose, showToast }) {
           ))}
         </div>
 
+        {/* ── Cloud Sync — manual only, no realtime ── */}
+        <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:12 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+            <span style={{ fontSize:24 }}>🔄</span>
+            <div>
+              <div style={{ fontSize:15, fontWeight:700, color:C.white }}>Cloud Sync</div>
+              <div style={{ fontSize:12, color:C.muted }}>
+                {!isCloudConfigured
+                  ? 'Not set up for this install'
+                  : lastSyncedAt
+                    ? `Last synced ${formatSyncTime(lastSyncedAt)}`
+                    : 'Never synced on this device'}
+              </div>
+            </div>
+          </div>
+
+          {isCloudConfigured ? (
+            <>
+              {syncStatus === 'error' && (
+                <div style={{ padding:'8px 12px', borderRadius:8, marginBottom:10, background:C.red+'18', color:C.red, fontSize:12, fontWeight:600 }}>
+                  Sync failed — check your connection and try again.
+                </div>
+              )}
+              <button
+                onClick={syncFromCloud}
+                disabled={syncing}
+                style={{ width:'100%', height:48, borderRadius:10, background:syncing?C.card:C.gold, border:syncing?`1px solid ${C.border}`:'none', color:syncing?C.muted:C.bg, fontWeight:700, fontSize:14, cursor:syncing?'default':'pointer', opacity:syncing?0.8:1 }}
+              >
+                {syncing ? 'Syncing…' : '🔄 Sync now'}
+              </button>
+              <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>Pulls the latest roster and battle plans from the cloud and merges them in — nothing local gets deleted.</div>
+            </>
+          ) : (
+            <div style={{ fontSize:12, color:C.muted }}>Ask whoever set up this alliance's account to share cloud sync access.</div>
+          )}
+        </div>
+
         {/* ── Spreadsheet Export — primary action ── */}
         <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:12 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
@@ -89,6 +148,7 @@ export function DataPanel({ data, onImport, onExport, onClose, showToast }) {
               (data.prepScores||[]).length > 0 ? ['✓', `Prep Scores — ${(data.prepScores||[]).length} entries`, C.green] : null,
               eventCount > 0 ? ['✓', `${eventCount} event${eventCount!==1?'s':''} — attendance, Discord, performance`, C.green] : null,
               joinerEvents.length > 0 ? ['✓', `${joinerEvents.length} SvS/Castle event${joinerEvents.length!==1?'s':''} include joiner coverage columns`, C.gold] : null,
+              ['✓', 'Can be re-imported on another device — nothing is lost round-tripping', C.icy],
             ].filter(Boolean).map(([icon, text, color], i) => (
               <div key={i} style={{ display:'flex', gap:8, marginBottom:4 }}>
                 <span style={{ fontSize:12, color, flexShrink:0 }}>{icon}</span>
@@ -118,19 +178,21 @@ export function DataPanel({ data, onImport, onExport, onClose, showToast }) {
         {/* ── Import ── */}
         <div style={{ background:C.section, borderRadius:12, padding:16 }}>
           <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:8 }}>Import</div>
+          <div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>Accepts either a JSON backup or an .xlsx spreadsheet exported from this app (uses its hidden "…Data" sheets — the pretty report sheets alone can't be re-imported).</div>
           <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-            {[['replace','Replace all'],['merge','Merge']].map(([v,l]) => (
-              <button key={v} onClick={() => setMode(v)} style={{ flex:1, height:40, borderRadius:10, border:`1px solid ${mode===v?C.gold:C.border}`, background:mode===v?C.gold+'22':C.card, color:mode===v?C.gold:C.muted, fontWeight:600, fontSize:14, cursor:'pointer' }}>
+            {[['replace','Replace all'],['merge','Merge — newest edit wins']].map(([v,l]) => (
+              <button key={v} onClick={() => setMode(v)} style={{ flex:1, height:40, borderRadius:10, border:`1px solid ${mode===v?C.gold:C.border}`, background:mode===v?C.gold+'22':C.card, color:mode===v?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
                 {l}
               </button>
             ))}
           </div>
           <div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>
-            {mode === 'replace' ? '⚠️ Replaces all existing data.' : 'Merges with existing data by ID — nothing is deleted.'}
+            {mode === 'replace' ? '⚠️ Replaces all existing data.' : 'Merges with existing data record by record — whichever side was edited more recently wins, nothing is deleted.'}
           </div>
-          <input type="file" accept=".json" ref={fileRef} onChange={handleFile} style={{ display:'none' }} />
-          <button onClick={() => fileRef.current?.click()} style={{ width:'100%', height:44, borderRadius:10, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:14, cursor:'pointer' }}>
-            ⬆️ Choose JSON file
+          <input type="file" accept=".json,.xlsx" ref={fileRef} onChange={handleFile} style={{ display:'none' }} />
+          <button onClick={() => fileRef.current?.click()} disabled={importing}
+            style={{ width:'100%', height:44, borderRadius:10, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:14, cursor:importing?'default':'pointer', opacity:importing?0.7:1 }}>
+            {importing ? 'Importing…' : '⬆️ Choose JSON or .xlsx file'}
           </button>
         </div>
       </div>

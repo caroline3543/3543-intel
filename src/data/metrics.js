@@ -48,6 +48,53 @@ export function calcMetrics(player, events) {
 }
 
 /**
+ * Given a recommended formation's joiner slots (already resolved to
+ * their real hero alternatives — see battleConstants.js's
+ * resolveHero(), which knows "Jessie*" means Jessie/Jasser/Jeronimo,
+ * not literally "Jessie" with an asterisk stripped) and the current
+ * roster, pick a specific roster member for each slot — weighted by
+ * who owns any of that slot's acceptable heroes at Skill 5 and who's
+ * currently available. Reuses autoSuggestPlayers' scoring rather than
+ * duplicating it.
+ *
+ * Deliberately takes pre-resolved slots rather than raw formation
+ * strings (formation.j1 etc.) or importing battleConstants.js itself —
+ * this file is data-layer (src/data/), resolveHero() lives in the
+ * battle component tree (src/components/svs/battle/), and the
+ * substitution-notation parsing belongs there, not here.
+ *
+ * @param resolvedSlots  [{ slotLabel, heroOptions: string[] }, ...] —
+ *                       heroOptions is every acceptable hero name for
+ *                       that slot (e.g. ['Jessie','Jasser','Jeronimo']).
+ * One player is never assigned to two slots in the same call.
+ *
+ * Returns one entry per slot: { player, hero, slotIndex, slotLabel,
+ * score, reasons, missing }. `player` is null if no available roster
+ * member owns any option in that slot.
+ */
+export function suggestPriorityJoiners(resolvedSlots, players, events) {
+  if (!resolvedSlots?.length) return [];
+  const assigned = new Set();
+
+  return resolvedSlots.map(({ slotLabel, heroOptions }, slotIndex) => {
+    let best = null;
+
+    for (const hero of heroOptions || []) {
+      const ranked = autoSuggestPlayers(players, events, { heroes: [hero], requireAvailable: true })
+        .filter(c => !assigned.has(c.player.id));
+      if (ranked.length && (!best || ranked[0].score > best.score)) {
+        best = { player: ranked[0].player, hero, score: ranked[0].score, reasons: ranked[0].reasons, missing: ranked[0].missing };
+      }
+    }
+
+    if (best) assigned.add(best.player.id);
+    return best
+      ? { ...best, slotIndex, slotLabel }
+      : { player: null, hero: heroOptions?.[0] || null, slotIndex, slotLabel, score: 0, reasons: [], missing: ['No available roster member owns this hero'] };
+  });
+}
+
+/**
  * Auto-suggest players ranked by suitability for a given requirement set.
  */
 export function autoSuggestPlayers(players, events, requirements = {}) {

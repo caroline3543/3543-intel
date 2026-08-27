@@ -11,8 +11,6 @@ import { LeaderMode }      from './rally/LeaderMode.jsx';
 import { Calculator }      from './rally/Calculator.jsx';
 import { MarchRegistry }   from './rally/MarchRegistry.jsx';
 import { ArchivedSection, TimerSheet } from './rally/ArchivedSection.jsx';
-import { useVoiceCountdown, loadVoiceSettings, saveVoiceSettings } from './rally/useVoiceCountdown.js';
-import { VoiceSettingsSheet } from './rally/VoiceSettingsSheet.jsx';
 
 const DEFAULT_STATE = {
   timers:[], archived:[], marchRegistry:[],
@@ -31,16 +29,8 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
   const [prefillImpact, setPrefillImpact]   = useState(null);
   const [leaderTimer, setLeaderTimer]       = useState(null);
   const [toastMsg, setToastMsg]             = useState(null);
-  const [voiceSettings, setVoiceSettings]   = useState(() => loadVoiceSettings());
-  const [voiceSheetOpen, setVoiceSheetOpen] = useState(false);
   const [clearConfirm, setClearConfirm]     = useState(false);
   const planLoadedRef = useRef(false);
-
-  // Persist voice settings whenever they change
-  useEffect(() => { saveVoiceSettings(voiceSettings); }, [voiceSettings]);
-
-  // Wire up voice countdown — runs in background, zero re-renders
-  useVoiceCountdown(state.timers, voiceSettings.voiceOn, voiceSettings.cues, voiceSettings.voiceURI, voiceSettings.rate, voiceSettings.pitch);
 
   // Pre-populate calculator from Battle Plan (once only)
   useEffect(() => {
@@ -62,8 +52,6 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
   useEffect(() => { saveState(state); }, [state]);
 
   // Auto-archive 30s after impact — checked every 10s.
-  // Unified schema: every timer stores impactAtUtc directly, so this is
-  // now a single check instead of branching on ASAP vs. scheduled shape.
   useEffect(() => {
     const id = setInterval(() => {
       const now = nowEpochSecs();
@@ -106,8 +94,6 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
       const toAdd = newTimers.slice(0, slots);
       if (toAdd.length < newTimers.length) showToast(`${toAdd.length} of ${newTimers.length} timers created — room full`);
       else showToast(`${toAdd.length} timer${toAdd.length !== 1 ? 's' : ''} started ✓`);
-      // Carry joiner/ratio assignments over from the calculator's leader
-      // row, matched by leaderName (the unified timer schema's field).
       const built = toAdd.map(t => {
         const cl = state.calculator.leaders.find(l => l.name === t.leaderName);
         return cl ? { ...t, joiners:cl.joiners||[], ratio:cl.ratio||'' } : t;
@@ -118,22 +104,9 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
     vibe([10,40,10]);
   }
 
-  const voiceOn = voiceSettings.voiceOn;
-
   return (
     <>
       {leaderTimer && <LeaderMode timer={leaderTimer} allTimers={state.timers} onClose={() => setLeaderTimer(null)}/>}
-
-      <VoiceSettingsSheet
-        open={voiceSheetOpen}
-        onClose={() => setVoiceSheetOpen(false)}
-        voiceOn={voiceSettings.voiceOn}
-        cues={voiceSettings.cues}
-        voiceURI={voiceSettings.voiceURI}
-        rate={voiceSettings.rate}
-        pitch={voiceSettings.pitch}
-        onChange={s => setVoiceSettings(s)}
-      />
 
       {toastMsg && (
         <div style={{ position:'fixed', top:20, left:'50%', transform:'translateX(-50%)', background:C.card+'ee', backdropFilter:'blur(12px)', border:`1px solid ${C.gold}44`, borderRadius:20, padding:'10px 20px', fontSize:14, fontWeight:600, color:C.gold, zIndex:800, whiteSpace:'nowrap', pointerEvents:'none' }}>
@@ -142,16 +115,10 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
       )}
 
       <div style={{ padding:'16px 20px 0' }}>
-        {/* Top bar: back + voice toggle */}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+        {/* Top bar: back */}
+        <div style={{ marginBottom:16 }}>
           <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', padding:0 }}>
             ← Back to Plans
-          </button>
-          <button
-            onClick={() => setVoiceSheetOpen(true)}
-            style={{ display:'flex', alignItems:'center', gap:6, height:36, padding:'0 12px', borderRadius:18, background:voiceOn ? C.gold+'22' : C.section, border:`1px solid ${voiceOn ? C.gold : C.border}`, color:voiceOn ? C.gold : C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-            {voiceOn ? '🔊' : '🔇'}
-            <span>{voiceOn ? 'Voice on' : 'Muted'}</span>
           </button>
         </div>
 

@@ -36,49 +36,52 @@ export function useAppState() {
     function handler() {
       showToast('⚠️ Storage full — export your data now to avoid losing changes', 'error');
     }
-    window.addEventListener('sunfire:storage-full', handler);
-    return () => window.removeEventListener('sunfire:storage-full', handler);
+    window.addEventListener('app:storage-full', handler);
+    return () => window.removeEventListener('app:storage-full', handler);
   }, [showToast]);
 
   const allianceTag = () => data.settings?.allianceTag || '';
 
   // ── Player operations ─────────────────────────────────────
   const savePlayer = useCallback((player) => {
+    const stamped = { ...player, profileLastUpdated: new Date().toISOString() };
     setData(prev => {
-      const isEdit = prev.players.some(p => p.id === player.id);
+      const isEdit = prev.players.some(p => p.id === stamped.id);
       return {
         ...prev,
         players: isEdit
-          ? prev.players.map(p => p.id === player.id ? player : p)
-          : [...prev.players, player],
+          ? prev.players.map(p => p.id === stamped.id ? stamped : p)
+          : [...prev.players, stamped],
         lastUpdated: new Date().toISOString(),
       };
     });
-    pushPlayer(player, allianceTag()); // fire-and-forget cloud push
+    pushPlayer(stamped, allianceTag()); // fire-and-forget cloud push
     showToast('Player saved ✓');
   }, [showToast]);
 
   const addPlayers = useCallback((newPlayers) => {
+    const stamped = newPlayers.map(p => ({ ...p, profileLastUpdated: new Date().toISOString() }));
     setData(prev => ({
       ...prev,
-      players: [...prev.players, ...newPlayers],
+      players: [...prev.players, ...stamped],
       lastUpdated: new Date().toISOString(),
     }));
-    newPlayers.forEach(p => pushPlayer(p, allianceTag()));
-    if (newPlayers.length) showToast(`${newPlayers.length} player${newPlayers.length !== 1 ? 's' : ''} added ✓`);
+    stamped.forEach(p => pushPlayer(p, allianceTag()));
+    if (stamped.length) showToast(`${stamped.length} player${stamped.length !== 1 ? 's' : ''} added ✓`);
   }, [showToast]);
 
   const updatePlayers = useCallback((updatedPlayers) => {
+    const stamped = updatedPlayers.map(p => ({ ...p, profileLastUpdated: new Date().toISOString() }));
     setData(prev => ({
       ...prev,
       players: prev.players.map(p => {
-        const u = updatedPlayers.find(u => u.id === p.id);
+        const u = stamped.find(u => u.id === p.id);
         return u ? u : p;
       }),
       lastUpdated: new Date().toISOString(),
     }));
-    updatedPlayers.forEach(p => pushPlayer(p, allianceTag()));
-    if (updatedPlayers.length) showToast(`${updatedPlayers.length} updated ✓`);
+    stamped.forEach(p => pushPlayer(p, allianceTag()));
+    if (stamped.length) showToast(`${stamped.length} updated ✓`);
   }, [showToast]);
 
   const deletePlayer = useCallback((id) => {
@@ -95,7 +98,7 @@ export function useAppState() {
   const createEvent = useCallback((ev) => {
     setData(prev => ({
       ...prev,
-      events: [...(prev.events || []), ev],
+      events: [...(prev.events || []), { ...ev, updatedAt: new Date().toISOString() }],
       lastUpdated: new Date().toISOString(),
     }));
     showToast('Event created ✓');
@@ -104,7 +107,7 @@ export function useAppState() {
   const updateEvent = useCallback((ev) => {
     setData(prev => ({
       ...prev,
-      events: (prev.events || []).map(e => e.id === ev.id ? ev : e),
+      events: (prev.events || []).map(e => e.id === ev.id ? { ...ev, updatedAt: new Date().toISOString() } : e),
       lastUpdated: new Date().toISOString(),
     }));
   }, []);

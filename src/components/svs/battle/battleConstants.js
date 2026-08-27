@@ -116,4 +116,4 @@ export function suggestJoinerHeroes(leaderPlayer, slotType, leaderRallyHeroes) {
   };
 }
 
-export const FC_ORDER = ['FC1','FC2','FC3','FC4','FC5'];
+export const FC_ORDER = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','Helios'];

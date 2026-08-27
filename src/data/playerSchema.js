@@ -51,6 +51,7 @@ export function newEvent(overrides = {}) {
     participantIds: [],
     notes:          '',
     createdAt:      new Date().toISOString(),
+    updatedAt:      new Date().toISOString(),
     snapshots:      [],
     ...overrides,
   };
@@ -82,9 +83,10 @@ export function newSnapshot(playerId, playerProfile, eventId) {
     },
     combat: {
       joinedRallies: false, ledRallies: false,
-      defendedStructures: false,
+      defendedStructures: false, followedOrders: null, wentRogue: false,
     },
     notes:          '',
+    performanceTag: null,
   };
 }
 
@@ -99,6 +101,7 @@ export function newSvsPlan(overrides = {}) {
     postBattleNotes: '',
     rallySlots:      [],   // new structure — replaces rallies/reinforcements
     createdAt:       new Date().toISOString(),
+    updatedAt:       new Date().toISOString(),
     ...overrides,
   };
 }

@@ -15,7 +15,7 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
   const existingTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
 
   function createPlan(plan)    { onSave([...plans, plan]); setActivePlanId(plan.id); showToast('Plan created ✓'); }
-  function updatePlan(updated) { onSave(plans.map(p => p.id === updated.id ? updated : p)); }
+  function updatePlan(updated) { onSave(plans.map(p => p.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : p)); }
 
   function deletePlan(id) {
     onDelete(id);
@@ -30,6 +30,7 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
       name: `${plan.name || 'Plan'} (copy)`,
       status: 'draft',
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     onSave([...plans, copy]);
   }

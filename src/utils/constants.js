@@ -14,7 +14,15 @@ export const C = {
   border:  '#2A4A64',
 };
 
-export const TIER_OPTIONS = ['T10','FC1','FC2','FC3','FC4','FC5','T11','T12'];
+// Tier order, low to high. FC1–FC8 all enhance T10 troops without
+// changing their tier name; T11 is unlocked separately; Helios
+// ("Helios T11") is a further War Academy research tier above T11 —
+// not a camp-level milestone like the FC tiers.
+// NOTE: 'T12' was already in this list before this edit and is kept
+// as-is (not removing data that may already be stored on players) —
+// but current sourcing only confirms Helios as the tier above T11, not
+// a 'T12'. Worth confirming whether T12 is real or a leftover/typo.
+export const TIER_OPTIONS = ['T10','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11','Helios','T12'];
 
 // NOTE: player roles are no longer a fixed list. "Rally Lead" is the only
 // permanent, built-in role (see src/utils/roles.js) — every other role is

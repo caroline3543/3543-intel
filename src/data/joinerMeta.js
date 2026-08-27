@@ -17,7 +17,7 @@ export const JOINER_META = [
   {
     gen: 1, genLabel: 'Gen 1 — Jeronimo, Natalia, Molly, Zinman + Purple Heroes',
     formations: [
-      { type:'Defense', ratio:'60/40/0 or 60/10/30', leaders:['Jeronimo','Molly & Zinman'],   j1:'Jessie*', j2:'Seeyoon', j3:'Patrick', j4:'Sergey**', alt1:'Ling Xue', comments:'Jeronimo is Jessie + Seyoon already so stacking happens' },
+      { type:'Defense', ratio:'60/40/0 or 60/10/30', leaders:['Jeronimo','Molly & Zinman'],   j1:'Jessie*', j2:'Seeyoon', j3:'Patrick', j4:'Patrick', alt1:'Sergey**', alt2:'Ling Xue', comments:'Jeronimo is Jessie + Seyoon already so stacking happens' },
       { type:'Offense', ratio:'50/20/30 or 30/20/50', leaders:['Jeronimo','Molly & Zinman'],   j1:'Jessie*', j2:'Seeyoon', j3:'Patrick', j4:'Jessie*/Patrick', alt1:'Sergey**', alt2:'Ling Xue', comments:'Jeronimo is Jessie + Seyoon already so stacking happens' },
     ],
   },
@@ -40,9 +40,9 @@ export const JOINER_META = [
     gen: 4, genLabel: 'Gen 4 — Ahmose, Reina, Lynn',
     formations: [
       { type:'Defense', ratio:'60/40/0 or 60/30/10', leaders:['Ahmose/Logan & Reina & Lynn'], j1:'Mia',     j2:'Patrick', j3:'Jessie*', j4:'Seeyoon',    alt1:'Zinman',   alt2:'Philly' },
-      { type:'Defense', ratio:'50/20/30 or 30/20/50', leaders:['Jeronimo & Reina & Greg'],    j1:'Mia',     j2:'Patrick', j3:'Philly',  j4:'Zinman',     alt1:'Jessie*',  alt2:'Seeyoon', comments:'Jeronimo is Jessie + Seyoon already' },
+      { type:'Offense', ratio:'50/20/30 or 30/20/50', leaders:['Jeronimo & Reina & Greg'],    j1:'Mia',     j2:'Philly',  j3:'Patrick', j4:'Zinman',     alt1:'Jessie*',  alt2:'Seeyoon', comments:'Jeronimo is Jessie + Seyoon already' },
       { type:'Offense', ratio:'48/4/48 or 40/10/50',  leaders:['Jeronimo & Mia & Greg/Alonso'],j1:'Patrick',j2:'Philly',  j3:'Zinman',  j4:'Reina',     alt1:'Jessie*',  alt2:'Seeyoon', comments:'Jeronimo is Jessie + Seyoon already' },
-      { type:'Offense', ratio:'60/40/0 or 40/60/0',   leaders:['Jeronimo & Reina/Mia & Mia & Greg'],j1:'Mia/Reina',j2:'Patrick',j3:'Zinman',j4:'Jessie*', alt1:'Seeyoon', comments:'ONLY 1 Mia, do not stack. Jeronimo is Jessie + Seyoon already' },
+      { type:'Offense', ratio:'60/40/0 or 40/60/0',   leaders:['Jeronimo & Reina/Mia & Greg'],j1:'Patrick', j2:'Philly',  j3:'Zinman',  j4:'Mia/Reina',  alt1:'Jessie*',  alt2:'Seeyoon', comments:'ONLY 1 Mia, do not stack here. Jeronimo is Jessie + Seyoon already' },
     ],
   },
   {
@@ -50,7 +50,7 @@ export const JOINER_META = [
     formations: [
       { type:'Defense', ratio:'60/40/0',               leaders:['Hector & Norah & Zinman'],    j1:'Mia',     j2:'Patrick', j3:'Jessie*', j4:'Philly' },
       { type:'Offense', ratio:'50/20/30 or 30/20/50',  leaders:['Jeronimo & Reina & Gwen'],    j1:'Mia',     j2:'Jessie*', j3:'Seeyoon', j4:'Norah',     alt1:'Patrick',  alt2:'Philly' },
-      { type:'Offense', ratio:'48/4/48 or 40/10/50',   leaders:['Jeronimo & Mia & Gwen'],      j1:'Norah',   j2:'Norah',   j3:'Norah',   j4:'Patrick',    alt2:'Philly',   alt3:'Zinman', comments:'Alternative joiners choice: Jessie, Seeyoon, 2xPatrick' },
+      { type:'Offense', ratio:'48/4/48 or 40/10/50',   leaders:['Jeronimo & Mia & Gwen'],      j1:'Norah',   j2:'Norah',   j3:'Norah',   j4:'Patrick',    alt1:'Philly',   alt2:'Zinman', comments:'Alternative joiners choice: Jessie, Seeyoon, 2xPatrick' },
       { type:'Offense', ratio:'60/40/0 or 40/60/0',    leaders:['Jeronimo & Norah & Greg'],    j1:'Mia',     j2:'Patrick', j3:'Jessie*', j4:'Philly',     alt1:'Zinman' },
     ],
   },
@@ -61,7 +61,7 @@ export const JOINER_META = [
       { type:'Offense', ratio:'50/20/30 or 30/20/50',  leaders:['Jeronimo & Renee & Gwen'],    j1:'Jessie*', j2:'Seeyoon', j3:'Mia',     j4:'Norah',      alt1:'Patrick',  alt2:'Wu Ming', comments:'Jeronimo is Jessie + Seyoon already so stacking happens. Wu Ming to counter his skills damages' },
       { type:'Offense', ratio:'48/4/48 or 40/10/50',   leaders:['Jeronimo/Hector & Mia & Wayne/Gwen'],j1:'Norah',j2:'Norah',j3:'Norah',j4:'Norah/Patrick',alt1:'or 25%', comments:'Alternative joiners choice: Jessie, Seeyoon, 2xPatrick. Wu Ming to counter his skills damages' },
       { type:'Offense', ratio:'60/40/0 or 40/60/0',    leaders:['Jeronimo & Renee & Greg'],    j1:'Mia',     j2:'Patrick', j3:'Jessie**',j4:'Seeyoon',    alt1:'Wu Ming',  alt2:'Philly', comments:'Jeronimo is Jessie + Seyoon already so stacking happens. Wu Ming to counter his skills damages' },
-      { type:'NEW META Defense', ratio:'45/5/50',       leaders:['Logan & Philly & Wayne'],     j1:'Norah',   j2:'Norah',   j3:'Norah',   j4:'Norah/Patrick',alt1:'or 25%', comments:'', isMeta:true },
+      { type:'NEW META Defense', ratio:'48/4/48 or 45/5/50', leaders:['Logan & Philly & Wayne'],     j1:'Norah',   j2:'Norah',   j3:'Norah',   j4:'Norah/Patrick',alt1:'or 25%', comments:'', isMeta:true },
       { type:'NEW Defense',      ratio:'45/16/40',      leaders:['Hector & Norah & Wayne'],     j1:'Mia',     j2:'Patrick', j3:'Philly',  j4:'Lynn',       alt1:'or 25%', isMeta:true },
     ],
   },
@@ -77,6 +77,30 @@ export function buildCoverageReport(players, heroList) {
     );
     return { hero, count: owners.length, owners };
   });
+}
+
+/**
+ * Given a generation and attack/defense type, return ONE recommended
+ * formation — not a browsable list of every variant. This is what
+ * powers the simplified Battle Plan picker: pick gen + type, get a
+ * single clear answer (leader heroes, ratio, joiners), not a menu of
+ * every Offense A/B/C variant.
+ *
+ * When a generation has multiple matching formations (e.g. three
+ * Offense variants), established (non-isMeta) entries are preferred
+ * over "NEW"/isMeta ones — those are newer, less-verified picks (see
+ * the December-update warning at the top of this file's source data)
+ * and shouldn't be the default recommendation until more real-world
+ * results confirm them.
+ */
+export function getRecommendedFormation(gen, type) {
+  const genData = JOINER_META.find(g => g.gen === gen);
+  if (!genData) return null;
+  const wanted = (type || '').toLowerCase();
+  const matches = genData.formations.filter(f => f.type.toLowerCase().includes(wanted));
+  if (!matches.length) return null;
+  const established = matches.filter(f => !f.isMeta);
+  return established[0] || matches[0];
 }
 
 /**

@@ -15,6 +15,7 @@
 
 import * as XLSX from 'xlsx';
 import { JOINER_COVERAGE_EVENTS } from '../utils/constants.js';
+import { buildRosterDataSheet, buildEventsDataSheet, buildPlansDataSheet, buildRolesDataSheet } from './xlsxDataSheets.js';
 
 // ── Styling helpers ────────────────────────────────────────────
 const HEADER_STYLE = {
@@ -314,7 +315,7 @@ function buildCoverSheet(data) {
   const now      = new Date().toLocaleString();
   const alliance = data.settings?.allianceName || data.settings?.allianceTag || 'Alliance';
   const rows = [
-    [cell('SUNFIRE COMMAND', { font: { bold: true, sz: 18, name: 'Arial', color: { rgb: 'F5A623' } } })],
+    [cell('ALLIANCE MANAGER', { font: { bold: true, sz: 18, name: 'Arial', color: { rgb: 'F5A623' } } })],
     [cell(alliance, { font: { bold: true, sz: 14, name: 'Arial', color: { rgb: 'FFFFFF' } } })],
     [],
     [cell('Exported:', SUBHEADER_STYLE), cell(now, ROW_STYLE)],
@@ -327,6 +328,8 @@ function buildCoverSheet(data) {
     [cell('• Joiner Coverage', ROW_STYLE), cell('Hero Skill 5 ownership across the alliance', ROW_STYLE)],
     [cell('• Prep Scores', ROW_STYLE), cell('SvS prep points and targets', ROW_STYLE)],
     [cell('• [Event sheets]', ROW_STYLE), cell('One sheet per event — attendance, Discord, performance', ROW_STYLE)],
+    [],
+    [cell('This file also contains hidden "…Data" sheets (Roster Data, Events Data, etc.) with one row per record. These are how this app reads a spreadsheet back in — leave them alone unless you know what you\'re doing.', { font: { italic: true, sz: 9, name: 'Arial', color: { rgb: '888888' } } })],
     [],
     [cell('Note: SvS and Castle events include joiner coverage columns in their attendance sheet.', { font: { italic: true, sz: 9, name: 'Arial', color: { rgb: '888888' } } })],
   ];
@@ -376,11 +379,35 @@ export function exportWorkbook(data) {
     XLSX.utils.book_append_sheet(wb, eventWs, sheetName);
   });
 
-  // 6. Generate filename
+  // 6. Raw "…Data" sheets — one row per record, for re-importing this
+  // file back into the app later (see xlsxImportService.js). Hidden by
+  // default (Sheet > Unhide to see them) so they don't clutter the
+  // view for someone just reading the report.
+  const dataSheetNames = [];
+  const rosterDataWs = buildRosterDataSheet(data.players || []);
+  XLSX.utils.book_append_sheet(wb, rosterDataWs, 'Roster Data');
+  dataSheetNames.push('Roster Data');
+
+  const eventsDataWs = buildEventsDataSheet(data.events || []);
+  XLSX.utils.book_append_sheet(wb, eventsDataWs, 'Events Data');
+  dataSheetNames.push('Events Data');
+
+  const plansDataWs = buildPlansDataSheet(data.svsPlans || []);
+  XLSX.utils.book_append_sheet(wb, plansDataWs, 'Plans Data');
+  dataSheetNames.push('Plans Data');
+
+  const rolesDataWs = buildRolesDataSheet(data.customRoles || []);
+  XLSX.utils.book_append_sheet(wb, rolesDataWs, 'Roles Data');
+  dataSheetNames.push('Roles Data');
+
+  wb.Workbook = wb.Workbook || {};
+  wb.Workbook.Sheets = wb.SheetNames.map(name => ({ Hidden: dataSheetNames.includes(name) ? 1 : 0 }));
+
+  // 7. Generate filename
   const alliance  = data.settings?.allianceTag || 'export';
   const dateStr   = new Date().toISOString().slice(0, 10);
-  const filename  = `sunfire-${alliance}-${dateStr}.xlsx`;
+  const filename  = `alliance-manager-${alliance}-${dateStr}.xlsx`;
 
-  // 7. Write and download
+  // 8. Write and download
   XLSX.writeFile(wb, filename, { bookType: 'xlsx', type: 'binary', cellStyles: true });
 }

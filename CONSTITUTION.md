@@ -99,7 +99,6 @@ BattleTab and LiveRallyRoom both hit ~1000 lines before being split. Don't let i
 | Key | Owner | Contents |
 |-----|-------|----------|
 | `svs_live_rally_room_v2` | `LiveRallyRoom.jsx` | Timers, calculator, march registry |
-| `svs_voice_settings` | `useVoiceCountdown.js` | Voice on/off, cues, voiceURI, rate, pitch |
 | `svs_onboarded` | `LandingPage.jsx` | Onboarding complete flag |
 | (global app data) | `exportImportService.js` | Players, plans, events, scores, settings |
 
@@ -115,6 +114,7 @@ BattleTab and LiveRallyRoom both hit ~1000 lines before being split. Don't let i
 | Timer identity system (emoji/number/border) | ❌ Reverted | Visual noise, not useful under pressure |
 | Per-leader message template | ✅ Optional override | Alliance default + per-leader override |
 | CSS files | ❌ No | Inline styles keep everything co-located |
+| Voice countdown (SpeechSynthesis announcer) | ❌ Removed | Dropped — text/visual countdown is sufficient; simplifies Live Rally Room |
 | Router | ❌ No | Tab-based nav is sufficient and simpler |
 | TypeScript | ⏳ Not yet | Future migration path, not now |
 
