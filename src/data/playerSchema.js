@@ -119,6 +119,27 @@ export function newRallySlot(overrides = {}) {
     requestedHeroes: [],
     joiners:      [newJoinerSlot(), newJoinerSlot(), newJoinerSlot(), newJoinerSlot()],
     notes:        '',
+    testRallies:  [],       // real-battle results logged against this formation — see newTestRallyEntry
+    ...overrides,
+  };
+}
+
+/**
+ * A single logged real-battle result against a formation — who the
+ * leader fought, what the enemy's ratio/heroes/joiners were, and the
+ * outcome. Builds real data over time for formations flagged as
+ * unverified in joinerMeta.js.
+ */
+export function newTestRallyEntry(overrides = {}) {
+  return {
+    id:           uid(),
+    opponent:     '',   // who they went against
+    enemyRatio:   '',
+    enemyHeroes:  '',
+    enemyJoiners: '',
+    result:       '',   // free text — win/loss, points, whatever the leader wants to note
+    notes:        '',
+    createdAt:    new Date().toISOString(),
     ...overrides,
   };
 }

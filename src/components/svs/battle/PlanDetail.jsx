@@ -13,8 +13,10 @@ import { RallySlotCard } from './RallySlotCard.jsx';
 //   onBack        – () => void
 //   onGoLive      – (plan) => void
 //   onGoToMembers – () => void
-//   maxGeneration – number from Settings
-export function PlanDetail({ plan, players, onUpdate, onBack, onGoLive, onGoToMembers, maxGeneration = 6 }) {
+//   selectedGenerations – number[] from Settings — explicit list, NOT
+//                         cumulative; empty array means "no filter,
+//                         show everything" (see SettingsPanel.jsx)
+export function PlanDetail({ plan, players, onUpdate, onBack, onGoLive, onGoToMembers, selectedGenerations = [] }) {
   function updPlan(patch) { onUpdate({ ...plan, ...patch }); }
 
   function addSlot() {
@@ -119,7 +121,7 @@ export function PlanDetail({ plan, players, onUpdate, onBack, onGoLive, onGoToMe
           onMoveUp={() => moveSlot(i, -1)}
           onMoveDown={() => moveSlot(i, 1)}
           onGoToMembers={onGoToMembers}
-          maxGeneration={maxGeneration}
+          selectedGenerations={selectedGenerations}
           assignedInOtherSlots={assignedInOtherSlots(slot.id)}
         />
       ))}

@@ -7,6 +7,8 @@ import {
 } from './battleConstants.js';
 import { FormationPicker } from './FormationPicker.jsx';
 import { JoinerSlotRow }   from './JoinerSlotRow.jsx';
+import { RatioPicker }     from './RatioPicker.jsx';
+import { TestRallyLog }    from './TestRallyLog.jsx';
 
 // ── RallySlotCard ──────────────────────────────────────────────
 // One rally slot inside a battle plan.
@@ -20,7 +22,7 @@ import { JoinerSlotRow }   from './JoinerSlotRow.jsx';
 //   onMoveUp      – () => void
 //   onMoveDown    – () => void
 //   onGoToMembers – () => void  (navigation shortcut)
-//   maxGeneration – number from Settings
+//   selectedGenerations – number[] from Settings, explicit not cumulative
 //   assignedInOtherSlots – Set of playerIds already used as a priority
 //                          joiner in a DIFFERENT slot in this same plan
 //                          (plan-wide exclusivity — a priority joiner
@@ -28,7 +30,7 @@ import { JoinerSlotRow }   from './JoinerSlotRow.jsx';
 export function RallySlotCard({
   slot, index, players, totalSlots,
   onUpdate, onDelete, onMoveUp, onMoveDown,
-  onGoToMembers, maxGeneration = 6,
+  onGoToMembers, selectedGenerations = [],
   assignedInOtherSlots,
 }) {
   const [open, setOpen]               = useState(index === 0);
@@ -197,35 +199,7 @@ export function RallySlotCard({
             </div>
           </div>
 
-          {/* Troop ratio */}
-          <div style={{ marginBottom:14 }}>
-            <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>
-              Troop ratio <span style={{ fontWeight:400 }}>(Infantry / Lancer / Marksman)</span>
-            </label>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:slot.ratio==='Custom'?8:0 }}>
-              {RATIO_PRESETS.map(r => {
-                const sel = slot.ratio === r;
-                return (
-                  <button key={r} onClick={() => upd({ ratio:r })}
-                    style={{ padding:'6px 12px', borderRadius:16, border:`1px solid ${sel?C.icy:C.border}`, background:sel?C.icy+'22':C.section, color:sel?C.icy:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
-                    {r}
-                  </button>
-                );
-              })}
-              <button onClick={() => upd({ ratio:'Custom' })}
-                style={{ padding:'6px 12px', borderRadius:16, border:`1px solid ${slot.ratio&&!RATIO_PRESETS.includes(slot.ratio)?C.icy:C.border}`, background:slot.ratio&&!RATIO_PRESETS.includes(slot.ratio)?C.icy+'22':C.section, color:slot.ratio&&!RATIO_PRESETS.includes(slot.ratio)?C.icy:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
-                Custom
-              </button>
-            </div>
-            {(slot.ratio === 'Custom' || (slot.ratio && !RATIO_PRESETS.includes(slot.ratio))) && (
-              <input
-                value={slot.ratio === 'Custom' ? '' : slot.ratio}
-                onChange={e => upd({ ratio:e.target.value })}
-                placeholder="e.g. 55/35/10"
-                style={{ width:'100%', background:C.section, border:`1px solid ${C.border}`, borderRadius:8, padding:'10px 12px', fontSize:15, color:C.white, boxSizing:'border-box', fontFamily:'inherit', marginTop:6 }}
-              />
-            )}
-          </div>
+          <RatioPicker slot={slot} upd={upd} />
 
           {/* FC Troop requirements */}
           <div style={{ marginBottom:14 }}>
@@ -259,7 +233,7 @@ export function RallySlotCard({
             upd={upd}
             color={color}
             players={players}
-            maxGeneration={maxGeneration}
+            selectedGenerations={selectedGenerations}
           />
 
           {/* Priority joiners */}
@@ -282,7 +256,7 @@ export function RallySlotCard({
           </div>
 
           {/* Notes */}
-          <div>
+          <div style={{ marginBottom:14 }}>
             <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:6 }}>Strategy notes</label>
             <textarea
               value={slot.notes || ''}
@@ -291,6 +265,9 @@ export function RallySlotCard({
               style={{ width:'100%', minHeight:64, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:14, color:C.white, resize:'none', boxSizing:'border-box', fontFamily:'inherit' }}
             />
           </div>
+
+          {/* Test rallies — real-battle results logged against this formation */}
+          <TestRallyLog entries={slot.testRallies || []} onChange={testRallies => upd({ testRallies })} />
         </div>
       )}
     </div>

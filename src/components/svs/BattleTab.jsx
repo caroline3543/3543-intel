@@ -50,7 +50,7 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
         onBack={() => setActivePlanId(null)}
         onGoLive={handleGoLive}
         onGoToMembers={onGoToMembers}
-        maxGeneration={settings?.maxGeneration || 6}
+        selectedGenerations={settings?.selectedGenerations || []}
       />
     );
   }

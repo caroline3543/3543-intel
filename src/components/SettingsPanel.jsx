@@ -9,6 +9,18 @@ export function SettingsPanel({ settings, onSave, onClose }) {
   const [s, setS] = useState(settings || {});
   function upd(k, v) { setS(prev => ({ ...prev, [k]: v })); }
 
+  // Multi-select — NOT cumulative. Selecting Gen 4 and Gen 5 means
+  // exactly those two show up in battle-plan suggestions, nothing
+  // else. Replaces the old "this generation and everything below it"
+  // single-select model, which showed generations an alliance may have
+  // already outgrown.
+  const selectedGens = s.selectedGenerations || [];
+  function toggleGen(gen) {
+    upd('selectedGenerations', selectedGens.includes(gen)
+      ? selectedGens.filter(g => g !== gen)
+      : [...selectedGens, gen].sort((a, b) => a - b));
+  }
+
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'#000c', zIndex:300, display:'flex', alignItems:'flex-end' }}>
       <div onClick={e => e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', padding:'16px 20px 60px', maxHeight:'86vh', overflowY:'auto' }}>
@@ -27,26 +39,27 @@ export function SettingsPanel({ settings, onSave, onClose }) {
           <Inp value={s.stateId} onChange={v => upd('stateId', v)} placeholder="e.g. 1234" inputMode="numeric" />
         </Field>
 
-        {/* Generation setting */}
-        <Field label="Hero Generation" hint="Only formations from this generation and below will be suggested in battle planning.">
+        {/* Generation setting — multi-select */}
+        <Field label="Hero Generations" hint="Select every generation your alliance is actively using. Only these will be suggested in battle planning — you don't need to also select the generations below them.">
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {GENERATIONS.map(g => {
-              const sel = (s.maxGeneration || 6) >= g.gen;
-              const active = s.maxGeneration === g.gen;
+              const sel = selectedGens.includes(g.gen);
               return (
-                <button key={g.gen} onClick={() => upd('maxGeneration', g.gen)}
-                  style={{ textAlign:'left', padding:'10px 14px', borderRadius:10, border:`1px solid ${active?C.gold:sel?C.border:C.border+'44'}`, background:active?C.gold+'22':C.section, cursor:'pointer' }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:active?C.gold:sel?C.white:C.muted }}>
-                    {active?'✓ ':''}Gen {g.gen}
-                    {active&&<span style={{ fontSize:11, fontWeight:400, color:C.gold, marginLeft:8 }}>Current</span>}
+                <button key={g.gen} onClick={() => toggleGen(g.gen)}
+                  style={{ textAlign:'left', padding:'10px 14px', borderRadius:10, border:`1px solid ${sel?C.gold:C.border+'44'}`, background:sel?C.gold+'22':C.section, cursor:'pointer' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:sel?C.gold:C.muted }}>
+                    {sel?'✓ ':''}Gen {g.gen}
                   </div>
-                  <div style={{ fontSize:11, color:active?C.gold:C.muted, marginTop:2 }}>
+                  <div style={{ fontSize:11, color:sel?C.gold:C.muted, marginTop:2 }}>
                     {g.label.replace(`Gen ${g.gen} — `,'').replace(`Gen ${g.gen} —`,'')}
                   </div>
                 </button>
               );
             })}
           </div>
+          {selectedGens.length === 0 && (
+            <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>Nothing selected yet — battle planning will show suggestions from every generation until you pick which ones apply to you.</div>
+          )}
         </Field>
 
         <button onClick={() => onSave(s)} style={{ width:'100%', height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>
