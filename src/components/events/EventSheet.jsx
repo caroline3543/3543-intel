@@ -6,7 +6,7 @@ import { Field, Inp, SheetHandle } from '../common/Primitives.jsx';
 import { AlliancePicker } from '../common/AlliancePicker.jsx';
 
 // ── Event Sheet ────────────────────────────────────────────────
-function EventSheet({ event, open, onClose, onSave, players }) {
+export function EventSheet({ event, open, onClose, onSave, players }) {
   const [ev, setEv] = useState(() => event || newEvent());
 
   useEffect(() => {
