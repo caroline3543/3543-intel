@@ -1,25 +1,62 @@
+import { useState } from 'react';
 import { C } from '../../../utils/constants.js';
-import { JOINER_META } from '../../../data/joinerMeta.js';
+import { getRecommendedFormation } from '../../../data/joinerMeta.js';
+import { suggestPriorityJoiners } from '../../../data/metrics.js';
+import { newJoinerSlot } from '../../../data/playerSchema.js';
+import { buildFormationMessage } from '../../../services/formationMessage.js';
 import { resolveHero, playerCanFillSlot } from './battleConstants.js';
 
 // ── FormationPicker ────────────────────────────────────────────
 // Renders the guided/custom formation section inside a RallySlotCard.
+//
+// Redesigned: instead of browsing every formation for every generation
+// up to a cumulative cap, this shows ONE clear recommendation per
+// selected generation (via joinerMeta.js's getRecommendedFormation) —
+// exactly the generations chosen in Settings, nothing else. Selecting
+// a recommendation auto-fills the leader heroes, ratio, AND the 4
+// priority joiner slots (via suggestPriorityJoiners, weighted by who
+// owns the required heroes and is currently available) — the officer
+// can still hand-edit anything afterward.
+//
 // Props:
 //   slot           – rally slot object
 //   upd            – (patch) => void  — updates the parent slot
 //   color          – accent colour for this rally type
-//   players        – full roster array (for coverage checks)
-//   maxGeneration  – number (1–6), from Settings
-export function FormationPicker({ slot, upd, color, players, maxGeneration = 6 }) {
+//   players        – full roster array (for coverage checks + auto-suggest)
+//   events         – full events array (for auto-suggest's reliability scoring)
+//   selectedGenerations – number[] from Settings, explicit not cumulative;
+//                        empty means "no filter, show every generation"
+//   assignedInOtherSlots – Set of playerIds already used elsewhere in
+//                          this plan — auto-suggest won't propose them
+export function FormationPicker({ slot, upd, color, players, events = [], selectedGenerations = [], assignedInOtherSlots }) {
+  const [copied, setCopied] = useState(false);
   const isCustom = slot.formationMode === 'custom';
 
-  const availableFormations = JOINER_META
-    .filter(g => g.gen <= maxGeneration)
-    .flatMap(g => g.formations.map(f => ({ ...f, gen:g.gen, genLabel:g.genLabel })));
+  const gensToShow = selectedGenerations.length > 0
+    ? selectedGenerations
+    : Array.from({ length: 6 }, (_, i) => i + 1);
 
-  const filtered = slot.formationFilter
-    ? availableFormations.filter(f => f.type.toLowerCase().includes(slot.formationFilter.toLowerCase()))
-    : availableFormations;
+  // Real formation data sometimes packs multiple heroes into one array
+  // element (e.g. ['Jeronimo', 'Molly & Zinman']) — flatten to a clean
+  // list of individual hero names so "3 heroes chosen" checks (see
+  // RatioPicker.jsx) work against real data, not just custom mode's
+  // already-flat toggle list. "/" alternatives take the first option.
+  function flattenLeaders(leadersArr) {
+    return (leadersArr || [])
+      .flatMap(l => l.split('&').map(part => part.trim().split('/')[0].trim()))
+      .filter(Boolean);
+  }
+
+  function recsForGen(gen) {
+    if (slot.formationFilter) {
+      const rec = getRecommendedFormation(gen, slot.formationFilter);
+      return rec ? [rec] : [];
+    }
+    // "All" — one offense pick and one defense pick, not a full browse list
+    return [getRecommendedFormation(gen, 'offense'), getRecommendedFormation(gen, 'defense')].filter(Boolean);
+  }
+
+  const recommendations = gensToShow.flatMap(recsForGen);
 
   function getCoverage(f) {
     return [f.j1, f.j2, f.j3, f.j4].filter(Boolean).map(heroRaw => {
@@ -30,17 +67,71 @@ export function FormationPicker({ slot, upd, color, players, maxGeneration = 6 }
   }
 
   const selectedFormation = slot.selectedFormation
-    ? availableFormations.find(f =>
+    ? recommendations.find(f =>
         f.gen === slot.selectedFormation.gen &&
         f.leaders.join() === slot.selectedFormation.leaders.join() &&
         f.type === slot.selectedFormation.type)
     : null;
 
+  // Auto-suggest the 4 priority joiners for a formation's hero slots —
+  // resolves substitution notation ("Jessie*" -> Jessie/Jasser/Jeronimo)
+  // and excludes anyone already used elsewhere in this plan.
+  function autoSuggestJoiners(heroSlotStrings) {
+    const resolvedSlots = heroSlotStrings.filter(Boolean).map(raw => {
+      const r = resolveHero(raw);
+      return { slotLabel: raw, heroOptions: r ? [r.display, ...r.alternatives] : [raw] };
+    });
+    const excludeIds = assignedInOtherSlots || new Set();
+    const eligiblePlayers = players.filter(p => !excludeIds.has(p.id));
+    const suggested = suggestPriorityJoiners(resolvedSlots, eligiblePlayers, events);
+    return suggested.map(s => newJoinerSlot({
+      playerId:   s.player?.id || null,
+      playerName: s.player ? (s.player.username || s.player.alias || '') : '',
+      heroName:   s.hero || '',
+      confirmed:  true,
+    }));
+  }
+
+  function selectFormation(f) {
+    const isSelected = selectedFormation &&
+      f.gen === selectedFormation.gen && f.leaders.join() === selectedFormation.leaders.join() && f.type === selectedFormation.type;
+
+    if (isSelected) { upd({ selectedFormation: null }); return; }
+
+    upd({
+      selectedFormation: { gen:f.gen, leaders:f.leaders, type:f.type },
+      leaderRallyHeroes: flattenLeaders(f.leaders),
+      requestedHeroes:   [f.j1, f.j2, f.j3, f.j4].filter(Boolean).map(h => resolveHero(h)?.display).filter(Boolean),
+      ratio:             f.ratio,
+      joiners:           autoSuggestJoiners([f.j1, f.j2, f.j3, f.j4]),
+    });
+  }
+
+  function customAutoSuggest() {
+    upd({ joiners: autoSuggestJoiners(slot.requestedHeroes || []) });
+  }
+
+  function copyInstructions() {
+    const formation = selectedFormation || {
+      type: slot.type, ratio: slot.ratio, leaders: slot.leaderRallyHeroes || [],
+    };
+    const messageJoiners = (slot.joiners || []).map(j => ({
+      player: j.playerId ? { username: j.playerName } : null,
+      hero:   j.heroName,
+    }));
+    const text = buildFormationMessage(formation, messageJoiners, slot.leaderName);
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  }
+
+  const heroesLocked = (slot.leaderRallyHeroes || []).length === 3;
+
   return (
     <div style={{ marginBottom:14 }}>
       <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Formation</label>
       <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>
-        Showing Gen 1–{maxGeneration} formations. Change in ⚙️ Settings.
+        {selectedGenerations.length > 0
+          ? `Showing Gen ${selectedGenerations.join(', ')}. Change in ⚙️ Settings.`
+          : 'Showing all generations — pick which ones apply to you in ⚙️ Settings.'}
       </div>
 
       {/* All / Offense / Defense / Custom toggle */}
@@ -71,7 +162,7 @@ export function FormationPicker({ slot, upd, color, players, maxGeneration = 6 }
           <div style={{ fontSize:12, color:C.green, fontWeight:700, marginBottom:10 }}>🔬 Custom formation — enter any heroes and ratio</div>
 
           <div style={{ marginBottom:10 }}>
-            <label style={{ fontSize:11, color:C.muted, display:'block', marginBottom:6 }}>Leader rally heroes</label>
+            <label style={{ fontSize:11, color:C.muted, display:'block', marginBottom:6 }}>Leader rally heroes {heroesLocked && <span style={{ color:C.gold }}>· 3 chosen ✓</span>}</label>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {['Jeronimo','Natalia','Molly','Zinman','Flint','Philly','Alonso','Logan','Mia','Greg','Ahmose','Reina','Lynn','Hector','Norah','Gwen','Wu Ming','Renee','Wayne'].map(hero => {
                 const sel = (slot.leaderRallyHeroes || []).includes(hero);
@@ -103,18 +194,26 @@ export function FormationPicker({ slot, upd, color, players, maxGeneration = 6 }
               })}
             </div>
           </div>
+
+          {(slot.requestedHeroes || []).length > 0 && (
+            <button onClick={customAutoSuggest}
+              style={{ width:'100%', height:44, borderRadius:10, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+              🔄 Auto-suggest joiners from requested heroes
+            </button>
+          )}
         </div>
       )}
 
-      {/* Guided formation cards */}
+      {/* Guided recommendation cards — one per selected generation
+          (two if "All" is picked: one offense, one defense) */}
       {!isCustom && (
         <div>
-          {filtered.length === 0 && (
+          {recommendations.length === 0 && (
             <div style={{ fontSize:13, color:C.muted, textAlign:'center', padding:'20px 0' }}>
-              No formations available for Gen 1–{maxGeneration}. Update generation in ⚙️ Settings.
+              No {slot.formationFilter || ''} formation found for the selected generation{gensToShow.length !== 1 ? 's' : ''}.
             </div>
           )}
-          {filtered.map((f, i) => {
+          {recommendations.map((f, i) => {
             const isSelected = selectedFormation &&
               f.gen === selectedFormation.gen &&
               f.leaders.join() === selectedFormation.leaders.join() &&
@@ -124,17 +223,12 @@ export function FormationPicker({ slot, upd, color, players, maxGeneration = 6 }
             const fColor     = f.type.toLowerCase().includes('offense') ? '#F5A623' : '#6B8CAE';
 
             return (
-              <div key={i} onClick={() => {
-                upd({
-                  selectedFormation: isSelected ? null : { gen:f.gen, leaders:f.leaders, type:f.type },
-                  leaderRallyHeroes: f.leaders,
-                  requestedHeroes:   [f.j1, f.j2, f.j3, f.j4].filter(Boolean).map(h => resolveHero(h)?.display).filter(Boolean),
-                });
-              }} style={{ background:isSelected?fColor+'18':C.section, border:`1.5px solid ${isSelected?fColor:C.border}`, borderRadius:12, padding:14, marginBottom:8, cursor:'pointer' }}>
+              <div key={i} onClick={() => selectFormation(f)}
+                style={{ background:isSelected?fColor+'18':C.section, border:`1.5px solid ${isSelected?fColor:C.border}`, borderRadius:12, padding:14, marginBottom:8, cursor:'pointer' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
                   <div>
                     <div style={{ fontSize:12, color:fColor, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>
-                      Gen {f.gen} · {f.type}
+                      Gen {f.gen} · {f.type}{f.isMeta ? ' · ⚠ unverified' : ''}
                     </div>
                     <div style={{ fontSize:13, fontWeight:700, color:C.white }}>
                       {f.leaders.join(' + ')}
@@ -149,7 +243,6 @@ export function FormationPicker({ slot, upd, color, players, maxGeneration = 6 }
                   </div>
                 </div>
 
-                {/* Joiner slots with coverage */}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:f.comments?6:0 }}>
                   {coverage.map((c, ci) => (
                     <div key={ci} style={{ background:C.card, borderRadius:8, padding:'6px 10px', display:'flex', alignItems:'center', gap:6 }}>
@@ -171,6 +264,15 @@ export function FormationPicker({ slot, upd, color, players, maxGeneration = 6 }
             );
           })}
         </div>
+      )}
+
+      {/* Copy alliance-wide instructions — available once a formation
+          is selected (guided) or heroes are chosen (custom) */}
+      {(selectedFormation || heroesLocked) && (
+        <button onClick={copyInstructions}
+          style={{ width:'100%', height:44, borderRadius:10, marginTop:8, background:copied?C.green+'18':C.section, border:`1px solid ${copied?C.green:C.border}`, color:copied?C.green:C.icy, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+          {copied ? '✓ Copied' : '📋 Copy formation instructions'}
+        </button>
       )}
     </div>
   );

@@ -28,7 +28,7 @@ import { TestRallyLog }    from './TestRallyLog.jsx';
 //                          (plan-wide exclusivity — a priority joiner
 //                          can only be used in one rally per event)
 export function RallySlotCard({
-  slot, index, players, totalSlots,
+  slot, index, players, events = [], totalSlots,
   onUpdate, onDelete, onMoveUp, onMoveDown,
   onGoToMembers, selectedGenerations = [],
   assignedInOtherSlots,
@@ -233,7 +233,9 @@ export function RallySlotCard({
             upd={upd}
             color={color}
             players={players}
+            events={events}
             selectedGenerations={selectedGenerations}
+            assignedInOtherSlots={assignedInOtherSlots}
           />
 
           {/* Priority joiners */}

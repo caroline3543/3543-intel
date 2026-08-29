@@ -9,6 +9,7 @@ import { RallySlotCard } from './RallySlotCard.jsx';
 // Props:
 //   plan          – the active SvsPlan object
 //   players       – full roster array
+//   events        – full events array (needed for reliability/availability scoring)
 //   onUpdate      – (updatedPlan) => void
 //   onBack        – () => void
 //   onGoLive      – (plan) => void
@@ -16,7 +17,7 @@ import { RallySlotCard } from './RallySlotCard.jsx';
 //   selectedGenerations – number[] from Settings — explicit list, NOT
 //                         cumulative; empty array means "no filter,
 //                         show everything" (see SettingsPanel.jsx)
-export function PlanDetail({ plan, players, onUpdate, onBack, onGoLive, onGoToMembers, selectedGenerations = [] }) {
+export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoLive, onGoToMembers, selectedGenerations = [] }) {
   function updPlan(patch) { onUpdate({ ...plan, ...patch }); }
 
   function addSlot() {
@@ -116,6 +117,7 @@ export function PlanDetail({ plan, players, onUpdate, onBack, onGoLive, onGoToMe
           index={i}
           totalSlots={slots.length}
           players={players}
+          events={events}
           onUpdate={updSlot}
           onDelete={delSlot}
           onMoveUp={() => moveSlot(i, -1)}
