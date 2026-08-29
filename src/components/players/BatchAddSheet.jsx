@@ -4,12 +4,14 @@ import { vibe } from '../../utils/vibe.js';
 import { newPlayer } from '../../data/playerSchema.js';
 import { resolveBatchRows, mergePlayerObjects } from '../../services/batchAddService.js';
 import { searchPlayers } from '../../services/playerAutosuggest.js';
-import { Inp, Sel, AvailChip, SheetHandle } from '../common/Primitives.jsx';
+import { Inp, Sel, SheetHandle } from '../common/Primitives.jsx';
 import { AlliancePicker } from '../common/AlliancePicker.jsx';
 
 function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
 }
+
+const TROOP_TYPES = [['🛡️',C.inf,'infantry'],['⚔️',C.lan,'lancer'],['🏹',C.mar,'marksman']];
 
 export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisting }) {
   const [phase, setPhase]         = useState(0);
@@ -20,15 +22,11 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
   const [showOpt, setShowOpt]     = useState(false);
   const [resolved, setResolved]   = useState(null);
   const [fuzzyDec, setFuzzyDec]   = useState({});
-  const [voiceSet, setVoiceSet]   = useState(new Set());
-  const [lateSet, setLateSet]     = useState(new Set());
-  const [lateBy, setLateBy]       = useState('unknown');
-  const [earlySet, setEarlySet]   = useState(new Set());
-  const [unavailSet, setUnavailSet] = useState(new Set());
-  const [grpTierSel, setGrpTierSel] = useState(new Set());
+  const [grpSel, setGrpSel]       = useState(new Set());
+  const [grpFurnace, setGrpFurnace] = useState(null);
   const [grpTroops, setGrpTroops]   = useState({infantry:null,lancer:null,marksman:null});
-  const [memTroops, setMemTroops]   = useState({});
-  const [tierIdx, setTierIdx]     = useState(0);
+  const [memStats, setMemStats]     = useState({}); // { name: { furnaceLevel, troops:{...} } }
+  const [expanded, setExpanded]     = useState(null); // which member row is expanded
 
   useEffect(() => {
     if (!open) return;
@@ -57,12 +55,11 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
     return n;
   }
   const active = getActive();
-  const tierStack = active.filter(n=>!grpTierSel.has(n));
+  const individualList = active.filter(n=>!grpSel.has(n));
 
   function resetAll() {
     setPhase(0);setRawLines([]);setInputText('');setSuggestions([]);setTagAll('');setShowOpt(false);setResolved(null);setFuzzyDec({});
-    setVoiceSet(new Set());setLateSet(new Set());setLateBy('unknown');setEarlySet(new Set());setUnavailSet(new Set());
-    setGrpTierSel(new Set());setGrpTroops({infantry:null,lancer:null,marksman:null});setMemTroops({});setTierIdx(0);
+    setGrpSel(new Set());setGrpFurnace(null);setGrpTroops({infantry:null,lancer:null,marksman:null});setMemStats({});setExpanded(null);
   }
   function handleClose() { resetAll(); onClose(); }
   function tog(set,fn,k) { const n=new Set(set);n.has(k)?n.delete(k):n.add(k);fn(n); }
@@ -74,20 +71,26 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
     setFuzzyDec(d);setPhase(1);vibe(8);
   }
 
-  function buildAvail(n) { return { present:unavailSet.has(n)?'unavailable':'available', timing:lateSet.has(n)?'late':earlySet.has(n)?'early':'unknown', lateBy:lateSet.has(n)?lateBy:null, earlyBy:null, discord:voiceSet.has(n)?'yes':'unknown' }; }
-  function buildTroops(n) { return grpTierSel.has(n)?{...grpTroops}:(memTroops[n]||{infantry:null,lancer:null,marksman:null}); }
+  function memStat(n) { return memStats[n] || { furnaceLevel:null, troops:{infantry:null,lancer:null,marksman:null} }; }
+  function setMemStat(n, patch) { setMemStats(prev => ({ ...prev, [n]: { ...memStat(n), ...patch } })); }
+  function setMemTroop(n, key, val) { setMemStat(n, { troops: { ...memStat(n).troops, [key]: val } }); }
+
+  function buildStats(n) {
+    if (grpSel.has(n)) return { furnaceLevel: grpFurnace, troops: { ...grpTroops } };
+    return memStat(n);
+  }
 
   function buildAndSave() {
     const toCreate=[],toUpdate=[];
-    (resolved?.exact||[]).forEach(r=>{const patch={availability:buildAvail(r.name),troops:buildTroops(r.name)};if(tagAll)patch.allianceTag=tagAll;toUpdate.push(mergePlayerObjects(r.existingPlayer,patch));});
-    (resolved?.fuzzy||[]).forEach(r=>{const d=fuzzyDec[r.name];if(d==='skip')return;const patch={availability:buildAvail(r.name),troops:buildTroops(r.name)};if(tagAll)patch.allianceTag=tagAll;d==='update'?toUpdate.push(mergePlayerObjects(r.existingPlayer,patch)):toCreate.push(newPlayer({username:r.name,allianceTag:tagAll,...patch}));});
-    (resolved?.fresh||[]).forEach(r=>toCreate.push(newPlayer({username:r.name,allianceTag:tagAll,troops:buildTroops(r.name),availability:buildAvail(r.name)})));
+    (resolved?.exact||[]).forEach(r=>{const patch={...buildStats(r.name)};if(tagAll)patch.allianceTag=tagAll;toUpdate.push(mergePlayerObjects(r.existingPlayer,patch));});
+    (resolved?.fuzzy||[]).forEach(r=>{const d=fuzzyDec[r.name];if(d==='skip')return;const patch={...buildStats(r.name)};if(tagAll)patch.allianceTag=tagAll;d==='update'?toUpdate.push(mergePlayerObjects(r.existingPlayer,patch)):toCreate.push(newPlayer({username:r.name,allianceTag:tagAll,...patch}));});
+    (resolved?.fresh||[]).forEach(r=>toCreate.push(newPlayer({username:r.name,allianceTag:tagAll,...buildStats(r.name)})));
     if(toUpdate.length)onUpdateExisting(toUpdate);
     if(toCreate.length)onAddNew(toCreate);
     vibe([10,50,10]);resetAll();onClose();
   }
 
-  const PL=['Names','Review','Availability','Troop Tiers'];
+  const PL=['Names','Review','Troop & Furnace'];
   if (!open) return null;
 
   return (
@@ -188,78 +191,84 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
           </div>
         )}
 
-        {/* Phase 2 — Availability */}
+        {/* Phase 2 — Troop & Furnace, JoinerRegistry-styled: a group
+            shortcut for bulk values, then a flat list of expandable
+            per-member cards (tap to open, set values inline) instead
+            of a sequential one-at-a-time carousel. */}
         {phase===2&&(
           <div>
-            <div style={{ fontSize:22, fontWeight:700, color:C.white, marginBottom:16 }}>Availability</div>
-            {[
-              {label:'🎙️ Discord voice?',set:voiceSet,fn:setVoiceSet,col:C.gold},
-              {label:'🕐 Arriving late?',set:lateSet,fn:setLateSet,col:C.icy,extra:lateSet.size>0&&<div style={{ marginTop:10 }}><div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>How late?</div><div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>{['15 min','30 min','1 hr','Unknown'].map(o=><button key={o} onClick={()=>setLateBy(o)} style={{ padding:'6px 14px', borderRadius:20, minHeight:36, border:`1px solid ${lateBy===o?C.icy:C.border}`, background:lateBy===o?C.icy+'22':C.section, color:lateBy===o?C.icy:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>{o}</button>)}</div></div>},
-              {label:"❌ Won't make it?",set:unavailSet,fn:setUnavailSet,col:C.red},
-            ].map(({label,set,fn,col,extra})=>(
-              <div key={label} style={{ marginBottom:24 }}>
-                <div style={{ fontSize:16, fontWeight:700, color:C.white, marginBottom:8 }}>{label}</div>
-                <div style={{ display:'flex', gap:8, marginBottom:10 }}>
-                  <button onClick={()=>fn(new Set(active))} style={{ fontSize:13, color:C.gold, background:'none', border:'none', cursor:'pointer' }}>Select all</button>
-                  <span style={{ color:C.muted }}>·</span>
-                  <button onClick={()=>fn(new Set())} style={{ fontSize:13, color:C.gold, background:'none', border:'none', cursor:'pointer' }}>Clear</button>
-                </div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>{active.map(n=><AvailChip key={n} label={n} selected={set.has(n)} color={col} onClick={()=>{tog(set,fn,n);vibe(8);}}/>)}</div>
-                {extra}
-              </div>
-            ))}
-            <div style={{ display:'flex', gap:10 }}>
-              <button onClick={()=>setPhase(1)} style={{ flex:1, height:54, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:16, cursor:'pointer' }}>← Back</button>
-              <button onClick={()=>{setPhase(3);vibe(8);}} style={{ flex:2, height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>Continue →</button>
-            </div>
-            <button onClick={()=>setPhase(3)} style={{ display:'block', margin:'10px auto 0', background:'none', border:'none', color:C.muted, fontSize:13, cursor:'pointer' }}>Skip →</button>
-          </div>
-        )}
+            <div style={{ fontSize:22, fontWeight:700, color:C.white, marginBottom:4 }}>Troop tiers & furnace level</div>
+            <div style={{ fontSize:13, color:C.icy, marginBottom:16 }}>Set values for everyone at once, or tap a member below to override.</div>
 
-        {/* Phase 3 — Tiers */}
-        {phase===3&&(
-          <div>
-            <div style={{ fontSize:22, fontWeight:700, color:C.white, marginBottom:16 }}>Troop tiers</div>
+            {/* Group shortcut */}
             <div style={{ background:C.section, borderRadius:12, borderLeft:`3px solid ${C.gold}`, padding:16, marginBottom:20 }}>
               <div style={{ fontSize:15, fontWeight:700, color:C.gold, marginBottom:4 }}>⚡ Group shortcut</div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:14 }}>{active.map(n=><button key={n} onClick={()=>{tog(grpTierSel,setGrpTierSel,n);vibe(8);}} style={{ padding:'8px 14px', borderRadius:20, minHeight:40, border:`1px solid ${grpTierSel.has(n)?C.gold:C.border}`, background:grpTierSel.has(n)?C.gold+'22':C.card, color:grpTierSel.has(n)?C.gold:C.icy, fontWeight:600, fontSize:14, cursor:'pointer' }}>{n}</button>)}</div>
-              {[['🛡️',C.inf,'infantry'],['⚔️',C.lan,'lancer'],['🏹',C.mar,'marksman']].map(([icon,c,k])=>(
+              <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>Tap members to include, then set their values below.</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:14 }}>
+                {active.map(n=><button key={n} onClick={()=>{tog(grpSel,setGrpSel,n);vibe(8);}} style={{ padding:'8px 14px', borderRadius:20, minHeight:40, border:`1px solid ${grpSel.has(n)?C.gold:C.border}`, background:grpSel.has(n)?C.gold+'22':C.card, color:grpSel.has(n)?C.gold:C.icy, fontWeight:600, fontSize:14, cursor:'pointer' }}>{n}</button>)}
+              </div>
+
+              <div style={{ fontSize:12, color:C.muted, fontWeight:700, marginBottom:6 }}>🔥 Furnace level</div>
+              <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:14 }}>
+                {TIER_OPTIONS.map(t=><button key={t} onClick={()=>setGrpFurnace(prev=>prev===t?null:t)} style={{ padding:'6px 12px', borderRadius:16, flexShrink:0, border:`1px solid ${grpFurnace===t?C.gold:C.border}`, background:grpFurnace===t?C.gold+'22':C.section, color:grpFurnace===t?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{t}</button>)}
+              </div>
+
+              {TROOP_TYPES.map(([icon,c,k])=>(
                 <div key={k} style={{ marginBottom:10 }}>
                   <div style={{ fontSize:12, color:c, fontWeight:700, marginBottom:6 }}>{icon}</div>
                   <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4 }}>{TIER_OPTIONS.map(t=><button key={t} onClick={()=>setGrpTroops(prev=>({...prev,[k]:prev[k]===t?null:t}))} style={{ padding:'6px 12px', borderRadius:16, flexShrink:0, border:`1px solid ${grpTroops[k]===t?c:C.border}`, background:grpTroops[k]===t?c+'22':C.section, color:grpTroops[k]===t?c:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{t}</button>)}</div>
                 </div>
               ))}
             </div>
-            {tierStack.length>0&&(()=>{
-              const cur=tierStack[tierIdx];
-              const mt=memTroops[cur]||{infantry:null,lancer:null,marksman:null};
-              function setMT(f,v){setMemTroops(p=>({...p,[cur]:{...(p[cur]||{infantry:null,lancer:null,marksman:null}),[f]:v}}));}
-              return (
-                <div>
-                  <div style={{ background:C.section, borderRadius:14, padding:18, marginBottom:12 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}><div style={{ fontSize:18, fontWeight:700, color:C.white }}>{cur}</div><div style={{ fontSize:13, color:C.muted }}>{tierIdx+1}/{tierStack.length}</div></div>
-                    {[['🛡️',C.inf,'infantry'],['⚔️',C.lan,'lancer'],['🏹',C.mar,'marksman']].map(([icon,c,k])=>(
-                      <div key={k} style={{ marginBottom:10 }}>
-                        <div style={{ fontSize:12, color:c, fontWeight:700, marginBottom:6 }}>{icon}</div>
-                        <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4 }}>{TIER_OPTIONS.map(t=><button key={t} onClick={()=>setMT(k,mt[k]===t?null:t)} style={{ padding:'6px 12px', borderRadius:16, flexShrink:0, border:`1px solid ${mt[k]===t?c:C.border}`, background:mt[k]===t?c+'22':C.section, color:mt[k]===t?c:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{t}</button>)}</div>
+
+            {/* Individual overrides — flat expandable list, JoinerRegistry HeroCard style */}
+            {individualList.length>0&&(
+              <div style={{ marginBottom:20 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Individual overrides</div>
+                {individualList.map(n=>{
+                  const stat = memStat(n);
+                  const isOpen = expanded===n;
+                  const summary = [stat.furnaceLevel, stat.troops.infantry, stat.troops.lancer, stat.troops.marksman].filter(Boolean).length;
+                  return (
+                    <div key={n} style={{ background:C.card, borderRadius:12, padding:14, marginBottom:8 }}>
+                      <div onClick={()=>setExpanded(isOpen?null:n)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                          <div style={{ width:32, height:32, borderRadius:'50%', background:C.muted+'33', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:12, color:C.white, flexShrink:0 }}>{initials(n)}</div>
+                          <div>
+                            <div style={{ fontSize:15, fontWeight:700, color:C.white }}>{n}</div>
+                            <div style={{ fontSize:12, color:C.muted }}>{summary>0?`${summary} value${summary!==1?'s':''} set`:'Not set'}</div>
+                          </div>
+                        </div>
+                        <span style={{ fontSize:16, color:C.muted }}>{isOpen?'▲':'▼'}</span>
                       </div>
-                    ))}
-                    <div style={{ display:'flex', gap:6, justifyContent:'center', marginTop:16 }}>{tierStack.map((_,i)=><button key={i} onClick={()=>setTierIdx(i)} style={{ width:i===tierIdx?20:8, height:8, borderRadius:4, border:'none', cursor:'pointer', padding:0, background:i<tierIdx?C.green:i===tierIdx?C.gold:C.border, transition:'all 200ms' }}/>)}</div>
-                  </div>
-                  <div style={{ display:'flex', gap:10, marginBottom:16 }}>
-                    {tierIdx>0&&<button onClick={()=>setTierIdx(i=>i-1)} style={{ flex:1, height:48, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:15, cursor:'pointer' }}>← Back</button>}
-                    {tierIdx<tierStack.length-1&&<button onClick={()=>{setTierIdx(i=>i+1);vibe(8);}} style={{ flex:2, height:48, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>Next →</button>}
-                  </div>
-                </div>
-              );
-            })()}
+
+                      {isOpen&&(
+                        <div style={{ marginTop:14, borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
+                          <div style={{ fontSize:11, color:C.gold, fontWeight:700, marginBottom:6 }}>🔥 Furnace level</div>
+                          <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:12 }}>
+                            {TIER_OPTIONS.map(t=><button key={t} onClick={()=>setMemStat(n,{furnaceLevel:stat.furnaceLevel===t?null:t})} style={{ padding:'6px 12px', borderRadius:16, flexShrink:0, border:`1px solid ${stat.furnaceLevel===t?C.gold:C.border}`, background:stat.furnaceLevel===t?C.gold+'22':C.section, color:stat.furnaceLevel===t?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{t}</button>)}
+                          </div>
+                          {TROOP_TYPES.map(([icon,c,k])=>(
+                            <div key={k} style={{ marginBottom:10 }}>
+                              <div style={{ fontSize:11, color:c, fontWeight:700, marginBottom:6 }}>{icon}</div>
+                              <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4 }}>{TIER_OPTIONS.map(t=><button key={t} onClick={()=>setMemTroop(n,k,stat.troops[k]===t?null:t)} style={{ padding:'6px 12px', borderRadius:16, flexShrink:0, border:`1px solid ${stat.troops[k]===t?c:C.border}`, background:stat.troops[k]===t?c+'22':C.section, color:stat.troops[k]===t?c:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{t}</button>)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <div style={{ display:'flex', gap:10 }}>
-              <button onClick={()=>setPhase(2)} style={{ flex:1, height:54, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:16, cursor:'pointer' }}>← Back</button>
+              <button onClick={()=>setPhase(1)} style={{ flex:1, height:54, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:16, cursor:'pointer' }}>← Back</button>
               <button onClick={buildAndSave} style={{ flex:2, height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>
                 Save {active.length} Player{active.length!==1?'s':''}
               </button>
             </div>
-            <button onClick={buildAndSave} style={{ display:'block', margin:'10px auto 0', background:'none', border:'none', color:C.muted, fontSize:13, cursor:'pointer' }}>Skip tiers →</button>
+            <button onClick={buildAndSave} style={{ display:'block', margin:'10px auto 0', background:'none', border:'none', color:C.muted, fontSize:13, cursor:'pointer' }}>Skip values →</button>
           </div>
         )}
       </div>

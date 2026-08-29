@@ -29,7 +29,7 @@ export function buildRosterDataSheet(players) {
   const headers = [
     'id','fid','username','alias','allianceTag','country','timezone','languages',
     'furnaceLevel','infantryCampLevel','lancerCampLevel','marksmanCampLevel','troops',
-    'joinerHeroes','roles','availability','teamAssignment','notes','eventAvailability',
+    'joinerHeroes','roles','teamAssignment','notes',
     'profileLastUpdated','createdAt','eventHistory',
   ];
   const rows = [headers.map(cell)];
@@ -38,8 +38,8 @@ export function buildRosterDataSheet(players) {
       cell(p.id), cell(p.fid), cell(p.username), cell(p.alias), cell(p.allianceTag),
       cell(p.country), cell(p.timezone), jsonCell(p.languages),
       cell(p.furnaceLevel), cell(p.infantryCampLevel), cell(p.lancerCampLevel), cell(p.marksmanCampLevel),
-      jsonCell(p.troops), jsonCell(p.joinerHeroes), jsonCell(p.roles), jsonCell(p.availability),
-      cell(p.teamAssignment), cell(p.notes), jsonCell(p.eventAvailability),
+      jsonCell(p.troops), jsonCell(p.joinerHeroes), jsonCell(p.roles),
+      cell(p.teamAssignment), cell(p.notes),
       cell(p.profileLastUpdated), cell(p.createdAt), jsonCell(p.eventHistory),
     ]);
   });

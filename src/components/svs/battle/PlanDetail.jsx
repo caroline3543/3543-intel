@@ -9,7 +9,7 @@ import { RallySlotCard } from './RallySlotCard.jsx';
 // Props:
 //   plan          – the active SvsPlan object
 //   players       – full roster array
-//   events        – full events array (needed for reliability/availability scoring)
+//   events        – full events array (needed for auto-suggest scoring)
 //   onUpdate      – (updatedPlan) => void
 //   onBack        – () => void
 //   onGoLive      – (plan) => void
@@ -64,9 +64,7 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
   // someone drops offline mid-event.
   const allAssignedPlanWide = new Set();
   slots.forEach(s => (s.joiners || []).forEach(j => { if (j.playerId) allAssignedPlanWide.add(j.playerId); }));
-  const unallocated = players.filter(p =>
-    p.availability?.present === 'available' && !allAssignedPlanWide.has(p.id)
-  );
+  const unallocated = players.filter(p => !allAssignedPlanWide.has(p.id));
 
   return (
     <div style={{ padding:'16px 20px 0', paddingBottom:readySlots.length > 0 ? 120 : 20 }}>
@@ -138,7 +136,7 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
       {slots.length > 0 && (
         <div style={{ background:C.section, borderRadius:12, padding:14, marginBottom:16 }}>
           <div style={{ fontSize:13, fontWeight:700, color:C.icy, marginBottom:2 }}>🔁 Unallocated — available as backups</div>
-          <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>Available members not used as a priority joiner anywhere in this plan — sub one in if someone drops.</div>
+          <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>Members not used as a priority joiner anywhere in this plan — sub one in if someone drops.</div>
           {unallocated.length === 0 ? (
             <div style={{ fontSize:12, color:C.muted }}>Everyone available is already allocated somewhere in this plan.</div>
           ) : (

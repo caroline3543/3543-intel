@@ -46,7 +46,6 @@ export function JoinerSlotRow({ slot, index, players, onUpdate, allAssignedIds, 
     ? eligible
         .filter(p => p.id !== slot.playerId)
         .filter(p => !allAssignedIds.has(p.id))
-        .filter(p => p.availability?.present !== 'unavailable')
         .filter(p => (p.joinerHeroes || []).some(jh => jh.hero === slot.heroName && jh.skillLevel >= 5))
         .slice(0, 3)
     : [];

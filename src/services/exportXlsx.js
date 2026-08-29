@@ -94,7 +94,7 @@ function buildRosterSheet(players) {
     'Username', 'Nickname', 'Alliance', 'Furnace',
     'Infantry', 'Lancer', 'Marksman',
     'Role(s)', 'Joiner Heroes',
-    'Availability', 'Discord', 'Country', 'Languages',
+    'Country', 'Languages',
     'Player ID', 'Reliability', 'Last Updated',
   ];
 
@@ -114,8 +114,6 @@ function buildRosterSheet(players) {
       cell(p.troops?.marksman || '', style),
       cell((p.roles || []).join(', '), style),
       cell(joiners, style),
-      yesNo(p.availability?.present),
-      yesNo(p.availability?.discord),
       cell(p.country || '', style),
       cell((p.languages || []).join(', '), style),
       cell(p.fid || '', style),
@@ -125,9 +123,9 @@ function buildRosterSheet(players) {
   });
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  setColWidths(ws, [18, 14, 10, 9, 9, 9, 9, 22, 30, 12, 10, 16, 20, 12, 12, 14]);
+  setColWidths(ws, [18, 14, 10, 9, 9, 9, 9, 22, 30, 16, 20, 12, 12, 14]);
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  autoFilter(ws, `A1:P1`);
+  autoFilter(ws, `A1:N1`);
   return ws;
 }
 
@@ -137,14 +135,13 @@ function buildEventSheet(event, players, includeJoiners) {
   const eventPlayers = event.participantIds?.length > 0
     ? players.filter(p => event.participantIds.includes(p.id))
     : players;
+  const isUpcoming = event.status === 'upcoming';
 
-  // Base columns
-  const baseHeaders = [
-    'Username', 'Alliance', 'Furnace',
-    'Showed Up', 'Late', 'Left Early', 'No-show',
-    'On Discord', 'Joined Rallies', 'Followed Plan', 'Ignored Orders',
-    'Performance', 'Notes',
-  ];
+  // Base columns differ by phase — RSVP (a prediction) for upcoming
+  // events, post-event actuals otherwise. Never both at once.
+  const baseHeaders = isUpcoming
+    ? ['Username', 'Alliance', 'Furnace', 'Participating', 'On Time', 'Will Be Late', 'Will Leave Early', 'Will Join Discord', 'Present Whole Time', 'Notes']
+    : ['Username', 'Alliance', 'Furnace', 'Attended', 'No-show', 'Late (No Notice)', 'Joined Voice', 'Notes'];
 
   // Joiner columns — added for SvS / Castle events
   const joinerHeroList = includeJoiners
@@ -165,24 +162,30 @@ function buildEventSheet(event, players, includeJoiners) {
   eventPlayers.forEach((p, i) => {
     const snap  = snapMap[p.id];
     const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
-    const perf  = snap?.performanceTag || '';
-    const perfLabel = perf === 'strong' ? '⭐ Strong' : perf === 'reliable' ? '✓ Reliable' : perf === 'issue' ? '⚠ Issue' : perf === 'noshow' ? '✗ No-show' : perf === 'improving' ? '↑ Improving' : '';
 
-    const base = [
-      cell(p.username || '', style),
-      cell(p.allianceTag || '', style),
-      cell(p.furnaceLevel || '', style),
-      yesNo(snap?.attendance?.attended),
-      yesNo(snap?.attendance?.late),
-      yesNo(snap?.attendance?.leftEarly),
-      yesNo(snap?.attendance?.noShow),
-      yesNo(snap?.voice?.joined),
-      yesNo(snap?.combat?.joinedRallies),
-      yesNo(snap?.combat?.followedOrders),
-      yesNo(snap?.combat?.wentRogue ? true : false),
-      cell(perfLabel, style),
-      cell(snap?.notes || '', style),
-    ];
+    const base = isUpcoming
+      ? [
+          cell(p.username || '', style),
+          cell(p.allianceTag || '', style),
+          cell(p.furnaceLevel || '', style),
+          yesNo(snap?.rsvp?.participating),
+          yesNo(snap?.rsvp?.onTime),
+          yesNo(snap?.rsvp?.willBeLate),
+          yesNo(snap?.rsvp?.willLeaveEarly),
+          yesNo(snap?.rsvp?.willJoinDiscord),
+          yesNo(snap?.rsvp?.presentWholeTime),
+          cell(snap?.notes || '', style),
+        ]
+      : [
+          cell(p.username || '', style),
+          cell(p.allianceTag || '', style),
+          cell(p.furnaceLevel || '', style),
+          yesNo(snap?.attendance?.attended),
+          yesNo(snap?.attendance?.noShow),
+          yesNo(snap?.attendance?.joinedLateNoNotice),
+          yesNo(snap?.voice?.joined),
+          cell(snap?.notes || '', style),
+        ];
 
     if (includeJoiners) {
       const playerJoiners = new Set(
@@ -197,25 +200,35 @@ function buildEventSheet(event, players, includeJoiners) {
   });
 
   // Summary row
-  const total     = eventPlayers.length;
-  const attended  = Object.values(snapMap).filter(s => s.attendance?.attended === true).length;
-  const noShow    = Object.values(snapMap).filter(s => s.attendance?.noShow).length;
-  const discord   = Object.values(snapMap).filter(s => s.voice?.joined === true).length;
-
+  const total = eventPlayers.length;
   rows.push([]);
-  rows.push([
-    cell('SUMMARY', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell(`${attended}/${total} showed up`, SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell(`${noShow} no-shows`, SUBHEADER_STYLE),
-    cell(`${discord} on Discord`, SUBHEADER_STYLE),
-  ]);
+  if (isUpcoming) {
+    const participating = Object.values(snapMap).filter(s => s.rsvp?.participating).length;
+    rows.push([
+      cell('SUMMARY', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell(`${participating}/${total} participating`, SUBHEADER_STYLE),
+    ]);
+  } else {
+    const attended = Object.values(snapMap).filter(s => s.attendance?.attended === true).length;
+    const noShow   = Object.values(snapMap).filter(s => s.attendance?.noShow).length;
+    const discord  = Object.values(snapMap).filter(s => s.voice?.joined === true).length;
+    rows.push([
+      cell('SUMMARY', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell(`${attended}/${total} attended`, SUBHEADER_STYLE),
+      cell(`${noShow} no-shows`, SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell(`${discord} joined voice`, SUBHEADER_STYLE),
+    ]);
+  }
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  const baseWidths = [18, 10, 9, 11, 8, 11, 9, 11, 14, 14, 14, 14, 24];
+  const baseWidths = isUpcoming
+    ? [18, 10, 9, 13, 9, 12, 14, 14, 16, 24]
+    : [18, 10, 9, 11, 9, 15, 11, 24];
   const joinerWidths = joinerHeroList.map(() => 10);
   setColWidths(ws, [...baseWidths, ...joinerWidths]);
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
