@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { C } from '../../utils/constants.js';
+import { C, TROOP_POWER_EVENTS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { ToggleRow, SheetHandle } from '../common/Primitives.jsx';
 
@@ -11,14 +11,20 @@ import { ToggleRow, SheetHandle } from '../common/Primitives.jsx';
 //                          reliabilityScore is computed from — see metrics.js)
 // No Combat section — removed entirely, not just the judgment fields.
 //
+// For Foundry/Canyon Clash events (see TROOP_POWER_EVENTS), also
+// tracks troop power for that event — shown next to the player's name
+// in EventsTab's list and charted over time in ProfileView.
+//
 // Props:
 //   snapshot     – the snapshot object being edited
 //   playerName   – display name
+//   eventType    – event.type — gates whether troop power shows
 //   eventStatus  – 'upcoming' | 'active' | 'completed'
 //   open, onClose, onSave
-export function SnapshotEditor({ snapshot, playerName, eventStatus, open, onClose, onSave }) {
+export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, open, onClose, onSave }) {
   const [s, setS] = useState(() => snapshot || {});
   const isUpcoming = eventStatus === 'upcoming';
+  const tracksTroopPower = TROOP_POWER_EVENTS.includes(eventType);
 
   useEffect(() => {
     if (open && snapshot) setS({ ...snapshot });
@@ -72,6 +78,20 @@ export function SnapshotEditor({ snapshot, playerName, eventStatus, open, onClos
               <ToggleRow label="Joined voice" value={s.voice?.joined} onChange={v=>updV({joined:v})} colorOn={C.icy} colorOff={C.muted}/>
             </div>
           </>
+        )}
+
+        {tracksTroopPower && (
+          <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
+            <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:8 }}>💪 Troop Power</div>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={s.troopPower ?? ''}
+              onChange={e => setS(prev => ({ ...prev, troopPower: e.target.value === '' ? null : Number(e.target.value) }))}
+              placeholder="e.g. 4200000"
+              style={{ width:'100%', minHeight:48, background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 14px', fontSize:16, color:C.white, boxSizing:'border-box', fontFamily:'inherit' }}
+            />
+          </div>
         )}
 
         <div style={{ marginBottom:20 }}>

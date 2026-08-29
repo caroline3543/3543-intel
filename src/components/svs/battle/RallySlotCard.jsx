@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C } from '../../../utils/constants.js';
+import { C, tierChipStyle } from '../../../utils/constants.js';
 import { vibe } from '../../../utils/vibe.js';
 import {
   RALLY_TYPES, RALLY_ICONS, RALLY_COLORS,
@@ -210,12 +210,12 @@ export function RallySlotCard({
                 <div key={key}>
                   <div style={{ fontSize:11, color:tc, fontWeight:700, marginBottom:4 }}>{label}</div>
                   <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                    {['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','Helios'].map(fc => {
+                    {['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios'].map(fc => {
                       const sel = (slot.troopReqs || {})[key] === fc;
                       return (
                         <button key={fc} onClick={() => upd({ troopReqs:{ ...(slot.troopReqs||{}), [key]:sel?null:fc } })}
-                          style={{ height:32, borderRadius:8, border:`1px solid ${sel?tc:C.border}`, background:sel?tc+'22':C.section, color:sel?tc:C.muted, fontWeight:sel?700:400, fontSize:12, cursor:'pointer' }}>
-                          {fc}+
+                          style={{ ...tierChipStyle(sel, tc), height:32, borderRadius:8 }}>
+                          {sel?'✓ ':''}{fc}+
                         </button>
                       );
                     })}

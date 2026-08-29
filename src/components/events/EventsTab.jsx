@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C, EVENT_TYPES, EVENT_ICONS } from '../../utils/constants.js';
+import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { fmtDateShort } from '../../utils/dates.js';
 import { newSnapshot } from '../../data/playerSchema.js';
@@ -77,6 +77,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   }
 
   const isUpcoming = activeEvent?.status === 'upcoming';
+  const tracksTroopPower = TROOP_POWER_EVENTS.includes(activeEvent?.type);
   let eventPlayers = activeEvent
     ? (activeEvent.participantIds?.length>0 ? players.filter(p=>activeEvent.participantIds.includes(p.id)) : players)
     : [];
@@ -149,7 +150,12 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                     {bulkMode && <div style={{ width:22, height:22, borderRadius:'50%', border:`2px solid ${isSel?C.gold:C.border}`, background:isSel?C.gold:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{isSel && <span style={{ fontSize:12, color:C.bg, fontWeight:700 }}>✓</span>}</div>}
                     <div style={{ width:36, height:36, borderRadius:'50%', background:C.muted+'33', border:`1.5px solid ${C.muted}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:14, color:C.white, flexShrink:0 }}>{initials(dn)}</div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:15, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, overflow:'hidden' }}>
+                        <div style={{ fontSize:15, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+                        {tracksTroopPower && snap?.troopPower != null && (
+                          <span style={{ fontSize:11, color:C.gold, fontWeight:700, flexShrink:0 }}>💪 {snap.troopPower.toLocaleString()}</span>
+                        )}
+                      </div>
                       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:3 }}>
                         {isUpcoming ? (
                           <>
@@ -222,7 +228,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
         </>
       )}
       <EventSheet event={editingEvent} open={eventSheetOpen} onClose={() => setEventSheetOpen(false)} onSave={ev => { if (editingEvent) onUpdateEvent(ev); else onCreateEvent(ev); }} players={players}/>
-      <SnapshotEditor snapshot={snapEditing?.snapshot} playerName={snapEditing?.playerName} eventStatus={activeEvent?.status} open={snapOpen} onClose={() => setSnapOpen(false)} onSave={saveSnap}/>
+      <SnapshotEditor snapshot={snapEditing?.snapshot} playerName={snapEditing?.playerName} eventType={activeEvent?.type} eventStatus={activeEvent?.status} open={snapOpen} onClose={() => setSnapOpen(false)} onSave={saveSnap}/>
       {deleteConfirmId && (
         <DeleteConfirmModal
           message="Delete this event? This cannot be undone."

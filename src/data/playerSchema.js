@@ -22,16 +22,8 @@ export function newPlayer(overrides = {}) {
     // Single source of truth for joiner heroes
     joinerHeroes:       [],   // [{ hero, skillLevel, verified, updatedAt }]
     roles:              [],
-    availability: {
-      present:  'available',
-      timing:   'unknown',
-      lateBy:   null,
-      earlyBy:  null,
-      discord:  'unknown',
-    },
     teamAssignment:     null,
     notes:              '',
-    eventAvailability:  {},   // { "SvS Week 3": { present, timing, discord } }
     profileLastUpdated: null,
     createdAt:          Date.now(),
     eventHistory:       [],
@@ -42,7 +34,7 @@ export function newPlayer(overrides = {}) {
 export function newEvent(overrides = {}) {
   return {
     id:             uid(),
-    type:           'SvS',
+    type:           'SvS Castle Battle',
     name:           '',
     allianceTag:    '',
     date:           new Date().toISOString().slice(0, 10),
@@ -72,21 +64,31 @@ export function newSnapshot(playerId, playerProfile, eventId) {
       roles:        [...(playerProfile.roles || [])],
       joinerHeroes: [...(playerProfile.joinerHeroes || [])],
     },
+    // Pre-event RSVP — set while the event is still upcoming. Never
+    // used for reliabilityScore (see metrics.js) — only a prediction.
+    rsvp: {
+      participating:    false,
+      onTime:           false,
+      willBeLate:       false,
+      willLeaveEarly:   false,
+      willJoinDiscord:  false,
+      presentWholeTime: false,
+    },
+    // Post-event actuals — set after the event has happened. This is
+    // the ONLY data reliabilityScore is computed from.
     attendance: {
-      registered: false, attended: null, late: false,
-      leftEarly: false, noShow: false, stayedFull: false,
-      prepPhase: false, battlePhase: false,
+      attended:           null,
+      noShow:             false,
+      joinedLateNoNotice: false,
     },
     voice: {
-      joined: null, onTime: false, leftEarly: false,
-      joinedLate: false, qualityNote: '',
+      joined: false,
     },
-    combat: {
-      joinedRallies: false, ledRallies: false,
-      defendedStructures: false, followedOrders: null, wentRogue: false,
-    },
-    notes:          '',
-    performanceTag: null,
+    // Set only for Foundry/Canyon Clash events (see TROOP_POWER_EVENTS
+    // in constants.js) — shown next to the player's name in that
+    // event's participant list, and charted over time in ProfileView.
+    troopPower: null,
+    notes: '',
   };
 }
 

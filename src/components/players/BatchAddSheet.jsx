@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
-import { C, TIER_OPTIONS } from '../../utils/constants.js';
+import { C, TIER_OPTIONS, LANGUAGES, tierChipStyle } from '../../utils/constants.js';
+import { JOINER_HEROES } from '../../data/joinerMeta.js';
 import { vibe } from '../../utils/vibe.js';
 import { newPlayer } from '../../data/playerSchema.js';
 import { resolveBatchRows, mergePlayerObjects } from '../../services/batchAddService.js';
 import { searchPlayers } from '../../services/playerAutosuggest.js';
 import { Inp, Sel, SheetHandle } from '../common/Primitives.jsx';
 import { AlliancePicker } from '../common/AlliancePicker.jsx';
+import { BatchMemberCard } from './BatchMemberCard.jsx';
 
 function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
 }
 
 const TROOP_TYPES = [['🛡️',C.inf,'infantry'],['⚔️',C.lan,'lancer'],['🏹',C.mar,'marksman']];
+const emptyTroops = () => ({infantry:null,lancer:null,marksman:null});
+const emptyStat = () => ({ furnaceLevel:null, troops:emptyTroops(), languages:[], joinerHeroes:[] });
 
 export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisting }) {
   const [phase, setPhase]         = useState(0);
@@ -23,10 +27,8 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
   const [resolved, setResolved]   = useState(null);
   const [fuzzyDec, setFuzzyDec]   = useState({});
   const [grpSel, setGrpSel]       = useState(new Set());
-  const [grpFurnace, setGrpFurnace] = useState(null);
-  const [grpTroops, setGrpTroops]   = useState({infantry:null,lancer:null,marksman:null});
-  const [memStats, setMemStats]     = useState({}); // { name: { furnaceLevel, troops:{...} } }
-  const [expanded, setExpanded]     = useState(null); // which member row is expanded
+  const [grpStat, setGrpStat]     = useState(emptyStat());
+  const [memStats, setMemStats]   = useState({});
 
   useEffect(() => {
     if (!open) return;
@@ -59,7 +61,7 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
 
   function resetAll() {
     setPhase(0);setRawLines([]);setInputText('');setSuggestions([]);setTagAll('');setShowOpt(false);setResolved(null);setFuzzyDec({});
-    setGrpSel(new Set());setGrpFurnace(null);setGrpTroops({infantry:null,lancer:null,marksman:null});setMemStats({});setExpanded(null);
+    setGrpSel(new Set());setGrpStat(emptyStat());setMemStats({});
   }
   function handleClose() { resetAll(); onClose(); }
   function tog(set,fn,k) { const n=new Set(set);n.has(k)?n.delete(k):n.add(k);fn(n); }
@@ -71,13 +73,22 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
     setFuzzyDec(d);setPhase(1);vibe(8);
   }
 
-  function memStat(n) { return memStats[n] || { furnaceLevel:null, troops:{infantry:null,lancer:null,marksman:null} }; }
+  function memStat(n) { return memStats[n] || emptyStat(); }
   function setMemStat(n, patch) { setMemStats(prev => ({ ...prev, [n]: { ...memStat(n), ...patch } })); }
-  function setMemTroop(n, key, val) { setMemStat(n, { troops: { ...memStat(n).troops, [key]: val } }); }
+
+  function toGrpJoinerHeroes(list) {
+    const now = new Date().toISOString();
+    return (list || []).map(hero => ({ hero, skillLevel: 5, verified: false, updatedAt: now }));
+  }
 
   function buildStats(n) {
-    if (grpSel.has(n)) return { furnaceLevel: grpFurnace, troops: { ...grpTroops } };
-    return memStat(n);
+    const raw = grpSel.has(n) ? grpStat : memStat(n);
+    return {
+      furnaceLevel: raw.furnaceLevel,
+      troops: raw.troops,
+      languages: raw.languages,
+      joinerHeroes: toGrpJoinerHeroes(raw.joinerHeroes),
+    };
   }
 
   function buildAndSave() {
@@ -90,7 +101,7 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
     vibe([10,50,10]);resetAll();onClose();
   }
 
-  const PL=['Names','Review','Troop & Furnace'];
+  const PL=['Names','Review','Details'];
   if (!open) return null;
 
   return (
@@ -191,16 +202,14 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
           </div>
         )}
 
-        {/* Phase 2 — Troop & Furnace, JoinerRegistry-styled: a group
-            shortcut for bulk values, then a flat list of expandable
-            per-member cards (tap to open, set values inline) instead
-            of a sequential one-at-a-time carousel. */}
+        {/* Phase 2 — Details: furnace, troop tiers, languages, joiner
+            heroes. JoinerRegistry-styled: group shortcut for bulk
+            values, then a flat list of expandable per-member cards. */}
         {phase===2&&(
           <div>
-            <div style={{ fontSize:22, fontWeight:700, color:C.white, marginBottom:4 }}>Troop tiers & furnace level</div>
+            <div style={{ fontSize:22, fontWeight:700, color:C.white, marginBottom:4 }}>Member details</div>
             <div style={{ fontSize:13, color:C.icy, marginBottom:16 }}>Set values for everyone at once, or tap a member below to override.</div>
 
-            {/* Group shortcut */}
             <div style={{ background:C.section, borderRadius:12, borderLeft:`3px solid ${C.gold}`, padding:16, marginBottom:20 }}>
               <div style={{ fontSize:15, fontWeight:700, color:C.gold, marginBottom:4 }}>⚡ Group shortcut</div>
               <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>Tap members to include, then set their values below.</div>
@@ -210,55 +219,39 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
 
               <div style={{ fontSize:12, color:C.muted, fontWeight:700, marginBottom:6 }}>🔥 Furnace level</div>
               <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:14 }}>
-                {TIER_OPTIONS.map(t=><button key={t} onClick={()=>setGrpFurnace(prev=>prev===t?null:t)} style={{ padding:'6px 12px', borderRadius:16, flexShrink:0, border:`1px solid ${grpFurnace===t?C.gold:C.border}`, background:grpFurnace===t?C.gold+'22':C.section, color:grpFurnace===t?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{t}</button>)}
+                {TIER_OPTIONS.map(t=><button key={t} onClick={()=>setGrpStat(prev=>({...prev, furnaceLevel:prev.furnaceLevel===t?null:t}))} style={tierChipStyle(grpStat.furnaceLevel===t)}>{grpStat.furnaceLevel===t?'✓ ':''}{t}</button>)}
               </div>
 
               {TROOP_TYPES.map(([icon,c,k])=>(
                 <div key={k} style={{ marginBottom:10 }}>
                   <div style={{ fontSize:12, color:c, fontWeight:700, marginBottom:6 }}>{icon}</div>
-                  <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4 }}>{TIER_OPTIONS.map(t=><button key={t} onClick={()=>setGrpTroops(prev=>({...prev,[k]:prev[k]===t?null:t}))} style={{ padding:'6px 12px', borderRadius:16, flexShrink:0, border:`1px solid ${grpTroops[k]===t?c:C.border}`, background:grpTroops[k]===t?c+'22':C.section, color:grpTroops[k]===t?c:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{t}</button>)}</div>
+                  <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4 }}>{TIER_OPTIONS.map(t=><button key={t} onClick={()=>setGrpStat(prev=>({...prev, troops:{...prev.troops,[k]:prev.troops[k]===t?null:t}}))} style={tierChipStyle(grpStat.troops[k]===t,c)}>{grpStat.troops[k]===t?'✓ ':''}{t}</button>)}</div>
                 </div>
               ))}
+
+              <div style={{ fontSize:12, color:C.icy, fontWeight:700, marginBottom:6, marginTop:4 }}>🌐 Languages spoken</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:14 }}>
+                {LANGUAGES.map(lang=>{
+                  const sel = grpStat.languages.includes(lang);
+                  return <button key={lang} onClick={()=>setGrpStat(prev=>({...prev, languages: sel?prev.languages.filter(l=>l!==lang):[...prev.languages,lang]}))} style={{ padding:'6px 12px', borderRadius:16, border:`2px solid ${sel?C.icy:C.border}`, background:sel?C.icy:C.section, color:sel?C.bg:C.muted, fontWeight:sel?800:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{sel?'✓ ':''}{lang}</button>;
+                })}
+              </div>
+
+              <div style={{ fontSize:12, color:C.gold, fontWeight:700, marginBottom:6 }}>🦸 Joiner heroes (Skill 5)</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {JOINER_HEROES.map(hero=>{
+                  const sel = grpStat.joinerHeroes.includes(hero);
+                  return <button key={hero} onClick={()=>setGrpStat(prev=>({...prev, joinerHeroes: sel?prev.joinerHeroes.filter(h=>h!==hero):[...prev.joinerHeroes,hero]}))} style={{ padding:'6px 12px', borderRadius:16, border:`2px solid ${sel?C.gold:C.border}`, background:sel?C.gold:C.section, color:sel?C.bg:C.muted, fontWeight:sel?800:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{sel?'✓ ':''}{hero}</button>;
+                })}
+              </div>
             </div>
 
-            {/* Individual overrides — flat expandable list, JoinerRegistry HeroCard style */}
             {individualList.length>0&&(
               <div style={{ marginBottom:20 }}>
                 <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Individual overrides</div>
-                {individualList.map(n=>{
-                  const stat = memStat(n);
-                  const isOpen = expanded===n;
-                  const summary = [stat.furnaceLevel, stat.troops.infantry, stat.troops.lancer, stat.troops.marksman].filter(Boolean).length;
-                  return (
-                    <div key={n} style={{ background:C.card, borderRadius:12, padding:14, marginBottom:8 }}>
-                      <div onClick={()=>setExpanded(isOpen?null:n)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                          <div style={{ width:32, height:32, borderRadius:'50%', background:C.muted+'33', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:12, color:C.white, flexShrink:0 }}>{initials(n)}</div>
-                          <div>
-                            <div style={{ fontSize:15, fontWeight:700, color:C.white }}>{n}</div>
-                            <div style={{ fontSize:12, color:C.muted }}>{summary>0?`${summary} value${summary!==1?'s':''} set`:'Not set'}</div>
-                          </div>
-                        </div>
-                        <span style={{ fontSize:16, color:C.muted }}>{isOpen?'▲':'▼'}</span>
-                      </div>
-
-                      {isOpen&&(
-                        <div style={{ marginTop:14, borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
-                          <div style={{ fontSize:11, color:C.gold, fontWeight:700, marginBottom:6 }}>🔥 Furnace level</div>
-                          <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:12 }}>
-                            {TIER_OPTIONS.map(t=><button key={t} onClick={()=>setMemStat(n,{furnaceLevel:stat.furnaceLevel===t?null:t})} style={{ padding:'6px 12px', borderRadius:16, flexShrink:0, border:`1px solid ${stat.furnaceLevel===t?C.gold:C.border}`, background:stat.furnaceLevel===t?C.gold+'22':C.section, color:stat.furnaceLevel===t?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{t}</button>)}
-                          </div>
-                          {TROOP_TYPES.map(([icon,c,k])=>(
-                            <div key={k} style={{ marginBottom:10 }}>
-                              <div style={{ fontSize:11, color:c, fontWeight:700, marginBottom:6 }}>{icon}</div>
-                              <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4 }}>{TIER_OPTIONS.map(t=><button key={t} onClick={()=>setMemTroop(n,k,stat.troops[k]===t?null:t)} style={{ padding:'6px 12px', borderRadius:16, flexShrink:0, border:`1px solid ${stat.troops[k]===t?c:C.border}`, background:stat.troops[k]===t?c+'22':C.section, color:stat.troops[k]===t?c:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{t}</button>)}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {individualList.map(n=>(
+                  <BatchMemberCard key={n} name={n} stat={memStat(n)} onChange={patch=>setMemStat(n,patch)}/>
+                ))}
               </div>
             )}
 

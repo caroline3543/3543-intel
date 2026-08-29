@@ -4,7 +4,7 @@ import { getRecommendedFormation } from '../../../data/joinerMeta.js';
 import { suggestPriorityJoiners } from '../../../data/metrics.js';
 import { newJoinerSlot } from '../../../data/playerSchema.js';
 import { buildFormationMessage } from '../../../services/formationMessage.js';
-import { resolveHero, playerCanFillSlot } from './battleConstants.js';
+import { resolveHero, playerCanFillSlot, meetsTroopReqs } from './battleConstants.js';
 
 // ── FormationPicker ────────────────────────────────────────────
 // Renders the guided/custom formation section inside a RallySlotCard.
@@ -74,15 +74,19 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
     : null;
 
   // Auto-suggest the 4 priority joiners for a formation's hero slots —
-  // resolves substitution notation ("Jessie*" -> Jessie/Jasser/Jeronimo)
-  // and excludes anyone already used elsewhere in this plan.
+  // resolves substitution notation ("Jessie*" -> Jessie/Jasser/Jeronimo),
+  // excludes anyone already used elsewhere in this plan, AND excludes
+  // anyone below the rally's minimum troop tier requirements (used to
+  // only check hero ownership, never troop tier).
   function autoSuggestJoiners(heroSlotStrings) {
     const resolvedSlots = heroSlotStrings.filter(Boolean).map(raw => {
       const r = resolveHero(raw);
       return { slotLabel: raw, heroOptions: r ? [r.display, ...r.alternatives] : [raw] };
     });
     const excludeIds = assignedInOtherSlots || new Set();
-    const eligiblePlayers = players.filter(p => !excludeIds.has(p.id));
+    const eligiblePlayers = players
+      .filter(p => !excludeIds.has(p.id))
+      .filter(p => meetsTroopReqs(p, slot.troopReqs).ok);
     const suggested = suggestPriorityJoiners(resolvedSlots, eligiblePlayers, events);
     return suggested.map(s => newJoinerSlot({
       playerId:   s.player?.id || null,

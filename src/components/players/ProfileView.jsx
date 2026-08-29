@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { C } from '../../utils/constants.js';
+import { C, TROOP_POWER_EVENTS } from '../../utils/constants.js';
 import { roleColor, roleIcon } from '../../utils/roles.js';
 import { fmtDateShort } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
 import { ReliabilityBadge, SheetHandle } from '../common/Primitives.jsx';
+import { TroopPowerChart } from './TroopPowerChart.jsx';
 
 function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
@@ -45,6 +46,14 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events 
   const snaps   = (events||[])
     .flatMap(ev=>(ev.snapshots||[]).filter(s=>s.playerId===player.id).map(s=>({...s,eventName:ev.name||ev.type,eventDate:ev.date})))
     .sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+
+  const troopPowerHistory = (events||[])
+    .filter(ev => TROOP_POWER_EVENTS.includes(ev.type))
+    .flatMap(ev => (ev.snapshots||[])
+      .filter(s => s.playerId===player.id && s.troopPower != null)
+      .map(s => ({ date: ev.date, value: s.troopPower })))
+    .sort((a,b) => new Date(a.date) - new Date(b.date))
+    .map(p => ({ label: fmtDateShort(p.date), value: p.value }));
 
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'#000c', zIndex:300, display:'flex', alignItems:'flex-end' }}>
@@ -118,23 +127,6 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events 
           </div>
         )}
 
-        {/* 4. Availability */}
-        <Section title="Availability">
-          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-            <span style={{ padding:'6px 14px', borderRadius:20, fontSize:13, fontWeight:600,
-              background: player.availability?.present==='available'?C.green+'22':C.red+'22',
-              color:       player.availability?.present==='available'?C.green:C.red,
-              border:     `1px solid ${player.availability?.present==='available'?C.green:C.red}44`
-            }}>
-              {player.availability?.present==='available'?'✅ Available':'❌ Unavailable'}
-            </span>
-            {player.availability?.timing==='late'&&<span style={{ padding:'6px 14px', borderRadius:20, fontSize:13, fontWeight:600, background:C.gold+'22', color:C.gold, border:`1px solid ${C.gold}44` }}>🕐 Arriving late</span>}
-            {player.availability?.timing==='early'&&<span style={{ padding:'6px 14px', borderRadius:20, fontSize:13, fontWeight:600, background:C.mar+'22', color:C.mar, border:`1px solid ${C.mar}44` }}>🚪 Leaving early</span>}
-            {player.availability?.discord==='yes'&&<span style={{ padding:'6px 14px', borderRadius:20, fontSize:13, fontWeight:600, background:C.icy+'22', color:C.icy, border:`1px solid ${C.icy}44` }}>🎙️ On Discord</span>}
-            {player.availability?.discord==='no'&&<span style={{ padding:'6px 14px', borderRadius:20, fontSize:13, fontWeight:600, background:C.muted+'22', color:C.muted, border:`1px solid ${C.muted}44` }}>🔇 Not on Discord</span>}
-          </div>
-        </Section>
-
         {/* 5. Identity — reference info, lower priority */}
         <Section title="Identity">
           <Row label="Player ID" value={player.fid}/>
@@ -166,6 +158,14 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events 
                 </div>
               </div>
             ))}
+          </Section>
+        )}
+
+        {/* 6.5 Troop Power — Foundry / Canyon Clash only */}
+        {troopPowerHistory.length > 0 && (
+          <Section title="Troop Power">
+            <TroopPowerChart points={troopPowerHistory}/>
+            <div style={{ fontSize:11, color:C.muted, marginTop:8, textAlign:'center' }}>Across Foundry / Canyon Clash events</div>
           </Section>
         )}
 

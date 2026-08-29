@@ -116,4 +116,23 @@ export function suggestJoinerHeroes(leaderPlayer, slotType, leaderRallyHeroes) {
   };
 }
 
-export const FC_ORDER = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','Helios'];
+export const FC_ORDER = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios'];
+
+/**
+ * Checks whether a player meets a rally slot's minimum troop tier
+ * requirements. Shared by JoinerSlotRow (manual picker — greys out
+ * ineligible members) and FormationPicker's auto-suggest (which used
+ * to ignore troop tier entirely and only check hero ownership).
+ */
+export function meetsTroopReqs(player, troopReqs) {
+  const reqs = troopReqs || {};
+  for (const [key, minFC] of Object.entries(reqs)) {
+    if (!minFC) continue;
+    const playerTier = player.troops?.[key];
+    if (!playerTier) return { ok: false, reason: `Needs ${minFC}+ ${key}` };
+    if (FC_ORDER.indexOf(playerTier) < FC_ORDER.indexOf(minFC)) {
+      return { ok: false, reason: `${key} ${playerTier} < ${minFC} required` };
+    }
+  }
+  return { ok: true, reason: null };
+}

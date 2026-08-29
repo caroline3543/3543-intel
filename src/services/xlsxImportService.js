@@ -46,7 +46,7 @@ export function importFromXlsxFile(file) {
           })).filter(p => p.id);
 
           const events = sheet('Events Data').map(row => ({
-            id: row.id, type: row.type || 'SvS', name: row.name || '', allianceTag: row.allianceTag || '',
+            id: row.id, type: row.type || 'SvS Castle Battle', name: row.name || '', allianceTag: row.allianceTag || '',
             date: row.date || '', time: row.time || '12:00', status: row.status || 'upcoming',
             participantIds: parseJsonCell(row.participantIds, []),
             notes: row.notes || '',

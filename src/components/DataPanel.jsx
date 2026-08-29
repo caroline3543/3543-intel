@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { C } from '../utils/constants.js';
+import { C, JOINER_COVERAGE_EVENTS } from '../utils/constants.js';
 import { SheetHandle } from './common/Primitives.jsx';
 import { exportWorkbook } from '../services/exportXlsx.js';
 
@@ -64,7 +64,7 @@ export function DataPanel({
   const eventCount    = (data.events||[]).length;
   const memberCount   = (data.players||[]).length;
   const hasJoiners    = (data.players||[]).some(p=>(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5));
-  const joinerEvents  = (data.events||[]).filter(e=>['SvS','SvS Castle Battle','Internal Sunfire Castle'].includes(e.type));
+  const joinerEvents  = (data.events||[]).filter(e=>JOINER_COVERAGE_EVENTS.includes(e.type));
   const syncing       = syncStatus === 'syncing';
 
   return (
@@ -147,7 +147,7 @@ export function DataPanel({
               ['✓', 'Joiner Coverage — who owns each hero at Skill 5', C.green],
               (data.prepScores||[]).length > 0 ? ['✓', `Prep Scores — ${(data.prepScores||[]).length} entries`, C.green] : null,
               eventCount > 0 ? ['✓', `${eventCount} event${eventCount!==1?'s':''} — attendance, Discord, performance`, C.green] : null,
-              joinerEvents.length > 0 ? ['✓', `${joinerEvents.length} SvS/Castle event${joinerEvents.length!==1?'s':''} include joiner coverage columns`, C.gold] : null,
+              joinerEvents.length > 0 ? ['✓', `${joinerEvents.length} Castle event${joinerEvents.length!==1?'s':''} include joiner coverage columns`, C.gold] : null,
               ['✓', 'Can be re-imported on another device — nothing is lost round-tripping', C.icy],
             ].filter(Boolean).map(([icon, text, color], i) => (
               <div key={i} style={{ display:'flex', gap:8, marginBottom:4 }}>

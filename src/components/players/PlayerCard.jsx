@@ -7,20 +7,14 @@ function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
 }
 
-export function PlayerCard({ player, roles = [], onClick, onDelete, events }) {
+export function PlayerCard({ player, roles = [], onClick, onDelete, events, missingCount }) {
   const dn      = player.username||player.alias||'Unknown';
   const rc      = roleColor(player.roles?.[0], roles);
   const metrics = calcMetrics(player, events||[]);
   const joiners = (player.joinerHeroes||[]).filter(jh=>jh.skillLevel>=5).map(jh=>jh.hero);
 
-  // Status glyphs — shown prominently
-  const unavailable = player.availability?.present==='unavailable';
-  const onDiscord   = player.availability?.discord==='yes';
-  const isLate      = player.availability?.timing==='late';
-  const leavingEarly= player.availability?.timing==='early';
-
   return (
-    <div onClick={onClick} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none', opacity:unavailable?0.6:1 }}>
+    <div onClick={onClick} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none' }}>
 
       {/* Avatar */}
       <div style={{ width:46, height:46, borderRadius:'50%', flexShrink:0, background:rc+'33', border:`2px solid ${rc}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:17, color:C.white }}>
@@ -29,13 +23,10 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events }) {
 
       <div style={{ flex:1, minWidth:0 }}>
 
-        {/* Row 1 — name + key status */}
+        {/* Row 1 — name */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
-          <div style={{ fontSize:16, fontWeight:700, color:unavailable?C.muted:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
-          {unavailable && <span style={{ fontSize:11, color:C.red, fontWeight:700 }}>Unavailable</span>}
-          {onDiscord   && <span style={{ fontSize:13 }}>🎙️</span>}
-          {isLate      && <span style={{ fontSize:13 }}>🕐</span>}
-          {leavingEarly&& <span style={{ fontSize:13 }}>🚪</span>}
+          <div style={{ fontSize:16, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+          {missingCount > 0 && <span style={{ fontSize:11, color:C.gold, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', flexShrink:0 }}>⚠ {missingCount} missing</span>}
         </div>
 
         {/* Row 2 — alliance · furnace · reliability */}

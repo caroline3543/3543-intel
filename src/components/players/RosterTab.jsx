@@ -10,12 +10,27 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [rosterView, setRosterView]       = useState('list');
   const [search, setSearch]               = useState('');
   const [filterRole, setFilterRole]       = useState('All');
+  const [sortMissing, setSortMissing]     = useState(false);
   const [viewingPlayer, setViewingPlayer] = useState(null);
   const [profileOpen, setProfileOpen]     = useState(false);
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [sheetOpen, setSheetOpen]         = useState(false);
   const [batchOpen, setBatchOpen]         = useState(false);
   const [roleManagerOpen, setRoleManagerOpen] = useState(false);
+
+  // How many of the "should be set" fields are actually missing —
+  // higher = more incomplete. Used by the "missing info first" sort.
+  function missingCount(p) {
+    let n = 0;
+    if (!p.furnaceLevel) n++;
+    if (!p.troops?.infantry) n++;
+    if (!p.troops?.lancer) n++;
+    if (!p.troops?.marksman) n++;
+    if (!p.roles?.length) n++;
+    if (!p.languages?.length) n++;
+    if (!(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5)) n++;
+    return n;
+  }
 
   const filteredPlayers = players.filter(p => {
     const t = (p.username||p.alias||'').toLowerCase();
@@ -26,6 +41,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
     const mr = filterRole==='All' || p.roles?.includes(filterRole);
     return ms && mr;
   });
+  if (sortMissing) filteredPlayers.sort((a,b) => missingCount(b) - missingCount(a));
 
   function openProfile(player) { setViewingPlayer(player); setProfileOpen(true); }
   function openEdit(player)    { setEditingPlayer(player); setSheetOpen(true); }
@@ -52,33 +68,12 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
 
       {rosterView==='list' && (
         <>
-          {/* Ready for SvS summary bar — only show when there are players */}
-          {players.length>0&&(()=>{
-            const avail    = players.filter(p=>p.availability?.present==='available').length;
-            const onDisc   = players.filter(p=>p.availability?.discord==='yes').length;
-            const unknown  = players.filter(p=>!p.availability||p.availability.present==='available'&&p.availability.discord==='unknown').length;
-            return (
-              <div style={{ background:C.section, borderRadius:12, padding:'12px 16px', marginBottom:12, display:'flex', gap:0 }}>
-                <div style={{ flex:1, textAlign:'center', borderRight:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:20, fontWeight:700, color:C.green }}>{avail}</div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>Available</div>
-                </div>
-                <div style={{ flex:1, textAlign:'center', borderRight:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:20, fontWeight:700, color:C.icy }}>{onDisc}</div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>On Discord</div>
-                </div>
-                <div style={{ flex:1, textAlign:'center' }}>
-                  <div style={{ fontSize:20, fontWeight:700, color:unknown>0?C.gold:C.muted }}>{unknown}</div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>Unconfirmed</div>
-                </div>
-              </div>
-            );
-          })()}
           <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4, alignItems:'center' }}>
             {['All',...roles.map(r=>r.name)].map(r => (
               <button key={r} onClick={() => setFilterRole(r)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===r?C.gold+'22':C.section, border:`1px solid ${filterRole===r?C.gold:C.border}`, color:filterRole===r?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{r}</button>
             ))}
             <button onClick={() => setRoleManagerOpen(true)} style={{ padding:'0 10px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', flexShrink:0 }}>⚙ Roles</button>
+            <button onClick={() => setSortMissing(!sortMissing)} style={{ padding:'0 10px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:sortMissing?C.gold+'22':'none', border:`1px solid ${sortMissing?C.gold:C.border}`, color:sortMissing?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', flexShrink:0 }}>⚠ Missing info first</button>
           </div>
           {players.length > 0 && (
             <div style={{ fontSize:13, color:C.muted, marginBottom:12 }}>
@@ -100,20 +95,19 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             <div style={{ textAlign:'center', padding:'40px 20px', color:C.muted }}>No results for "{search||filterRole}"</div>
           )}
           {filteredPlayers.map(p => (
-            <PlayerCard key={p.id} player={p} roles={roles} onClick={() => openProfile(p)} onDelete={onDeletePlayer} events={events}/>
+            <PlayerCard key={p.id} player={p} roles={roles} onClick={() => openProfile(p)} onDelete={onDeletePlayer} events={events} missingCount={sortMissing ? missingCount(p) : 0}/>
           ))}
         </>
       )}
 
       {rosterView==='roles' && (() => {
-        const avail  = players.filter(p => p.availability?.present==='available');
-        const byRole = roles.map(roleDef => ({ roleDef, members:avail.filter(p => p.roles?.includes(roleDef.name)) })).filter(g => g.members.length > 0);
+        const byRole = roles.map(roleDef => ({ roleDef, members:players.filter(p => p.roles?.includes(roleDef.name)) })).filter(g => g.members.length > 0);
         return (
           <div>
             <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
-              <div style={{ fontSize:13, color:C.icy, marginBottom:4 }}>Available for SvS</div>
+              <div style={{ fontSize:13, color:C.icy, marginBottom:4 }}>Members with a role assigned</div>
               <div style={{ fontSize:28, fontWeight:700, color:C.white }}>
-                {avail.length} <span style={{ fontSize:16, color:C.muted }}>of {players.length}</span>
+                {players.filter(p => (p.roles||[]).length > 0).length} <span style={{ fontSize:16, color:C.muted }}>of {players.length}</span>
               </div>
             </div>
             {byRole.map(({ roleDef, members }) => (
@@ -127,8 +121,6 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
                       <div style={{ fontWeight:700, color:C.white, fontSize:15 }}>{m.username||m.alias||'?'}</div>
                       <div style={{ fontSize:12, color:C.icy }}>
                         {[m.furnaceLevel&&`${m.furnaceLevel}`, m.allianceTag&&`[${m.allianceTag}]`].filter(Boolean).join(' · ')}
-                        {m.availability?.timing==='late'?' · 🕐':''}
-                        {m.availability?.discord==='yes'?' · 🎙️':''}
                       </div>
                     </div>
                     <div style={{ display:'flex', gap:4 }}>
@@ -160,7 +152,6 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         onClose={() => { setSheetOpen(false); setEditingPlayer(null); }}
         onSave={onSavePlayer}
         existingTags={[...new Set(players.map(p=>p.allianceTag).filter(Boolean))]}
-        existingEvents={events.filter(e=>e.status!=='completed').slice(0,8)}
         onGoToIntel={onGoToIntel}
       />
       <BatchAddSheet

@@ -22,17 +22,15 @@ export const C = {
 // as-is (not removing data that may already be stored on players) —
 // but current sourcing only confirms Helios as the tier above T11, not
 // a 'T12'. Worth confirming whether T12 is real or a leftover/typo.
-export const TIER_OPTIONS = ['T10','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11','Helios','T12'];
+export const TIER_OPTIONS = ['T10','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios','T12'];
 
 // NOTE: player roles are no longer a fixed list. "Rally Lead" is the only
 // permanent, built-in role (see src/utils/roles.js) — every other role is
 // created by the alliance itself and stored in app data, not here.
 
 export const EVENT_ICONS = {
-  'SvS':                      '⚔️',
   'Foundry':                  '🔥',
   'Canyon Clash':              '🏔️',
-  'Bear Trap':                 '🪤',
   'SvS Castle Battle':         '🏰',
   'Internal Sunfire Castle':   '🏯',
   'Transfer Season':           '🚀',
@@ -94,10 +92,33 @@ export const TEAM_ROLES = [
 ];
 
 export const EVENT_TYPES = [
-  'SvS', 'SvS Castle Battle', 'Internal Sunfire Castle',
-  'Foundry', 'Canyon Clash', 'Bear Trap',
+  'SvS Castle Battle', 'Internal Sunfire Castle',
+  'Foundry', 'Canyon Clash',
   'Transfer Season', 'Custom',
 ];
 
 // Event types that automatically include joiner coverage in exports
-export const JOINER_COVERAGE_EVENTS = ['SvS', 'SvS Castle Battle', 'Internal Sunfire Castle'];
+export const JOINER_COVERAGE_EVENTS = ['SvS Castle Battle', 'Internal Sunfire Castle'];
+
+// Event types that track troop power per player, per event (see
+// SnapshotEditor.jsx and ProfileView.jsx's troop-power chart)
+export const TROOP_POWER_EVENTS = ['Foundry', 'Canyon Clash'];
+
+// Shared "obviously selected" style for tier/FC chips (PlayerSheet,
+// RallySlotCard, BatchAddSheet all use this) — thicker border + solid
+// fill + bold text make selection unambiguous at a glance, instead of
+// each screen's own subtle border-tint variant.
+export function tierChipStyle(selected, color = C.gold) {
+  return {
+    padding: '7px 13px',
+    borderRadius: 16,
+    flexShrink: 0,
+    border: `2px solid ${selected ? color : C.border}`,
+    background: selected ? color : C.section,
+    color: selected ? C.bg : C.muted,
+    fontWeight: selected ? 800 : 600,
+    fontSize: 13,
+    cursor: 'pointer',
+    minHeight: 36,
+  };
+}

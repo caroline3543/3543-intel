@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { C } from '../../../utils/constants.js';
-import { FC_ORDER } from './battleConstants.js';
+import { meetsTroopReqs } from './battleConstants.js';
 
 // ── JoinerSlotRow ──────────────────────────────────────────────
 // One priority-joiner row inside a rally slot.
@@ -22,18 +22,7 @@ export function JoinerSlotRow({ slot, index, players, onUpdate, allAssignedIds, 
   const isComplete = !!(slot.playerName && slot.heroName);
   const isUnavail  = slot.confirmed === false && slot.playerId;
 
-  function meetsReqs(p) {
-    const reqs = troopReqs || {};
-    for (const [key, minFC] of Object.entries(reqs)) {
-      if (!minFC) continue;
-      const playerTier = p.troops?.[key];
-      if (!playerTier) return { ok: false, reason: `Needs ${minFC}+ ${key}` };
-      if (FC_ORDER.indexOf(playerTier) < FC_ORDER.indexOf(minFC)) {
-        return { ok: false, reason: `${key} ${playerTier} < ${minFC} required` };
-      }
-    }
-    return { ok: true, reason: null };
-  }
+  function meetsReqs(p) { return meetsTroopReqs(p, troopReqs); }
 
   const hasReqs    = Object.values(troopReqs || {}).some(Boolean);
   const eligible   = players.filter(p => !hasReqs || meetsReqs(p).ok);
