@@ -4,7 +4,7 @@ import { getRecommendedFormation } from '../../../data/joinerMeta.js';
 import { suggestPriorityJoiners } from '../../../data/metrics.js';
 import { newJoinerSlot } from '../../../data/playerSchema.js';
 import { buildFormationMessage } from '../../../services/formationMessage.js';
-import { resolveHero, playerCanFillSlot, meetsTroopReqs } from './battleConstants.js';
+import { resolveHero, playerCanFillSlot, meetsTroopReqs, CUSTOM_HERO_OPTIONS } from './battleConstants.js';
 
 // ── FormationPicker ────────────────────────────────────────────
 // Renders the guided/custom formation section inside a RallySlotCard.
@@ -30,6 +30,11 @@ import { resolveHero, playerCanFillSlot, meetsTroopReqs } from './battleConstant
 //                          this plan — auto-suggest won't propose them
 export function FormationPicker({ slot, upd, color, players, events = [], selectedGenerations = [], assignedInOtherSlots }) {
   const [copied, setCopied] = useState(false);
+  // Once a formation is selected, show only that one card — the rest
+  // stay accessible via "Change formation" rather than occupying
+  // screen space. Resets to the compact view every time a NEW
+  // selection is made (see selectFormation).
+  const [showAll, setShowAll] = useState(false);
   const isCustom = slot.formationMode === 'custom';
 
   const gensToShow = selectedGenerations.length > 0
@@ -100,7 +105,7 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
     const isSelected = selectedFormation &&
       f.gen === selectedFormation.gen && f.leaders.join() === selectedFormation.leaders.join() && f.type === selectedFormation.type;
 
-    if (isSelected) { upd({ selectedFormation: null }); return; }
+    if (isSelected) { upd({ selectedFormation: null }); setShowAll(true); return; }
 
     upd({
       selectedFormation: { gen:f.gen, leaders:f.leaders, type:f.type },
@@ -109,6 +114,7 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
       ratio:             f.ratio,
       joiners:           autoSuggestJoiners([f.j1, f.j2, f.j3, f.j4]),
     });
+    setShowAll(false);
   }
 
   function customAutoSuggest() {
@@ -185,7 +191,7 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
           <div style={{ marginBottom:10 }}>
             <label style={{ fontSize:11, color:C.muted, display:'block', marginBottom:6 }}>Requested joiner heroes</label>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-              {['Jessie','Seo-Yoon','Jasser','Patrick','Mia','Norah','Philly','Logan','Reina','Sergey','Wu Ming','Gwen','Lynn','Zinman'].map(hero => {
+              {CUSTOM_HERO_OPTIONS.map(hero => {
                 const sel = (slot.requestedHeroes || []).includes(hero);
                 return (
                   <button key={hero} onClick={() => {
@@ -210,65 +216,83 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
 
       {/* Guided recommendation cards — one per selected generation
           (two if "All" is picked: one offense, one defense) */}
-      {!isCustom && (
-        <div>
-          {recommendations.length === 0 && (
-            <div style={{ fontSize:13, color:C.muted, textAlign:'center', padding:'20px 0' }}>
-              No {slot.formationFilter || ''} formation found for the selected generation{gensToShow.length !== 1 ? 's' : ''}.
+      {!isCustom && (() => {
+        function renderCard(f, i) {
+          const isSelected = selectedFormation &&
+            f.gen === selectedFormation.gen &&
+            f.leaders.join() === selectedFormation.leaders.join() &&
+            f.type === selectedFormation.type;
+          const coverage   = getCoverage(f);
+          const allCovered = coverage.every(c => c.ok);
+          const fColor     = f.type.toLowerCase().includes('offense') ? '#F5A623' : '#6B8CAE';
+
+          return (
+            <div key={i} onClick={() => selectFormation(f)}
+              style={{ background:isSelected?fColor+'18':C.section, border:`1.5px solid ${isSelected?fColor:C.border}`, borderRadius:12, padding:14, marginBottom:8, cursor:'pointer' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                <div>
+                  <div style={{ fontSize:12, color:fColor, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>
+                    Gen {f.gen} · {f.type}{f.isMeta ? ' · ⚠ unverified' : ''}
+                  </div>
+                  <div style={{ fontSize:13, fontWeight:700, color:C.white }}>
+                    {f.leaders.join(' + ')}
+                  </div>
+                  <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>{f.ratio}</div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+                  {isSelected && <span style={{ fontSize:11, color:fColor, fontWeight:700 }}>✓ Selected</span>}
+                  <span style={{ fontSize:11, color:allCovered?C.green:C.gold, fontWeight:600 }}>
+                    {allCovered ? '✓ Full coverage' : '⚠ Check coverage'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:f.comments?6:0 }}>
+                {coverage.map((c, ci) => (
+                  <div key={ci} style={{ background:C.card, borderRadius:8, padding:'6px 10px', display:'flex', alignItems:'center', gap:6 }}>
+                    <div style={{ width:6, height:6, borderRadius:'50%', background:c.ok?C.green:C.red, flexShrink:0 }}/>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:C.white }}>{c.display}</div>
+                      {c.alternatives?.length > 0 && <div style={{ fontSize:10, color:C.muted }}>or {c.alternatives.join('/')}</div>}
+                    </div>
+                    <div style={{ fontSize:11, color:c.ok?C.green:C.red, fontWeight:700 }}>×{c.count}</div>
+                  </div>
+                ))}
+              </div>
+
+              {[f.alt1, f.alt2].filter(Boolean).length > 0 && (
+                <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>Alt: {[f.alt1, f.alt2].filter(Boolean).join(' · ')}</div>
+              )}
+              {f.comments && <div style={{ fontSize:11, color:C.gold, marginTop:4, fontStyle:'italic' }}>⚠ {f.comments}</div>}
             </div>
-          )}
-          {recommendations.map((f, i) => {
-            const isSelected = selectedFormation &&
+          );
+        }
+
+        const showCompact = selectedFormation && !showAll;
+        const cardsToShow = showCompact
+          ? recommendations.filter(f =>
               f.gen === selectedFormation.gen &&
               f.leaders.join() === selectedFormation.leaders.join() &&
-              f.type === selectedFormation.type;
-            const coverage   = getCoverage(f);
-            const allCovered = coverage.every(c => c.ok);
-            const fColor     = f.type.toLowerCase().includes('offense') ? '#F5A623' : '#6B8CAE';
+              f.type === selectedFormation.type)
+          : recommendations;
 
-            return (
-              <div key={i} onClick={() => selectFormation(f)}
-                style={{ background:isSelected?fColor+'18':C.section, border:`1.5px solid ${isSelected?fColor:C.border}`, borderRadius:12, padding:14, marginBottom:8, cursor:'pointer' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-                  <div>
-                    <div style={{ fontSize:12, color:fColor, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>
-                      Gen {f.gen} · {f.type}{f.isMeta ? ' · ⚠ unverified' : ''}
-                    </div>
-                    <div style={{ fontSize:13, fontWeight:700, color:C.white }}>
-                      {f.leaders.join(' + ')}
-                    </div>
-                    <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>{f.ratio}</div>
-                  </div>
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
-                    {isSelected && <span style={{ fontSize:11, color:fColor, fontWeight:700 }}>✓ Selected</span>}
-                    <span style={{ fontSize:11, color:allCovered?C.green:C.gold, fontWeight:600 }}>
-                      {allCovered ? '✓ Full coverage' : '⚠ Check coverage'}
-                    </span>
-                  </div>
-                </div>
-
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:f.comments?6:0 }}>
-                  {coverage.map((c, ci) => (
-                    <div key={ci} style={{ background:C.card, borderRadius:8, padding:'6px 10px', display:'flex', alignItems:'center', gap:6 }}>
-                      <div style={{ width:6, height:6, borderRadius:'50%', background:c.ok?C.green:C.red, flexShrink:0 }}/>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:12, fontWeight:700, color:C.white }}>{c.display}</div>
-                        {c.alternatives?.length > 0 && <div style={{ fontSize:10, color:C.muted }}>or {c.alternatives.join('/')}</div>}
-                      </div>
-                      <div style={{ fontSize:11, color:c.ok?C.green:C.red, fontWeight:700 }}>×{c.count}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {[f.alt1, f.alt2].filter(Boolean).length > 0 && (
-                  <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>Alt: {[f.alt1, f.alt2].filter(Boolean).join(' · ')}</div>
-                )}
-                {f.comments && <div style={{ fontSize:11, color:C.gold, marginTop:4, fontStyle:'italic' }}>⚠ {f.comments}</div>}
+        return (
+          <div>
+            {recommendations.length === 0 && (
+              <div style={{ fontSize:13, color:C.muted, textAlign:'center', padding:'20px 0' }}>
+                No {slot.formationFilter || ''} formation found for the selected generation{gensToShow.length !== 1 ? 's' : ''}.
               </div>
-            );
-          })}
-        </div>
-      )}
+            )}
+            {cardsToShow.map((f, i) => renderCard(f, i))}
+            {showCompact && (
+              <button onClick={() => setShowAll(true)}
+                style={{ width:'100%', height:36, borderRadius:8, background:'none', border:`1px dashed ${C.border}`, color:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', marginTop:2 }}>
+                Change formation ▾
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Copy alliance-wide instructions — available once a formation
           is selected (guided) or heroes are chosen (custom) */}

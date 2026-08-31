@@ -35,11 +35,18 @@ export function RallySlotCard({
 }) {
   const [open, setOpen]               = useState(index === 0);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [changingLeader, setChangingLeader] = useState(false);
 
   const color         = RALLY_COLORS[slot.type] || C.gold;
   const icon          = RALLY_ICONS[slot.type]  || '⚔️';
   const filledJoiners = slot.joiners.filter(j => j.playerName && j.heroName).length;
   const allJoinersFilled = filledJoiners === 4;
+
+  // The Rally Leader can never appear as their own joiner — this feeds
+  // FormationPicker (coverage counts, auto-suggest) AND JoinerSlotRow
+  // (manual eligible list) so the leader is excluded everywhere, not
+  // just greyed out like a normal already-assigned duplicate.
+  const joinerEligiblePlayers = players.filter(p => p.id !== slot.leaderId);
 
   // Priority-joiner exclusivity is plan-wide, not just within this
   // slot's own 4 joiners — merge in anyone already assigned elsewhere
@@ -142,6 +149,19 @@ export function RallySlotCard({
                 No members yet.{' '}
                 <button onClick={onGoToMembers} style={{ background:'none', border:'none', color:C.gold, fontSize:13, cursor:'pointer', padding:0, textDecoration:'underline' }}>Go to Members →</button>
               </div>
+            ) : slot.leaderId && !changingLeader ? (
+              /* Leader chosen — show them prominently, nothing else
+                 underneath. Joiner selection happens separately below. */
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:color+'14', border:`1px solid ${color}44`, borderRadius:12, padding:'12px 14px' }}>
+                <div>
+                  <div style={{ fontSize:11, color:C.muted, marginBottom:2 }}>Leading this rally</div>
+                  <div style={{ fontSize:16, fontWeight:800, color:C.white }}>{slot.leaderName}</div>
+                </div>
+                <button onClick={() => setChangingLeader(true)}
+                  style={{ background:'none', border:`1px solid ${C.border}`, borderRadius:16, padding:'6px 14px', color:C.gold, fontWeight:600, fontSize:12, cursor:'pointer' }}>
+                  Change
+                </button>
+              </div>
             ) : (
               <div>
                 {players.filter(p => p.roles?.includes('Rally Lead')).length > 0 && (
@@ -151,7 +171,7 @@ export function RallySlotCard({
                       {players.filter(p => p.roles?.includes('Rally Lead')).map(p => {
                         const sel = slot.leaderId === p.id;
                         return (
-                          <button key={p.id} onClick={() => upd({ leaderId:p.id, leaderName:p.username||p.alias })}
+                          <button key={p.id} onClick={() => { upd({ leaderId:p.id, leaderName:p.username||p.alias }); setChangingLeader(false); }}
                             style={{ padding:'7px 14px', borderRadius:20, border:`1px solid ${sel?color:C.gold+'44'}`, background:sel?color+'22':C.gold+'0a', color:sel?color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer' }}>
                             {p.username||p.alias}{p.furnaceLevel ? ` · ${p.furnaceLevel}` : ''}
                           </button>
@@ -167,7 +187,7 @@ export function RallySlotCard({
                       {players.filter(p => !p.roles?.includes('Rally Lead')).map(p => {
                         const sel = slot.leaderId === p.id;
                         return (
-                          <button key={p.id} onClick={() => upd({ leaderId:p.id, leaderName:p.username||p.alias })}
+                          <button key={p.id} onClick={() => { upd({ leaderId:p.id, leaderName:p.username||p.alias }); setChangingLeader(false); }}
                             style={{ padding:'7px 14px', borderRadius:20, border:`1px solid ${sel?color:C.border}`, background:sel?color+'22':C.section, color:sel?color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
                             {p.username||p.alias}{p.furnaceLevel ? ` · ${p.furnaceLevel}` : ''}
                           </button>
@@ -205,6 +225,22 @@ export function RallySlotCard({
           <div style={{ marginBottom:14 }}>
             <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Minimum troop tier required</label>
             <div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>Members below these tiers shouldn't join this rally.</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', marginBottom:10 }}>
+              <span style={{ fontSize:11, color:C.muted, marginRight:2 }}>Set all three:</span>
+              {['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios'].map(fc => {
+                const allMatch = ['infantry','lancer','marksman'].every(k => (slot.troopReqs||{})[k] === fc);
+                return (
+                  <button key={fc} onClick={() => upd({ troopReqs:{ infantry:fc, lancer:fc, marksman:fc } })}
+                    style={{ padding:'4px 10px', borderRadius:12, border:`1px solid ${allMatch?C.gold:C.border}`, background:allMatch?C.gold+'22':C.section, color:allMatch?C.gold:C.muted, fontWeight:600, fontSize:11, cursor:'pointer' }}>
+                    {allMatch?'✓ ':''}{fc}
+                  </button>
+                );
+              })}
+              <button onClick={() => upd({ troopReqs:{ infantry:null, lancer:null, marksman:null } })}
+                style={{ padding:'4px 10px', borderRadius:12, border:`1px solid ${C.border}`, background:'none', color:C.muted, fontSize:11, cursor:'pointer' }}>
+                Clear all
+              </button>
+            </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
               {[['🛡️ Infantry','infantry',C.inf],['⚔️ Lancer','lancer',C.lan],['🏹 Marksman','marksman',C.mar]].map(([label, key, tc]) => (
                 <div key={key}>
@@ -232,7 +268,7 @@ export function RallySlotCard({
             slot={slot}
             upd={upd}
             color={color}
-            players={players}
+            players={joinerEligiblePlayers}
             events={events}
             selectedGenerations={selectedGenerations}
             assignedInOtherSlots={assignedInOtherSlots}
@@ -248,7 +284,8 @@ export function RallySlotCard({
                   key={joiner.id}
                   slot={joiner}
                   index={i}
-                  players={players}
+                  players={joinerEligiblePlayers}
+                  events={events}
                   onUpdate={patch => updJoiner(i, patch)}
                   allAssignedIds={allAssignedIds}
                   troopReqs={slot.troopReqs}

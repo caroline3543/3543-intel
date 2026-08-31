@@ -49,6 +49,15 @@ export const HERO_SUBS = {
   'Renee':     ['Renee'],
 };
 
+// Flat hero list for manual "pick a required hero" pickers — shared by
+// FormationPicker's custom mode and JoinerSlotRow's hero-first manual
+// assignment, so there's one list to keep in sync, not two duplicated
+// inline arrays.
+export const CUSTOM_HERO_OPTIONS = [
+  'Jessie','Seo-Yoon','Jasser','Patrick','Mia','Norah','Philly',
+  'Logan','Reina','Sergey','Wu Ming','Gwen','Lynn','Zinman',
+];
+
 /** Resolve a raw hero name (possibly with * or **) to display + alternatives. */
 export function resolveHero(raw) {
   if (!raw) return null;
