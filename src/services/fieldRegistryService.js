@@ -1,96 +1,88 @@
-// Generic get/assign/unassign helpers for any player attribute reachable
-// by a dot-path (e.g. 'languages', 'troops.infantry'). Powers
-// FieldRegistry.jsx — the same tap-to-assign pattern the old Joiner
-// Registry used for heroes, generalized across any profile field so new
-// fields don't need their own bespoke service.
+// Pure functions backing FieldRegistry.jsx — no React, no side effects
+// beyond the isolated custom-option localStorage store below.
 //
-// Array fields (multi:true, e.g. languages) ADD on assign and remove a
-// single entry on unassign — a player can hold several values.
-// Single-value fields (multi:false, e.g. troops.infantry) REPLACE on
-// assign and clear to null on unassign — a player can only hold one tier
-// per troop type, so moving them to a new value naturally drops them
-// from wherever they were before (no separate "remove" step needed).
+// localStorage key: svs_field_registry_custom_options
+// Owner: fieldRegistryService.js (never write to it elsewhere — see
+// CONSTITUTION.md localStorage key registry, add this key there).
 
-function getPath(obj, path) {
-  return path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
-}
+const CUSTOM_OPTIONS_KEY = 'svs_field_registry_custom_options';
 
-// Immutable nested set — clones only the objects along the path so
-// unrelated nested fields (e.g. troops.lancer while writing troops.infantry)
-// aren't accidentally shared/mutated.
-function setPath(obj, path, value) {
-  const keys = path.split('.');
-  const last = keys.pop();
-  const clone = { ...obj };
-  let cursor = clone;
-  let source = obj;
-  for (const k of keys) {
-    source = source?.[k] || {};
-    cursor[k] = { ...source };
-    cursor = cursor[k];
+function loadCustomOptions() {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_OPTIONS_KEY)) || {};
+  } catch {
+    return {};
   }
-  cursor[last] = value;
-  return clone;
 }
 
-export function getFieldValue(player, path) {
-  return getPath(player, path);
+function saveCustomOptions(data) {
+  try {
+    localStorage.setItem(CUSTOM_OPTIONS_KEY, JSON.stringify(data));
+  } catch {
+    // storage full or unavailable — custom option simply won't persist
+  }
 }
 
-// Every distinct value currently in use for this field across the roster,
-// merged with the field's predefined option list. This is how "new
-// options" work without any separate custom-values storage: once an
-// officer assigns a brand-new value to even one player, it's "in use"
-// and will show up as its own card on every future render.
-export function getAllFieldValues(players, path, predefined, multi) {
-  const inUse = new Set();
-  players.forEach(p => {
-    const v = getPath(p, path);
-    if (multi) {
-      (v || []).forEach(x => x && inUse.add(x));
-    } else if (v) {
-      inUse.add(v);
-    }
-  });
-  const merged = [...predefined];
-  inUse.forEach(v => { if (!merged.includes(v)) merged.push(v); });
-  return merged;
+export function getCustomOptions(fieldId) {
+  return loadCustomOptions()[fieldId] || [];
 }
 
-export function getPlayersWithFieldValue(players, path, value, multi) {
-  return players.filter(p => {
-    const v = getPath(p, path);
-    return multi ? (v || []).includes(value) : v === value;
-  });
+export function addCustomOption(fieldId, value) {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return;
+  const data = loadCustomOptions();
+  const existing = data[fieldId] || [];
+  if (!existing.some(v => v.toLowerCase() === trimmed.toLowerCase())) {
+    data[fieldId] = [...existing, trimmed];
+    saveCustomOptions(data);
+  }
 }
 
-export function getFieldValueCounts(players, path, values, multi) {
-  const counts = {};
-  values.forEach(v => { counts[v] = 0; });
-  players.forEach(p => {
-    const v = getPath(p, path);
-    if (multi) {
-      (v || []).forEach(x => { if (x in counts) counts[x]++; });
-    } else if (v != null && v in counts) {
-      counts[v]++;
-    }
-  });
-  return counts;
+// Full set of values to show for a field: predefined options + any
+// custom ones added at runtime + anything already present on a player
+// (defensive — covers data set some other way, e.g. direct profile edit).
+export function getFieldValues(players, field) {
+  const fromPlayers = new Set();
+  players.forEach(p => field.get(p).forEach(v => fromPlayers.add(v)));
+  const base = field.baseOptions();
+  const custom = getCustomOptions(field.id);
+  return Array.from(new Set([...base, ...custom, ...fromPlayers]));
 }
 
-export function assignFieldValue(player, path, value, multi) {
-  if (multi) {
-    const current = getPath(player, path) || [];
+export function getPlayersWithFieldValue(players, field, value) {
+  return players.filter(p => field.get(p).includes(value));
+}
+
+function setFieldValue(player, fieldId, value) {
+  const stamp = new Date().toISOString();
+  switch (fieldId) {
+    case 'languages':
+      return { ...player, languages: value, profileLastUpdated: stamp };
+    case 'infantry':
+      return { ...player, troops: { ...player.troops, infantry: value }, profileLastUpdated: stamp };
+    case 'lancer':
+      return { ...player, troops: { ...player.troops, lancer: value }, profileLastUpdated: stamp };
+    case 'marksman':
+      return { ...player, troops: { ...player.troops, marksman: value }, profileLastUpdated: stamp };
+    default:
+      return player;
+  }
+}
+
+// Multi-value fields (languages) ADD to the existing array.
+// Single-value fields (troop tiers) REPLACE the existing value.
+export function assignFieldValue(player, field, value) {
+  if (field.multi) {
+    const current = field.get(player);
     if (current.includes(value)) return player;
-    return setPath(player, path, [...current, value]);
+    return setFieldValue(player, field.id, [...current, value]);
   }
-  return setPath(player, path, value);
+  return setFieldValue(player, field.id, value);
 }
 
-export function unassignFieldValue(player, path, value, multi) {
-  if (multi) {
-    const current = getPath(player, path) || [];
-    return setPath(player, path, current.filter(v => v !== value));
+export function removeFieldValue(player, field, value) {
+  if (field.multi) {
+    return setFieldValue(player, field.id, field.get(player).filter(v => v !== value));
   }
-  return setPath(player, path, null);
+  return setFieldValue(player, field.id, null);
 }

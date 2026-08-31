@@ -3,10 +3,11 @@ import { C } from '../../utils/constants.js';
 import { PlayerCard }       from './PlayerCard.jsx';
 import { ProfileView }      from './ProfileView.jsx';
 import { PlayerSheet }      from './PlayerSheet.jsx';
-import { BatchAddSheet }    from './BatchAddSheet.jsx';
 import { RoleManagerSheet } from './RoleManagerSheet.jsx';
+import BulkNameAdd          from './BulkNameAdd.jsx';
+import FieldRegistry        from './FieldRegistry.jsx';
 
-export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePlayer, onAddPlayers, onUpdatePlayers, onDeletePlayer, onGoToIntel }) {
+export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePlayer, onAddPlayers, onUpdatePlayers, onDeletePlayer, onGoToIntel, showToast }) {
   const [rosterView, setRosterView]       = useState('list');
   const [search, setSearch]               = useState('');
   const [filterRole, setFilterRole]       = useState('All');
@@ -15,7 +16,8 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [profileOpen, setProfileOpen]     = useState(false);
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [sheetOpen, setSheetOpen]         = useState(false);
-  const [batchOpen, setBatchOpen]         = useState(false);
+  const [bulkAddOpen, setBulkAddOpen]     = useState(false);
+  const [fieldRegistryOpen, setFieldRegistryOpen] = useState(false);
   const [roleManagerOpen, setRoleManagerOpen] = useState(false);
 
   // How many of the "should be set" fields are actually missing —
@@ -57,7 +59,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
           placeholder="Search name, tag, country…"
           style={{ flex:1, height:48, background:'#152236', border:'1px solid #2A4A64', borderRadius:10, padding:'0 14px', fontSize:16, color:'#FFFFFF', fontFamily:'inherit' }}
         />
-        <button onClick={() => setBatchOpen(true)} style={{ height:48, padding:'0 12px', borderRadius:10, background:'none', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer' }}>⚡ Batch</button>
+        <button onClick={() => setBulkAddOpen(true)} style={{ height:48, padding:'0 12px', borderRadius:10, background:'none', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer' }}>➕ Bulk Add</button>
         <button onClick={openAdd} style={{ height:48, padding:'0 14px', borderRadius:10, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>＋</button>
       </div>
 
@@ -72,6 +74,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             {['All',...roles.map(r=>r.name)].map(r => (
               <button key={r} onClick={() => setFilterRole(r)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===r?C.gold+'22':C.section, border:`1px solid ${filterRole===r?C.gold:C.border}`, color:filterRole===r?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{r}</button>
             ))}
+            <button onClick={() => setFieldRegistryOpen(true)} style={{ padding:'0 10px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', flexShrink:0 }}>📋 Fields</button>
             <button onClick={() => setRoleManagerOpen(true)} style={{ padding:'0 10px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', flexShrink:0 }}>⚙ Roles</button>
             <button onClick={() => setSortMissing(!sortMissing)} style={{ padding:'0 10px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:sortMissing?C.gold+'22':'none', border:`1px solid ${sortMissing?C.gold:C.border}`, color:sortMissing?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', flexShrink:0 }}>⚠ Missing info first</button>
           </div>
@@ -84,9 +87,9 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             <div style={{ textAlign:'center', padding:'60px 20px' }}>
               <div style={{ fontSize:52, marginBottom:16 }}>👥</div>
               <div style={{ fontSize:18, fontWeight:700, color:C.white, marginBottom:8 }}>No players yet</div>
-              <div style={{ fontSize:15, color:C.muted, marginBottom:28 }}>Batch add your alliance or add one by one</div>
+              <div style={{ fontSize:15, color:C.muted, marginBottom:28 }}>Bulk add names, then fill in details via Field Registry — or add one by one</div>
               <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
-                <button onClick={() => setBatchOpen(true)} style={{ height:52, padding:'0 24px', borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>⚡ Batch Add</button>
+                <button onClick={() => setBulkAddOpen(true)} style={{ height:52, padding:'0 24px', borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>➕ Bulk Add</button>
                 <button onClick={openAdd} style={{ height:52, padding:'0 24px', borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:15, cursor:'pointer' }}>＋ Add One</button>
               </div>
             </div>
@@ -154,13 +157,6 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         existingTags={[...new Set(players.map(p=>p.allianceTag).filter(Boolean))]}
         onGoToIntel={onGoToIntel}
       />
-      <BatchAddSheet
-        open={batchOpen}
-        onClose={() => setBatchOpen(false)}
-        members={players}
-        onAddNew={onAddPlayers}
-        onUpdateExisting={onUpdatePlayers}
-      />
       <RoleManagerSheet
         open={roleManagerOpen}
         onClose={() => setRoleManagerOpen(false)}
@@ -169,6 +165,26 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         players={players}
         onUpdatePlayers={onUpdatePlayers}
       />
+
+      {bulkAddOpen && (
+        <div style={{ position:'fixed', inset:0, zIndex:600 }}>
+          <BulkNameAdd
+            onAddPlayers={onAddPlayers}
+            onClose={() => setBulkAddOpen(false)}
+            showToast={showToast}
+          />
+        </div>
+      )}
+
+      {fieldRegistryOpen && (
+        <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg }}>
+          <FieldRegistry
+            players={players}
+            onUpdatePlayer={onSavePlayer}
+            onClose={() => setFieldRegistryOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
