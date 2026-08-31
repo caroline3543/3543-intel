@@ -63,20 +63,27 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         <button onClick={openAdd} style={{ height:48, padding:'0 14px', borderRadius:10, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>＋</button>
       </div>
 
-      <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+      <div style={{ display:'flex', gap:8, marginBottom:10 }}>
         <button onClick={() => setRosterView('list')} style={{ flex:1, height:36, borderRadius:20, background:rosterView==='list'?C.gold+'22':C.section, border:`1px solid ${rosterView==='list'?C.gold:C.border}`, color:rosterView==='list'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>≡ List</button>
         <button onClick={() => setRosterView('roles')} style={{ flex:1, height:36, borderRadius:20, background:rosterView==='roles'?C.gold+'22':C.section, border:`1px solid ${rosterView==='roles'?C.gold:C.border}`, color:rosterView==='roles'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>⚔️ By Role</button>
       </div>
 
+      {/* Fixed utility row — never scrolls away, unlike the role-filter
+          chips below (which grow unbounded as custom roles are added) */}
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
+        <button onClick={() => setFieldRegistryOpen(true)} style={{ padding:'0 12px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>📋 Fields</button>
+        <button onClick={() => setRoleManagerOpen(true)} style={{ padding:'0 12px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>⚙ Roles</button>
+        {rosterView==='list' && (
+          <button onClick={() => setSortMissing(!sortMissing)} style={{ padding:'0 12px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:sortMissing?C.gold+'22':'none', border:`1px solid ${sortMissing?C.gold:C.border}`, color:sortMissing?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>⚠ Missing info first</button>
+        )}
+      </div>
+
       {rosterView==='list' && (
         <>
-          <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4, alignItems:'center' }}>
+          <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
             {['All',...roles.map(r=>r.name)].map(r => (
-              <button key={r} onClick={() => setFilterRole(r)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===r?C.gold+'22':C.section, border:`1px solid ${filterRole===r?C.gold:C.border}`, color:filterRole===r?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{r}</button>
+              <button key={r} onClick={() => setFilterRole(r)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===r?C.gold+'22':C.section, border:`1px solid ${filterRole===r?C.gold:C.border}`, color:filterRole===r?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{r}</button>
             ))}
-            <button onClick={() => setFieldRegistryOpen(true)} style={{ padding:'0 10px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', flexShrink:0 }}>📋 Fields</button>
-            <button onClick={() => setRoleManagerOpen(true)} style={{ padding:'0 10px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', flexShrink:0 }}>⚙ Roles</button>
-            <button onClick={() => setSortMissing(!sortMissing)} style={{ padding:'0 10px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:sortMissing?C.gold+'22':'none', border:`1px solid ${sortMissing?C.gold:C.border}`, color:sortMissing?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', flexShrink:0 }}>⚠ Missing info first</button>
           </div>
           {players.length > 0 && (
             <div style={{ fontSize:13, color:C.muted, marginBottom:12 }}>
@@ -105,6 +112,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
 
       {rosterView==='roles' && (() => {
         const byRole = roles.map(roleDef => ({ roleDef, members:players.filter(p => p.roles?.includes(roleDef.name)) })).filter(g => g.members.length > 0);
+        const unassigned = players.filter(p => !(p.roles||[]).length);
         return (
           <div>
             <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
@@ -113,6 +121,28 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
                 {players.filter(p => (p.roles||[]).length > 0).length} <span style={{ fontSize:16, color:C.muted }}>of {players.length}</span>
               </div>
             </div>
+            {unassigned.length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
+                  ❔ Unassigned · {unassigned.length}
+                </div>
+                {unassigned.map(m => (
+                  <div key={m.id} onClick={() => openProfile(m)} style={{ background:C.card, borderRadius:10, padding:'10px 14px', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
+                    <div>
+                      <div style={{ fontWeight:700, color:C.white, fontSize:15 }}>{m.username||m.alias||'?'}</div>
+                      <div style={{ fontSize:12, color:C.icy }}>
+                        {[m.furnaceLevel&&`${m.furnaceLevel}`, m.allianceTag&&`[${m.allianceTag}]`].filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:4 }}>
+                      {[m.troops?.infantry, m.troops?.lancer, m.troops?.marksman].map((t,i) => (
+                        <span key={i} style={{ fontSize:11, padding:'2px 6px', borderRadius:6, background:[C.inf,C.lan,C.mar][i]+'22', color:[C.inf,C.lan,C.mar][i] }}>{t||'?'}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {byRole.map(({ roleDef, members }) => (
               <div key={roleDef.id} style={{ marginBottom:16 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:roleDef.color, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
@@ -172,6 +202,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             onAddPlayers={onAddPlayers}
             onClose={() => setBulkAddOpen(false)}
             showToast={showToast}
+            onGoToFieldRegistry={() => { setBulkAddOpen(false); setFieldRegistryOpen(true); }}
           />
         </div>
       )}

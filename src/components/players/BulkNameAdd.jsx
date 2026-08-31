@@ -14,8 +14,12 @@ function parseNames(raw) {
 // Details). Details — languages, troop tiers, joiner heroes, roles —
 // are now filled in afterward via Field Registry, which is faster for
 // assigning one value to many people than the old per-member carousel.
-export default function BulkNameAdd({ onAddPlayers, onClose, showToast }) {
+// After adding, this screen offers a direct one-tap handoff into Field
+// Registry rather than closing silently — that's almost always the
+// very next thing you want to do with names you just bulk-added.
+export default function BulkNameAdd({ onAddPlayers, onClose, showToast, onGoToFieldRegistry }) {
   const [raw, setRaw] = useState('');
+  const [addedCount, setAddedCount] = useState(null); // null = still entering names
   const names = parseNames(raw);
 
   function handleAdd() {
@@ -24,7 +28,33 @@ export default function BulkNameAdd({ onAddPlayers, onClose, showToast }) {
     onAddPlayers(players);
     showToast?.(`Added ${players.length} player${players.length !== 1 ? 's' : ''}`, 'success');
     vibe(10);
-    onClose();
+    setAddedCount(players.length);
+  }
+
+  if (addedCount !== null) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: C.bg, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,-apple-system,sans-serif', color: C.white }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>✅</div>
+          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Added {addedCount} player{addedCount !== 1 ? 's' : ''}</div>
+          <div style={{ fontSize: 14, color: C.muted, marginBottom: 32, maxWidth: 320 }}>
+            They have no languages, troop tiers, or joiner heroes set yet. Field Registry is the fastest way to fill those in for everyone.
+          </div>
+          <button
+            onClick={() => onGoToFieldRegistry?.()}
+            style={{ width: '100%', maxWidth: 320, height: 52, borderRadius: 12, background: C.gold, border: 'none', color: C.bg, fontWeight: 800, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}
+          >
+            📋 Assign Details Now
+          </button>
+          <button
+            onClick={onClose}
+            style={{ width: '100%', maxWidth: 320, height: 44, borderRadius: 12, background: 'none', border: `1px solid ${C.border}`, color: C.muted, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
