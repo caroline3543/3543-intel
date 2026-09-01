@@ -37,6 +37,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [sortMode, setSortMode]       = useState('alpha'); // 'alpha' | 'troopPower'
   const [addQuery, setAddQuery]       = useState('');
   const [addResults, setAddResults]   = useState([]);
+  const [copyPickerOpen, setCopyPickerOpen] = useState(false);
 
   const activeEvent = events.find(e => e.id === activeEventId);
   const allTags = [...new Set(events.map(e => e.allianceTag).filter(Boolean))];
@@ -95,6 +96,29 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   function removeParticipant(playerId) {
     if (!activeEvent) return;
     onUpdateEvent({ ...activeEvent, participantIds: (activeEvent.participantIds || []).filter(id => id !== playerId) });
+  }
+
+  // Brings over the roster only — never RSVP predictions from the
+  // source event, since "was arriving late last week" says nothing
+  // about this week. Saves re-typing everyone's name for a recurring
+  // event type (SvS Castle Battle, Foundry, etc.) now that events
+  // start with an explicit, empty participant list.
+  function copyRosterFrom(sourceEvent) {
+    if (!activeEvent) return;
+    const already = new Set(activeEvent.participantIds || []);
+    const toAdd = (sourceEvent.participantIds || []).filter(id => !already.has(id));
+    const participantIds = [...(activeEvent.participantIds || []), ...toAdd];
+    const snaps = [...(activeEvent.snapshots || [])];
+    toAdd.forEach(pid => {
+      const player = players.find(p => p.id === pid);
+      if (!player) return;
+      const snap = newSnapshot(pid, player, activeEvent.id);
+      snap.rsvp.participating = true;
+      snaps.push(snap);
+    });
+    onUpdateEvent({ ...activeEvent, participantIds, snapshots: snaps });
+    setCopyPickerOpen(false);
+    vibe(8);
   }
 
   // Bulk tags differ by event phase — RSVP-relevant tags for upcoming
@@ -161,17 +185,20 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             ← Back to Events
           </button>
           <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
               <div>
                 <div style={{ fontSize:20, fontWeight:700, color:C.white }}>{EVENT_ICONS[activeEvent.type]||'📋'} {activeEvent.name||activeEvent.type}</div>
                 <div style={{ fontSize:13, color:C.muted }}>{fmtDateShort(activeEvent.date)}{activeEvent.time?` ${activeEvent.time}`:''}{activeEvent.allianceTag?` · [${activeEvent.allianceTag}]`:''}</div>
               </div>
-              <div style={{ display:'flex', gap:8 }}>
-                <button onClick={() => { setEditingEvent(activeEvent); setEventSheetOpen(true); }} style={{ height:34, padding:'0 12px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontSize:13, cursor:'pointer' }}>Edit</button>
-                <button onClick={() => { const n=activeEvent.status==='active'?'completed':activeEvent.status==='completed'?'upcoming':'active'; onUpdateEvent({ ...activeEvent, status:n }); }} style={{ height:34, padding:'0 12px', borderRadius:20, background:activeEvent.status==='active'?C.green+'22':C.section, border:`1px solid ${activeEvent.status==='active'?C.green:C.border}`, color:activeEvent.status==='active'?C.green:C.muted, fontSize:13, fontWeight:600, cursor:'pointer' }}>
-                  {activeEvent.status==='active'?'🔴 Live':activeEvent.status==='completed'?'✓ Done':'Upcoming'}
+              <button onClick={() => { setEditingEvent(activeEvent); setEventSheetOpen(true); }} style={{ height:34, padding:'0 12px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontSize:13, cursor:'pointer', flexShrink:0 }}>Edit</button>
+            </div>
+            <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+              {[['upcoming','Upcoming',C.icy],['active','🔴 Live',C.green],['completed','✓ Done',C.muted]].map(([s,l,c]) => (
+                <button key={s} onClick={() => onUpdateEvent({ ...activeEvent, status:s })}
+                  style={{ flex:1, height:34, borderRadius:20, border:`1px solid ${activeEvent.status===s?c:C.border}`, background:activeEvent.status===s?c+'22':C.section, color:activeEvent.status===s?c:C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  {l}
                 </button>
-              </div>
+              ))}
             </div>
             {(() => {
               const s = evSum(activeEvent);
@@ -210,6 +237,29 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             )}
           </div>
 
+          {/* Copy roster from a previous event — participant list only,
+              never RSVP predictions from that event */}
+          {events.filter(e => e.id !== activeEvent.id && (e.participantIds||[]).length > 0).length > 0 && (
+            <div style={{ marginBottom:12 }}>
+              <button onClick={() => setCopyPickerOpen(!copyPickerOpen)}
+                style={{ background:'none', border:'none', color:C.gold, fontSize:13, fontWeight:600, cursor:'pointer', padding:0 }}>
+                {copyPickerOpen ? 'Cancel' : '📋 Copy roster from a previous event'}
+              </button>
+              {copyPickerOpen && (
+                <div style={{ marginTop:8, maxHeight:200, overflowY:'auto' }}>
+                  {events.filter(e => e.id !== activeEvent.id && (e.participantIds||[]).length > 0)
+                    .sort((a,b) => new Date(b.date) - new Date(a.date))
+                    .map(ev => (
+                      <button key={ev.id} onClick={() => copyRosterFrom(ev)}
+                        style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 12px', borderRadius:8, background:C.section, border:`1px solid ${C.border}`, color:C.white, fontSize:13, marginBottom:6, cursor:'pointer' }}>
+                        {EVENT_ICONS[ev.type]||'📋'} {ev.name||ev.type} · {fmtDateShort(ev.date)} · {ev.participantIds.length} people
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Sort toggle */}
           {eventPlayers.length > 1 && (
             <div style={{ display:'flex', gap:6, marginBottom:12 }}>
@@ -224,6 +274,12 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             <button onClick={() => { setBulkMode(!bulkMode); setBulkSel(new Set()); }} style={{ height:36, padding:'0 14px', borderRadius:20, background:bulkMode?C.gold+'22':C.section, border:`1px solid ${bulkMode?C.gold:C.border}`, color:bulkMode?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
               {bulkMode ? `✓ ${bulkSel.size} selected` : '⚡ Update multiple'}
             </button>
+            {bulkMode && eventPlayers.length>0 && (
+              <button onClick={() => setBulkSel(bulkSel.size===eventPlayers.length ? new Set() : new Set(eventPlayers.map(p=>p.id)))}
+                style={{ height:36, padding:'0 14px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+                {bulkSel.size===eventPlayers.length ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
             {bulkMode && bulkSel.size>0 && bulkTags.map(([l,t,c]) => (
               <button key={t} onClick={() => applyBulk(t)} style={{ height:36, padding:'0 12px', borderRadius:20, background:c+'18', border:`1px solid ${c}44`, color:c, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>{l}</button>
             ))}
