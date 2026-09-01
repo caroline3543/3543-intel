@@ -6,7 +6,7 @@ import { PlanDetail } from './battle/PlanDetail.jsx';
 // ── BattleTab ──────────────────────────────────────────────────
 // Thin coordinator. Owns the view stack (plans → detail → liveRoom)
 // and the four plan-level mutations (create / update / delete / duplicate).
-export function BattleTab({ plans, players, events, onSave, onDelete, showToast, onGoToMembers, settings }) {
+export function BattleTab({ plans, players, events, onSave, onDelete, showToast, onGoToMembers, settings, checklist, onSaveChecklist }) {
   const [view, setView]                 = useState('plans');
   const [activePlanId, setActivePlanId] = useState(null);
   const [liveRoomPlan, setLiveRoomPlan] = useState(null);
@@ -52,6 +52,8 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
         onGoLive={handleGoLive}
         onGoToMembers={onGoToMembers}
         selectedGenerations={settings?.selectedGenerations || []}
+        checklist={checklist}
+        onSaveChecklist={onSaveChecklist}
       />
     );
   }

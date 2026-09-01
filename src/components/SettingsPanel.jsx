@@ -1,9 +1,20 @@
 import { useState } from 'react';
-import { C } from '../utils/constants.js';
+import { C, HEROES_BY_GEN } from '../utils/constants.js';
 import { Field, Inp, SheetHandle } from './common/Primitives.jsx';
-import { JOINER_META } from '../data/joinerMeta.js';
+import { FORMATION_GEN_CUTOFF } from '../data/joinerMeta.js';
 
-const GENERATIONS = JOINER_META.map(g => ({ gen: g.gen, label: g.genLabel }));
+// Show every generation the game has (from HEROES_BY_GEN, currently up
+// to 11), not just the ones with authored formation data — otherwise
+// an alliance past Gen 6 can never select their real generation at
+// all, which is what actually made this setting feel non-functional.
+const GENERATIONS = HEROES_BY_GEN.map((g, i) => {
+  const gen = i + 1;
+  return {
+    gen,
+    label: g.heroes.join(', '),
+    hasFormations: gen <= FORMATION_GEN_CUTOFF,
+  };
+});
 
 export function SettingsPanel({ settings, onSave, onClose }) {
   const [s, setS] = useState(settings || {});
@@ -40,7 +51,7 @@ export function SettingsPanel({ settings, onSave, onClose }) {
         </Field>
 
         {/* Generation setting — multi-select */}
-        <Field label="Hero Generations" hint="Select every generation your alliance is actively using. Only these will be suggested in battle planning — you don't need to also select the generations below them.">
+        <Field label="Hero Generations" hint="Select every generation your alliance is actively using. Only these will be suggested in battle planning. Generations marked ⚠ don't have guided formations authored yet — Battle Plan's Custom mode still works for those.">
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {GENERATIONS.map(g => {
               const sel = selectedGens.includes(g.gen);
@@ -50,9 +61,10 @@ export function SettingsPanel({ settings, onSave, onClose }) {
                   <div style={{ fontSize:13, fontWeight:700, color:sel?C.gold:C.muted }}>
                     {sel?'✓ ':''}Gen {g.gen}
                   </div>
-                  <div style={{ fontSize:11, color:sel?C.gold:C.muted, marginTop:2 }}>
-                    {g.label.replace(`Gen ${g.gen} — `,'').replace(`Gen ${g.gen} —`,'')}
-                  </div>
+                  <div style={{ fontSize:11, color:sel?C.gold:C.muted, marginTop:2 }}>{g.label}</div>
+                  {!g.hasFormations && (
+                    <div style={{ fontSize:10, color:C.gold, marginTop:4 }}>⚠ No guided formations yet — Custom mode only</div>
+                  )}
                 </button>
               );
             })}

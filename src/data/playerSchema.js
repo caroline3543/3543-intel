@@ -101,6 +101,8 @@ export function newSvsPlan(overrides = {}) {
     status:          'draft',
     notes:           '',
     postBattleNotes: '',
+    eventId:         null,   // links this plan to a tracked Event — required before joiner/leader eligibility can be shown (see battleConstants.js's isAttending)
+    checklist:       {},     // { [checklistItemId]: boolean } — per-plan checked state against the alliance-wide Leadership Checklist (see utils/checklist.js)
     rallySlots:      [],   // new structure — replaces rallies/reinforcements
     createdAt:       new Date().toISOString(),
     updatedAt:       new Date().toISOString(),

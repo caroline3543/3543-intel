@@ -11,9 +11,7 @@ export const JOINER_HEROES = [
   'Reina','Ahmose','Lynn',
   'Norah','Hector','Gwen',
   'Wu Ming','Renee','Wayne',
-];
-
-export const JOINER_META = [
+];export const JOINER_META = [
   {
     gen: 1, genLabel: 'Gen 1 — Jeronimo, Natalia, Molly, Zinman + Purple Heroes',
     formations: [
@@ -66,6 +64,16 @@ export const JOINER_META = [
     ],
   },
 ];
+
+/**
+ * Highest generation with real, authored formation data. Computed from
+ * JOINER_META itself — single source of truth for both SettingsPanel.jsx
+ * (which generations to flag as "no guided formations yet") and
+ * FormationPicker.jsx (which empty-state message to show), so neither
+ * file hardcodes a number that could drift out of sync if more
+ * generations get formation data added later.
+ */
+export const FORMATION_GEN_CUTOFF = Math.max(...JOINER_META.map(g => g.gen));
 
 /**
  * Build a coverage report: for each joiner hero, how many players own it.

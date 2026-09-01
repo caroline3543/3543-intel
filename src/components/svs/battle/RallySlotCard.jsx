@@ -3,7 +3,7 @@ import { C, tierChipStyle } from '../../../utils/constants.js';
 import { vibe } from '../../../utils/vibe.js';
 import {
   RALLY_TYPES, RALLY_ICONS, RALLY_COLORS,
-  RATIO_PRESETS, RALLY_DURATIONS,
+  RATIO_PRESETS, RALLY_DURATIONS, isAttending,
 } from './battleConstants.js';
 import { FormationPicker } from './FormationPicker.jsx';
 import { JoinerSlotRow }   from './JoinerSlotRow.jsx';
@@ -27,11 +27,15 @@ import { TestRallyLog }    from './TestRallyLog.jsx';
 //                          joiner in a DIFFERENT slot in this same plan
 //                          (plan-wide exclusivity — a priority joiner
 //                          can only be used in one rally per event)
+//   linkedEvent   – the Event this plan is linked to (or null). Leader
+//                   selection and joiner eligibility are BOTH gated on
+//                   this existing — no event linked means no attendance
+//                   data exists, so neither can be shown accurately.
 export function RallySlotCard({
   slot, index, players, events = [], totalSlots,
   onUpdate, onDelete, onMoveUp, onMoveDown,
   onGoToMembers, selectedGenerations = [],
-  assignedInOtherSlots,
+  assignedInOtherSlots, linkedEvent = null,
 }) {
   const [open, setOpen]               = useState(index === 0);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -42,11 +46,17 @@ export function RallySlotCard({
   const filledJoiners = slot.joiners.filter(j => j.playerName && j.heroName).length;
   const allJoinersFilled = filledJoiners === 4;
 
+  // Everyone attending the linked event — the pool a Rally Leader can
+  // be picked from. Empty (not "everyone") when no event is linked, so
+  // nobody gets selected as leader without confirmed real attendance.
+  const attendingMembers = linkedEvent ? players.filter(p => isAttending(p.id, linkedEvent)) : [];
+
   // The Rally Leader can never appear as their own joiner — this feeds
   // FormationPicker (coverage counts, auto-suggest) AND JoinerSlotRow
   // (manual eligible list) so the leader is excluded everywhere, not
-  // just greyed out like a normal already-assigned duplicate.
-  const joinerEligiblePlayers = players.filter(p => p.id !== slot.leaderId);
+  // just greyed out like a normal already-assigned duplicate. Also
+  // attendance-filtered for the same reason as the leader pool above.
+  const joinerEligiblePlayers = attendingMembers.filter(p => p.id !== slot.leaderId);
 
   // Priority-joiner exclusivity is plan-wide, not just within this
   // slot's own 4 joiners — merge in anyone already assigned elsewhere
@@ -141,13 +151,19 @@ export function RallySlotCard({
             </div>
           </div>
 
-          {/* Rally leader */}
+          {/* Rally leader — gated on a linked event, since a leader
+              can't be picked without confirming they're actually
+              attending (same rule as joiners). */}
           <div style={{ marginBottom:14 }}>
             <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:8 }}>Rally leader</label>
             {players.length === 0 ? (
               <div style={{ fontSize:13, color:C.muted, padding:'8px 0' }}>
                 No members yet.{' '}
                 <button onClick={onGoToMembers} style={{ background:'none', border:'none', color:C.gold, fontSize:13, cursor:'pointer', padding:0, textDecoration:'underline' }}>Go to Members →</button>
+              </div>
+            ) : !linkedEvent ? (
+              <div style={{ fontSize:13, color:C.muted, padding:'8px 0' }}>
+                🔗 Link this plan to an event above to select a leader.
               </div>
             ) : slot.leaderId && !changingLeader ? (
               /* Leader chosen — show them prominently, nothing else
@@ -162,13 +178,17 @@ export function RallySlotCard({
                   Change
                 </button>
               </div>
+            ) : attendingMembers.length === 0 ? (
+              <div style={{ fontSize:13, color:C.gold, padding:'8px 0' }}>
+                ⚠ No one is marked attending this event yet. Update RSVPs in the Events tab.
+              </div>
             ) : (
               <div>
-                {players.filter(p => p.roles?.includes('Rally Lead')).length > 0 && (
+                {attendingMembers.filter(p => p.roles?.includes('Rally Lead')).length > 0 && (
                   <div style={{ marginBottom:8 }}>
                     <div style={{ fontSize:10, color:C.gold, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>Rally leads</div>
                     <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                      {players.filter(p => p.roles?.includes('Rally Lead')).map(p => {
+                      {attendingMembers.filter(p => p.roles?.includes('Rally Lead')).map(p => {
                         const sel = slot.leaderId === p.id;
                         return (
                           <button key={p.id} onClick={() => { upd({ leaderId:p.id, leaderName:p.username||p.alias }); setChangingLeader(false); }}
@@ -180,11 +200,11 @@ export function RallySlotCard({
                     </div>
                   </div>
                 )}
-                {players.filter(p => !p.roles?.includes('Rally Lead')).length > 0 && (
+                {attendingMembers.filter(p => !p.roles?.includes('Rally Lead')).length > 0 && (
                   <div>
-                    <div style={{ fontSize:10, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>Other members</div>
+                    <div style={{ fontSize:10, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>Other attending members</div>
                     <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                      {players.filter(p => !p.roles?.includes('Rally Lead')).map(p => {
+                      {attendingMembers.filter(p => !p.roles?.includes('Rally Lead')).map(p => {
                         const sel = slot.leaderId === p.id;
                         return (
                           <button key={p.id} onClick={() => { upd({ leaderId:p.id, leaderName:p.username||p.alias }); setChangingLeader(false); }}
@@ -196,9 +216,9 @@ export function RallySlotCard({
                     </div>
                   </div>
                 )}
-                {players.filter(p => p.roles?.includes('Rally Lead')).length === 0 && (
+                {attendingMembers.filter(p => p.roles?.includes('Rally Lead')).length === 0 && (
                   <div style={{ fontSize:12, color:C.muted, marginTop:4 }}>
-                    No Rally Lead roles set.{' '}
+                    No attending members have the Rally Lead role.{' '}
                     <button onClick={onGoToMembers} style={{ background:'none', border:'none', color:C.gold, fontSize:12, cursor:'pointer', padding:0, textDecoration:'underline' }}>Assign roles in Members →</button>
                   </div>
                 )}
@@ -263,36 +283,44 @@ export function RallySlotCard({
             </div>
           </div>
 
-          {/* Formation picker */}
-          <FormationPicker
-            slot={slot}
-            upd={upd}
-            color={color}
-            players={joinerEligiblePlayers}
-            events={events}
-            selectedGenerations={selectedGenerations}
-            assignedInOtherSlots={assignedInOtherSlots}
-          />
+          {/* Formation picker + Priority joiners — both need real
+              attendance data, so both are gated on a linked event. */}
+          {linkedEvent ? (
+            <>
+              <FormationPicker
+                slot={slot}
+                upd={upd}
+                color={color}
+                players={joinerEligiblePlayers}
+                events={events}
+                selectedGenerations={selectedGenerations}
+                assignedInOtherSlots={assignedInOtherSlots}
+              />
 
-          {/* Priority joiners */}
-          <div style={{ marginBottom:14 }}>
-            <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Priority joiners</label>
-            <div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>These 4 members must join first, each bringing a specific hero.</div>
-            <div style={{ background:C.section, borderRadius:10, padding:10 }}>
-              {slot.joiners.map((joiner, i) => (
-                <JoinerSlotRow
-                  key={joiner.id}
-                  slot={joiner}
-                  index={i}
-                  players={joinerEligiblePlayers}
-                  events={events}
-                  onUpdate={patch => updJoiner(i, patch)}
-                  allAssignedIds={allAssignedIds}
-                  troopReqs={slot.troopReqs}
-                />
-              ))}
+              <div style={{ marginBottom:14 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Priority joiners</label>
+                <div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>These 4 members must join first, each bringing a specific hero.</div>
+                <div style={{ background:C.section, borderRadius:10, padding:10 }}>
+                  {slot.joiners.map((joiner, i) => (
+                    <JoinerSlotRow
+                      key={joiner.id}
+                      slot={joiner}
+                      index={i}
+                      players={joinerEligiblePlayers}
+                      events={events}
+                      onUpdate={patch => updJoiner(i, patch)}
+                      allAssignedIds={allAssignedIds}
+                      troopReqs={slot.troopReqs}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ background:C.section, borderRadius:12, padding:14, marginBottom:14, textAlign:'center' }}>
+              <div style={{ fontSize:13, color:C.muted }}>🔗 Link this plan to an event above to plan formations and priority joiners — eligibility needs real attendance data.</div>
             </div>
-          </div>
+          )}
 
           {/* Notes */}
           <div style={{ marginBottom:14 }}>

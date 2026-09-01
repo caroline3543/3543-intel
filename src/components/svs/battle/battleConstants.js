@@ -49,15 +49,6 @@ export const HERO_SUBS = {
   'Renee':     ['Renee'],
 };
 
-// Flat hero list for manual "pick a required hero" pickers — shared by
-// FormationPicker's custom mode and JoinerSlotRow's hero-first manual
-// assignment, so there's one list to keep in sync, not two duplicated
-// inline arrays.
-export const CUSTOM_HERO_OPTIONS = [
-  'Jessie','Seo-Yoon','Jasser','Patrick','Mia','Norah','Philly',
-  'Logan','Reina','Sergey','Wu Ming','Gwen','Lynn','Zinman',
-];
-
 /** Resolve a raw hero name (possibly with * or **) to display + alternatives. */
 export function resolveHero(raw) {
   if (!raw) return null;
@@ -126,6 +117,25 @@ export function suggestJoinerHeroes(leaderPlayer, slotType, leaderRallyHeroes) {
 }
 
 export const FC_ORDER = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios'];
+
+/**
+ * Whether a player counts as attending a linked Event, for the purpose
+ * of Battle Plan eligibility (Rally Leader picker, Priority Joiner
+ * eligible lists). Mirrors EventsTab.jsx's own upcoming/actuals split
+ * exactly rather than inventing a separate rule:
+ *   - event.status === 'upcoming'  → use the RSVP prediction
+ *   - otherwise (active/completed) → use the recorded actual
+ * Returns false if there's no event, or no snapshot for this player at
+ * all (nobody has RSVP'd/been recorded for them yet).
+ */
+export function isAttending(playerId, event) {
+  if (!event) return false;
+  const snap = (event.snapshots || []).find(s => s.playerId === playerId);
+  if (!snap) return false;
+  return event.status === 'upcoming'
+    ? !!snap.rsvp?.participating
+    : snap.attendance?.attended === true;
+}
 
 /**
  * Checks whether a player meets a rally slot's minimum troop tier

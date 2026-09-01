@@ -1,15 +1,18 @@
-import { C } from '../../../utils/constants.js';
+import { useState } from 'react';
+import { C, EVENT_ICONS } from '../../../utils/constants.js';
 import { vibe } from '../../../utils/vibe.js';
 import { newRallySlot } from '../../../data/playerSchema.js';
-import { RALLY_ICONS } from './battleConstants.js';
+import { RALLY_ICONS, isAttending, playerCanFillSlot, meetsTroopReqs } from './battleConstants.js';
 import { RallySlotCard } from './RallySlotCard.jsx';
+import { ChecklistManagerSheet } from './ChecklistManagerSheet.jsx';
 
 // ── PlanDetail ─────────────────────────────────────────────────
 // The open-plan view: header, all rally slots, Go Live sticky bar.
 // Props:
 //   plan          – the active SvsPlan object
 //   players       – full roster array
-//   events        – full events array (needed for auto-suggest scoring)
+//   events        – full events array (needed for auto-suggest scoring,
+//                   and to pick which one this plan links to)
 //   onUpdate      – (updatedPlan) => void
 //   onBack        – () => void
 //   onGoLive      – (plan) => void
@@ -17,7 +20,12 @@ import { RallySlotCard } from './RallySlotCard.jsx';
 //   selectedGenerations – number[] from Settings — explicit list, NOT
 //                         cumulative; empty array means "no filter,
 //                         show everything" (see SettingsPanel.jsx)
-export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoLive, onGoToMembers, selectedGenerations = [] }) {
+//   checklist       – alliance-wide Leadership Checklist item defs
+//   onSaveChecklist – (items[]) => void — replaces the whole item list
+export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoLive, onGoToMembers, selectedGenerations = [], checklist = [], onSaveChecklist }) {
+  const [eventPickerOpen, setEventPickerOpen]         = useState(false);
+  const [checklistManagerOpen, setChecklistManagerOpen] = useState(false);
+
   function updPlan(patch) { onUpdate({ ...plan, ...patch }); }
 
   function addSlot() {
@@ -42,6 +50,7 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
 
   const slots      = plan.rallySlots || [];
   const readySlots = slots.filter(s => s.leaderName);
+  const linkedEvent = events.find(e => e.id === plan.eventId) || null;
 
   // ── Plan-wide priority-joiner exclusivity ─────────────────────
   // A priority joiner should only be usable in ONE rally slot across
@@ -58,13 +67,41 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
     return ids;
   }
 
+  // ── Plan-wide unfilled-joiner flag ─────────────────────────────
+  // How many priority joiner slots (across the whole plan) have a
+  // required hero set but literally nobody eligible to fill it —
+  // surfaced as a single banner so this is visible without opening
+  // every rally slot individually. Deliberately a simplified count:
+  // it checks hero ownership + troop tier + attendance per slot, but
+  // doesn't also account for plan-wide exclusivity (a person eligible
+  // here might already be claimed by another slot) — that's already
+  // enforced correctly in the actual assignment UI; this banner is
+  // just a heads-up indicator, not the source of truth.
+  let unfillableCount = 0;
+  if (linkedEvent) {
+    slots.forEach(slot => {
+      const pool = players.filter(p => p.id !== slot.leaderId && isAttending(p.id, linkedEvent));
+      const hasReqs = Object.values(slot.troopReqs || {}).some(Boolean);
+      (slot.joiners || []).forEach(j => {
+        if (!j.heroName) return;
+        const eligible = pool.filter(p => playerCanFillSlot(p, j.heroName) && (!hasReqs || meetsTroopReqs(p, slot.troopReqs).ok));
+        if (eligible.length === 0) unfillableCount++;
+      });
+    });
+  }
+
   // ── Unallocated backups ────────────────────────────────────────
-  // Available roster members not currently used as a priority joiner
+  // Attending roster members not currently used as a priority joiner
   // ANYWHERE in this plan — quick reference for who can sub in if
-  // someone drops offline mid-event.
+  // someone drops offline mid-event. Falls back to the whole roster
+  // when no event is linked yet, same as before.
   const allAssignedPlanWide = new Set();
   slots.forEach(s => (s.joiners || []).forEach(j => { if (j.playerId) allAssignedPlanWide.add(j.playerId); }));
-  const unallocated = players.filter(p => !allAssignedPlanWide.has(p.id));
+  const unallocated = players.filter(p =>
+    !allAssignedPlanWide.has(p.id) && (!linkedEvent || isAttending(p.id, linkedEvent))
+  );
+
+  const linkableEvents = events.filter(e => e.status !== 'completed');
 
   return (
     <div style={{ padding:'16px 20px 0', paddingBottom:readySlots.length > 0 ? 120 : 20 }}>
@@ -98,6 +135,77 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
         />
       </div>
 
+      {/* Linked event — required before leader/joiner planning unlocks */}
+      <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>Linked event</div>
+        {linkedEvent ? (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div>
+              <div style={{ fontSize:15, fontWeight:700, color:C.white }}>{EVENT_ICONS[linkedEvent.type] || '📋'} {linkedEvent.name || linkedEvent.type}</div>
+              <div style={{ fontSize:12, color:C.muted }}>{linkedEvent.date}</div>
+            </div>
+            <button onClick={() => setEventPickerOpen(!eventPickerOpen)}
+              style={{ background:'none', border:`1px solid ${C.border}`, borderRadius:16, padding:'6px 14px', color:C.gold, fontWeight:600, fontSize:12, cursor:'pointer' }}>
+              {eventPickerOpen ? 'Cancel' : 'Change'}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize:13, color:C.red, fontWeight:600, marginBottom:10 }}>⚠ No event linked — leader and joiner planning is locked until you link one.</div>
+            <button onClick={() => setEventPickerOpen(!eventPickerOpen)}
+              style={{ width:'100%', height:44, borderRadius:10, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+              🔗 Link an event
+            </button>
+          </div>
+        )}
+        {eventPickerOpen && (
+          <div style={{ marginTop:10, maxHeight:220, overflowY:'auto' }}>
+            {linkableEvents.length === 0 ? (
+              <div style={{ fontSize:12, color:C.muted, textAlign:'center', padding:'10px 0' }}>No upcoming or active events yet. Create one in the Events tab first.</div>
+            ) : (
+              linkableEvents.map(ev => (
+                <button key={ev.id} onClick={() => { updPlan({ eventId:ev.id }); setEventPickerOpen(false); }}
+                  style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 12px', borderRadius:8, background:C.section, border:`1px solid ${plan.eventId===ev.id?C.gold:C.border}`, color:C.white, fontSize:13, marginBottom:6, cursor:'pointer' }}>
+                  {EVENT_ICONS[ev.type] || '📋'} {ev.name || ev.type} · {ev.date}
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Plan-wide flag — priority joiners with nobody eligible */}
+      {unfillableCount > 0 && (
+        <div style={{ background:C.red+'0e', border:`1px solid ${C.red}44`, borderRadius:12, padding:'12px 14px', marginBottom:16 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:C.red }}>⚠ {unfillableCount} priority joiner{unfillableCount !== 1 ? 's have' : ' has'} no eligible attendee</div>
+          <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>Review the rally slots below before going live.</div>
+        </div>
+      )}
+
+      {/* Leadership Checklist */}
+      <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:C.white }}>📋 Leadership Checklist</div>
+          <button onClick={() => setChecklistManagerOpen(true)} style={{ background:'none', border:'none', color:C.gold, fontSize:12, fontWeight:600, cursor:'pointer' }}>Manage</button>
+        </div>
+        {checklist.length === 0 ? (
+          <div style={{ fontSize:13, color:C.muted }}>No checklist items yet. Tap Manage to add some — e.g. "Rally leads briefed", "Formations locked", "Backup joiners identified".</div>
+        ) : (
+          checklist.map(item => {
+            const checked = !!(plan.checklist || {})[item.id];
+            return (
+              <div key={item.id} onClick={() => updPlan({ checklist:{ ...(plan.checklist || {}), [item.id]:!checked } })}
+                style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', cursor:'pointer' }}>
+                <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${checked?C.green:C.border}`, background:checked?C.green+'33':'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  {checked && <span style={{ color:C.green, fontSize:13, fontWeight:700 }}>✓</span>}
+                </div>
+                <span style={{ fontSize:14, color:checked?C.muted:C.white, textDecoration:checked?'line-through':'none' }}>{item.name}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
+
       {/* Empty state */}
       {slots.length === 0 && (
         <div style={{ textAlign:'center', padding:'32px 20px', background:C.section, borderRadius:12, marginBottom:16 }}>
@@ -123,6 +231,7 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
           onGoToMembers={onGoToMembers}
           selectedGenerations={selectedGenerations}
           assignedInOtherSlots={assignedInOtherSlots(slot.id)}
+          linkedEvent={linkedEvent}
         />
       ))}
 
@@ -136,7 +245,7 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
       {slots.length > 0 && (
         <div style={{ background:C.section, borderRadius:12, padding:14, marginBottom:16 }}>
           <div style={{ fontSize:13, fontWeight:700, color:C.icy, marginBottom:2 }}>🔁 Unallocated — available as backups</div>
-          <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>Members not used as a priority joiner anywhere in this plan — sub one in if someone drops.</div>
+          <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>{linkedEvent ? 'Attending members' : 'Members'} not used as a priority joiner anywhere in this plan — sub one in if someone drops.</div>
           {unallocated.length === 0 ? (
             <div style={{ fontSize:12, color:C.muted }}>Everyone available is already allocated somewhere in this plan.</div>
           ) : (
@@ -154,6 +263,13 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
           )}
         </div>
       )}
+
+      <ChecklistManagerSheet
+        open={checklistManagerOpen}
+        onClose={() => setChecklistManagerOpen(false)}
+        items={checklist}
+        onSaveItems={onSaveChecklist}
+      />
 
       {/* Sticky Go Live bar */}
       {readySlots.length > 0 && (

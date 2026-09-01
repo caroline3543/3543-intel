@@ -159,6 +159,14 @@ export function useAppState() {
     setData(prev => ({ ...prev, customRoles, lastUpdated: new Date().toISOString() }));
   }, []);
 
+  // ── Leadership checklist ──────────────────────────────────
+  // Alliance-wide checklist item list (see utils/checklist.js) — same
+  // whole-array-replace pattern as saveCustomRoles. Per-plan checked
+  // state lives on each plan object (plan.checklist), not here.
+  const saveChecklistItems = useCallback((customChecklist) => {
+    setData(prev => ({ ...prev, customChecklist, lastUpdated: new Date().toISOString() }));
+  }, []);
+
   // ── Import ────────────────────────────────────────────────
   const applyImport = useCallback((imported, mode) => {
     setData(prev => {
@@ -201,6 +209,7 @@ export function useAppState() {
   const settings    = data.settings    || {};
   const customRoles = data.customRoles || [];
   const roles       = withBuiltinRole(customRoles);
+  const customChecklist = data.customChecklist || [];
 
   return {
     // Raw data
@@ -241,6 +250,10 @@ export function useAppState() {
     // Player roles
     roles,
     saveCustomRoles,
+
+    // Leadership checklist
+    customChecklist,
+    saveChecklistItems,
 
     // Import
     applyImport,

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { C } from '../../../utils/constants.js';
-import { getRecommendedFormation } from '../../../data/joinerMeta.js';
+import { getRecommendedFormation, FORMATION_GEN_CUTOFF } from '../../../data/joinerMeta.js';
 import { suggestPriorityJoiners } from '../../../data/metrics.js';
 import { newJoinerSlot } from '../../../data/playerSchema.js';
 import { buildFormationMessage } from '../../../services/formationMessage.js';
@@ -39,7 +39,7 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
 
   const gensToShow = selectedGenerations.length > 0
     ? selectedGenerations
-    : Array.from({ length: 6 }, (_, i) => i + 1);
+    : Array.from({ length: FORMATION_GEN_CUTOFF }, (_, i) => i + 1);
 
   // Real formation data sometimes packs multiple heroes into one array
   // element (e.g. ['Jeronimo', 'Molly & Zinman']) — flatten to a clean
@@ -280,7 +280,9 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
           <div>
             {recommendations.length === 0 && (
               <div style={{ fontSize:13, color:C.muted, textAlign:'center', padding:'20px 0' }}>
-                No {slot.formationFilter || ''} formation found for the selected generation{gensToShow.length !== 1 ? 's' : ''}.
+                {gensToShow.every(g => g > FORMATION_GEN_CUTOFF)
+                  ? `No guided formations exist yet for Gen ${gensToShow.join(', ')} — this isn't a bug, community formation data currently only covers Gen 1–${FORMATION_GEN_CUTOFF}. Use 🔬 Custom mode above.`
+                  : `No ${slot.formationFilter || ''} formation found for the selected generation${gensToShow.length !== 1 ? 's' : ''}.`}
               </div>
             )}
             {cardsToShow.map((f, i) => renderCard(f, i))}
