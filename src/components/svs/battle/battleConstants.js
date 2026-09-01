@@ -49,11 +49,23 @@ export const HERO_SUBS = {
   'Renee':     ['Renee'],
 };
 
-/** Resolve a raw hero name (possibly with * or **) to display + alternatives. */
+/**
+ * Resolve a hero name to display + alternatives. Works with either the
+ * raw spreadsheet notation ("Jessie*") OR an already-resolved display
+ * name ("Jessie") — the latter matters because once a joiner slot's
+ * heroName gets set to the resolved display form, a naive lookup by
+ * raw key alone would find nothing and silently lose the substitution
+ * alternates (Jasser, Jeronimo). Falls back to searching every group's
+ * display name before giving up.
+ */
 export function resolveHero(raw) {
   if (!raw) return null;
   const clean = raw.replace(/\*/g,'').replace(/\*\*/g,'').trim();
-  const subs  = HERO_SUBS[raw] || HERO_SUBS[clean] || [clean];
+  let subs = HERO_SUBS[raw] || HERO_SUBS[clean];
+  if (!subs) {
+    const match = Object.values(HERO_SUBS).find(arr => arr[0].toLowerCase() === clean.toLowerCase());
+    subs = match || [clean];
+  }
   return { display: subs[0], alternatives: subs.slice(1), raw };
 }
 

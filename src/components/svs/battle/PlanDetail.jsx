@@ -94,12 +94,18 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
   // Attending roster members not currently used as a priority joiner
   // ANYWHERE in this plan — quick reference for who can sub in if
   // someone drops offline mid-event. Falls back to the whole roster
-  // when no event is linked yet, same as before.
+  // when no event is linked yet, same as before. Split into who's
+  // actually eligible to fill a hero-based joiner slot (has at least
+  // one Skill-5 joiner hero recorded) vs. who currently isn't, so it's
+  // clear at a glance who's a real backup option right now.
   const allAssignedPlanWide = new Set();
   slots.forEach(s => (s.joiners || []).forEach(j => { if (j.playerId) allAssignedPlanWide.add(j.playerId); }));
   const unallocated = players.filter(p =>
     !allAssignedPlanWide.has(p.id) && (!linkedEvent || isAttending(p.id, linkedEvent))
   );
+  const hasJoinerHero = p => (p.joinerHeroes || []).some(jh => jh.skillLevel >= 5);
+  const unallocatedEligible   = unallocated.filter(hasJoinerHero);
+  const unallocatedIneligible = unallocated.filter(p => !hasJoinerHero(p));
 
   const linkableEvents = events.filter(e => e.status !== 'completed');
 
@@ -241,25 +247,45 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
         </button>
       )}
 
-      {/* Unallocated — available as backups */}
+      {/* Unallocated — categorised by whether they're actually
+          eligible to fill a hero-based joiner slot right now */}
       {slots.length > 0 && (
         <div style={{ background:C.section, borderRadius:12, padding:14, marginBottom:16 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:C.icy, marginBottom:2 }}>🔁 Unallocated — available as backups</div>
-          <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>{linkedEvent ? 'Attending members' : 'Members'} not used as a priority joiner anywhere in this plan — sub one in if someone drops.</div>
+          <div style={{ fontSize:13, fontWeight:700, color:C.icy, marginBottom:2 }}>🔁 Unallocated</div>
+          <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>{linkedEvent ? 'Attending members' : 'Members'} not used as a priority joiner anywhere in this plan.</div>
           {unallocated.length === 0 ? (
             <div style={{ fontSize:12, color:C.muted }}>Everyone available is already allocated somewhere in this plan.</div>
           ) : (
-            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-              {unallocated.map(p => {
-                const heroes = (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero);
-                return (
-                  <div key={p.id} style={{ padding:'6px 12px', borderRadius:16, background:C.card, border:`1px solid ${C.border}` }}>
-                    <span style={{ fontSize:13, fontWeight:600, color:C.white }}>{p.username || p.alias || '?'}</span>
-                    {heroes.length > 0 && <span style={{ fontSize:11, color:C.gold, marginLeft:6 }}>{heroes.slice(0,2).join(', ')}{heroes.length > 2 ? ` +${heroes.length-2}` : ''}</span>}
+            <>
+              {unallocatedEligible.length > 0 && (
+                <div style={{ marginBottom: unallocatedIneligible.length > 0 ? 12 : 0 }}>
+                  <div style={{ fontSize:10, color:C.green, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>✓ Eligible — has joiner heroes</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                    {unallocatedEligible.map(p => {
+                      const heroes = (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero);
+                      return (
+                        <div key={p.id} style={{ padding:'6px 12px', borderRadius:16, background:C.card, border:`1px solid ${C.green}44` }}>
+                          <span style={{ fontSize:13, fontWeight:600, color:C.white }}>{p.username || p.alias || '?'}</span>
+                          <span style={{ fontSize:11, color:C.gold, marginLeft:6 }}>{heroes.slice(0,2).join(', ')}{heroes.length > 2 ? ` +${heroes.length-2}` : ''}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              )}
+              {unallocatedIneligible.length > 0 && (
+                <div>
+                  <div style={{ fontSize:10, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>✗ Not currently eligible — no joiner heroes recorded</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                    {unallocatedIneligible.map(p => (
+                      <div key={p.id} style={{ padding:'6px 12px', borderRadius:16, background:C.card, border:`1px solid ${C.border}`, opacity:0.7 }}>
+                        <span style={{ fontSize:13, fontWeight:600, color:C.muted }}>{p.username || p.alias || '?'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

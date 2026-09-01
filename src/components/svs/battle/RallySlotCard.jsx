@@ -2,16 +2,25 @@ import { useState } from 'react';
 import { C, tierChipStyle } from '../../../utils/constants.js';
 import { vibe } from '../../../utils/vibe.js';
 import {
-  RALLY_TYPES, RALLY_ICONS, RALLY_COLORS,
-  RATIO_PRESETS, RALLY_DURATIONS, isAttending,
+  RALLY_TYPES, RALLY_ICONS, RALLY_COLORS, isAttending,
 } from './battleConstants.js';
 import { FormationPicker } from './FormationPicker.jsx';
 import { JoinerSlotRow }   from './JoinerSlotRow.jsx';
 import { RatioPicker }     from './RatioPicker.jsx';
 import { TestRallyLog }    from './TestRallyLog.jsx';
+import { AlliancePicker }  from '../../common/AlliancePicker.jsx';
+import { buildFormationMessage } from '../../../services/formationMessage.js';
 
 // ── RallySlotCard ──────────────────────────────────────────────
 // One rally slot inside a battle plan.
+//
+// Field order (deliberate): Alliance, Type, Formation, Troop Ratio,
+// Rally Leader, Minimum Troop Tier, Copy Formation Instructions,
+// Priority Joiners, Strategy Notes, Test Rallies. Rally Duration is
+// NOT shown here — it still exists on the slot (feeds Live Rally
+// Room's timer math, default 3min) but is set per-leader in the Live
+// Room's Calculator instead, not during planning.
+//
 // Props:
 //   slot          – rally slot object
 //   index         – 0-based position
@@ -40,22 +49,31 @@ export function RallySlotCard({
   const [open, setOpen]               = useState(index === 0);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [changingLeader, setChangingLeader] = useState(false);
+  const [instructionsText, setInstructionsText] = useState(null); // lazily generated, hand-editable
+  const [copied, setCopied] = useState(false);
 
   const color         = RALLY_COLORS[slot.type] || C.gold;
   const icon          = RALLY_ICONS[slot.type]  || '⚔️';
   const filledJoiners = slot.joiners.filter(j => j.playerName && j.heroName).length;
   const allJoinersFilled = filledJoiners === 4;
 
-  // Everyone attending the linked event — the pool a Rally Leader can
-  // be picked from. Empty (not "everyone") when no event is linked, so
+  const existingTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
+
+  // Everyone attending the linked event, further narrowed to this
+  // slot's alliance if one is set — the pool a Rally Leader can be
+  // picked from. Empty (not "everyone") when no event is linked, so
   // nobody gets selected as leader without confirmed real attendance.
-  const attendingMembers = linkedEvent ? players.filter(p => isAttending(p.id, linkedEvent)) : [];
+  const attendingMembers = linkedEvent
+    ? players
+        .filter(p => isAttending(p.id, linkedEvent))
+        .filter(p => !slot.allianceTag || p.allianceTag === slot.allianceTag)
+    : [];
 
   // The Rally Leader can never appear as their own joiner — this feeds
   // FormationPicker (coverage counts, auto-suggest) AND JoinerSlotRow
   // (manual eligible list) so the leader is excluded everywhere, not
   // just greyed out like a normal already-assigned duplicate. Also
-  // attendance-filtered for the same reason as the leader pool above.
+  // attendance- and alliance-filtered for the same reason as above.
   const joinerEligiblePlayers = attendingMembers.filter(p => p.id !== slot.leaderId);
 
   // Priority-joiner exclusivity is plan-wide, not just within this
@@ -77,6 +95,26 @@ export function RallySlotCard({
     (!!slot.leaderName + filledJoiners / 4 * 0.8 + !!slot.ratio * 0.1) / 1.9 * 100
   );
 
+  const hasFormationContent = !!slot.selectedFormation || (slot.leaderRallyHeroes || []).length === 3;
+
+  function generateInstructions() {
+    const formation = { type: slot.type, ratio: slot.ratio, leaders: slot.leaderRallyHeroes || [] };
+    const messageJoiners = (slot.joiners || []).map(j => ({
+      player: j.playerId ? { username: j.playerName } : null,
+      hero:   j.heroName,
+    }));
+    return buildFormationMessage(formation, messageJoiners, slot.leaderName);
+  }
+
+  function regenerateInstructions() {
+    setInstructionsText(generateInstructions());
+  }
+
+  function copyInstructions() {
+    const text = instructionsText ?? generateInstructions();
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  }
+
   return (
     <div style={{ background:C.card, borderRadius:14, marginBottom:12, border:`1px solid ${color}44`, overflow:'hidden' }}>
       {/* Completion bar */}
@@ -90,7 +128,7 @@ export function RallySlotCard({
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
             <div style={{ fontSize:15, fontWeight:700, color:C.white }}>{slot.type}</div>
-            <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:color+'22', color, fontWeight:700 }}>{slot.rallyDuration}min</span>
+            {slot.allianceTag && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:C.icy+'22', color:C.icy, fontWeight:700 }}>[{slot.allianceTag}]</span>}
             {slot.ratio && <span style={{ fontSize:11, color:C.muted }}>{slot.ratio}</span>}
           </div>
           <div style={{ fontSize:13, color:C.icy }}>
@@ -134,8 +172,17 @@ export function RallySlotCard({
       {open && !confirmDelete && (
         <div style={{ padding:'0 16px 16px', borderTop:`1px solid ${C.border}22` }}>
 
-          {/* Rally type */}
+          {/* 1. Alliance */}
           <div style={{ marginBottom:14, marginTop:14 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:8 }}>Alliance</label>
+            <AlliancePicker value={slot.allianceTag || ''} onChange={v => upd({ allianceTag: v || null })} existingTags={existingTags} />
+            {slot.allianceTag && (
+              <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>Only [{slot.allianceTag}] members can be selected as leader or joiners below.</div>
+            )}
+          </div>
+
+          {/* 2. Type */}
+          <div style={{ marginBottom:14 }}>
             <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:8 }}>Type</label>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {RALLY_TYPES.map(type => {
@@ -151,19 +198,39 @@ export function RallySlotCard({
             </div>
           </div>
 
-          {/* Rally leader — gated on a linked event, since a leader
+          {/* 3. Formation + 4. Troop Ratio — both need real attendance
+              data (formation coverage/auto-suggest reads the eligible
+              pool), so gated on a linked event same as leader/joiners. */}
+          {linkedEvent ? (
+            <>
+              <FormationPicker
+                slot={slot}
+                upd={upd}
+                color={color}
+                players={joinerEligiblePlayers}
+                events={events}
+                selectedGenerations={selectedGenerations}
+                assignedInOtherSlots={assignedInOtherSlots}
+              />
+
+              <RatioPicker slot={slot} upd={upd} />
+            </>
+          ) : (
+            <div style={{ background:C.section, borderRadius:12, padding:14, marginBottom:14, textAlign:'center' }}>
+              <div style={{ fontSize:13, color:C.muted }}>🔗 Link this plan to an event above to plan formations, leader, and priority joiners — eligibility needs real attendance data.</div>
+            </div>
+          )}
+
+          {/* 5. Rally leader — gated on a linked event, since a leader
               can't be picked without confirming they're actually
               attending (same rule as joiners). */}
+          {linkedEvent && (
           <div style={{ marginBottom:14 }}>
             <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:8 }}>Rally leader</label>
             {players.length === 0 ? (
               <div style={{ fontSize:13, color:C.muted, padding:'8px 0' }}>
                 No members yet.{' '}
                 <button onClick={onGoToMembers} style={{ background:'none', border:'none', color:C.gold, fontSize:13, cursor:'pointer', padding:0, textDecoration:'underline' }}>Go to Members →</button>
-              </div>
-            ) : !linkedEvent ? (
-              <div style={{ fontSize:13, color:C.muted, padding:'8px 0' }}>
-                🔗 Link this plan to an event above to select a leader.
               </div>
             ) : slot.leaderId && !changingLeader ? (
               /* Leader chosen — show them prominently, nothing else
@@ -180,7 +247,7 @@ export function RallySlotCard({
               </div>
             ) : attendingMembers.length === 0 ? (
               <div style={{ fontSize:13, color:C.gold, padding:'8px 0' }}>
-                ⚠ No one is marked attending this event yet. Update RSVPs in the Events tab.
+                ⚠ No one{slot.allianceTag ? ` from [${slot.allianceTag}]` : ''} is marked attending this event yet. Update RSVPs in the Events tab.
               </div>
             ) : (
               <div>
@@ -225,23 +292,9 @@ export function RallySlotCard({
               </div>
             )}
           </div>
+          )}
 
-          {/* Rally duration */}
-          <div style={{ marginBottom:14 }}>
-            <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:8 }}>Rally duration</label>
-            <div style={{ display:'flex', gap:8 }}>
-              {RALLY_DURATIONS.map(d => (
-                <button key={d} onClick={() => upd({ rallyDuration:d })}
-                  style={{ flex:1, height:48, borderRadius:10, border:`1px solid ${slot.rallyDuration===d?color:C.border}`, background:slot.rallyDuration===d?color+'22':C.section, color:slot.rallyDuration===d?color:C.muted, fontWeight:700, fontSize:15, cursor:'pointer' }}>
-                  {d} min
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <RatioPicker slot={slot} upd={upd} />
-
-          {/* FC Troop requirements */}
+          {/* 6. Minimum troop tier */}
           <div style={{ marginBottom:14 }}>
             <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Minimum troop tier required</label>
             <div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>Members below these tiers shouldn't join this rally.</div>
@@ -283,46 +336,52 @@ export function RallySlotCard({
             </div>
           </div>
 
-          {/* Formation picker + Priority joiners — both need real
-              attendance data, so both are gated on a linked event. */}
-          {linkedEvent ? (
-            <>
-              <FormationPicker
-                slot={slot}
-                upd={upd}
-                color={color}
-                players={joinerEligiblePlayers}
-                events={events}
-                selectedGenerations={selectedGenerations}
-                assignedInOtherSlots={assignedInOtherSlots}
+          {/* 7. Copy formation instructions — viewable and hand-editable
+              before copying, not a silent one-shot clipboard write. */}
+          {hasFormationContent && (
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:6 }}>Copy formation instructions</label>
+              <textarea
+                value={instructionsText ?? generateInstructions()}
+                onChange={e => setInstructionsText(e.target.value)}
+                style={{ width:'100%', minHeight:110, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:13, color:C.white, resize:'vertical', boxSizing:'border-box', fontFamily:'inherit' }}
               />
-
-              <div style={{ marginBottom:14 }}>
-                <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Priority joiners</label>
-                <div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>These 4 members must join first, each bringing a specific hero.</div>
-                <div style={{ background:C.section, borderRadius:10, padding:10 }}>
-                  {slot.joiners.map((joiner, i) => (
-                    <JoinerSlotRow
-                      key={joiner.id}
-                      slot={joiner}
-                      index={i}
-                      players={joinerEligiblePlayers}
-                      events={events}
-                      onUpdate={patch => updJoiner(i, patch)}
-                      allAssignedIds={allAssignedIds}
-                      troopReqs={slot.troopReqs}
-                    />
-                  ))}
-                </div>
+              <div style={{ display:'flex', gap:8, marginTop:8 }}>
+                <button onClick={copyInstructions}
+                  style={{ flex:2, height:44, borderRadius:10, background:copied?C.green+'18':C.gold+'18', border:`1px solid ${copied?C.green:C.gold}44`, color:copied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  {copied ? '✓ Copied' : '📋 Copy'}
+                </button>
+                <button onClick={regenerateInstructions}
+                  style={{ flex:1, height:44, borderRadius:10, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                  ↺ Reset
+                </button>
               </div>
-            </>
-          ) : (
-            <div style={{ background:C.section, borderRadius:12, padding:14, marginBottom:14, textAlign:'center' }}>
-              <div style={{ fontSize:13, color:C.muted }}>🔗 Link this plan to an event above to plan formations and priority joiners — eligibility needs real attendance data.</div>
             </div>
           )}
 
-          {/* Notes */}
+          {/* 8. Priority joiners */}
+          {linkedEvent && (
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Priority joiners</label>
+              <div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>These 4 members must join first, each bringing a specific hero.</div>
+              <div style={{ background:C.section, borderRadius:10, padding:10 }}>
+                {slot.joiners.map((joiner, i) => (
+                  <JoinerSlotRow
+                    key={joiner.id}
+                    slot={joiner}
+                    index={i}
+                    players={joinerEligiblePlayers}
+                    events={events}
+                    onUpdate={patch => updJoiner(i, patch)}
+                    allAssignedIds={allAssignedIds}
+                    troopReqs={slot.troopReqs}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 9. Strategy notes */}
           <div style={{ marginBottom:14 }}>
             <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:6 }}>Strategy notes</label>
             <textarea
@@ -333,7 +392,7 @@ export function RallySlotCard({
             />
           </div>
 
-          {/* Test rallies — real-battle results logged against this formation */}
+          {/* 10. Test rallies — real-battle results logged against this formation */}
           <TestRallyLog entries={slot.testRallies || []} onChange={testRallies => upd({ testRallies })} />
         </div>
       )}

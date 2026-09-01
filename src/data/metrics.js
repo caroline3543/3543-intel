@@ -81,7 +81,13 @@ export function suggestPriorityJoiners(resolvedSlots, players, events) {
 
     for (const hero of heroOptions || []) {
       const ranked = autoSuggestPlayers(players, events, { heroes: [hero], requireAvailable: true })
-        .filter(c => !assigned.has(c.player.id));
+        .filter(c => !assigned.has(c.player.id))
+        // autoSuggestPlayers only SCORES hero ownership as a bonus, it
+        // never excludes non-owners — without this hard filter, the
+        // "best available" candidate could be someone who simply
+        // doesn't have the hero at all when nobody eligible does.
+        // Never allocate a joiner nobody can actually fulfil.
+        .filter(c => (c.player.joinerHeroes || []).some(jh => jh.hero === hero && jh.skillLevel >= 5));
       if (ranked.length && (!best || ranked[0].score > best.score)) {
         best = { player: ranked[0].player, hero, score: ranked[0].score, reasons: ranked[0].reasons, missing: ranked[0].missing };
       }
@@ -90,7 +96,7 @@ export function suggestPriorityJoiners(resolvedSlots, players, events) {
     if (best) assigned.add(best.player.id);
     return best
       ? { ...best, slotIndex, slotLabel }
-      : { player: null, hero: heroOptions?.[0] || null, slotIndex, slotLabel, score: 0, reasons: [], missing: ['No available roster member owns this hero'] };
+      : { player: null, hero: heroOptions?.[0] || null, slotIndex, slotLabel, score: 0, reasons: [], missing: ['No eligible attendee owns this hero'] };
   });
 }
 

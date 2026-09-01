@@ -114,6 +114,7 @@ export function newRallySlot(overrides = {}) {
   return {
     id:           uid(),
     type:         'Main Rally',
+    allianceTag:  null,     // restricts leader + joiner eligibility to this alliance only, if set
     leaderId:     null,
     leaderName:   '',
     rallyDuration: 3,

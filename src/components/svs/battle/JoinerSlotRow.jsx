@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { C } from '../../../utils/constants.js';
-import { meetsTroopReqs, playerCanFillSlot, CUSTOM_HERO_OPTIONS } from './battleConstants.js';
+import { meetsTroopReqs, playerCanFillSlot, resolveHero, CUSTOM_HERO_OPTIONS } from './battleConstants.js';
 import { calcMetrics } from '../../../data/metrics.js';
 
 // ── JoinerSlotRow ──────────────────────────────────────────────
@@ -56,6 +56,13 @@ export function JoinerSlotRow({ slot, index, players, events = [], onUpdate, all
   }
 
   const eligible = slot.heroName ? eligibleFor(slot.heroName) : [];
+
+  // Alternate heroes accepted for whatever's currently required — e.g.
+  // "Jessie" also accepts Jasser/Jeronimo per the community spreadsheet
+  // substitution notes. Surfaced as quick-tap swaps rather than making
+  // the officer hunt through the full hero list for a known substitute,
+  // even when the current hero came from a Gen-suggested formation.
+  const currentAlternatives = slot.heroName ? (resolveHero(slot.heroName)?.alternatives || []) : [];
 
   function setHero(hero) {
     // Changing the required hero can invalidate whoever was previously
@@ -127,13 +134,30 @@ export function JoinerSlotRow({ slot, index, players, events = [], onUpdate, all
               )}
             </div>
             {(!slot.heroName || pickingHero) && (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                {CUSTOM_HERO_OPTIONS.map(hero => (
-                  <button key={hero} onClick={() => setHero(hero)}
-                    style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${slot.heroName===hero?C.gold:C.border}`, background:slot.heroName===hero?C.gold+'22':C.section, color:slot.heroName===hero?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
-                    {hero}
-                  </button>
-                ))}
+              <div>
+                {pickingHero && currentAlternatives.length > 0 && (
+                  <div style={{ marginBottom:8 }}>
+                    <div style={{ fontSize:10, color:C.gold, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>
+                      Alternates for {slot.heroName}
+                    </div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                      {currentAlternatives.map(alt => (
+                        <button key={alt} onClick={() => setHero(alt)}
+                          style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${C.gold}`, background:C.gold+'18', color:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                          ⇄ {alt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {CUSTOM_HERO_OPTIONS.map(hero => (
+                    <button key={hero} onClick={() => setHero(hero)}
+                      style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${slot.heroName===hero?C.gold:C.border}`, background:slot.heroName===hero?C.gold+'22':C.section, color:slot.heroName===hero?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                      {hero}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

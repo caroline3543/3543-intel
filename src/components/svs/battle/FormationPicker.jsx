@@ -3,7 +3,6 @@ import { C } from '../../../utils/constants.js';
 import { getRecommendedFormation, FORMATION_GEN_CUTOFF } from '../../../data/joinerMeta.js';
 import { suggestPriorityJoiners } from '../../../data/metrics.js';
 import { newJoinerSlot } from '../../../data/playerSchema.js';
-import { buildFormationMessage } from '../../../services/formationMessage.js';
 import { resolveHero, playerCanFillSlot, meetsTroopReqs, CUSTOM_HERO_OPTIONS } from './battleConstants.js';
 
 // ── FormationPicker ────────────────────────────────────────────
@@ -29,7 +28,6 @@ import { resolveHero, playerCanFillSlot, meetsTroopReqs, CUSTOM_HERO_OPTIONS } f
 //   assignedInOtherSlots – Set of playerIds already used elsewhere in
 //                          this plan — auto-suggest won't propose them
 export function FormationPicker({ slot, upd, color, players, events = [], selectedGenerations = [], assignedInOtherSlots }) {
-  const [copied, setCopied] = useState(false);
   // Once a formation is selected, show only that one card — the rest
   // stay accessible via "Change formation" rather than occupying
   // screen space. Resets to the compact view every time a NEW
@@ -119,18 +117,6 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
 
   function customAutoSuggest() {
     upd({ joiners: autoSuggestJoiners(slot.requestedHeroes || []) });
-  }
-
-  function copyInstructions() {
-    const formation = selectedFormation || {
-      type: slot.type, ratio: slot.ratio, leaders: slot.leaderRallyHeroes || [],
-    };
-    const messageJoiners = (slot.joiners || []).map(j => ({
-      player: j.playerId ? { username: j.playerName } : null,
-      hero:   j.heroName,
-    }));
-    const text = buildFormationMessage(formation, messageJoiners, slot.leaderName);
-    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   }
 
   const heroesLocked = (slot.leaderRallyHeroes || []).length === 3;
@@ -295,15 +281,6 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
           </div>
         );
       })()}
-
-      {/* Copy alliance-wide instructions — available once a formation
-          is selected (guided) or heroes are chosen (custom) */}
-      {(selectedFormation || heroesLocked) && (
-        <button onClick={copyInstructions}
-          style={{ width:'100%', height:44, borderRadius:10, marginTop:8, background:copied?C.green+'18':C.section, border:`1px solid ${copied?C.green:C.border}`, color:copied?C.green:C.icy, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-          {copied ? '✓ Copied' : '📋 Copy formation instructions'}
-        </button>
-      )}
     </div>
   );
 }
