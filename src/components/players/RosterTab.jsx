@@ -7,11 +7,44 @@ import { RoleManagerSheet } from './RoleManagerSheet.jsx';
 import BulkNameAdd          from './BulkNameAdd.jsx';
 import FieldRegistry        from './FieldRegistry.jsx';
 
+// Auto-derived "role-like" filters computed straight from existing
+// troop-tier data — no manual role to create or assign. Only shown as
+// filter chips when at least one player actually qualifies, so an
+// alliance with nobody at Helios tier yet doesn't see empty chips.
+const DERIVED_TIER_FILTERS = [
+  { id:'helios-marksman', label:'🏹 Helios Marksman', match:p => p.troops?.marksman === 'T11/Helios' },
+  { id:'helios-lancer',   label:'⚔️ Helios Lancer',   match:p => p.troops?.lancer   === 'T11/Helios' },
+  { id:'helios-infantry', label:'🛡️ Helios Infantry', match:p => p.troops?.infantry === 'T11/Helios' },
+];
+
+const SORT_OPTIONS = [
+  { id:'name',       label:'Name (A–Z)' },
+  { id:'troopPower', label:'💪 Troop power (high → low)' },
+  { id:'missing',    label:'⚠ Missing info first' },
+];
+
+// Troop power isn't a standing field on the player profile — it's
+// derived from the most recent event snapshot that recorded one (see
+// EventsTab.jsx / TROOP_POWER_EVENTS), so there's one source of truth
+// instead of a second, separately-maintained number that can drift.
+function getCurrentTroopPower(player, events) {
+  let best = null;
+  (events || []).forEach(ev => {
+    const snap = (ev.snapshots || []).find(s => s.playerId === player.id);
+    if (snap?.troopPower != null && (!best || new Date(ev.date) > new Date(best.date))) {
+      best = { value: snap.troopPower, date: ev.date };
+    }
+  });
+  return best?.value ?? null;
+}
+
 export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePlayer, onAddPlayers, onUpdatePlayers, onDeletePlayer, onGoToIntel, showToast }) {
   const [rosterView, setRosterView]       = useState('list');
   const [search, setSearch]               = useState('');
   const [filterRole, setFilterRole]       = useState('All');
-  const [sortMissing, setSortMissing]     = useState(false);
+  const [sortBy, setSortBy]               = useState('name');
+  const [sortMenuOpen, setSortMenuOpen]   = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen]   = useState(false);
   const [viewingPlayer, setViewingPlayer] = useState(null);
   const [profileOpen, setProfileOpen]     = useState(false);
   const [editingPlayer, setEditingPlayer] = useState(null);
@@ -21,18 +54,32 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [roleManagerOpen, setRoleManagerOpen] = useState(false);
 
   // How many of the "should be set" fields are actually missing —
-  // higher = more incomplete. Used by the "missing info first" sort.
+  // higher = more incomplete. NOTE: having zero roles is no longer
+  // counted here — Rally Lead is the only role that changes anything
+  // functionally (Battle Plan eligibility never checks for a "Joiner"
+  // tag), so an untagged member is a normal joiner, not an incomplete
+  // profile.
   function missingCount(p) {
     let n = 0;
     if (!p.furnaceLevel) n++;
     if (!p.troops?.infantry) n++;
     if (!p.troops?.lancer) n++;
     if (!p.troops?.marksman) n++;
-    if (!p.roles?.length) n++;
     if (!p.languages?.length) n++;
     if (!(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5)) n++;
     return n;
   }
+
+  // One-tap Rally Lead toggle — pass to PlayerCard once it can render
+  // a tap target for it; the flip logic lives here either way.
+  function toggleRallyLead(player) {
+    const has = player.roles?.includes('Rally Lead');
+    const nextRoles = has ? (player.roles||[]).filter(r => r !== 'Rally Lead') : [...(player.roles||[]), 'Rally Lead'];
+    onSavePlayer({ ...player, roles: nextRoles });
+  }
+
+  const activeDerivedFilters = DERIVED_TIER_FILTERS.filter(d => players.some(d.match));
+  const derivedMatch = DERIVED_TIER_FILTERS.find(d => d.id === filterRole);
 
   const filteredPlayers = players.filter(p => {
     const t = (p.username||p.alias||'').toLowerCase();
@@ -40,10 +87,16 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
       || t.includes(search.toLowerCase())
       || (p.allianceTag||'').toLowerCase().includes(search.toLowerCase())
       || (p.country||'').toLowerCase().includes(search.toLowerCase());
-    const mr = filterRole==='All' || p.roles?.includes(filterRole);
+    const mr = filterRole==='All' || (derivedMatch ? derivedMatch.match(p) : p.roles?.includes(filterRole));
     return ms && mr;
   });
-  if (sortMissing) filteredPlayers.sort((a,b) => missingCount(b) - missingCount(a));
+  if (sortBy === 'missing') {
+    filteredPlayers.sort((a,b) => missingCount(b) - missingCount(a));
+  } else if (sortBy === 'troopPower') {
+    filteredPlayers.sort((a,b) => (getCurrentTroopPower(b,events) ?? -1) - (getCurrentTroopPower(a,events) ?? -1));
+  } else {
+    filteredPlayers.sort((a,b) => (a.username||a.alias||'').localeCompare(b.username||b.alias||''));
+  }
 
   function openProfile(player) { setViewingPlayer(player); setProfileOpen(true); }
   function openEdit(player)    { setEditingPlayer(player); setSheetOpen(true); }
@@ -68,21 +121,46 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         <button onClick={() => setRosterView('roles')} style={{ flex:1, height:36, borderRadius:20, background:rosterView==='roles'?C.gold+'22':C.section, border:`1px solid ${rosterView==='roles'?C.gold:C.border}`, color:rosterView==='roles'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>⚔️ By Role</button>
       </div>
 
-      {/* Fixed utility row — never scrolls away, unlike the role-filter
-          chips below (which grow unbounded as custom roles are added) */}
-      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
-        <button onClick={() => setFieldRegistryOpen(true)} style={{ padding:'0 12px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>📋 Fields</button>
-        <button onClick={() => setRoleManagerOpen(true)} style={{ padding:'0 12px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>⚙ Roles</button>
+      {/* Consolidated utility row — was 3 separate chips (Fields, Roles,
+          Missing info toggle), now Sort dropdown (list view only) + a
+          single overflow menu for Fields/Roles. */}
+      <div style={{ display:'flex', gap:6, marginBottom:12, position:'relative' }}>
         {rosterView==='list' && (
-          <button onClick={() => setSortMissing(!sortMissing)} style={{ padding:'0 12px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:sortMissing?C.gold+'22':'none', border:`1px solid ${sortMissing?C.gold:C.border}`, color:sortMissing?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>⚠ Missing info first</button>
+          <button onClick={() => { setSortMenuOpen(!sortMenuOpen); setMoreMenuOpen(false); }}
+            style={{ flex:1, height:36, padding:'0 12px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span>{SORT_OPTIONS.find(o=>o.id===sortBy)?.label}</span>
+            <span style={{ fontSize:10 }}>▼</span>
+          </button>
+        )}
+        <button onClick={() => { setMoreMenuOpen(!moreMenuOpen); setSortMenuOpen(false); }}
+          style={{ width:44, height:36, borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.muted, fontSize:16, cursor:'pointer', flexShrink:0 }}>⋯</button>
+
+        {sortMenuOpen && (
+          <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:52, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:30, boxShadow:'0 8px 24px #000a' }}>
+            {SORT_OPTIONS.map(o => (
+              <button key={o.id} onClick={() => { setSortBy(o.id); setSortMenuOpen(false); }}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', background:sortBy===o.id?C.gold+'18':'none', border:'none', color:sortBy===o.id?C.gold:C.white, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {moreMenuOpen && (
+          <div style={{ position:'absolute', top:'calc(100% + 4px)', right:0, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:30, minWidth:150, boxShadow:'0 8px 24px #000a' }}>
+            <button onClick={() => { setFieldRegistryOpen(true); setMoreMenuOpen(false); }} style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', background:'none', border:'none', color:C.white, fontSize:13, fontWeight:600, cursor:'pointer' }}>📋 Fields</button>
+            <button onClick={() => { setRoleManagerOpen(true); setMoreMenuOpen(false); }} style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', background:'none', border:'none', color:C.white, fontSize:13, fontWeight:600, cursor:'pointer' }}>⚙ Roles</button>
+          </div>
         )}
       </div>
 
       {rosterView==='list' && (
         <>
           <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
-            {['All',...roles.map(r=>r.name)].map(r => (
+            {['All', ...roles.map(r=>r.name)].map(r => (
               <button key={r} onClick={() => setFilterRole(r)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===r?C.gold+'22':C.section, border:`1px solid ${filterRole===r?C.gold:C.border}`, color:filterRole===r?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{r}</button>
+            ))}
+            {activeDerivedFilters.map(d => (
+              <button key={d.id} onClick={() => setFilterRole(d.id)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===d.id?C.icy+'22':C.section, border:`1px solid ${filterRole===d.id?C.icy:C.border}`, color:filterRole===d.id?C.icy:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{d.label}</button>
             ))}
           </div>
           {players.length > 0 && (
@@ -105,28 +183,40 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             <div style={{ textAlign:'center', padding:'40px 20px', color:C.muted }}>No results for "{search||filterRole}"</div>
           )}
           {filteredPlayers.map(p => (
-            <PlayerCard key={p.id} player={p} roles={roles} onClick={() => openProfile(p)} onDelete={onDeletePlayer} events={events} missingCount={sortMissing ? missingCount(p) : 0}/>
+            <PlayerCard
+              key={p.id}
+              player={p}
+              roles={roles}
+              onClick={() => openProfile(p)}
+              onDelete={onDeletePlayer}
+              events={events}
+              missingCount={sortBy==='missing' ? missingCount(p) : 0}
+              troopPower={getCurrentTroopPower(p, events)}
+              onToggleRallyLead={() => toggleRallyLead(p)}
+            />
           ))}
         </>
       )}
 
       {rosterView==='roles' && (() => {
         const byRole = roles.map(roleDef => ({ roleDef, members:players.filter(p => p.roles?.includes(roleDef.name)) })).filter(g => g.members.length > 0);
-        const unassigned = players.filter(p => !(p.roles||[]).length);
+        const joiners = players.filter(p => !(p.roles||[]).length);
+        const rallyLeadCount = players.filter(p => p.roles?.includes('Rally Lead')).length;
         return (
           <div>
             <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
-              <div style={{ fontSize:13, color:C.icy, marginBottom:4 }}>Members with a role assigned</div>
+              <div style={{ fontSize:13, color:C.icy, marginBottom:4 }}>Rally Leads assigned</div>
               <div style={{ fontSize:28, fontWeight:700, color:C.white }}>
-                {players.filter(p => (p.roles||[]).length > 0).length} <span style={{ fontSize:16, color:C.muted }}>of {players.length}</span>
+                {rallyLeadCount} <span style={{ fontSize:16, color:C.muted }}>of {players.length}</span>
               </div>
+              <div style={{ fontSize:12, color:C.muted, marginTop:4 }}>Everyone else is available as a joiner by default — no role needed.</div>
             </div>
-            {unassigned.length > 0 && (
+            {joiners.length > 0 && (
               <div style={{ marginBottom:16 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
-                  ❔ Unassigned · {unassigned.length}
+                  🎯 Joiners · {joiners.length}
                 </div>
-                {unassigned.map(m => (
+                {joiners.map(m => (
                   <div key={m.id} onClick={() => openProfile(m)} style={{ background:C.card, borderRadius:10, padding:'10px 14px', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
                     <div>
                       <div style={{ fontWeight:700, color:C.white, fontSize:15 }}>{m.username||m.alias||'?'}</div>
