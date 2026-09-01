@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { C, JOINER_COVERAGE_EVENTS } from '../utils/constants.js';
 import { SheetHandle } from './common/Primitives.jsx';
 import { exportWorkbook } from '../services/exportXlsx.js';
+import { importFromXlsxFile } from '../services/xlsxImportService.js';
+import { importFromFile } from '../services/exportImportService.js';
 
 function formatSyncTime(iso) {
   if (!iso) return null;
@@ -27,14 +29,7 @@ export function DataPanel({
     setImporting(true);
     try {
       const isXlsx = /\.xlsx$/i.test(file.name);
-      let imp;
-      if (isXlsx) {
-        const { importFromXlsxFile } = await import('../services/xlsxImportService.js');
-        imp = await importFromXlsxFile(file);
-      } else {
-        const { importFromFile } = await import('../services/exportImportService.js');
-        imp = await importFromFile(file);
-      }
+      const imp = isXlsx ? await importFromXlsxFile(file) : await importFromFile(file);
       onImport(imp, mode);
       setMsg({ text: `✓ Imported from ${isXlsx ? 'spreadsheet' : 'JSON'} successfully`, type:'success' });
       setTimeout(() => setMsg(null), 3000);
