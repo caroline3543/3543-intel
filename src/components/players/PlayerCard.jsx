@@ -7,11 +7,12 @@ function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
 }
 
-export function PlayerCard({ player, roles = [], onClick, onDelete, events, missingCount }) {
+export function PlayerCard({ player, roles = [], onClick, onDelete, events, missingCount, troopPower, onToggleRallyLead }) {
   const dn      = player.username||player.alias||'Unknown';
   const rc      = roleColor(player.roles?.[0], roles);
   const metrics = calcMetrics(player, events||[]);
   const joiners = (player.joinerHeroes||[]).filter(jh=>jh.skillLevel>=5).map(jh=>jh.hero);
+  const isRallyLead = player.roles?.includes('Rally Lead');
 
   return (
     <div onClick={onClick} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none' }}>
@@ -29,10 +30,11 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
           {missingCount > 0 && <span style={{ fontSize:11, color:C.gold, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', flexShrink:0 }}>⚠ {missingCount} missing</span>}
         </div>
 
-        {/* Row 2 — alliance · furnace · reliability */}
+        {/* Row 2 — alliance · furnace · troop power · reliability */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
           {player.allianceTag && <span style={{ fontSize:12, color:C.icy, fontWeight:600 }}>[{player.allianceTag}]</span>}
           {player.furnaceLevel && <span style={{ fontSize:12, color:C.gold, fontWeight:700 }}>{player.furnaceLevel}</span>}
+          {troopPower != null && <span style={{ fontSize:12, color:C.gold, fontWeight:700 }}>💪 {troopPower.toLocaleString()}</span>}
           {player.country && <span style={{ fontSize:12, color:C.muted }}>{player.country}</span>}
           {metrics && (
             <span style={{ fontSize:11, fontWeight:700, marginLeft:'auto', color:metrics.reliabilityScore>=70?C.green:metrics.reliabilityScore>=40?C.gold:C.red }}>
@@ -57,6 +59,14 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
         </div>
 
       </div>
+
+      {/* One-tap Rally Lead toggle — no need to open the profile just
+          to flag someone as a leader */}
+      <button
+        onClick={e => { e.stopPropagation(); onToggleRallyLead?.(); }}
+        title={isRallyLead ? 'Rally Lead — tap to remove' : 'Tap to make Rally Lead'}
+        style={{ width:36, height:36, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:isRallyLead?C.gold+'22':'none', border:`1.5px solid ${isRallyLead?C.gold:C.border}`, color:isRallyLead?C.gold:C.muted+'88', fontSize:16, cursor:'pointer', flexShrink:0 }}
+      >👑</button>
 
       {/* Delete */}
       <button
