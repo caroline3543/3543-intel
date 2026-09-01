@@ -3,6 +3,7 @@ import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS } from '../../utils/con
 import { vibe } from '../../utils/vibe.js';
 import { fmtDateShort } from '../../utils/dates.js';
 import { newSnapshot } from '../../data/playerSchema.js';
+import { searchPlayers } from '../../services/playerAutosuggest.js';
 import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 import { SnapshotEditor } from './SnapshotEditor.jsx';
 import { EventSheet } from './EventSheet.jsx';
@@ -10,6 +11,18 @@ import { EventSheet } from './EventSheet.jsx';
 function initials(n) { return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?'; }
 
 // ── EventsTab ──────────────────────────────────────────────────
+//
+// Participant lists are now an EXPLICIT roster, not "empty = show
+// everyone" — an event starts with nobody and you add people one at a
+// time via the type-and-enter search below. This means any event
+// created before this change, if it relied on the old empty-list
+// fallback, will show zero participants until names are re-added.
+//
+// Being added to the roster at all now IS the participation signal —
+// there's no separate "participating" toggle in the UI. rsvp.participating
+// still exists in the data (Battle Plan's isAttending() reads it as the
+// hard eligibility filter for leader/joiner picks), it's just set
+// automatically the moment someone is added here, not chosen manually.
 export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent }) {
   const [filterType, setFilterType]   = useState('All');
   const [filterTag, setFilterTag]     = useState('');
@@ -21,7 +34,9 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [bulkMode, setBulkMode]       = useState(false);
   const [bulkSel, setBulkSel]         = useState(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
-  const [participatingOnly, setParticipatingOnly] = useState(false);
+  const [sortMode, setSortMode]       = useState('alpha'); // 'alpha' | 'troopPower'
+  const [addQuery, setAddQuery]       = useState('');
+  const [addResults, setAddResults]   = useState([]);
 
   const activeEvent = events.find(e => e.id === activeEventId);
   const allTags = [...new Set(events.map(e => e.allianceTag).filter(Boolean))];
@@ -47,8 +62,48 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     onUpdateEvent({ ...ev, snapshots:snaps });
   }
 
+  // ── Add participant by name — type + Enter commits the top match ──
+  function searchAdd(q) {
+    setAddQuery(q);
+    if (!q.trim() || !activeEvent) { setAddResults([]); return; }
+    const already = new Set(activeEvent.participantIds || []);
+    const pool = players.filter(p => !already.has(p.id));
+    setAddResults(searchPlayers(pool, q, 5));
+  }
+
+  function addParticipant(player) {
+    if (!activeEvent) return;
+    const participantIds = [...new Set([...(activeEvent.participantIds || []), player.id])];
+    const snaps = [...(activeEvent.snapshots || [])];
+    const idx = snaps.findIndex(s => s.playerId === player.id);
+    if (idx >= 0) {
+      snaps[idx] = { ...snaps[idx], rsvp: { ...snaps[idx].rsvp, participating: true } };
+    } else {
+      const snap = newSnapshot(player.id, player, activeEvent.id);
+      snap.rsvp.participating = true; // being added IS participating — no separate toggle
+      snaps.push(snap);
+    }
+    onUpdateEvent({ ...activeEvent, participantIds, snapshots: snaps });
+    setAddQuery(''); setAddResults([]);
+    vibe(8);
+  }
+
+  function commitTopMatch() {
+    if (addResults.length > 0) addParticipant(addResults[0]);
+  }
+
+  function removeParticipant(playerId) {
+    if (!activeEvent) return;
+    onUpdateEvent({ ...activeEvent, participantIds: (activeEvent.participantIds || []).filter(id => id !== playerId) });
+  }
+
   // Bulk tags differ by event phase — RSVP-relevant tags for upcoming
   // events, post-event actuals for active/completed ones. Never both.
+  // "rsvpLate" (upcoming, a prediction) and "late" (post-event, an
+  // actual with no notice) are deliberately different tag keys — the
+  // if-chain below doesn't know which button set fired it, so reusing
+  // one key for both would let an upcoming "Arriving late" tap also
+  // set the unrelated post-event "joined late with no notice" field.
   function applyBulk(tag) {
     if (!activeEvent || !bulkSel.size) return;
     const snaps = [...(activeEvent.snapshots||[])];
@@ -56,12 +111,15 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
       const player = players.find(p => p.id===pid); if (!player) return;
       const idx = snaps.findIndex(s => s.playerId===pid);
       let s = idx>=0 ? { ...snaps[idx] } : newSnapshot(pid, player, activeEvent.id);
-      if (tag==='participating') s = { ...s, rsvp:{ ...s.rsvp, participating:true } };
-      if (tag==='discord')       s = { ...s, rsvp:{ ...s.rsvp, willJoinDiscord:true } };
-      if (tag==='attended')      s = { ...s, attendance:{ ...s.attendance, attended:true, noShow:false } };
-      if (tag==='noshow')        s = { ...s, attendance:{ ...s.attendance, attended:false, noShow:true } };
-      if (tag==='late')          s = { ...s, attendance:{ ...s.attendance, joinedLateNoNotice:true } };
-      if (tag==='voice')         s = { ...s, voice:{ ...s.voice, joined:true } };
+      if (tag==='rsvpLate')    s = { ...s, rsvp:{ ...s.rsvp, willBeLate:true } };
+      if (tag==='early')      s = { ...s, rsvp:{ ...s.rsvp, willLeaveEarly:true } };
+      if (tag==='discord')    s = { ...s, rsvp:{ ...s.rsvp, willJoinDiscord:true } };
+      if (tag==='wholetime')  s = { ...s, rsvp:{ ...s.rsvp, presentWholeTime:true } };
+      if (tag==='substitute') s = { ...s, rsvp:{ ...s.rsvp, substitute:true } };
+      if (tag==='attended')   s = { ...s, attendance:{ ...s.attendance, attended:true, noShow:false } };
+      if (tag==='noshow')     s = { ...s, attendance:{ ...s.attendance, attended:false, noShow:true } };
+      if (tag==='late')       s = { ...s, attendance:{ ...s.attendance, joinedLateNoNotice:true } };
+      if (tag==='voice')      s = { ...s, voice:{ ...s.voice, joined:true } };
       if (idx>=0) snaps[idx]=s; else snaps.push(s);
     });
     onUpdateEvent({ ...activeEvent, snapshots:snaps });
@@ -78,22 +136,28 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
   const isUpcoming = activeEvent?.status === 'upcoming';
   const tracksTroopPower = TROOP_POWER_EVENTS.includes(activeEvent?.type);
-  let eventPlayers = activeEvent
-    ? (activeEvent.participantIds?.length>0 ? players.filter(p=>activeEvent.participantIds.includes(p.id)) : players)
-    : [];
-  if (activeEvent && isUpcoming && participatingOnly) {
-    eventPlayers = eventPlayers.filter(p => getSnap(activeEvent, p.id)?.rsvp?.participating);
-  }
+
+  // Explicit roster — strictly the participantIds list, no "empty means
+  // everyone" fallback.
+  let eventPlayers = activeEvent ? players.filter(p => (activeEvent.participantIds||[]).includes(p.id)) : [];
+  eventPlayers = [...eventPlayers].sort((a, b) => {
+    if (sortMode === 'troopPower' && tracksTroopPower) {
+      const ta = getSnap(activeEvent, a.id)?.troopPower ?? -1;
+      const tb = getSnap(activeEvent, b.id)?.troopPower ?? -1;
+      return tb - ta;
+    }
+    return (a.username||a.alias||'').localeCompare(b.username||b.alias||'');
+  });
 
   const bulkTags = isUpcoming
-    ? [['✓ Participating','participating',C.green],['🎙️ Will join Discord','discord',C.icy]]
+    ? [['🕐 Arriving late','rsvpLate',C.gold],['🏃 Leaving early','early',C.gold],['🎙️ Will join Discord','discord',C.icy],['✓ Present whole time','wholetime',C.green],['🔄 Substitute','substitute',C.muted]]
     : [['✓ Attended','attended',C.green],['✗ No-show','noshow',C.red],['🕐 Late (no notice)','late',C.gold],['🎙️ Voice','voice',C.icy]];
 
   return (
     <div style={{ padding:'16px 20px 0' }}>
       {activeEvent ? (
         <div>
-          <button onClick={() => { setActiveEventId(null); setBulkMode(false); setBulkSel(new Set()); setParticipatingOnly(false); }} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', marginBottom:16, padding:0 }}>
+          <button onClick={() => { setActiveEventId(null); setBulkMode(false); setBulkSel(new Set()); setAddQuery(''); setAddResults([]); }} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', marginBottom:16, padding:0 }}>
             ← Back to Events
           </button>
           <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
@@ -124,11 +188,36 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             })()}
           </div>
 
-          {/* Participating-only toggle — upcoming events only */}
-          {isUpcoming && (
-            <button onClick={() => setParticipatingOnly(!participatingOnly)} style={{ display:'flex', alignItems:'center', gap:8, height:40, padding:'0 14px', borderRadius:20, background:participatingOnly?C.green+'22':C.section, border:`1px solid ${participatingOnly?C.green:C.border}`, color:participatingOnly?C.green:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', marginBottom:12 }}>
-              {participatingOnly ? '✓ Showing participating only' : '👥 Show only who\'s participating'}
-            </button>
+          {/* Add participant — type a name, Enter commits the top match */}
+          <div style={{ position:'relative', marginBottom:12 }}>
+            <input
+              value={addQuery}
+              onChange={e => searchAdd(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitTopMatch(); } }}
+              placeholder="Type a name to add…"
+              style={{ width:'100%', height:44, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 14px', fontSize:15, color:C.white, boxSizing:'border-box', fontFamily:'inherit' }}
+            />
+            {addResults.length > 0 && (
+              <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:20, boxShadow:'0 8px 24px #000a' }}>
+                {addResults.map((p, i) => (
+                  <button key={p.id} onClick={() => addParticipant(p)}
+                    style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', padding:'10px 14px', background:i===0?C.gold+'12':'none', border:'none', borderBottom:`1px solid ${C.border}22`, cursor:'pointer', textAlign:'left' }}>
+                    <span style={{ fontSize:14, fontWeight:700, color:C.white }}>{p.username||p.alias||'?'}</span>
+                    <span style={{ fontSize:11, color:C.muted }}>{p.furnaceLevel||''}{i===0?'  ↵ Enter':''}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sort toggle */}
+          {eventPlayers.length > 1 && (
+            <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+              <button onClick={() => setSortMode('alpha')} style={{ height:32, padding:'0 12px', borderRadius:16, background:sortMode==='alpha'?C.gold+'22':C.section, border:`1px solid ${sortMode==='alpha'?C.gold:C.border}`, color:sortMode==='alpha'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>A–Z</button>
+              {tracksTroopPower && (
+                <button onClick={() => setSortMode('troopPower')} style={{ height:32, padding:'0 12px', borderRadius:16, background:sortMode==='troopPower'?C.gold+'22':C.section, border:`1px solid ${sortMode==='troopPower'?C.gold:C.border}`, color:sortMode==='troopPower'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>💪 Troop Power</button>
+              )}
+            </div>
           )}
 
           <div style={{ display:'flex', gap:8, marginBottom:16, overflowX:'auto' }}>
@@ -140,7 +229,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             ))}
           </div>
           {eventPlayers.length===0
-            ? <div style={{ textAlign:'center', padding:'40px 0', color:C.muted }}>{participatingOnly ? 'No one marked as participating yet' : 'No participants'}</div>
+            ? <div style={{ textAlign:'center', padding:'40px 0', color:C.muted }}>No one added yet — type a name above to add them.</div>
             : eventPlayers.map(player => {
                 const snap = getSnap(activeEvent, player.id);
                 const dn = player.username||player.alias||'Unknown';
@@ -152,6 +241,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6, overflow:'hidden' }}>
                         <div style={{ fontSize:15, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+                        {player.furnaceLevel && <span style={{ fontSize:11, color:C.icy, fontWeight:600, flexShrink:0 }}>{player.furnaceLevel}</span>}
                         {tracksTroopPower && snap?.troopPower != null && (
                           <span style={{ fontSize:11, color:C.gold, fontWeight:700, flexShrink:0 }}>💪 {snap.troopPower.toLocaleString()}</span>
                         )}
@@ -159,9 +249,11 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:3 }}>
                         {isUpcoming ? (
                           <>
-                            {snap?.rsvp?.participating && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.green+'18', color:C.green, fontWeight:600 }}>✓ In</span>}
-                            {snap?.rsvp?.willBeLate && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, fontWeight:600 }}>🕐</span>}
+                            {snap?.rsvp?.willBeLate && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, fontWeight:600 }}>🕐 Late</span>}
+                            {snap?.rsvp?.willLeaveEarly && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, fontWeight:600 }}>🏃 Early</span>}
                             {snap?.rsvp?.willJoinDiscord && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.icy+'18', color:C.icy, fontWeight:600 }}>🎙️</span>}
+                            {snap?.rsvp?.presentWholeTime && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.green+'18', color:C.green, fontWeight:600 }}>✓ Full</span>}
+                            {snap?.rsvp?.substitute && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.muted+'22', color:C.muted, fontWeight:600 }}>🔄 Sub</span>}
                           </>
                         ) : (
                           <>
@@ -173,7 +265,13 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                         )}
                       </div>
                     </div>
-                    {!bulkMode && <span style={{ fontSize:18, color:C.muted }}>›</span>}
+                    {!bulkMode && (
+                      <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                        <button onClick={e => { e.stopPropagation(); removeParticipant(player.id); }}
+                          style={{ width:28, height:28, borderRadius:8, background:'none', border:`1px solid ${C.red}33`, color:C.red+'88', fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                        <span style={{ fontSize:18, color:C.muted }}>›</span>
+                      </div>
+                    )}
                   </div>
                 );
               })

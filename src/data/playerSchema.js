@@ -66,6 +66,12 @@ export function newSnapshot(playerId, playerProfile, eventId) {
     },
     // Pre-event RSVP — set while the event is still upcoming. Never
     // used for reliabilityScore (see metrics.js) — only a prediction.
+    // Note: there is no separate "participating" toggle in the UI —
+    // being added to the event's participantIds at all IS the
+    // participation signal, set automatically on add (see
+    // EventsTab.jsx). `participating` itself still exists here because
+    // Battle Plan's isAttending() (battleConstants.js) reads it as the
+    // hard eligibility filter for Rally Leader/Priority Joiner picks.
     rsvp: {
       participating:    false,
       onTime:           false,
@@ -73,6 +79,7 @@ export function newSnapshot(playerId, playerProfile, eventId) {
       willLeaveEarly:   false,
       willJoinDiscord:  false,
       presentWholeTime: false,
+      substitute:       false,
     },
     // Post-event actuals — set after the event has happened. This is
     // the ONLY data reliabilityScore is computed from.
