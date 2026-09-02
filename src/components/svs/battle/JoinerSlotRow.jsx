@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { C } from '../../../utils/constants.js';
 import { meetsTroopReqs, playerCanFillSlot, resolveHero, CUSTOM_HERO_OPTIONS } from './battleConstants.js';
-import { calcMetrics } from '../../../data/metrics.js';
+import { calcMetrics, isMvpJoiner } from '../../../data/metrics.js';
 
 // ── JoinerSlotRow ──────────────────────────────────────────────
 // One priority-joiner row inside a rally slot.
@@ -41,13 +41,16 @@ export function JoinerSlotRow({ slot, index, players, events = [], onUpdate, all
   const hasReqs     = Object.values(troopReqs || {}).some(Boolean);
 
   // Eligible members for a given required hero — hard-filtered, then
-  // ranked by historical reliability (see note above), then name.
+  // ranked by: MVP Joiner status first (ever joined Discord voice —
+  // see metrics.js), then historical reliability, then name.
   function eligibleFor(hero) {
     return players
       .filter(p => !allAssignedIds.has(p.id) || p.id === slot.playerId)
       .filter(p => playerCanFillSlot(p, hero))
       .filter(p => !hasReqs || meetsTroopReqs(p, troopReqs).ok)
       .sort((a, b) => {
+        const mvpA = isMvpJoiner(a, events), mvpB = isMvpJoiner(b, events);
+        if (mvpA !== mvpB) return mvpA ? -1 : 1;
         const ra = calcMetrics(a, events)?.reliabilityScore || 0;
         const rb = calcMetrics(b, events)?.reliabilityScore || 0;
         if (rb !== ra) return rb - ra;
@@ -178,13 +181,14 @@ export function JoinerSlotRow({ slot, index, players, events = [], onUpdate, all
                   <div style={{ fontSize:12, color:C.muted }}>Eligible attendees: 0</div>
                 </div>
               ) : (
-                <div style={{ maxHeight:160, overflowY:'auto', display:'flex', flexWrap:'wrap', gap:6 }}>
+                  <div style={{ maxHeight:160, overflowY:'auto', display:'flex', flexWrap:'wrap', gap:6 }}>
                   {eligible.map(p => {
                     const sel = slot.playerId === p.id;
+                    const mvp = isMvpJoiner(p, events);
                     return (
                       <button key={p.id} onClick={() => assignMember(p)}
-                        style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${sel?C.gold:C.border}`, background:sel?C.gold+'22':C.section, color:sel?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
-                        {sel ? '✓ ' : ''}{p.username || p.alias}{p.furnaceLevel ? ` · ${p.furnaceLevel}` : ''}
+                        style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${sel?C.gold:mvp?C.green+'88':C.border}`, background:sel?C.gold+'22':C.section, color:sel?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                        {sel ? '✓ ' : ''}{mvp && <span style={{ color:C.green }}>🎙️MVP </span>}{p.username || p.alias}{p.furnaceLevel ? ` · ${p.furnaceLevel}` : ''}
                       </button>
                     );
                   })}

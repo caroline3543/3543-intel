@@ -1,10 +1,23 @@
 /**
  * Calculate reliability metrics for a player across all events.
- * Returns null if the player has no event history.
+ * Returns null if the player has no qualifying event history.
+ *
+ * Only events that have actually HAPPENED count — determined by the
+ * event's own `status` field ('active' or 'completed'), not by
+ * comparing `event.date` to today's date. A date-string comparison
+ * would incorrectly count an event scheduled for later TODAY as
+ * already having happened the moment the calendar day starts, even
+ * though it hasn't actually run yet.
+ *
+ * reliabilityScore is deliberately NOT influenced by Discord/voice
+ * participation — whether someone was on voice doesn't reflect how
+ * reliably they show up. Voice participation instead determines MVP
+ * Joiner status (see isMvpJoiner below), which affects joiner
+ * allocation order, not the reliability number itself. voicePct is
+ * still returned for display purposes (e.g. ProfileView's stat grid).
  */
 export function calcMetrics(player, events) {
-  const today = new Date().toISOString().slice(0, 10);
-  const snaps = (events || []).filter(ev => ev.date && ev.date <= today).flatMap(ev =>
+  const snaps = (events || []).filter(ev => ev.status !== 'upcoming').flatMap(ev =>
     (ev.snapshots || []).filter(s => s.playerId === player.id)
   );
   if (!snaps.length) return null;
@@ -28,9 +41,8 @@ export function calcMetrics(player, events) {
   }
 
   const reliabilityScore = Math.round(
-    ap * 0.6 +
-    vp * 0.25 +
-    Math.max(0, 100 - noShows.length * 10) * 0.15
+    ap * 0.8 +
+    Math.max(0, 100 - noShows.length * 10) * 0.2
   );
 
   return {
@@ -45,6 +57,19 @@ export function calcMetrics(player, events) {
     consecutiveMisses,
     reliabilityScore,
   };
+}
+
+/**
+ * MVP Joiner — true if this player has EVER joined Discord voice in a
+ * real (non-upcoming) event. A binary flag, not a percentage
+ * threshold: any confirmed voice participation qualifies. Used to rank
+ * joiner allocation order (MVP joiners first), completely separate
+ * from reliabilityScore, which no longer factors in voice at all.
+ */
+export function isMvpJoiner(player, events) {
+  return (events || [])
+    .filter(ev => ev.status !== 'upcoming')
+    .some(ev => (ev.snapshots || []).some(s => s.playerId === player.id && s.voice?.joined === true));
 }
 
 /**

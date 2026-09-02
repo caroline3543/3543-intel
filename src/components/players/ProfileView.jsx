@@ -29,7 +29,7 @@ function Row({ label, value }) {
   );
 }
 
-export function ProfileView({ player, roles = [], open, onClose, onEdit, events }) {
+export function ProfileView({ player, roles = [], open, onClose, onEdit, events, onOpenLeaderProfile }) {
   useEffect(() => {
     if (!open) return;
     function handler(e) { if (e.key === 'Escape') onClose(); }
@@ -94,6 +94,21 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events 
                   </span>
                 );
               })}
+            </div>
+          </Section>
+        )}
+
+        {/* 1.5 Rally Leader Profile — reusable formation/joiner setup */}
+        {onOpenLeaderProfile && (
+          <Section title="Rally Leader Profile">
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div style={{ fontSize:14, fontWeight:600, color:C.white }}>
+                {{ leader:'👑 Rally Leader', substitute:'🔁 Substitute', both:'👑 Leader + Substitute', none:'Not set' }[player.leaderProfile?.role || 'none']}
+                {(player.leaderProfile?.teams?.length > 0) && <span style={{ fontSize:12, color:C.muted, fontWeight:400 }}> · {player.leaderProfile.teams.length} team{player.leaderProfile.teams.length!==1?'s':''} saved</span>}
+              </div>
+              <button onClick={onOpenLeaderProfile} style={{ height:36, padding:'0 14px', borderRadius:20, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:700, fontSize:13, cursor:'pointer', flexShrink:0 }}>
+                {player.leaderProfile?.teams?.length > 0 ? 'Edit' : '+ Set Up'}
+              </button>
             </div>
           </Section>
         )}

@@ -4,6 +4,7 @@ import { PlayerCard }       from './PlayerCard.jsx';
 import { ProfileView }      from './ProfileView.jsx';
 import { PlayerSheet }      from './PlayerSheet.jsx';
 import { RoleManagerSheet } from './RoleManagerSheet.jsx';
+import { RallyLeaderProfileSheet } from './RallyLeaderProfileSheet.jsx';
 import BulkNameAdd          from './BulkNameAdd.jsx';
 import FieldRegistry        from './FieldRegistry.jsx';
 
@@ -47,6 +48,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [moreMenuOpen, setMoreMenuOpen]   = useState(false);
   const [viewingPlayer, setViewingPlayer] = useState(null);
   const [profileOpen, setProfileOpen]     = useState(false);
+  const [leaderProfileOpen, setLeaderProfileOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [sheetOpen, setSheetOpen]         = useState(false);
   const [bulkAddOpen, setBulkAddOpen]     = useState(false);
@@ -267,6 +269,13 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         onClose={() => setProfileOpen(false)}
         onEdit={() => { setProfileOpen(false); openEdit(viewingPlayer); }}
         events={events}
+        onOpenLeaderProfile={() => setLeaderProfileOpen(true)}
+      />
+      <RallyLeaderProfileSheet
+        player={viewingPlayer}
+        open={leaderProfileOpen}
+        onClose={() => setLeaderProfileOpen(false)}
+        onSave={updated => { onSavePlayer(updated); setViewingPlayer(updated); }}
       />
       <PlayerSheet
         open={sheetOpen}

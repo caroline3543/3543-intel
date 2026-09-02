@@ -45,6 +45,7 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
     return (
       <PlanDetail
         plan={activePlan}
+        plans={plans}
         players={players}
         events={events}
         onUpdate={updatePlan}

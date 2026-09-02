@@ -22,7 +22,7 @@ import { ChecklistManagerSheet } from './ChecklistManagerSheet.jsx';
 //                         show everything" (see SettingsPanel.jsx)
 //   checklist       – alliance-wide Leadership Checklist item defs
 //   onSaveChecklist – (items[]) => void — replaces the whole item list
-export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoLive, onGoToMembers, selectedGenerations = [], checklist = [], onSaveChecklist }) {
+export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, onBack, onGoLive, onGoToMembers, selectedGenerations = [], checklist = [], onSaveChecklist }) {
   const [eventPickerOpen, setEventPickerOpen]         = useState(false);
   const [checklistManagerOpen, setChecklistManagerOpen] = useState(false);
 
@@ -55,14 +55,24 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
   // ── Plan-wide priority-joiner exclusivity ─────────────────────
   // A priority joiner should only be usable in ONE rally slot across
   // the whole battle plan/event, not just unique within one slot's own
-  // 4 joiners. For each slot, this is everyone assigned as a joiner in
-  // every OTHER slot — passed down so RallySlotCard can widen its own
-  // exclusion set beyond "this slot only".
+  // 4 joiners — AND not just within this one plan. If a second,
+  // separate Battle Plan is linked to the SAME event (e.g. a main
+  // assault plan and a garrison plan for the same SvS), someone
+  // already committed there can't be double-booked here either, or
+  // coverage counts would silently be wrong. Sibling plans are any
+  // OTHER plan sharing this plan's eventId.
+  const siblingPlans = plan.eventId ? plans.filter(p => p.id !== plan.id && p.eventId === plan.eventId) : [];
+
   function assignedInOtherSlots(currentSlotId) {
     const ids = new Set();
     slots.forEach(s => {
       if (s.id === currentSlotId) return;
       (s.joiners || []).forEach(j => { if (j.playerId) ids.add(j.playerId); });
+    });
+    siblingPlans.forEach(sp => {
+      (sp.rallySlots || []).forEach(s => {
+        (s.joiners || []).forEach(j => { if (j.playerId) ids.add(j.playerId); });
+      });
     });
     return ids;
   }
@@ -100,6 +110,7 @@ export function PlanDetail({ plan, players, events = [], onUpdate, onBack, onGoL
   // clear at a glance who's a real backup option right now.
   const allAssignedPlanWide = new Set();
   slots.forEach(s => (s.joiners || []).forEach(j => { if (j.playerId) allAssignedPlanWide.add(j.playerId); }));
+  siblingPlans.forEach(sp => (sp.rallySlots || []).forEach(s => (s.joiners || []).forEach(j => { if (j.playerId) allAssignedPlanWide.add(j.playerId); })));
   const unallocated = players.filter(p =>
     !allAssignedPlanWide.has(p.id) && (!linkedEvent || isAttending(p.id, linkedEvent))
   );
