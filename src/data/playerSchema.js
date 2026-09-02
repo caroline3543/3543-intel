@@ -172,6 +172,7 @@ export function newRallySlot(overrides = {}) {
     id:           uid(),
     type:         'Main Rally',
     allianceTag:  null,     // restricts leader + joiner eligibility to this alliance only, if set
+    target:       null,     // 'turret' | 'castle' | null — SvS/Castle Battle events only (see JOINER_COVERAGE_EVENTS in constants.js); which structure this rally is aimed at
     leaderId:     null,
     leaderName:   '',
     rallyDuration: 3,

@@ -30,6 +30,7 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
   const [leaderTimer, setLeaderTimer]       = useState(null);
   const [toastMsg, setToastMsg]             = useState(null);
   const [clearConfirm, setClearConfirm]     = useState(false);
+  const [allRalliesCopied, setAllRalliesCopied] = useState(false);
   const planLoadedRef = useRef(false);
 
   // Pre-populate calculator from Battle Plan (once only)
@@ -69,6 +70,30 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
   }, []);
 
   function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); }
+
+  // Every rally currently in the calculator, one Discord-ready block —
+  // not per-leader like the individual copy buttons. leader.joiners and
+  // leader.ratio already carry through from the Battle Plan's rally
+  // slots (see the Go Live pre-populate effect above and
+  // handleStartTimers below), so this includes who's assigned and what
+  // hero they're bringing without any extra plumbing.
+  function generateAllRalliesText() {
+    const lines = ['📋 Live Rally Room — All Rallies', ''];
+    state.calculator.leaders.forEach(l => {
+      lines.push(`${l.type || 'Rally'} — ${l.name}`);
+      if (l.ratio) lines.push(`Ratio: ${l.ratio}`);
+      const filled = (l.joiners || []).filter(j => j.heroName);
+      if (filled.length) lines.push(`Joiners: ${filled.map(j => `${j.heroName} → ${j.playerName || '?'}`).join(', ')}`);
+      lines.push('');
+    });
+    return '```\n' + lines.join('\n').trim() + '\n```';
+  }
+  function copyAllRallies() {
+    navigator.clipboard.writeText(generateAllRalliesText()).then(() => {
+      setAllRalliesCopied(true);
+      setTimeout(() => setAllRalliesCopied(false), 2000);
+    });
+  }
 
   function saveTimer(t) {
     setState(prev => ({ ...prev, timers: prev.timers.some(x => x.id === t.id) ? prev.timers.map(x => x.id === t.id ? t : x) : [...prev.timers, t] }));
@@ -204,12 +229,24 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
         )}
 
         {view === 'calc' && (
-          <Calculator
-            calc={state.calculator}
-            onChange={calculator => setState(prev => ({ ...prev, calculator }))}
-            registry={state.marchRegistry}
-            onStartTimers={handleStartTimers}
-          />
+          <>
+            {state.calculator.leaders.length > 0 && (
+              <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:6 }}>📋 All Rallies</div>
+                <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>Every rally in this session — joiner heroes and assigned players included — copied as one Discord-ready block, not one at a time.</div>
+                <button onClick={copyAllRallies}
+                  style={{ width:'100%', height:44, borderRadius:10, background:allRalliesCopied?C.green+'18':C.gold+'18', border:`1px solid ${allRalliesCopied?C.green:C.gold}44`, color:allRalliesCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  {allRalliesCopied ? '✓ Copied' : '📋 Copy all rallies as code block'}
+                </button>
+              </div>
+            )}
+            <Calculator
+              calc={state.calculator}
+              onChange={calculator => setState(prev => ({ ...prev, calculator }))}
+              registry={state.marchRegistry}
+              onStartTimers={handleStartTimers}
+            />
+          </>
         )}
 
         {view === 'registry' && (

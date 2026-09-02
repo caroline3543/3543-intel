@@ -205,7 +205,7 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
   }
 
   return (
-    <div style={{ padding:'16px 20px 0', paddingBottom:readySlots.length > 0 ? 120 : 20 }}>
+    <div style={{ padding:'16px 20px 0', paddingBottom:readySlots.length > 0 ? 160 : 20 }}>
       {/* Back + breadcrumb */}
       <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', marginBottom:4, padding:0 }}>
         ← Battle Plans
@@ -439,9 +439,11 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
         onSaveItems={onSaveChecklist}
       />
 
-      {/* Sticky Go Live bar */}
+      {/* Sticky Go Live bar — sits above the app's 60px bottom tab nav
+          (see CONSTITUTION.md) rather than bottom:0, which rendered it
+          partly underneath the nav and cut the button off. */}
       {readySlots.length > 0 && (
-        <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, background:C.bg, borderTop:`1px solid ${C.border}`, padding:'12px 20px 28px', boxSizing:'border-box', zIndex:50 }}>
+        <div style={{ position:'fixed', bottom:60, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, background:C.bg, borderTop:`1px solid ${C.border}`, padding:'12px 20px 16px', boxSizing:'border-box', zIndex:50 }}>
           <button onClick={() => onGoLive(plan)} style={{ width:'100%', height:56, borderRadius:12, background:C.red, color:'#fff', fontWeight:800, fontSize:17, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
             🔴 Go Live — {readySlots.length} slot{readySlots.length !== 1 ? 's' : ''}
             <span style={{ fontSize:13, fontWeight:400, opacity:0.8 }}>

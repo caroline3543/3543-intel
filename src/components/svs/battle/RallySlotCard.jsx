@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C, tierChipStyle } from '../../../utils/constants.js';
+import { C, tierChipStyle, JOINER_COVERAGE_EVENTS } from '../../../utils/constants.js';
 import { vibe } from '../../../utils/vibe.js';
 import {
   RALLY_TYPES, RALLY_ICONS, RALLY_COLORS, isAttending,
@@ -127,6 +127,7 @@ export function RallySlotCard({
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
             <div style={{ fontSize:15, fontWeight:700, color:C.white }}>{slot.type}</div>
             {slot.allianceTag && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:C.icy+'22', color:C.icy, fontWeight:700 }}>[{slot.allianceTag}]</span>}
+            {slot.target && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:color+'22', color, fontWeight:700 }}>{slot.target==='turret'?'🗼 Turret':'🏰 Castle'}</span>}
             {slot.ratio && <span style={{ fontSize:11, color:C.muted }}>{slot.ratio}</span>}
           </div>
           <div style={{ fontSize:13, color:C.icy }}>
@@ -195,6 +196,27 @@ export function RallySlotCard({
               })}
             </div>
           </div>
+
+          {/* 2.5 Target — Turret or Castle. Only meaningful for SvS/
+              Castle Battle events (see JOINER_COVERAGE_EVENTS in
+              constants.js) — a Foundry or Canyon Clash rally has no
+              such target, so the field simply doesn't appear there. */}
+          {linkedEvent && JOINER_COVERAGE_EVENTS.includes(linkedEvent.type) && (
+            <div style={{ marginBottom:14 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:8 }}>Target</label>
+              <div style={{ display:'flex', gap:8 }}>
+                {[['turret','🗼 Turret'],['castle','🏰 Castle']].map(([val, label]) => {
+                  const sel = slot.target === val;
+                  return (
+                    <button key={val} onClick={() => upd({ target: sel ? null : val })}
+                      style={{ flex:1, height:44, borderRadius:12, border:`1px solid ${sel?color:C.border}`, background:sel?color+'22':C.section, color:sel?color:C.muted, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                      {sel?'✓ ':''}{label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 3. Rally leader + 4. Formation + Troop Ratio — all three
               need real attendance data (leader picker, formation
