@@ -33,6 +33,7 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
   // screen space. Resets to the compact view every time a NEW
   // selection is made (see selectFormation).
   const [showAll, setShowAll] = useState(false);
+  const [expandedIndices, setExpandedIndices] = useState(new Set());
   const isCustom = slot.formationMode === 'custom';
 
   const gensToShow = selectedGenerations.length > 0
@@ -61,10 +62,19 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
 
   const recommendations = gensToShow.flatMap(recsForGen);
 
+  // Coverage should reflect true remaining availability — excluding
+  // anyone already committed as a joiner elsewhere (this slot's other
+  // 3 priority joiners, another slot in this plan, or another plan
+  // linked to the same event — see assignedInOtherSlots, which
+  // RallySlotCard now passes as the FULL combined exclusion set, not
+  // just "other slots in this plan"). Otherwise "✓ Full coverage" could
+  // count someone who's actually already spoken for.
   function getCoverage(f) {
+    const excludeIds = assignedInOtherSlots || new Set();
+    const availablePool = players.filter(p => !excludeIds.has(p.id));
     return [f.j1, f.j2, f.j3, f.j4].filter(Boolean).map(heroRaw => {
       const resolved = resolveHero(heroRaw);
-      const count    = players.filter(p => playerCanFillSlot(p, heroRaw)).length;
+      const count    = availablePool.filter(p => playerCanFillSlot(p, heroRaw)).length;
       return { heroRaw, display: resolved?.display, alternatives: resolved?.alternatives, count, ok: count >= 1 };
     });
   }
@@ -151,20 +161,35 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
           : 'Showing all generations — pick which ones apply to you in ⚙️ Settings.'}
       </div>
 
-      {/* Rally Leader's saved setup — a suggestion, never forced */}
+      {/* Rally Leader's saved setup — MUCH more prominent than a
+          regular recommendation card, since it's the leader's own
+          confirmed data, not a generic community formation. Always
+          shown fully expanded (never collapsed) for that reason. */}
       {leaderTeams.length > 0 && (
-        <div style={{ background:C.gold+'0e', border:`1px solid ${C.gold}44`, borderRadius:10, padding:12, marginBottom:12 }}>
-          <div style={{ fontSize:12, color:C.gold, fontWeight:700, marginBottom:8 }}>
-            📋 {leaderPlayer.username || leaderPlayer.alias}'s saved {wantedTeamType} setup available
+        <div style={{ background:C.gold+'14', border:`2px solid ${C.gold}`, borderRadius:14, padding:16, marginBottom:16, boxShadow:`0 0 0 4px ${C.gold}0e` }}>
+          <div style={{ fontSize:15, color:C.gold, fontWeight:800, marginBottom:10, display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:18 }}>👑</span> {leaderPlayer.username || leaderPlayer.alias}'s saved {wantedTeamType} setup
           </div>
-          {leaderTeams.map((team, i) => (
-            <button key={team.id} onClick={() => applyLeaderTeam(team)}
-              style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 10px', marginBottom:6, borderRadius:8, background:C.section, border:`1px solid ${C.border}`, color:C.white, fontSize:12, cursor:'pointer' }}>
-              <span style={{ color:C.gold, fontWeight:700 }}>{i === 0 ? 'Recommended' : `Alternative ${i}`}</span>
-              {' — '}{(team.leadHeroes || []).filter(Boolean).join(' + ') || 'no heroes set'}{team.ratio ? ` · ${team.ratio}` : ''}
-            </button>
-          ))}
-          <div style={{ fontSize:10, color:C.muted, marginTop:2 }}>Based on {leaderPlayer.username || leaderPlayer.alias}'s saved rally setup</div>
+          {leaderTeams.map((team, i) => {
+            const leadHeroes = (team.leadHeroes || []).filter(Boolean);
+            const joinerHeroes = (team.priorityJoinerHeroes || []).filter(Boolean);
+            return (
+              <button key={team.id} onClick={() => applyLeaderTeam(team)}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'12px 14px', marginBottom:8, borderRadius:10, background:C.card, border:`1.5px solid ${i===0?C.gold:C.border}`, cursor:'pointer' }}>
+                <div style={{ fontSize:13, fontWeight:800, color:C.gold, marginBottom:6 }}>{i === 0 ? '⭐ Recommended' : `Alternative ${i}`}{team.ratio ? ` · ${team.ratio}` : ''}</div>
+                <div style={{ fontSize:11, color:C.muted, marginBottom:3 }}>Lead heroes</div>
+                <div style={{ fontSize:13, color:C.white, fontWeight:600, marginBottom:8 }}>
+                  {leadHeroes.length > 0 ? leadHeroes.map(h => `${h}${team.widgets?.[h] != null ? ` (${team.widgets[h]} widgets)` : ''}`).join(' + ') : 'None set'}
+                </div>
+                <div style={{ fontSize:11, color:C.muted, marginBottom:3 }}>Recommended joiners</div>
+                <div style={{ fontSize:13, color:C.icy, fontWeight:600 }}>
+                  {joinerHeroes.length > 0 ? joinerHeroes.join(', ') : 'None set'}
+                </div>
+                {team.notes && <div style={{ fontSize:12, color:C.muted, marginTop:8, fontStyle:'italic' }}>{team.notes}</div>}
+              </button>
+            );
+          })}
+          <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>Tap to apply — based on {leaderPlayer.username || leaderPlayer.alias}'s saved rally setup. You can still change anything after.</div>
         </div>
       )}
 
@@ -239,8 +264,21 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
       )}
 
       {/* Guided recommendation cards — one per selected generation
-          (two if "All" is picked: one offense, one defense) */}
+          (two if "All" is picked: one offense, one defense). Each card
+          defaults to COMPACT: just the leader heroes and a single
+          coverage check, so a first-time officer sees a short list of
+          simple choices rather than a wall of ratios/joiners/alternates
+          up front. Tapping "More info" reveals the rest without
+          selecting; tapping the card itself selects it. */}
       {!isCustom && (() => {
+        function toggleExpand(i) {
+          setExpandedIndices(prev => {
+            const next = new Set(prev);
+            next.has(i) ? next.delete(i) : next.add(i);
+            return next;
+          });
+        }
+
         function renderCard(f, i) {
           const isSelected = selectedFormation &&
             f.gen === selectedFormation.gen &&
@@ -249,45 +287,51 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
           const coverage   = getCoverage(f);
           const allCovered = coverage.every(c => c.ok);
           const fColor     = f.type.toLowerCase().includes('offense') ? '#F5A623' : '#6B8CAE';
+          const isExpanded = expandedIndices.has(i);
 
           return (
-            <div key={i} onClick={() => selectFormation(f)}
-              style={{ background:isSelected?fColor+'18':C.section, border:`1.5px solid ${isSelected?fColor:C.border}`, borderRadius:12, padding:14, marginBottom:8, cursor:'pointer' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-                <div>
+            <div key={i} style={{ background:isSelected?fColor+'18':C.section, border:`1.5px solid ${isSelected?fColor:C.border}`, borderRadius:12, marginBottom:8, overflow:'hidden' }}>
+              <div onClick={() => selectFormation(f)} style={{ padding:14, cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
+                <div style={{ minWidth:0 }}>
                   <div style={{ fontSize:12, color:fColor, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>
                     Gen {f.gen} · {f.type}{f.isMeta ? ' · ⚠ unverified' : ''}
                   </div>
-                  <div style={{ fontSize:13, fontWeight:700, color:C.white }}>
-                    {f.leaders.join(' + ')}
-                  </div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>{f.ratio}</div>
+                  <div style={{ fontSize:13, fontWeight:700, color:C.white }}>{f.leaders.join(' + ')}</div>
                 </div>
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
                   {isSelected && <span style={{ fontSize:11, color:fColor, fontWeight:700 }}>✓ Selected</span>}
-                  <span style={{ fontSize:11, color:allCovered?C.green:C.gold, fontWeight:600 }}>
+                  <span style={{ fontSize:11, color:allCovered?C.green:C.gold, fontWeight:600, whiteSpace:'nowrap' }}>
                     {allCovered ? '✓ Full coverage' : '⚠ Check coverage'}
                   </span>
                 </div>
               </div>
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:f.comments?6:0 }}>
-                {coverage.map((c, ci) => (
-                  <div key={ci} style={{ background:C.card, borderRadius:8, padding:'6px 10px', display:'flex', alignItems:'center', gap:6 }}>
-                    <div style={{ width:6, height:6, borderRadius:'50%', background:c.ok?C.green:C.red, flexShrink:0 }}/>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:12, fontWeight:700, color:C.white }}>{c.display}</div>
-                      {c.alternatives?.length > 0 && <div style={{ fontSize:10, color:C.muted }}>or {c.alternatives.join('/')}</div>}
-                    </div>
-                    <div style={{ fontSize:11, color:c.ok?C.green:C.red, fontWeight:700 }}>×{c.count}</div>
-                  </div>
-                ))}
-              </div>
+              <button onClick={e => { e.stopPropagation(); toggleExpand(i); }}
+                style={{ width:'100%', height:32, background:'none', border:'none', borderTop:`1px solid ${C.border}44`, color:C.muted, fontSize:11, cursor:'pointer' }}>
+                {isExpanded ? '▲ Less info' : '▼ More info — ratio, joiners, alternates'}
+              </button>
 
-              {[f.alt1, f.alt2].filter(Boolean).length > 0 && (
-                <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>Alt: {[f.alt1, f.alt2].filter(Boolean).join(' · ')}</div>
+              {isExpanded && (
+                <div style={{ padding:'0 14px 14px' }}>
+                  <div style={{ fontSize:11, color:C.muted, marginBottom:8 }}>{f.ratio}</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:f.comments?6:0 }}>
+                    {coverage.map((c, ci) => (
+                      <div key={ci} style={{ background:C.card, borderRadius:8, padding:'6px 10px', display:'flex', alignItems:'center', gap:6 }}>
+                        <div style={{ width:6, height:6, borderRadius:'50%', background:c.ok?C.green:C.red, flexShrink:0 }}/>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:12, fontWeight:700, color:C.white }}>{c.display}</div>
+                          {c.alternatives?.length > 0 && <div style={{ fontSize:10, color:C.muted }}>or {c.alternatives.join('/')}</div>}
+                        </div>
+                        <div style={{ fontSize:11, color:c.ok?C.green:C.red, fontWeight:700 }}>×{c.count}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {[f.alt1, f.alt2].filter(Boolean).length > 0 && (
+                    <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>Alt: {[f.alt1, f.alt2].filter(Boolean).join(' · ')}</div>
+                  )}
+                  {f.comments && <div style={{ fontSize:11, color:C.gold, marginTop:4, fontStyle:'italic' }}>⚠ {f.comments}</div>}
+                </div>
               )}
-              {f.comments && <div style={{ fontSize:11, color:C.gold, marginTop:4, fontStyle:'italic' }}>⚠ {f.comments}</div>}
             </div>
           );
         }

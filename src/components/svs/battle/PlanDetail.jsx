@@ -25,6 +25,8 @@ import { ChecklistManagerSheet } from './ChecklistManagerSheet.jsx';
 export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, onBack, onGoLive, onGoToMembers, selectedGenerations = [], checklist = [], onSaveChecklist }) {
   const [eventPickerOpen, setEventPickerOpen]         = useState(false);
   const [checklistManagerOpen, setChecklistManagerOpen] = useState(false);
+  const [summaryText, setSummaryText] = useState(null); // lazily generated, hand-editable
+  const [summaryCopied, setSummaryCopied] = useState(false);
 
   function updPlan(patch) { onUpdate({ ...plan, ...patch }); }
 
@@ -77,48 +79,91 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
     return ids;
   }
 
-  // ── Plan-wide unfilled-joiner flag ─────────────────────────────
-  // How many priority joiner slots (across the whole plan) have a
-  // required hero set but literally nobody eligible to fill it —
-  // surfaced as a single banner so this is visible without opening
-  // every rally slot individually. Deliberately a simplified count:
-  // it checks hero ownership + troop tier + attendance per slot, but
-  // doesn't also account for plan-wide exclusivity (a person eligible
-  // here might already be claimed by another slot) — that's already
-  // enforced correctly in the actual assignment UI; this banner is
-  // just a heads-up indicator, not the source of truth.
-  let unfillableCount = 0;
-  if (linkedEvent) {
-    slots.forEach(slot => {
-      const pool = players.filter(p => p.id !== slot.leaderId && isAttending(p.id, linkedEvent));
+  // Everyone leading ANY rally, in this plan or a sibling plan for the
+  // same event — a rally leader is already spoken for and should never
+  // show up as an "available backup" joiner candidate, even if they
+  // aren't currently assigned as anyone's joiner.
+  const allLeaderIds = new Set();
+  slots.forEach(s => { if (s.leaderId) allLeaderIds.add(s.leaderId); });
+  siblingPlans.forEach(sp => (sp.rallySlots || []).forEach(s => { if (s.leaderId) allLeaderIds.add(s.leaderId); }));
+
+  // ── Auto-flagged action items ──────────────────────────────────
+  // Computed fresh from the plan's current state every render — not
+  // manually toggled like the custom checklist items below. Two kinds:
+  //  - "ask": a rally's leader-rally-heroes includes a hero that isn't
+  //    recorded in that leader's saved Rally Leader Profile teams —
+  //    the officer picked/changed something the leader hasn't
+  //    confirmed, so it needs a real check-in before relying on it.
+  //  - "coverage": a priority joiner hero has zero eligible attendees.
+  // Also the single source of truth for the plan-wide unfillable count
+  // (previously computed separately — now derived from this instead).
+  const autoFlags = [];
+  slots.forEach(slot => {
+    if (slot.leaderId && slot.leaderName) {
+      const leaderPlayer = players.find(p => p.id === slot.leaderId);
+      const savedHeroes = new Set();
+      (leaderPlayer?.leaderProfile?.teams || []).forEach(t => (t.leadHeroes || []).forEach(h => h && savedHeroes.add(h)));
+      (slot.leaderRallyHeroes || []).forEach(h => {
+        if (h && !savedHeroes.has(h)) {
+          autoFlags.push({ id:`${slot.id}-ask-${h}`, type:'ask', text:`Ask ${slot.leaderName} if they have ${h} — not in their saved setup` });
+        }
+      });
+    }
+    if (linkedEvent) {
       const hasReqs = Object.values(slot.troopReqs || {}).some(Boolean);
+      const pool = players
+        .filter(p => p.id !== slot.leaderId)
+        .filter(p => isAttending(p.id, linkedEvent))
+        .filter(p => !slot.allianceTag || p.allianceTag === slot.allianceTag);
       (slot.joiners || []).forEach(j => {
         if (!j.heroName) return;
         const eligible = pool.filter(p => playerCanFillSlot(p, j.heroName) && (!hasReqs || meetsTroopReqs(p, slot.troopReqs).ok));
-        if (eligible.length === 0) unfillableCount++;
+        if (eligible.length === 0) {
+          autoFlags.push({ id:`${slot.id}-cov-${j.heroName}`, type:'coverage', text:`${j.heroName} needed for ${slot.leaderName || 'this'}'s rally — no one eligible yet` });
+        }
       });
-    });
-  }
+    }
+  });
+  const unfillableCount = autoFlags.filter(f => f.type === 'coverage').length;
 
   // ── Unallocated backups ────────────────────────────────────────
   // Attending roster members not currently used as a priority joiner
-  // ANYWHERE in this plan — quick reference for who can sub in if
-  // someone drops offline mid-event. Falls back to the whole roster
-  // when no event is linked yet, same as before. Split into who's
-  // actually eligible to fill a hero-based joiner slot (has at least
-  // one Skill-5 joiner hero recorded) vs. who currently isn't, so it's
-  // clear at a glance who's a real backup option right now.
+  // AND not leading any rally — quick reference for who can sub in if
+  // someone drops offline mid-event. Split into who's actually
+  // eligible to fill a hero-based joiner slot (has at least one
+  // Skill-5 joiner hero recorded) vs. who currently isn't.
   const allAssignedPlanWide = new Set();
   slots.forEach(s => (s.joiners || []).forEach(j => { if (j.playerId) allAssignedPlanWide.add(j.playerId); }));
   siblingPlans.forEach(sp => (sp.rallySlots || []).forEach(s => (s.joiners || []).forEach(j => { if (j.playerId) allAssignedPlanWide.add(j.playerId); })));
   const unallocated = players.filter(p =>
-    !allAssignedPlanWide.has(p.id) && (!linkedEvent || isAttending(p.id, linkedEvent))
+    !allAssignedPlanWide.has(p.id) && !allLeaderIds.has(p.id) && (!linkedEvent || isAttending(p.id, linkedEvent))
   );
   const hasJoinerHero = p => (p.joinerHeroes || []).some(jh => jh.skillLevel >= 5);
   const unallocatedEligible   = unallocated.filter(hasJoinerHero);
   const unallocatedIneligible = unallocated.filter(p => !hasJoinerHero(p));
 
   const linkableEvents = events.filter(e => e.status !== 'completed');
+
+  // ── Plan-wide copy summary — one block for every rally, replacing
+  // the old per-rally-slot copy button entirely.
+  function generateSummary() {
+    const lines = [`📋 ${plan.name || 'Battle Plan'} — ${plan.date}`, ''];
+    slots.forEach(slot => {
+      if (!slot.leaderName) return;
+      lines.push(`${RALLY_ICONS[slot.type] || '⚔️'} ${slot.type} — ${slot.leaderName}`);
+      if (slot.ratio) lines.push(`Ratio: ${slot.ratio}`);
+      if ((slot.leaderRallyHeroes || []).length) lines.push(`Lead heroes: ${slot.leaderRallyHeroes.join(', ')}`);
+      const filled = (slot.joiners || []).filter(j => j.heroName);
+      if (filled.length) lines.push(`Joiners: ${filled.map(j => `${j.heroName} → ${j.playerName || '?'}`).join(', ')}`);
+      lines.push('');
+    });
+    return lines.join('\n').trim();
+  }
+  function regenerateSummary() { setSummaryText(generateSummary()); }
+  function copySummary() {
+    const text = summaryText ?? generateSummary();
+    navigator.clipboard.writeText(text).then(() => { setSummaryCopied(true); setTimeout(() => setSummaryCopied(false), 2000); });
+  }
 
   return (
     <div style={{ padding:'16px 20px 0', paddingBottom:readySlots.length > 0 ? 120 : 20 }}>
@@ -195,33 +240,9 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
       {unfillableCount > 0 && (
         <div style={{ background:C.red+'0e', border:`1px solid ${C.red}44`, borderRadius:12, padding:'12px 14px', marginBottom:16 }}>
           <div style={{ fontSize:13, fontWeight:700, color:C.red }}>⚠ {unfillableCount} priority joiner{unfillableCount !== 1 ? 's have' : ' has'} no eligible attendee</div>
-          <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>Review the rally slots below before going live.</div>
+          <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>See Leadership Checklist below for details.</div>
         </div>
       )}
-
-      {/* Leadership Checklist */}
-      <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-          <div style={{ fontSize:14, fontWeight:700, color:C.white }}>📋 Leadership Checklist</div>
-          <button onClick={() => setChecklistManagerOpen(true)} style={{ background:'none', border:'none', color:C.gold, fontSize:12, fontWeight:600, cursor:'pointer' }}>Manage</button>
-        </div>
-        {checklist.length === 0 ? (
-          <div style={{ fontSize:13, color:C.muted }}>No checklist items yet. Tap Manage to add some — e.g. "Rally leads briefed", "Formations locked", "Backup joiners identified".</div>
-        ) : (
-          checklist.map(item => {
-            const checked = !!(plan.checklist || {})[item.id];
-            return (
-              <div key={item.id} onClick={() => updPlan({ checklist:{ ...(plan.checklist || {}), [item.id]:!checked } })}
-                style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', cursor:'pointer' }}>
-                <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${checked?C.green:C.border}`, background:checked?C.green+'33':'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  {checked && <span style={{ color:C.green, fontSize:13, fontWeight:700 }}>✓</span>}
-                </div>
-                <span style={{ fontSize:14, color:checked?C.muted:C.white, textDecoration:checked?'line-through':'none' }}>{item.name}</span>
-              </div>
-            );
-          })
-        )}
-      </div>
 
       {/* Empty state */}
       {slots.length === 0 && (
@@ -258,12 +279,34 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
         </button>
       )}
 
-      {/* Unallocated — categorised by whether they're actually
-          eligible to fill a hero-based joiner slot right now */}
+      {/* Plan-wide copy summary — ALL rallies in one block, not one
+          button per rally slot */}
+      {readySlots.length > 0 && (
+        <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:8 }}>📋 Plan Summary</div>
+          <textarea
+            value={summaryText ?? generateSummary()}
+            onChange={e => setSummaryText(e.target.value)}
+            style={{ width:'100%', minHeight:140, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:13, color:C.white, resize:'vertical', boxSizing:'border-box', fontFamily:'inherit' }}
+          />
+          <div style={{ display:'flex', gap:8, marginTop:8 }}>
+            <button onClick={copySummary}
+              style={{ flex:2, height:44, borderRadius:10, background:summaryCopied?C.green+'18':C.gold+'18', border:`1px solid ${summaryCopied?C.green:C.gold}44`, color:summaryCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+              {summaryCopied ? '✓ Copied' : '📋 Copy summary'}
+            </button>
+            <button onClick={regenerateSummary}
+              style={{ flex:1, height:44, borderRadius:10, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+              ↺ Reset
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Unallocated */}
       {slots.length > 0 && (
         <div style={{ background:C.section, borderRadius:12, padding:14, marginBottom:16 }}>
           <div style={{ fontSize:13, fontWeight:700, color:C.icy, marginBottom:2 }}>🔁 Unallocated</div>
-          <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>{linkedEvent ? 'Attending members' : 'Members'} not used as a priority joiner anywhere in this plan.</div>
+          <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>{linkedEvent ? 'Attending members' : 'Members'} not leading or already used as a priority joiner in this plan.</div>
           {unallocated.length === 0 ? (
             <div style={{ fontSize:12, color:C.muted }}>Everyone available is already allocated somewhere in this plan.</div>
           ) : (
@@ -300,6 +343,44 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
           )}
         </div>
       )}
+
+      {/* Leadership Checklist — moved to the bottom; auto-detected
+          action items shown above the manual checkable list */}
+      <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:C.white }}>📋 Leadership Checklist</div>
+          <button onClick={() => setChecklistManagerOpen(true)} style={{ background:'none', border:'none', color:C.gold, fontSize:12, fontWeight:600, cursor:'pointer' }}>Manage</button>
+        </div>
+
+        {autoFlags.length > 0 && (
+          <div style={{ marginBottom:14 }}>
+            <div style={{ fontSize:10, color:C.gold, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>⚠ Needs attention</div>
+            {autoFlags.map(flag => (
+              <div key={flag.id} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'6px 0' }}>
+                <span style={{ fontSize:13, color:flag.type==='coverage'?C.red:C.gold, flexShrink:0 }}>{flag.type==='coverage'?'⚠':'❓'}</span>
+                <span style={{ fontSize:13, color:C.icy }}>{flag.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {checklist.length === 0 ? (
+          <div style={{ fontSize:13, color:C.muted }}>No checklist items yet. Tap Manage to add some — e.g. "Rally leads briefed", "Formations locked", "Backup joiners identified".</div>
+        ) : (
+          checklist.map(item => {
+            const checked = !!(plan.checklist || {})[item.id];
+            return (
+              <div key={item.id} onClick={() => updPlan({ checklist:{ ...(plan.checklist || {}), [item.id]:!checked } })}
+                style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', cursor:'pointer' }}>
+                <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${checked?C.green:C.border}`, background:checked?C.green+'33':'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  {checked && <span style={{ color:C.green, fontSize:13, fontWeight:700 }}>✓</span>}
+                </div>
+                <span style={{ fontSize:14, color:checked?C.muted:C.white, textDecoration:checked?'line-through':'none' }}>{item.name}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
 
       <ChecklistManagerSheet
         open={checklistManagerOpen}
