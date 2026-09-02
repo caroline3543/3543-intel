@@ -4,6 +4,7 @@ import { vibe } from '../../utils/vibe.js';
 import { fmtDateShort } from '../../utils/dates.js';
 import { newSnapshot } from '../../data/playerSchema.js';
 import { searchPlayers } from '../../services/playerAutosuggest.js';
+import { matchNamesToPlayers } from '../../utils/nameList.js';
 import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 import { SnapshotEditor } from './SnapshotEditor.jsx';
 import { EventSheet } from './EventSheet.jsx';
@@ -52,6 +53,8 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [addQuery, setAddQuery]       = useState('');
   const [addResults, setAddResults]   = useState([]);
   const [addAsSubstitute, setAddAsSubstitute] = useState(false);
+  const [addMode, setAddMode]         = useState('type'); // 'type' | 'paste'
+  const [pasteAddText, setPasteAddText] = useState('');
   const [copyPickerOpen, setCopyPickerOpen] = useState(false);
   const [participantsCopied, setParticipantsCopied] = useState(false);
   const [eventsView, setEventsView] = useState('active'); // 'active' | 'archive'
@@ -113,6 +116,30 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     }
     onUpdateEvent({ ...activeEvent, participantIds, snapshots: snaps });
     setAddQuery(''); setAddResults([]);
+    vibe(8);
+  }
+
+  // Paste-list add — computes participantIds/snapshots once for the
+  // whole batch in a single onUpdateEvent call. Looping addParticipant()
+  // per name would read the same stale activeEvent on every iteration
+  // and silently drop all but the last person.
+  function addParticipantsBatch(playersToAdd) {
+    if (!activeEvent || playersToAdd.length === 0) return;
+    const participantIds = [...new Set([...(activeEvent.participantIds || []), ...playersToAdd.map(p => p.id)])];
+    const snaps = [...(activeEvent.snapshots || [])];
+    playersToAdd.forEach(player => {
+      const idx = snaps.findIndex(s => s.playerId === player.id);
+      if (idx >= 0) {
+        snaps[idx] = { ...snaps[idx], rsvp: { ...snaps[idx].rsvp, participating: true, substitute: addAsSubstitute } };
+      } else {
+        const snap = newSnapshot(player.id, player, activeEvent.id);
+        snap.rsvp.participating = true;
+        snap.rsvp.substitute = addAsSubstitute;
+        snaps.push(snap);
+      }
+    });
+    onUpdateEvent({ ...activeEvent, participantIds, snapshots: snaps });
+    setPasteAddText('');
     vibe(8);
   }
 
@@ -265,20 +292,31 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   // Copyable, Discord-ready code block of the full roster — grouped by
   // rank the same way the on-screen list is, so what you copy always
   // matches what you see.
+  // Copyable, Discord-ready code block of the full roster — grouped by
+  // rank the same way the on-screen list is, so what you copy always
+  // matches what you see. Header includes time and Legion (when set)
+  // so the code block is self-identifying once posted in Discord —
+  // otherwise a Legion 1 and Legion 2 roster posted the same day are
+  // indistinguishable once separated from the app. Rally Leads get the
+  // same 👑 marker the on-screen row uses.
   function generateParticipantsText() {
     if (!activeEvent) return '';
-    const lines = [`📋 ${activeEvent.name || activeEvent.type} — ${fmtDateShort(activeEvent.date)}`, ''];
+    const headerParts = [activeEvent.name || activeEvent.type, fmtDateShort(activeEvent.date)];
+    if (activeEvent.time)   headerParts.push(`🕐 ${activeEvent.time}`);
+    if (activeEvent.legion) headerParts.push(`Legion ${activeEvent.legion}`);
+    const lines = [`📋 ${headerParts.join(' — ')}`, ''];
+    const nameLine = p => `  ${p.roles?.includes('Rally Lead') ? '👑 ' : ''}${p.username || p.alias || '?'}`;
     const groups = groupByRank(participantsList);
     lines.push(`PARTICIPANTS (${participantsList.length})`);
     [...ALLIANCE_RANKS, 'Unranked'].forEach(rank => {
       const group = groups[rank];
       if (!group.length) return;
       lines.push(`${rank} (${group.length})`);
-      group.forEach(p => lines.push(`  ${p.username || p.alias || '?'}`));
+      group.forEach(p => lines.push(nameLine(p)));
     });
     if (substitutesList.length > 0) {
       lines.push('', `SUBSTITUTES (${substitutesList.length})`);
-      substitutesList.forEach(p => lines.push(`  ${p.username || p.alias || '?'}`));
+      substitutesList.forEach(p => lines.push(nameLine(p)));
     }
     return '```\n' + lines.join('\n').trim() + '\n```';
   }
@@ -339,12 +377,18 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             })()}
           </div>
 
-          {/* Add participant — type a name, Enter commits the top match.
-              Adding-as toggle decides which section they land in. */}
+          {/* Add participant — type a name (Enter commits the top match)
+              or paste a whole list at once. Adding-as toggle decides
+              which section they land in, for either mode. */}
           <div style={{ display:'flex', gap:6, marginBottom:8 }}>
             <button onClick={() => setAddAsSubstitute(false)} style={{ flex:1, height:36, borderRadius:10, border:`1px solid ${!addAsSubstitute?C.gold:C.border}`, background:!addAsSubstitute?C.gold+'22':C.section, color:!addAsSubstitute?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>Add as Participant</button>
             <button onClick={() => setAddAsSubstitute(true)} style={{ flex:1, height:36, borderRadius:10, border:`1px solid ${addAsSubstitute?C.gold:C.border}`, background:addAsSubstitute?C.gold+'22':C.section, color:addAsSubstitute?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>Add as Substitute</button>
           </div>
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            <button onClick={() => setAddMode('type')} style={{ flex:1, height:32, borderRadius:16, background:addMode==='type'?C.gold+'22':C.section, border:`1px solid ${addMode==='type'?C.gold:C.border}`, color:addMode==='type'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>🔍 Type one</button>
+            <button onClick={() => setAddMode('paste')} style={{ flex:1, height:32, borderRadius:16, background:addMode==='paste'?C.gold+'22':C.section, border:`1px solid ${addMode==='paste'?C.gold:C.border}`, color:addMode==='paste'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>📋 Paste a list</button>
+          </div>
+          {addMode === 'type' ? (
           <div style={{ position:'relative', marginBottom:12 }}>
             <input
               value={addQuery}
@@ -365,6 +409,39 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               </div>
             )}
           </div>
+          ) : (() => {
+            const already = new Set(activeEvent.participantIds || []);
+            const pool = players.filter(p => !already.has(p.id));
+            const { matched: addMatched, unmatched: addUnmatched } = matchNamesToPlayers(pasteAddText, pool);
+            return (
+              <div style={{ marginBottom:12 }}>
+                <textarea
+                  value={pasteAddText}
+                  onChange={e => setPasteAddText(e.target.value)}
+                  placeholder={'Paste names, comma or newline separated…'}
+                  rows={3}
+                  style={{ width:'100%', background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 14px', fontSize:14, color:C.white, boxSizing:'border-box', fontFamily:'inherit', resize:'vertical', marginBottom:8 }}
+                />
+                {(addMatched.length > 0 || addUnmatched.length > 0) && (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
+                    {addMatched.map(p => (
+                      <span key={p.id} style={{ padding:'5px 10px', borderRadius:14, background:C.green+'18', border:`1px solid ${C.green}44`, color:C.green, fontSize:12 }}>✓ {p.username||p.alias}</span>
+                    ))}
+                    {addUnmatched.map((n, i) => (
+                      <span key={i} title="No roster match for this name" style={{ padding:'5px 10px', borderRadius:14, background:C.red+'14', border:`1px solid ${C.red}44`, color:C.red+'cc', fontSize:12 }}>? {n}</span>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => addParticipantsBatch(addMatched)}
+                  disabled={addMatched.length === 0}
+                  style={{ width:'100%', height:44, borderRadius:10, background:addMatched.length?C.gold+'22':C.section, border:`1px solid ${addMatched.length?C.gold:C.border}`, color:addMatched.length?C.gold:C.muted, fontWeight:700, fontSize:14, cursor:addMatched.length?'pointer':'default' }}
+                >
+                  Add {addMatched.length || ''} as {addAsSubstitute ? 'Substitute' : 'Participant'}{addMatched.length!==1?'s':''}
+                </button>
+              </div>
+            );
+          })()}
 
           {/* Copy roster from a previous event — participant list only,
               never RSVP predictions from that event */}

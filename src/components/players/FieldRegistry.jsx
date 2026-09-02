@@ -13,6 +13,7 @@ import {
   getCustomHeroGen,
   setCustomHeroGen,
 } from '../../services/fieldRegistryService.js';
+import { matchNamesToPlayers } from '../../utils/nameList.js';
 
 // Generation label for a joiner hero — built-in heroes resolve from
 // HEROES_BY_GEN (constants.js); anything an officer typed in that
@@ -76,10 +77,14 @@ function ValueCard({ field, value, players, onUpdatePlayer }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [assignMode, setAssignMode] = useState('search'); // 'search' | 'paste'
+  const [pasteText, setPasteText] = useState('');
 
   const owners = getPlayersWithFieldValue(players, field, value);
   const count = owners.length;
   const isJoinerHero = field.id === 'joinerHeroes';
+  const unassignedPool = players.filter(p => !field.get(p).includes(value));
+  const { matched: pasteMatched, unmatched: pasteUnmatched } = matchNamesToPlayers(pasteText, unassignedPool);
 
   function search(q) {
     setQuery(q);
@@ -95,6 +100,15 @@ function ValueCard({ field, value, players, onUpdatePlayer }) {
       onUpdatePlayer(assignFieldValue(player, field, value));
     }
     setQuery(''); setResults([]);
+  }
+
+  function addOwnersBatch(playersToAdd) {
+    playersToAdd.forEach(p => {
+      if (isJoinerHero) onUpdatePlayer(addJoinerHeroToPlayer(p, value));
+      else onUpdatePlayer(assignFieldValue(p, field, value));
+    });
+    setPasteText('');
+    vibe(8);
   }
 
   function removeOwner(player) {
@@ -146,6 +160,11 @@ function ValueCard({ field, value, players, onUpdatePlayer }) {
           <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
             {field.multi ? 'Add Player' : 'Set Player — replaces their existing value'}
           </div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <button onClick={() => setAssignMode('search')} style={{ flex: 1, height: 32, borderRadius: 16, background: assignMode==='search'?C.gold+'22':C.section, border: `1px solid ${assignMode==='search'?C.gold:C.border}`, color: assignMode==='search'?C.gold:C.muted, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>🔍 Search one at a time</button>
+            <button onClick={() => setAssignMode('paste')} style={{ flex: 1, height: 32, borderRadius: 16, background: assignMode==='paste'?C.gold+'22':C.section, border: `1px solid ${assignMode==='paste'?C.gold:C.border}`, color: assignMode==='paste'?C.gold:C.muted, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>📋 Paste a list</button>
+          </div>
+          {assignMode === 'search' ? (
           <div style={{ position: 'relative' }}>
             <input
               value={query}
@@ -174,6 +193,34 @@ function ValueCard({ field, value, players, onUpdatePlayer }) {
               </div>
             )}
           </div>
+          ) : (
+          <div>
+            <textarea
+              value={pasteText}
+              onChange={e => setPasteText(e.target.value)}
+              placeholder={'Paste names, comma or newline separated…'}
+              rows={3}
+              style={{ width: '100%', background: C.section, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: C.white, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 8 }}
+            />
+            {(pasteMatched.length > 0 || pasteUnmatched.length > 0) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {pasteMatched.map(p => (
+                  <span key={p.id} style={{ padding: '5px 10px', borderRadius: 14, background: C.green + '18', border: `1px solid ${C.green}44`, color: C.green, fontSize: 12 }}>✓ {p.username || p.alias}</span>
+                ))}
+                {pasteUnmatched.map((n, i) => (
+                  <span key={i} title="No roster match for this name" style={{ padding: '5px 10px', borderRadius: 14, background: C.red + '14', border: `1px solid ${C.red}44`, color: C.red + 'cc', fontSize: 12 }}>? {n}</span>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => addOwnersBatch(pasteMatched)}
+              disabled={pasteMatched.length === 0}
+              style={{ width: '100%', height: 44, borderRadius: 10, background: pasteMatched.length ? C.gold + '22' : C.section, border: `1px solid ${pasteMatched.length ? C.gold : C.border}`, color: pasteMatched.length ? C.gold : C.muted, fontWeight: 700, fontSize: 14, cursor: pasteMatched.length ? 'pointer' : 'default' }}
+            >
+              {field.multi ? `Add ${pasteMatched.length || ''} player${pasteMatched.length !== 1 ? 's' : ''}` : `Set ${pasteMatched.length || ''} player${pasteMatched.length !== 1 ? 's' : ''}`}
+            </button>
+          </div>
+          )}
         </div>
       )}
     </div>

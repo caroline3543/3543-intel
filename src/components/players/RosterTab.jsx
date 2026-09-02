@@ -206,7 +206,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
                 Open Field Registry ›
               </div>
             </div>
-            {troopGapCount > 0 && (
+            {sortBy==='missing' && troopGapCount > 0 && (
               <button
                 onClick={e => { e.stopPropagation(); copyMissingTroops(); }}
                 style={{ marginTop:10, width:'100%', height:32, borderRadius:8, background:'none', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:12, cursor:'pointer' }}
@@ -255,7 +255,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
               onClick={() => openProfile(p)}
               onDelete={onDeletePlayer}
               events={events}
-              missingCount={missingCount(p)}
+              missingCount={sortBy==='missing' ? missingCount(p) : 0}
               troopPower={getCurrentTroopPower(p, events)}
               onToggleRallyLead={() => toggleRallyLead(p)}
               onOpenFields={() => setFieldRegistryOpen(true)}

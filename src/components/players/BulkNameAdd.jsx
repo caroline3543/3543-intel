@@ -2,13 +2,7 @@ import { useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { newPlayer } from '../../data/playerSchema.js';
-
-function parseNames(raw) {
-  return raw
-    .split(/[,\n]/)
-    .map(s => s.trim())
-    .filter(Boolean);
-}
+import { parseNames } from '../../utils/nameList.js';
 
 // Dedupes the pasted list case-insensitively (first occurrence wins)
 // and separates out any name that already exists on the roster. See
