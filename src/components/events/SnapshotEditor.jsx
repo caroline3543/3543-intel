@@ -1,29 +1,38 @@
 import { useState, useEffect } from 'react';
-import { C, TROOP_POWER_EVENTS } from '../../utils/constants.js';
+import { C, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { ToggleRow, SheetHandle } from '../common/Primitives.jsx';
 
 // ── SnapshotEditor ─────────────────────────────────────────────
 // Per-player event record. Shows ONE of two mutually-exclusive
 // sections depending on the event's status — never both:
-//   upcoming            -> RSVP (a prediction, never used for reliabilityScore)
+//   upcoming            -> RSVP (a prediction, never used for reliabilityScore),
+//                          and ONLY for the two SvS-related event types
+//                          (see SHOWS_RSVP_TYPES) — nobody needs to
+//                          predict "will I be on time" for a Foundry run.
 //   active / completed  -> post-event actuals (the ONLY data
 //                          reliabilityScore is computed from — see metrics.js)
 // No Combat section — removed entirely, not just the judgment fields.
+// No "Participating" toggle — being added to the event's roster at all
+// IS the participation signal (see EventsTab.jsx), set automatically,
+// not chosen here.
 //
 // For Foundry/Canyon Clash events (see TROOP_POWER_EVENTS), also
 // tracks troop power for that event — shown next to the player's name
-// in EventsTab's list and charted over time in ProfileView.
+// in EventsTab's list and charted over time in ProfileView. (Troop
+// power can also be set inline directly from the EventsTab row now —
+// this field just stays in sync with that.)
 //
 // Props:
 //   snapshot     – the snapshot object being edited
 //   playerName   – display name
-//   eventType    – event.type — gates whether troop power shows
+//   eventType    – event.type — gates whether troop power/RSVP show
 //   eventStatus  – 'upcoming' | 'active' | 'completed'
 //   open, onClose, onSave
 export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, open, onClose, onSave }) {
   const [s, setS] = useState(() => snapshot || {});
   const isUpcoming = eventStatus === 'upcoming';
+  const showsRsvp = SHOWS_RSVP_TYPES.includes(eventType);
   const tracksTroopPower = TROOP_POWER_EVENTS.includes(eventType);
 
   useEffect(() => {
@@ -56,15 +65,16 @@ export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, o
         </div>
 
         {isUpcoming ? (
-          <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
-            <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:12 }}>📋 RSVP</div>
-            <ToggleRow label="Participating"          value={s.rsvp?.participating}    onChange={v=>updR({participating:v})}    colorOn={C.green} colorOff={C.muted}/>
-            <ToggleRow label="On time"                value={s.rsvp?.onTime}           onChange={v=>updR({onTime:v})}/>
-            <ToggleRow label="Will be late"            value={s.rsvp?.willBeLate}       onChange={v=>updR({willBeLate:v})}       colorOn={C.gold} colorOff={C.muted}/>
-            <ToggleRow label="Will leave early"        value={s.rsvp?.willLeaveEarly}   onChange={v=>updR({willLeaveEarly:v})}   colorOn={C.mar}  colorOff={C.muted}/>
-            <ToggleRow label="Will join Discord"       value={s.rsvp?.willJoinDiscord}  onChange={v=>updR({willJoinDiscord:v})}  colorOn={C.icy}  colorOff={C.muted}/>
-            <ToggleRow label="Present the whole time"  value={s.rsvp?.presentWholeTime} onChange={v=>updR({presentWholeTime:v})}/>
-          </div>
+          showsRsvp && (
+            <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
+              <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:12 }}>📋 RSVP</div>
+              <ToggleRow label="On time"                value={s.rsvp?.onTime}           onChange={v=>updR({onTime:v})}/>
+              <ToggleRow label="Will be late"            value={s.rsvp?.willBeLate}       onChange={v=>updR({willBeLate:v})}       colorOn={C.gold} colorOff={C.muted}/>
+              <ToggleRow label="Will leave early"        value={s.rsvp?.willLeaveEarly}   onChange={v=>updR({willLeaveEarly:v})}   colorOn={C.mar}  colorOff={C.muted}/>
+              <ToggleRow label="Will join Discord"       value={s.rsvp?.willJoinDiscord}  onChange={v=>updR({willJoinDiscord:v})}  colorOn={C.icy}  colorOff={C.muted}/>
+              <ToggleRow label="Present the whole time"  value={s.rsvp?.presentWholeTime} onChange={v=>updR({presentWholeTime:v})}/>
+            </div>
+          )
         ) : (
           <>
             <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>

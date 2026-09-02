@@ -104,6 +104,14 @@ export const JOINER_COVERAGE_EVENTS = ['SvS Castle Battle', 'Internal Sunfire Ca
 // SnapshotEditor.jsx and ProfileView.jsx's troop-power chart)
 export const TROOP_POWER_EVENTS = ['Foundry', 'Canyon Clash'];
 
+// RSVP prediction fields (arriving late / leaving early / discord /
+// present whole time) only make sense for the two SvS-related event
+// types — nobody needs to predict "will I be on time" for a Foundry
+// run. Every other event type skips straight to a plain roster; post-
+// event actuals (attended/no-show/voice) still apply universally via
+// EventsTab.jsx's bulk actions regardless of this list.
+export const SHOWS_RSVP_TYPES = ['SvS Castle Battle', 'Internal Sunfire Castle'];
+
 // Shared "obviously selected" style for tier/FC chips (PlayerSheet,
 // RallySlotCard, BatchAddSheet all use this) — thicker border + solid
 // fill + bold text make selection unambiguous at a glance, instead of
