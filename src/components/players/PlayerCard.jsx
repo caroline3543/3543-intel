@@ -7,7 +7,7 @@ function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
 }
 
-export function PlayerCard({ player, roles = [], onClick, onDelete, events, missingCount, troopPower, onToggleRallyLead }) {
+export function PlayerCard({ player, roles = [], onClick, onDelete, events, missingCount, troopPower, onToggleRallyLead, onOpenFields }) {
   const dn      = player.username||player.alias||'Unknown';
   const rc      = roleColor(player.roles?.[0], roles);
   const metrics = calcMetrics(player, events||[]);
@@ -27,7 +27,13 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
         {/* Row 1 — name */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
           <div style={{ fontSize:16, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
-          {missingCount > 0 && <span style={{ fontSize:11, color:C.gold, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', flexShrink:0 }}>⚠ {missingCount} missing</span>}
+          {missingCount > 0 && (
+            <button
+              onClick={e => { e.stopPropagation(); onOpenFields?.(); }}
+              title="Open Field Registry"
+              style={{ fontSize:11, color:C.gold, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', border:'none', flexShrink:0, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}
+            >⚠ {missingCount} missing</button>
+          )}
         </div>
 
         {/* Row 2 — alliance · furnace · troop power · reliability */}
