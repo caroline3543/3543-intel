@@ -58,11 +58,11 @@ function HeroCard({ hero, count, players, onUpdatePlayer }) {
               {owners.map(p=>(
                 <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:`1px solid ${C.border}22` }}>
                   <div style={{ width:32, height:32, borderRadius:'50%', background:C.muted+'33', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:12, color:C.white, flexShrink:0 }}>{initials(p.username||p.alias||'?')}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:14, fontWeight:700, color:C.white }}>{p.username||p.alias||'?'}</div>
-                    <div style={{ fontSize:11, color:C.muted }}>{p.allianceTag?`[${p.allianceTag}]`:''}{p.furnaceLevel?` FC${p.furnaceLevel}`:''}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.white, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.username||p.alias||'?'}</div>
+                    <div style={{ fontSize:11, color:C.muted, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.allianceTag?`[${p.allianceTag}]`:''}{p.furnaceLevel?` FC${p.furnaceLevel}`:''}</div>
                   </div>
-                  <button onClick={()=>removeOwner(p)} style={{ background:'none', border:'none', color:C.red+'88', fontSize:16, cursor:'pointer', padding:'4px' }}>✕</button>
+                  <button onClick={()=>removeOwner(p)} style={{ background:'none', border:'none', color:C.red+'88', fontSize:16, cursor:'pointer', padding:'4px', flexShrink:0 }}>✕</button>
                 </div>
               ))}
             </div>
@@ -82,11 +82,11 @@ function HeroCard({ hero, count, players, onUpdatePlayer }) {
                 {results.map(p=>(
                   <button key={p.id} onClick={()=>{addOwner(p);vibe(8);}} style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'10px 14px', background:'none', border:'none', borderBottom:`1px solid ${C.border}22`, cursor:'pointer', textAlign:'left' }}>
                     <div style={{ width:30, height:30, borderRadius:'50%', background:C.muted+'33', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:12, color:C.white, flexShrink:0 }}>{initials(p.username||p.alias||'?')}</div>
-                    <div>
-                      <div style={{ fontSize:14, fontWeight:700, color:C.white }}>{p.username||p.alias||'?'}</div>
-                      <div style={{ fontSize:11, color:C.muted }}>{p.allianceTag?`[${p.allianceTag}]`:''}</div>
+                    <div style={{ minWidth:0, flex:1 }}>
+                      <div style={{ fontSize:14, fontWeight:700, color:C.white, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.username||p.alias||'?'}</div>
+                      <div style={{ fontSize:11, color:C.muted, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.allianceTag?`[${p.allianceTag}]`:''}</div>
                     </div>
-                    <span style={{ marginLeft:'auto', fontSize:12, color:C.green, fontWeight:600 }}>Add ›</span>
+                    <span style={{ marginLeft:'auto', fontSize:12, color:C.green, fontWeight:600, flexShrink:0 }}>Add ›</span>
                   </button>
                 ))}
               </div>
