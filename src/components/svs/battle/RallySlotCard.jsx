@@ -97,6 +97,20 @@ export function RallySlotCard({
     upd({ joiners });
   }
 
+  // Selecting a leader must also scrub them out of any Priority Joiner
+  // slot they were already assigned to BEFORE being promoted — the
+  // exclusion logic elsewhere only blocks NEW joiner assignments to
+  // the current leader, it doesn't retroactively clear a pre-existing
+  // one. Without this, a person picked as a joiner and later promoted
+  // to leader would still visibly show as their own joiner.
+  function selectLeader(p) {
+    const joiners = slot.joiners.map(j =>
+      j.playerId === p.id ? { ...j, playerId:null, playerName:'', confirmed:true, replacedBy:null } : j
+    );
+    onUpdate({ ...slot, leaderId:p.id, leaderName:p.username||p.alias, joiners });
+    setChangingLeader(false);
+  }
+
   const completionPct = Math.round(
     (!!slot.leaderName + filledJoiners / 4 * 0.8 + !!slot.ratio * 0.1) / 1.9 * 100
   );
@@ -217,7 +231,7 @@ export function RallySlotCard({
                 events={events}
                 selectedGenerations={selectedGenerations}
                 leaderPlayer={leaderPlayer}
-                assignedInOtherSlots={assignedInOtherSlots}
+                assignedInOtherSlots={allAssignedIds}
               />
 
               <RatioPicker slot={slot} upd={upd} />
@@ -258,6 +272,9 @@ export function RallySlotCard({
               </div>
             ) : (
               <div>
+                <div style={{ fontSize:12, color:C.gold, fontWeight:600, marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+                  <span>👇</span> Tap a name below to select as leader
+                </div>
                 {attendingMembers.filter(p => p.roles?.includes('Rally Lead')).length > 0 && (
                   <div style={{ marginBottom:8 }}>
                     <div style={{ fontSize:10, color:C.gold, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>Rally leads</div>
@@ -265,7 +282,7 @@ export function RallySlotCard({
                       {attendingMembers.filter(p => p.roles?.includes('Rally Lead')).map(p => {
                         const sel = slot.leaderId === p.id;
                         return (
-                          <button key={p.id} onClick={() => { upd({ leaderId:p.id, leaderName:p.username||p.alias }); setChangingLeader(false); }}
+                          <button key={p.id} onClick={() => selectLeader(p)}
                             style={{ padding:'7px 14px', borderRadius:20, border:`1px solid ${sel?color:C.gold+'44'}`, background:sel?color+'22':C.gold+'0a', color:sel?color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer' }}>
                             {p.username||p.alias}{p.furnaceLevel ? ` · ${p.furnaceLevel}` : ''}
                           </button>
@@ -281,7 +298,7 @@ export function RallySlotCard({
                       {attendingMembers.filter(p => !p.roles?.includes('Rally Lead')).map(p => {
                         const sel = slot.leaderId === p.id;
                         return (
-                          <button key={p.id} onClick={() => { upd({ leaderId:p.id, leaderName:p.username||p.alias }); setChangingLeader(false); }}
+                          <button key={p.id} onClick={() => selectLeader(p)}
                             style={{ padding:'7px 14px', borderRadius:20, border:`1px solid ${sel?color:C.border}`, background:sel?color+'22':C.section, color:sel?color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
                             {p.username||p.alias}{p.furnaceLevel ? ` · ${p.furnaceLevel}` : ''}
                           </button>
