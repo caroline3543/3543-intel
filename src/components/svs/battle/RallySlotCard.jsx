@@ -76,6 +76,12 @@ export function RallySlotCard({
   // attendance- and alliance-filtered for the same reason as above.
   const joinerEligiblePlayers = attendingMembers.filter(p => p.id !== slot.leaderId);
 
+  // Full player record for whoever's leading — needed to read their
+  // Rally Leader Profile (teams/heroes/widgets). Looked up from the
+  // FULL roster, not attendingMembers/joinerEligiblePlayers, since the
+  // leader is deliberately excluded from those two.
+  const leaderPlayer = players.find(p => p.id === slot.leaderId) || null;
+
   // Priority-joiner exclusivity is plan-wide, not just within this
   // slot's own 4 joiners — merge in anyone already assigned elsewhere
   // in the same battle plan (passed down from PlanDetail).
@@ -210,6 +216,7 @@ export function RallySlotCard({
                 players={joinerEligiblePlayers}
                 events={events}
                 selectedGenerations={selectedGenerations}
+                leaderPlayer={leaderPlayer}
                 assignedInOtherSlots={assignedInOtherSlots}
               />
 

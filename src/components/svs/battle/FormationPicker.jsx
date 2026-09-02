@@ -3,7 +3,7 @@ import { C } from '../../../utils/constants.js';
 import { getRecommendedFormation, FORMATION_GEN_CUTOFF } from '../../../data/joinerMeta.js';
 import { suggestPriorityJoiners } from '../../../data/metrics.js';
 import { newJoinerSlot } from '../../../data/playerSchema.js';
-import { resolveHero, playerCanFillSlot, meetsTroopReqs, CUSTOM_HERO_OPTIONS } from './battleConstants.js';
+import { resolveHero, playerCanFillSlot, meetsTroopReqs, CUSTOM_HERO_OPTIONS, LEADER_HERO_OPTIONS } from './battleConstants.js';
 
 // ── FormationPicker ────────────────────────────────────────────
 // Renders the guided/custom formation section inside a RallySlotCard.
@@ -27,7 +27,7 @@ import { resolveHero, playerCanFillSlot, meetsTroopReqs, CUSTOM_HERO_OPTIONS } f
 //                        empty means "no filter, show every generation"
 //   assignedInOtherSlots – Set of playerIds already used elsewhere in
 //                          this plan — auto-suggest won't propose them
-export function FormationPicker({ slot, upd, color, players, events = [], selectedGenerations = [], assignedInOtherSlots }) {
+export function FormationPicker({ slot, upd, color, players, events = [], selectedGenerations = [], assignedInOtherSlots, leaderPlayer = null }) {
   // Once a formation is selected, show only that one card — the rest
   // stay accessible via "Change formation" rather than occupying
   // screen space. Resets to the compact view every time a NEW
@@ -119,6 +119,27 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
     upd({ joiners: autoSuggestJoiners(slot.requestedHeroes || []) });
   }
 
+  // Apply a Rally Leader's saved team setup (from their Rally Leader
+  // Profile) — always a suggestion the officer can then edit, never a
+  // forced assignment. Falls into Custom mode since a leader's own
+  // saved setup isn't one of joinerMeta.js's gen-based formations.
+  const isDefenseType = slot.type?.toLowerCase().includes('garrison')
+    || slot.type?.toLowerCase().includes('reinforcement')
+    || slot.type === 'Counter Rally';
+  const wantedTeamType = isDefenseType ? 'defense' : 'offense';
+  const leaderTeams = (leaderPlayer?.leaderProfile?.teams || []).filter(t => t.type === wantedTeamType);
+
+  function applyLeaderTeam(team) {
+    upd({
+      formationMode:     'custom',
+      selectedFormation: null,
+      leaderRallyHeroes: (team.leadHeroes || []).filter(Boolean),
+      requestedHeroes:   (team.priorityJoinerHeroes || []).filter(Boolean),
+      ratio:             team.ratio || slot.ratio,
+      joiners:           autoSuggestJoiners(team.priorityJoinerHeroes || []),
+    });
+  }
+
   const heroesLocked = (slot.leaderRallyHeroes || []).length === 3;
 
   return (
@@ -129,6 +150,23 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
           ? `Showing Gen ${selectedGenerations.join(', ')}. Change in ⚙️ Settings.`
           : 'Showing all generations — pick which ones apply to you in ⚙️ Settings.'}
       </div>
+
+      {/* Rally Leader's saved setup — a suggestion, never forced */}
+      {leaderTeams.length > 0 && (
+        <div style={{ background:C.gold+'0e', border:`1px solid ${C.gold}44`, borderRadius:10, padding:12, marginBottom:12 }}>
+          <div style={{ fontSize:12, color:C.gold, fontWeight:700, marginBottom:8 }}>
+            📋 {leaderPlayer.username || leaderPlayer.alias}'s saved {wantedTeamType} setup available
+          </div>
+          {leaderTeams.map((team, i) => (
+            <button key={team.id} onClick={() => applyLeaderTeam(team)}
+              style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 10px', marginBottom:6, borderRadius:8, background:C.section, border:`1px solid ${C.border}`, color:C.white, fontSize:12, cursor:'pointer' }}>
+              <span style={{ color:C.gold, fontWeight:700 }}>{i === 0 ? 'Recommended' : `Alternative ${i}`}</span>
+              {' — '}{(team.leadHeroes || []).filter(Boolean).join(' + ') || 'no heroes set'}{team.ratio ? ` · ${team.ratio}` : ''}
+            </button>
+          ))}
+          <div style={{ fontSize:10, color:C.muted, marginTop:2 }}>Based on {leaderPlayer.username || leaderPlayer.alias}'s saved rally setup</div>
+        </div>
+      )}
 
       {/* All / Offense / Defense / Custom toggle */}
       <div style={{ display:'flex', gap:6, marginBottom:12 }}>
@@ -160,7 +198,7 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
           <div style={{ marginBottom:10 }}>
             <label style={{ fontSize:11, color:C.muted, display:'block', marginBottom:6 }}>Leader rally heroes {heroesLocked && <span style={{ color:C.gold }}>· 3 chosen ✓</span>}</label>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-              {['Jeronimo','Natalia','Molly','Zinman','Flint','Philly','Alonso','Logan','Mia','Greg','Ahmose','Reina','Lynn','Hector','Norah','Gwen','Wu Ming','Renee','Wayne'].map(hero => {
+              {LEADER_HERO_OPTIONS.map(hero => {
                 const sel = (slot.leaderRallyHeroes || []).includes(hero);
                 return (
                   <button key={hero} onClick={() => {

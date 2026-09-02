@@ -27,6 +27,48 @@ export function newPlayer(overrides = {}) {
     profileLastUpdated: null,
     createdAt:          Date.now(),
     eventHistory:       [],
+    leaderProfile:      newLeaderProfile(),
+    ...overrides,
+  };
+}
+
+/**
+ * One reusable "Rally Leader Profile" per player — separate from the
+ * roster's "Rally Lead" role tag (which is just a quick filter/badge).
+ * `role` here is the formal designation this spec asks for; a player
+ * can be a Leader, Substitute, Both, or Neither independent of whether
+ * they also happen to have the "Rally Lead" role tag on their roster
+ * profile — the two are related but not the same field, and existing
+ * Rally Leader picker grouping in RallySlotCard.jsx is untouched.
+ */
+export function newLeaderProfile(overrides = {}) {
+  return {
+    role:      'none', // 'leader' | 'substitute' | 'both' | 'none'
+    teams:     [],      // newLeaderTeam()[]
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+/**
+ * One "team" = a saved offense or defense rally setup for a specific
+ * leader: the 3 heroes THEY use to lead with (deliberately separate
+ * from Priority Joiner Heroes — see battleConstants.js's
+ * LEADER_HERO_OPTIONS vs CUSTOM_HERO_OPTIONS), a widget count (0–10)
+ * per lead hero, their preferred ratio, and their recommended 4
+ * priority joiner heroes. A profile starts with zero teams; more can
+ * be added later (roughly 1–2 per offense/defense, not hard-capped).
+ */
+export function newLeaderTeam(overrides = {}) {
+  return {
+    id:                   uid(),
+    type:                 'offense', // 'offense' | 'defense'
+    leadHeroes:           ['', '', ''],
+    widgets:              {},        // { [heroName]: 0-10 }
+    ratio:                '',
+    priorityJoinerHeroes: ['', '', '', ''],
+    notes:                '',
+    updatedAt:            new Date().toISOString(),
     ...overrides,
   };
 }

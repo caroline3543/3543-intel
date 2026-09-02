@@ -58,6 +58,16 @@ export const CUSTOM_HERO_OPTIONS = [
   'Logan','Reina','Sergey','Wu Ming','Gwen','Lynn','Zinman',
 ];
 
+// Leader heroes are a DIFFERENT hero pool from joiner heroes — these
+// are the heroes used to LEAD a rally (per joinerMeta.js's `leaders`
+// field), not to join one. Shared by FormationPicker's custom mode and
+// RallyLeaderProfileSheet.jsx's lead-hero picker.
+export const LEADER_HERO_OPTIONS = [
+  'Jeronimo','Natalia','Molly','Zinman','Flint','Philly','Alonso',
+  'Logan','Mia','Greg','Ahmose','Reina','Lynn','Hector','Norah',
+  'Gwen','Wu Ming','Renee','Wayne',
+];
+
 /**
  * Resolve a hero name to display + alternatives. Works with either the
  * raw spreadsheet notation ("Jessie*") OR an already-resolved display
