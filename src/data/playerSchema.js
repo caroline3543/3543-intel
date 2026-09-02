@@ -83,6 +83,13 @@ export function newEvent(overrides = {}) {
     date:           new Date().toISOString().slice(0, 10),
     time:           '12:00',
     status:         'upcoming',
+    // 1 | 2 | null — Foundry/Canyon Clash run as two separate same-day
+    // events (see TROOP_POWER_EVENTS in constants.js), so this lives on
+    // the event itself, set once at creation in EventSheet.jsx — not a
+    // per-participant tag inside the roster (that's what it used to be,
+    // on the snapshot; moved here since the events are the thing that's
+    // actually split, not the people in them).
+    legion:         null,
     participantIds: [],
     notes:          '',
     createdAt:      new Date().toISOString(),
@@ -138,7 +145,6 @@ export function newSnapshot(playerId, playerProfile, eventId) {
     // in constants.js) — shown next to the player's name in that
     // event's participant list, and charted over time in ProfileView.
     troopPower: null,
-    legion: null, // 1 | 2 | null — also Foundry/Canyon Clash only
     notes: '',
   };
 }

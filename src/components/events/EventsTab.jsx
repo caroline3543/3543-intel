@@ -54,12 +54,22 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [addAsSubstitute, setAddAsSubstitute] = useState(false);
   const [copyPickerOpen, setCopyPickerOpen] = useState(false);
   const [participantsCopied, setParticipantsCopied] = useState(false);
+  const [eventsView, setEventsView] = useState('active'); // 'active' | 'archive'
 
   const activeEvent = events.find(e => e.id === activeEventId);
   const allTags = [...new Set(events.map(e => e.allianceTag).filter(Boolean))];
   let filtered = filterType==='All' ? events : events.filter(e => e.type===filterType);
   if (filterTag) filtered = filtered.filter(e => e.allianceTag===filterTag);
   const sorted = [...filtered].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  // An event archives itself the moment either is true — no need to
+  // remember to tap "Done" for it to stop cluttering the main list.
+  // Date strings are always 'YYYY-MM-DD' (see playerSchema.js), so a
+  // plain string comparison against today sorts correctly with no
+  // timezone math involved.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  function isArchived(ev) { return ev.status === 'completed' || ev.date < todayStr; }
+  const listedEvents = sorted.filter(ev => eventsView === 'archive' ? isArchived(ev) : !isArchived(ev));
 
   function getSnap(ev, pid) { return (ev.snapshots||[]).find(s => s.playerId===pid); }
 
@@ -148,25 +158,6 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     else {
       const snap = newSnapshot(playerId, player, activeEvent.id);
       snap.troopPower = value;
-      snaps.push(snap);
-    }
-    onUpdateEvent({ ...activeEvent, snapshots: snaps });
-  }
-
-  // Legion 1/2 — Foundry/Canyon Clash only (same gate as troop power).
-  // Tap again to clear.
-  function setLegion(playerId, legion) {
-    if (!activeEvent) return;
-    const player = players.find(p => p.id === playerId);
-    if (!player) return;
-    const snaps = [...(activeEvent.snapshots || [])];
-    const idx = snaps.findIndex(s => s.playerId === playerId);
-    const current = idx >= 0 ? snaps[idx].legion : null;
-    const next = current === legion ? null : legion;
-    if (idx >= 0) snaps[idx] = { ...snaps[idx], legion: next };
-    else {
-      const snap = newSnapshot(playerId, player, activeEvent.id);
-      snap.legion = next;
       snaps.push(snap);
     }
     onUpdateEvent({ ...activeEvent, snapshots: snaps });
@@ -309,8 +300,19 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
               <div>
-                <div style={{ fontSize:20, fontWeight:700, color:C.white }}>{EVENT_ICONS[activeEvent.type]||'📋'} {activeEvent.name||activeEvent.type}</div>
-                <div style={{ fontSize:16, fontWeight:700, color:C.icy }}>{fmtDateShort(activeEvent.date)}{activeEvent.time?` ${activeEvent.time}`:''}{activeEvent.allianceTag?` · [${activeEvent.allianceTag}]`:''}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                  <div style={{ fontSize:20, fontWeight:700, color:C.white }}>{EVENT_ICONS[activeEvent.type]||'📋'} {activeEvent.name||activeEvent.type}</div>
+                  {activeEvent.legion && (
+                    <span style={{ fontSize:12, fontWeight:800, color:C.icy, padding:'2px 9px', borderRadius:10, background:C.icy+'22', border:`1px solid ${C.icy}55` }}>Legion {activeEvent.legion}</span>
+                  )}
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:4 }}>
+                  <span style={{ fontSize:13, color:C.muted }}>{fmtDateShort(activeEvent.date)}</span>
+                  {activeEvent.time && (
+                    <span style={{ fontSize:16, fontWeight:800, color:C.gold, padding:'1px 10px', borderRadius:10, background:C.gold+'18' }}>🕐 {activeEvent.time}</span>
+                  )}
+                  {activeEvent.allianceTag && <span style={{ fontSize:13, color:C.muted }}>[{activeEvent.allianceTag}]</span>}
+                </div>
               </div>
               <button onClick={() => { setEditingEvent(activeEvent); setEventSheetOpen(true); }} style={{ height:34, padding:'0 12px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontSize:13, cursor:'pointer', flexShrink:0 }}>Edit</button>
             </div>
@@ -442,12 +444,6 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                           placeholder="Troop power"
                           style={{ width:110, height:28, background:C.section, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 8px', fontSize:12, color:C.gold, fontWeight:700, fontFamily:'inherit' }}
                         />
-                        {[1,2].map(l => (
-                          <button key={l} onClick={e => { e.stopPropagation(); setLegion(player.id, l); }}
-                            style={{ width:32, height:28, borderRadius:8, border:`1px solid ${snap?.legion===l?C.icy:C.border}`, background:snap?.legion===l?C.icy+'22':C.section, color:snap?.legion===l?C.icy:C.muted, fontWeight:700, fontSize:11, cursor:'pointer' }}>
-                            L{l}
-                          </button>
-                        ))}
                       </div>
                     )}
                     {showsRsvp && (
@@ -544,32 +540,103 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           <button onClick={() => { setEditingEvent(null); setEventSheetOpen(true); }} style={{ width:'100%', height:48, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer', marginBottom:16 }}>
             ＋ New Event
           </button>
-          {sorted.length===0
-            ? <div style={{ textAlign:'center', padding:'60px 20px' }}><div style={{ fontSize:40, marginBottom:12 }}>📋</div><div style={{ fontSize:16, fontWeight:700, color:C.white }}>No events yet</div></div>
-            : sorted.map(ev => {
-                const s = evSum(ev);
-                const sc = ev.status==='active'?C.green:ev.status==='completed'?C.muted:C.icy;
-                return (
-                  <div key={ev.id} onClick={() => setActiveEventId(ev.id)} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, cursor:'pointer', border:`1px solid ${ev.status==='active'?C.green+'44':C.border+'44'}`, WebkitTapHighlightColor:'transparent' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
-                      <div style={{ flex:1, minWidth:0 }}>
+
+          {/* Active vs Archive — a past-dated or Done event no longer
+              sits in the same list as what's actually coming up. */}
+          <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+            <button onClick={() => setEventsView('active')} style={{ flex:1, height:36, borderRadius:20, background:eventsView==='active'?C.gold+'22':C.section, border:`1px solid ${eventsView==='active'?C.gold:C.border}`, color:eventsView==='active'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+              🗓 Active
+            </button>
+            <button onClick={() => setEventsView('archive')} style={{ flex:1, height:36, borderRadius:20, background:eventsView==='archive'?C.gold+'22':C.section, border:`1px solid ${eventsView==='archive'?C.gold:C.border}`, color:eventsView==='archive'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+              📁 Archive{sorted.filter(isArchived).length>0?` (${sorted.filter(isArchived).length})`:''}
+            </button>
+          </div>
+
+          {(() => {
+            function renderEventCard(ev) {
+              const s = evSum(ev);
+              const sc = ev.status==='active'?C.green:ev.status==='completed'?C.muted:C.icy;
+              return (
+                <div key={ev.id} onClick={() => setActiveEventId(ev.id)} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, cursor:'pointer', border:`1px solid ${ev.status==='active'?C.green+'44':C.border+'44'}`, WebkitTapHighlightColor:'transparent' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                         <div style={{ fontSize:16, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{EVENT_ICONS[ev.type]||'📋'} {ev.name||ev.type}</div>
-                        <div style={{ fontSize:12, color:C.muted }}>{fmtDateShort(ev.date)}{ev.time?` ${ev.time}`:''}{ev.allianceTag?` · [${ev.allianceTag}]`:''}</div>
+                        {ev.legion && <span style={{ fontSize:10, fontWeight:800, color:C.icy, padding:'1px 7px', borderRadius:8, background:C.icy+'22', flexShrink:0 }}>L{ev.legion}</span>}
                       </div>
-                      <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
-                        <span style={{ fontSize:11, fontWeight:700, color:sc, padding:'2px 8px', borderRadius:10, background:sc+'18' }}>{ev.status==='active'?'🔴 Live':ev.status==='completed'?'✓ Done':'Upcoming'}</span>
-                        <button onClick={e => { e.stopPropagation(); setDeleteConfirmId(ev.id); }} style={{ fontSize:11, color:C.red+'88', background:'none', border:'none', cursor:'pointer' }}>Delete</button>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:3 }}>
+                        <span style={{ fontSize:12, color:C.muted }}>{fmtDateShort(ev.date)}</span>
+                        {ev.time && <span style={{ fontSize:13, fontWeight:800, color:C.gold, padding:'0 7px', borderRadius:8, background:C.gold+'18' }}>🕐 {ev.time}</span>}
+                        {ev.allianceTag && <span style={{ fontSize:12, color:C.muted }}>[{ev.allianceTag}]</span>}
                       </div>
                     </div>
-                    {s.total>0 && (
-                      ev.status==='upcoming'
-                        ? <div style={{ fontSize:12, color:C.green }}>✓ {s.participating} participating</div>
-                        : <div style={{ display:'flex', gap:10 }}><span style={{ fontSize:12, color:C.green }}>✓ {s.attended}</span><span style={{ fontSize:12, color:C.red }}>✗ {s.noShow}</span><span style={{ fontSize:12, color:C.icy }}>🎙️ {s.voice}</span><span style={{ fontSize:12, color:C.muted }}>{s.total} recorded</span></div>
-                    )}
+                    <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+                      <span style={{ fontSize:11, fontWeight:700, color:sc, padding:'2px 8px', borderRadius:10, background:sc+'18' }}>{ev.status==='active'?'🔴 Live':ev.status==='completed'?'✓ Done':'Upcoming'}</span>
+                      <button onClick={e => { e.stopPropagation(); setDeleteConfirmId(ev.id); }} style={{ fontSize:11, color:C.red+'88', background:'none', border:'none', cursor:'pointer' }}>Delete</button>
+                    </div>
+                  </div>
+                  {s.total>0 && (
+                    ev.status==='upcoming'
+                      ? <div style={{ fontSize:12, color:C.green }}>✓ {s.participating} participating</div>
+                      : <div style={{ display:'flex', gap:10 }}><span style={{ fontSize:12, color:C.green }}>✓ {s.attended}</span><span style={{ fontSize:12, color:C.red }}>✗ {s.noShow}</span><span style={{ fontSize:12, color:C.icy }}>🎙️ {s.voice}</span><span style={{ fontSize:12, color:C.muted }}>{s.total} recorded</span></div>
+                  )}
+                </div>
+              );
+            }
+
+            if (listedEvents.length === 0) {
+              return (
+                <div style={{ textAlign:'center', padding:'60px 20px' }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>{eventsView==='archive'?'📁':'📋'}</div>
+                  <div style={{ fontSize:16, fontWeight:700, color:C.white }}>{eventsView==='archive' ? 'No archived events yet' : 'No events yet'}</div>
+                </div>
+              );
+            }
+
+            // Group by date, then by Legion within the date — this is
+            // exactly where Legion 1 and Legion 2 (same day, different
+            // event) were easy to mix up. A date with no Legion split
+            // just lists its events normally underneath.
+            const dateGroups = [];
+            const byDate = new Map();
+            listedEvents.forEach(ev => {
+              if (!byDate.has(ev.date)) { byDate.set(ev.date, { date: ev.date, dayEvents: [] }); dateGroups.push(byDate.get(ev.date)); }
+              byDate.get(ev.date).dayEvents.push(ev);
+            });
+
+            return dateGroups.map(({ date, dayEvents }) => {
+              const hasLegionSplit = dayEvents.some(e => e.legion);
+              if (!hasLegionSplit) {
+                return (
+                  <div key={date} style={{ marginBottom:18 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>{fmtDateShort(date)}</div>
+                    {dayEvents.map(renderEventCard)}
                   </div>
                 );
-              })
-          }
+              }
+              const l1 = dayEvents.filter(e => e.legion === 1);
+              const l2 = dayEvents.filter(e => e.legion === 2);
+              const rest = dayEvents.filter(e => !e.legion);
+              return (
+                <div key={date} style={{ marginBottom:18 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>{fmtDateShort(date)}</div>
+                  {l1.length > 0 && (
+                    <div style={{ marginBottom:10 }}>
+                      <div style={{ fontSize:11, fontWeight:800, color:C.icy, marginBottom:6 }}>⚔️ Legion 1</div>
+                      {l1.map(renderEventCard)}
+                    </div>
+                  )}
+                  {l2.length > 0 && (
+                    <div style={{ marginBottom:10 }}>
+                      <div style={{ fontSize:11, fontWeight:800, color:C.icy, marginBottom:6 }}>⚔️ Legion 2</div>
+                      {l2.map(renderEventCard)}
+                    </div>
+                  )}
+                  {rest.map(renderEventCard)}
+                </div>
+              );
+            });
+          })()}
         </>
       )}
       <EventSheet event={editingEvent} open={eventSheetOpen} onClose={() => setEventSheetOpen(false)} onSave={ev => { if (editingEvent) onUpdateEvent(ev); else onCreateEvent(ev); }} players={players}/>

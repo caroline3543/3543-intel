@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { C, EVENT_TYPES, EVENT_ICONS } from '../../utils/constants.js';
+import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { newEvent } from '../../data/playerSchema.js';
 import { Field, Inp, SheetHandle } from '../common/Primitives.jsx';
@@ -44,6 +44,15 @@ export function EventSheet({ event, open, onClose, onSave, players }) {
     if (!nameTouched) setEv(prev => ({ ...prev, name: suggestName(prev) }));
   }, [ev.type, ev.date, nameTouched]);
 
+  // Legion only makes sense for Foundry/Canyon Clash — clear it if the
+  // officer switches to a type that doesn't use it, so a stale value
+  // can't linger unseen on an event where it means nothing.
+  useEffect(() => {
+    if (!TROOP_POWER_EVENTS.includes(ev.type) && ev.legion) {
+      setEv(prev => ({ ...prev, legion: null }));
+    }
+  }, [ev.type]);
+
   function upd(k, v) { setEv(prev => ({ ...prev, [k]: v })); }
   const allTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
   if (!open) return null;
@@ -65,6 +74,18 @@ export function EventSheet({ event, open, onClose, onSave, players }) {
             ))}
           </div>
         </Field>
+        {TROOP_POWER_EVENTS.includes(ev.type) && (
+          <Field label="Legion" hint="Foundry and Canyon Clash run as two separate events on the same date — set this now so they never get mixed up later.">
+            <div style={{ display:'flex', gap:8 }}>
+              {[1, 2].map(l => (
+                <button key={l} onClick={() => upd('legion', ev.legion === l ? null : l)}
+                  style={{ flex:1, height:48, borderRadius:12, border:`2px solid ${ev.legion===l?C.icy:C.border}`, background:ev.legion===l?C.icy+'22':C.section, color:ev.legion===l?C.icy:C.muted, fontWeight:800, fontSize:15, cursor:'pointer' }}>
+                  Legion {l}
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
         <Field label="Alliance">
           <AlliancePicker
             value={ev.allianceTag}
