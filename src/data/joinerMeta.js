@@ -63,6 +63,42 @@ export const JOINER_HEROES = [
       { type:'NEW Defense',      ratio:'45/16/40',      leaders:['Hector & Norah & Wayne'],     j1:'Mia',     j2:'Patrick', j3:'Philly',  j4:'Lynn',       alt1:'or 25%', isMeta:true },
     ],
   },
+  // ── Gen 7–9: transcribed from a community spreadsheet screenshot.
+  // Hero/ratio/joiner columns are transcribed with reasonable
+  // confidence. The "Comments" column was cut off at the image's right
+  // edge for these three generations and could NOT be reliably read —
+  // left blank here rather than guessed. isMeta:true on all three
+  // pending real-battle confirmation (see TestRallyLog on each rally
+  // slot) — SPOT-CHECK THESE AGAINST THE ORIGINAL SOURCE before
+  // relying on them in a live battle.
+  {
+    gen: 7, genLabel: 'Gen 7 — Edith, Gordon, Bradley',
+    formations: [
+      { type:'Defense', ratio:'60/40/0',              leaders:['Edith & Gordon & Bradley'],        j1:'Renee', j2:'Mia',   j3:'Reina', j4:'Jessie', alt1:'Wu Ming', comments:'', isMeta:true },
+      { type:'Defense', ratio:'40/0/60 or 48/4/48',    leaders:['Edith & Molly/Philly & Bradley'],  j1:'Mia',   j2:'Norah', j3:'Norah', j4:'Lynn',   alt1:'or 25%',  comments:'', isMeta:true },
+      { type:'Offense', ratio:'48/4/48 or 40/10/50',   leaders:['Jeronimo/Edith & Mia & Bradley'],  j1:'Norah', j2:'Norah', j3:'Norah', j4:'Patrick',alt1:'or 25%', alt2:'Philly', comments:'', isMeta:true },
+    ],
+  },
+  {
+    gen: 8, genLabel: 'Gen 8 — Gatot, Sonya, Hendrik',
+    formations: [
+      { type:'Defense', ratio:'60/40/0',               leaders:['Gatot & Sonya & Bradley'],         j1:'Renee', j2:'Patrick', j3:'Mia',   j4:'Hendrik', alt1:'or 25%', alt2:'Wu Ming', comments:'', isMeta:true },
+      { type:'Defense', ratio:'40/0/60 or 48/4/48',    leaders:['Gatot & Molly/Philly & Bradley'],  j1:'Mia',   j2:'Patrick', j3:'Norah', j4:'Lynn',    alt1:'or 25%', comments:'', isMeta:true },
+      { type:'Offense', ratio:'48/4/48',                leaders:['Jeronimo & Mia & Bradley'],       j1:'Norah', j2:'Norah',   j3:'Norah', j4:'Hendrik', alt1:'or 25%', comments:'', isMeta:true },
+      { type:'Offense', ratio:'48/4/48 or 40/60',       leaders:['Edith & Mia & Hendrik'],           j1:'Norah', j2:'Norah',   j3:'Jessie',j4:'Seeyoon',  alt1:'or 25%', alt2:'Norah',   alt3:'Wu Ming', comments:'', isMeta:true },
+      { type:'Offense', ratio:'60/40/0 or 60/40/0',     leaders:['Edith/Gatot & Sonya & Bradley'],  j1:'Renee', j2:'Mia',     j3:'Hendrik', j4:'Jessie', alt1:'or 25%', alt2:'Wu Ming', comments:'', isMeta:true },
+      { type:'Offense', ratio:'60/40/0 or 60/40/0',     leaders:['Jeronimo & Gordon & Bradley'],    j1:'Renee', j2:'Mia',     j3:'Hendrik', j4:'Patrick',alt1:'or 25%', alt2:'Wu Ming', comments:'', isMeta:true },
+    ],
+  },
+  {
+    gen: 9, genLabel: 'Gen 9 — Magnus, Fred, Xura',
+    formations: [
+      { type:'Defense', ratio:'60/40/0',               leaders:['Magnus & Sonya & Bradley'],           j1:'Renee', j2:'Mia',   j3:'Patrick', j4:'Hendrik', alt1:'or 25%', alt2:'Wu Ming', alt3:'Gatot', comments:'', isMeta:true },
+      { type:'Defense', ratio:'40/0/60 or 48/4/48',    leaders:['Magnus & Molly/Philly & Bradley/Xura'],j1:'Mia',   j2:'Patrick', j3:'Norah', j4:'Lynn',    alt1:'or 25%', alt2:'Gatot', comments:'', isMeta:true },
+      { type:'Offense', ratio:'48/4/48 or 40/10/50',   leaders:['Magnus & Mia & Hendrik'],              j1:'Norah', j2:'Norah', j3:'Norah', j4:'Patrick', alt1:'or 25%', alt2:'Gatot', comments:'', isMeta:true },
+      { type:'Offense', ratio:'60/40/0 or 60/40/0',    leaders:['Magnus & Fred & Bradley'],             j1:'Renee', j2:'Mia',   j3:'Norah', j4:'Hendrik', alt1:'or 25%', alt2:'Wu Ming', alt3:'Gatot', comments:'', isMeta:true },
+    ],
+  },
 ];
 
 /**

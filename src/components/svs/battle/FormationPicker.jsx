@@ -69,13 +69,45 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
   // RallySlotCard now passes as the FULL combined exclusion set, not
   // just "other slots in this plan"). Otherwise "✓ Full coverage" could
   // count someone who's actually already spoken for.
+  //
+  // Hero requirements can STACK — some formations genuinely call for
+  // the same hero 2-3+ times (e.g. 3x Norah), not 4 distinct heroes.
+  // Checking each slot independently would show "✓ covered" on all 3
+  // Norah slots even with only 1 available Norah owner, since each
+  // check only asked "is there at least 1" in isolation. Grouping by
+  // resolved hero name and checking DISTINCT owners against the total
+  // copies needed fixes this. If a hero's own owners run short, the
+  // formation's alt1/alt2 (its own alternates, separate from the
+  // */** substitution notation already baked into resolveHero) are
+  // tried next before giving up — matching the spreadsheet's actual
+  // "alternative joiners choice" intent, not just a text hint.
   function getCoverage(f) {
     const excludeIds = assignedInOtherSlots || new Set();
     const availablePool = players.filter(p => !excludeIds.has(p.id));
-    return [f.j1, f.j2, f.j3, f.j4].filter(Boolean).map(heroRaw => {
-      const resolved = resolveHero(heroRaw);
-      const count    = availablePool.filter(p => playerCanFillSlot(p, heroRaw)).length;
-      return { heroRaw, display: resolved?.display, alternatives: resolved?.alternatives, count, ok: count >= 1 };
+    const heroSlots = [f.j1, f.j2, f.j3, f.j4].filter(Boolean);
+
+    const counts = {};
+    heroSlots.forEach(raw => {
+      const key = resolveHero(raw)?.display || raw;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+
+    return Object.entries(counts).map(([heroKey, needed]) => {
+      const raw = heroSlots.find(r => (resolveHero(r)?.display || r) === heroKey);
+      const resolved = resolveHero(raw);
+      const owners = availablePool.filter(p => playerCanFillSlot(p, raw));
+      if (owners.length >= needed) {
+        return { heroRaw: raw, display: resolved?.display, alternatives: resolved?.alternatives, count: owners.length, needed, ok: true };
+      }
+      // Primary hero (and its built-in */** alternates) can't cover
+      // the need — check the formation's own alt1/alt2 next.
+      for (const altRaw of [f.alt1, f.alt2, f.alt3].filter(Boolean)) {
+        const altOwners = availablePool.filter(p => playerCanFillSlot(p, altRaw));
+        if (altOwners.length >= needed) {
+          return { heroRaw: raw, display: resolved?.display, alternatives: resolved?.alternatives, count: owners.length, needed, ok: true, viaAlt: resolveHero(altRaw)?.display || altRaw };
+        }
+      }
+      return { heroRaw: raw, display: resolved?.display, alternatives: resolved?.alternatives, count: owners.length, needed, ok: false };
     });
   }
 
@@ -89,12 +121,20 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
   // Auto-suggest the 4 priority joiners for a formation's hero slots —
   // resolves substitution notation ("Jessie*" -> Jessie/Jasser/Jeronimo),
   // excludes anyone already used elsewhere in this plan, AND excludes
-  // anyone below the rally's minimum troop tier requirements (used to
-  // only check hero ownership, never troop tier).
-  function autoSuggestJoiners(heroSlotStrings) {
+  // anyone below the rally's minimum troop tier requirements. If given,
+  // formationAlts (a formation's own alt1/alt2 — a different thing
+  // from */** substitution notation) are appended as a LAST-RESORT
+  // fallback on every slot: only tried once the slot's own hero (and
+  // its built-in alternates) come up with nobody available.
+  function autoSuggestJoiners(heroSlotStrings, formationAlts = []) {
+    const altOptions = formationAlts.filter(Boolean).flatMap(raw => {
+      const r = resolveHero(raw);
+      return r ? [r.display, ...r.alternatives] : [raw];
+    });
     const resolvedSlots = heroSlotStrings.filter(Boolean).map(raw => {
       const r = resolveHero(raw);
-      return { slotLabel: raw, heroOptions: r ? [r.display, ...r.alternatives] : [raw] };
+      const primary = r ? [r.display, ...r.alternatives] : [raw];
+      return { slotLabel: raw, heroOptions: [...primary, ...altOptions] };
     });
     const excludeIds = assignedInOtherSlots || new Set();
     const eligiblePlayers = players
@@ -120,7 +160,7 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
       leaderRallyHeroes: flattenLeaders(f.leaders),
       requestedHeroes:   [f.j1, f.j2, f.j3, f.j4].filter(Boolean).map(h => resolveHero(h)?.display).filter(Boolean),
       ratio:             f.ratio,
-      joiners:           autoSuggestJoiners([f.j1, f.j2, f.j3, f.j4]),
+      joiners:           autoSuggestJoiners([f.j1, f.j2, f.j3, f.j4], [f.alt1, f.alt2, f.alt3]),
     });
     setShowAll(false);
   }
@@ -319,15 +359,16 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
                       <div key={ci} style={{ background:C.card, borderRadius:8, padding:'6px 10px', display:'flex', alignItems:'center', gap:6 }}>
                         <div style={{ width:6, height:6, borderRadius:'50%', background:c.ok?C.green:C.red, flexShrink:0 }}/>
                         <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:12, fontWeight:700, color:C.white }}>{c.display}</div>
+                          <div style={{ fontSize:12, fontWeight:700, color:C.white }}>{c.display}{c.needed > 1 ? ` ×${c.needed}` : ''}</div>
                           {c.alternatives?.length > 0 && <div style={{ fontSize:10, color:C.muted }}>or {c.alternatives.join('/')}</div>}
+                          {c.viaAlt && <div style={{ fontSize:10, color:C.gold }}>✓ via alternate: {c.viaAlt}</div>}
                         </div>
-                        <div style={{ fontSize:11, color:c.ok?C.green:C.red, fontWeight:700 }}>×{c.count}</div>
+                        <div style={{ fontSize:11, color:c.ok?C.green:C.red, fontWeight:700 }}>{c.count}/{c.needed}</div>
                       </div>
                     ))}
                   </div>
-                  {[f.alt1, f.alt2].filter(Boolean).length > 0 && (
-                    <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>Alt: {[f.alt1, f.alt2].filter(Boolean).join(' · ')}</div>
+                  {[f.alt1, f.alt2, f.alt3].filter(Boolean).length > 0 && (
+                    <div style={{ fontSize:11, color:C.muted, marginTop:6 }}>Alt: {[f.alt1, f.alt2, f.alt3].filter(Boolean).join(' · ')}</div>
                   )}
                   {f.comments && <div style={{ fontSize:11, color:C.gold, marginTop:4, fontStyle:'italic' }}>⚠ {f.comments}</div>}
                 </div>

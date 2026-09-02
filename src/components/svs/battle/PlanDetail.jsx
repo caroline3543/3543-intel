@@ -27,6 +27,7 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
   const [checklistManagerOpen, setChecklistManagerOpen] = useState(false);
   const [summaryText, setSummaryText] = useState(null); // lazily generated, hand-editable
   const [summaryCopied, setSummaryCopied] = useState(false);
+  const [checklistCopied, setChecklistCopied] = useState(false);
 
   function updPlan(patch) { onUpdate({ ...plan, ...patch }); }
 
@@ -163,6 +164,26 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
   function copySummary() {
     const text = summaryText ?? generateSummary();
     navigator.clipboard.writeText(text).then(() => { setSummaryCopied(true); setTimeout(() => setSummaryCopied(false), 2000); });
+  }
+
+  // ── Leadership Checklist as a Discord-ready code block — fenced in
+  // triple-backticks so it pastes into Discord already monospaced,
+  // rather than losing the ☐/☑ alignment as plain chat text.
+  function generateChecklistText() {
+    const lines = [`📋 ${plan.name || 'Battle Plan'} — Leadership Checklist`, ''];
+    if (autoFlags.length > 0) {
+      lines.push('NEEDS ATTENTION');
+      autoFlags.forEach(f => lines.push(`${f.type === 'coverage' ? '⚠' : '❓'} ${f.text}`));
+      lines.push('');
+    }
+    if (checklist.length > 0) {
+      lines.push('CHECKLIST');
+      checklist.forEach(item => lines.push(`${(plan.checklist || {})[item.id] ? '☑' : '☐'} ${item.name}`));
+    }
+    return '```\n' + lines.join('\n').trim() + '\n```';
+  }
+  function copyChecklist() {
+    navigator.clipboard.writeText(generateChecklistText()).then(() => { setChecklistCopied(true); setTimeout(() => setChecklistCopied(false), 2000); });
   }
 
   return (
@@ -345,40 +366,51 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
       )}
 
       {/* Leadership Checklist — moved to the bottom; auto-detected
-          action items shown above the manual checkable list */}
+          action items shown above the manual checkable list. Styled
+          and copyable as a Discord-ready code block (fenced text keeps
+          the ☐/☑ alignment when pasted, unlike plain chat text). */}
       <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
           <div style={{ fontSize:14, fontWeight:700, color:C.white }}>📋 Leadership Checklist</div>
           <button onClick={() => setChecklistManagerOpen(true)} style={{ background:'none', border:'none', color:C.gold, fontSize:12, fontWeight:600, cursor:'pointer' }}>Manage</button>
         </div>
 
-        {autoFlags.length > 0 && (
-          <div style={{ marginBottom:14 }}>
-            <div style={{ fontSize:10, color:C.gold, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>⚠ Needs attention</div>
-            {autoFlags.map(flag => (
-              <div key={flag.id} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'6px 0' }}>
-                <span style={{ fontSize:13, color:flag.type==='coverage'?C.red:C.gold, flexShrink:0 }}>{flag.type==='coverage'?'⚠':'❓'}</span>
-                <span style={{ fontSize:13, color:C.icy }}>{flag.text}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {checklist.length === 0 ? (
-          <div style={{ fontSize:13, color:C.muted }}>No checklist items yet. Tap Manage to add some — e.g. "Rally leads briefed", "Formations locked", "Backup joiners identified".</div>
-        ) : (
-          checklist.map(item => {
-            const checked = !!(plan.checklist || {})[item.id];
-            return (
-              <div key={item.id} onClick={() => updPlan({ checklist:{ ...(plan.checklist || {}), [item.id]:!checked } })}
-                style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', cursor:'pointer' }}>
-                <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${checked?C.green:C.border}`, background:checked?C.green+'33':'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  {checked && <span style={{ color:C.green, fontSize:13, fontWeight:700 }}>✓</span>}
+        <div style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:10, padding:14, fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+          {autoFlags.length > 0 && (
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontSize:10, color:C.gold, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>⚠ Needs attention</div>
+              {autoFlags.map(flag => (
+                <div key={flag.id} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'6px 0' }}>
+                  <span style={{ fontSize:13, color:flag.type==='coverage'?C.red:C.gold, flexShrink:0 }}>{flag.type==='coverage'?'⚠':'❓'}</span>
+                  <span style={{ fontSize:13, color:C.icy }}>{flag.text}</span>
                 </div>
-                <span style={{ fontSize:14, color:checked?C.muted:C.white, textDecoration:checked?'line-through':'none' }}>{item.name}</span>
-              </div>
-            );
-          })
+              ))}
+            </div>
+          )}
+
+          {checklist.length === 0 ? (
+            <div style={{ fontSize:13, color:C.muted }}>No checklist items yet. Tap Manage to add some — e.g. "Rally leads briefed", "Formations locked", "Backup joiners identified".</div>
+          ) : (
+            checklist.map(item => {
+              const checked = !!(plan.checklist || {})[item.id];
+              return (
+                <div key={item.id} onClick={() => updPlan({ checklist:{ ...(plan.checklist || {}), [item.id]:!checked } })}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', cursor:'pointer' }}>
+                  <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${checked?C.green:C.border}`, background:checked?C.green+'33':'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    {checked && <span style={{ color:C.green, fontSize:13, fontWeight:700 }}>✓</span>}
+                  </div>
+                  <span style={{ fontSize:14, color:checked?C.muted:C.white, textDecoration:checked?'line-through':'none' }}>{item.name}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {(autoFlags.length > 0 || checklist.length > 0) && (
+          <button onClick={copyChecklist}
+            style={{ width:'100%', height:44, borderRadius:10, marginTop:10, background:checklistCopied?C.green+'18':C.gold+'18', border:`1px solid ${checklistCopied?C.green:C.gold}44`, color:checklistCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+            {checklistCopied ? '✓ Copied' : '📋 Copy as code block'}
+          </button>
         )}
       </div>
 

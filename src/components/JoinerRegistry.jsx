@@ -253,7 +253,7 @@ export default function JoinerRegistry({ players, onUpdatePlayer, onClose }) {
   const counts = getJoinerHeroCounts(players, JOINER_HEROES);
 
   return (
-    <div style={{ height:'100vh', fontFamily:'system-ui,-apple-system,sans-serif', color:C.white, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div style={{ height:'100vh', maxWidth:480, margin:'0 auto', fontFamily:'system-ui,-apple-system,sans-serif', color:C.white, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {/* Header */}
       <div style={{ padding:'16px 20px', borderBottom:`1px solid ${C.border}`, background:C.bg, flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
