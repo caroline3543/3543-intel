@@ -8,6 +8,14 @@ import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 import { SnapshotEditor } from './SnapshotEditor.jsx';
 import { EventSheet } from './EventSheet.jsx';
 
+// RSVP prediction fields (arriving late / leaving early / discord /
+// present whole time) only make sense for the two SvS-related event
+// types — nobody needs to predict "will I be on time" for a Foundry
+// run. Every other event type skips straight to a plain roster; post-
+// event actuals (attended/no-show/voice) still apply universally,
+// that's a different, more general concept than a pre-event RSVP.
+const SHOWS_RSVP_TYPES = ['SvS Castle Battle', 'Internal Sunfire Castle'];
+
 function initials(n) { return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?'; }
 
 // ── EventsTab ──────────────────────────────────────────────────
@@ -37,6 +45,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [sortMode, setSortMode]       = useState('alpha'); // 'alpha' | 'troopPower'
   const [addQuery, setAddQuery]       = useState('');
   const [addResults, setAddResults]   = useState([]);
+  const [addAsSubstitute, setAddAsSubstitute] = useState(false);
   const [copyPickerOpen, setCopyPickerOpen] = useState(false);
 
   const activeEvent = events.find(e => e.id === activeEventId);
@@ -78,10 +87,11 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     const snaps = [...(activeEvent.snapshots || [])];
     const idx = snaps.findIndex(s => s.playerId === player.id);
     if (idx >= 0) {
-      snaps[idx] = { ...snaps[idx], rsvp: { ...snaps[idx].rsvp, participating: true } };
+      snaps[idx] = { ...snaps[idx], rsvp: { ...snaps[idx].rsvp, participating: true, substitute: addAsSubstitute } };
     } else {
       const snap = newSnapshot(player.id, player, activeEvent.id);
       snap.rsvp.participating = true; // being added IS participating — no separate toggle
+      snap.rsvp.substitute = addAsSubstitute;
       snaps.push(snap);
     }
     onUpdateEvent({ ...activeEvent, participantIds, snapshots: snaps });
@@ -96,6 +106,44 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   function removeParticipant(playerId) {
     if (!activeEvent) return;
     onUpdateEvent({ ...activeEvent, participantIds: (activeEvent.participantIds || []).filter(id => id !== playerId) });
+  }
+
+  // Moves someone between the Participants and Substitutes sections —
+  // a persistent category, not a bulk-settable prediction, so it lives
+  // as a per-row toggle rather than in bulkTags.
+  function toggleSubstitute(playerId) {
+    if (!activeEvent) return;
+    const player = players.find(p => p.id === playerId);
+    if (!player) return;
+    const snaps = [...(activeEvent.snapshots || [])];
+    const idx = snaps.findIndex(s => s.playerId === playerId);
+    if (idx >= 0) {
+      snaps[idx] = { ...snaps[idx], rsvp: { ...snaps[idx].rsvp, substitute: !snaps[idx].rsvp?.substitute } };
+    } else {
+      const snap = newSnapshot(playerId, player, activeEvent.id);
+      snap.rsvp.participating = true;
+      snap.rsvp.substitute = true;
+      snaps.push(snap);
+    }
+    onUpdateEvent({ ...activeEvent, snapshots: snaps });
+  }
+
+  // Inline troop power — editable directly on the row, no need to open
+  // a separate editor sheet just to record one number.
+  function setTroopPower(playerId, rawValue) {
+    if (!activeEvent) return;
+    const player = players.find(p => p.id === playerId);
+    if (!player) return;
+    const value = rawValue === '' ? null : Number(rawValue);
+    const snaps = [...(activeEvent.snapshots || [])];
+    const idx = snaps.findIndex(s => s.playerId === playerId);
+    if (idx >= 0) snaps[idx] = { ...snaps[idx], troopPower: value };
+    else {
+      const snap = newSnapshot(playerId, player, activeEvent.id);
+      snap.troopPower = value;
+      snaps.push(snap);
+    }
+    onUpdateEvent({ ...activeEvent, snapshots: snaps });
   }
 
   // Brings over the roster only — never RSVP predictions from the
@@ -122,12 +170,14 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   }
 
   // Bulk tags differ by event phase — RSVP-relevant tags for upcoming
-  // events, post-event actuals for active/completed ones. Never both.
-  // "rsvpLate" (upcoming, a prediction) and "late" (post-event, an
-  // actual with no notice) are deliberately different tag keys — the
-  // if-chain below doesn't know which button set fired it, so reusing
-  // one key for both would let an upcoming "Arriving late" tap also
-  // set the unrelated post-event "joined late with no notice" field.
+  // events (only for the two SvS-related types — see SHOWS_RSVP_TYPES),
+  // post-event actuals for active/completed ones. "Substitute" isn't
+  // here — it's a persistent category (see toggleSubstitute), not a
+  // bulk-settable prediction. "rsvpLate" (upcoming, a prediction) and
+  // "late" (post-event, an actual with no notice) are deliberately
+  // different tag keys — the if-chain below doesn't know which button
+  // set fired it, so reusing one key for both would let an upcoming
+  // "Arriving late" tap also set the unrelated post-event field.
   function applyBulk(tag) {
     if (!activeEvent || !bulkSel.size) return;
     const snaps = [...(activeEvent.snapshots||[])];
@@ -139,7 +189,6 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
       if (tag==='early')      s = { ...s, rsvp:{ ...s.rsvp, willLeaveEarly:true } };
       if (tag==='discord')    s = { ...s, rsvp:{ ...s.rsvp, willJoinDiscord:true } };
       if (tag==='wholetime')  s = { ...s, rsvp:{ ...s.rsvp, presentWholeTime:true } };
-      if (tag==='substitute') s = { ...s, rsvp:{ ...s.rsvp, substitute:true } };
       if (tag==='attended')   s = { ...s, attendance:{ ...s.attendance, attended:true, noShow:false } };
       if (tag==='noshow')     s = { ...s, attendance:{ ...s.attendance, attended:false, noShow:true } };
       if (tag==='late')       s = { ...s, attendance:{ ...s.attendance, joinedLateNoNotice:true } };
@@ -160,21 +209,33 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
   const isUpcoming = activeEvent?.status === 'upcoming';
   const tracksTroopPower = TROOP_POWER_EVENTS.includes(activeEvent?.type);
+  const showsRsvp = SHOWS_RSVP_TYPES.includes(activeEvent?.type);
 
   // Explicit roster — strictly the participantIds list, no "empty means
-  // everyone" fallback.
-  let eventPlayers = activeEvent ? players.filter(p => (activeEvent.participantIds||[]).includes(p.id)) : [];
-  eventPlayers = [...eventPlayers].sort((a, b) => {
-    if (sortMode === 'troopPower' && tracksTroopPower) {
-      const ta = getSnap(activeEvent, a.id)?.troopPower ?? -1;
-      const tb = getSnap(activeEvent, b.id)?.troopPower ?? -1;
-      return tb - ta;
-    }
-    return (a.username||a.alias||'').localeCompare(b.username||b.alias||'');
-  });
+  // everyone" fallback. Split into Participants vs Substitutes (two
+  // distinct categories, not one list with a badge), each with Rally
+  // Leads sorted to the top before the chosen secondary sort.
+  const allEventPlayers = activeEvent ? players.filter(p => (activeEvent.participantIds||[]).includes(p.id)) : [];
+
+  function sortGroup(list) {
+    return [...list].sort((a, b) => {
+      const aLead = a.roles?.includes('Rally Lead') ? 0 : 1;
+      const bLead = b.roles?.includes('Rally Lead') ? 0 : 1;
+      if (aLead !== bLead) return aLead - bLead;
+      if (sortMode === 'troopPower' && tracksTroopPower) {
+        const ta = getSnap(activeEvent, a.id)?.troopPower ?? -1;
+        const tb = getSnap(activeEvent, b.id)?.troopPower ?? -1;
+        return tb - ta;
+      }
+      return (a.username||a.alias||'').localeCompare(b.username||b.alias||'');
+    });
+  }
+
+  const participantsList = sortGroup(allEventPlayers.filter(p => !getSnap(activeEvent, p.id)?.rsvp?.substitute));
+  const substitutesList  = sortGroup(allEventPlayers.filter(p => getSnap(activeEvent, p.id)?.rsvp?.substitute));
 
   const bulkTags = isUpcoming
-    ? [['🕐 Arriving late','rsvpLate',C.gold],['🏃 Leaving early','early',C.gold],['🎙️ Will join Discord','discord',C.icy],['✓ Present whole time','wholetime',C.green],['🔄 Substitute','substitute',C.muted]]
+    ? (showsRsvp ? [['🕐 Arriving late','rsvpLate',C.gold],['🏃 Leaving early','early',C.gold],['🎙️ Will join Discord','discord',C.icy],['✓ Present whole time','wholetime',C.green]] : [])
     : [['✓ Attended','attended',C.green],['✗ No-show','noshow',C.red],['🕐 Late (no notice)','late',C.gold],['🎙️ Voice','voice',C.icy]];
 
   return (
@@ -215,7 +276,12 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             })()}
           </div>
 
-          {/* Add participant — type a name, Enter commits the top match */}
+          {/* Add participant — type a name, Enter commits the top match.
+              Adding-as toggle decides which section they land in. */}
+          <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+            <button onClick={() => setAddAsSubstitute(false)} style={{ flex:1, height:36, borderRadius:10, border:`1px solid ${!addAsSubstitute?C.gold:C.border}`, background:!addAsSubstitute?C.gold+'22':C.section, color:!addAsSubstitute?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>Add as Participant</button>
+            <button onClick={() => setAddAsSubstitute(true)} style={{ flex:1, height:36, borderRadius:10, border:`1px solid ${addAsSubstitute?C.gold:C.border}`, background:addAsSubstitute?C.gold+'22':C.section, color:addAsSubstitute?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>Add as Substitute</button>
+          </div>
           <div style={{ position:'relative', marginBottom:12 }}>
             <input
               value={addQuery}
@@ -261,7 +327,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           )}
 
           {/* Sort toggle */}
-          {eventPlayers.length > 1 && (
+          {allEventPlayers.length > 1 && (
             <div style={{ display:'flex', gap:6, marginBottom:12 }}>
               <button onClick={() => setSortMode('alpha')} style={{ height:32, padding:'0 12px', borderRadius:16, background:sortMode==='alpha'?C.gold+'22':C.section, border:`1px solid ${sortMode==='alpha'?C.gold:C.border}`, color:sortMode==='alpha'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>A–Z</button>
               {tracksTroopPower && (
@@ -270,38 +336,50 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             </div>
           )}
 
-          <div style={{ display:'flex', gap:8, marginBottom:16, overflowX:'auto' }}>
-            <button onClick={() => { setBulkMode(!bulkMode); setBulkSel(new Set()); }} style={{ height:36, padding:'0 14px', borderRadius:20, background:bulkMode?C.gold+'22':C.section, border:`1px solid ${bulkMode?C.gold:C.border}`, color:bulkMode?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
-              {bulkMode ? `✓ ${bulkSel.size} selected` : '⚡ Update multiple'}
-            </button>
-            {bulkMode && eventPlayers.length>0 && (
-              <button onClick={() => setBulkSel(bulkSel.size===eventPlayers.length ? new Set() : new Set(eventPlayers.map(p=>p.id)))}
-                style={{ height:36, padding:'0 14px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
-                {bulkSel.size===eventPlayers.length ? 'Deselect all' : 'Select all'}
+          {(bulkTags.length > 0 || !isUpcoming) && (
+            <div style={{ display:'flex', gap:8, marginBottom:16, overflowX:'auto' }}>
+              <button onClick={() => { setBulkMode(!bulkMode); setBulkSel(new Set()); }} style={{ height:36, padding:'0 14px', borderRadius:20, background:bulkMode?C.gold+'22':C.section, border:`1px solid ${bulkMode?C.gold:C.border}`, color:bulkMode?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+                {bulkMode ? `✓ ${bulkSel.size} selected` : '⚡ Update multiple'}
               </button>
-            )}
-            {bulkMode && bulkSel.size>0 && bulkTags.map(([l,t,c]) => (
-              <button key={t} onClick={() => applyBulk(t)} style={{ height:36, padding:'0 12px', borderRadius:20, background:c+'18', border:`1px solid ${c}44`, color:c, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>{l}</button>
-            ))}
-          </div>
-          {eventPlayers.length===0
-            ? <div style={{ textAlign:'center', padding:'40px 0', color:C.muted }}>No one added yet — type a name above to add them.</div>
-            : eventPlayers.map(player => {
-                const snap = getSnap(activeEvent, player.id);
-                const dn = player.username||player.alias||'Unknown';
-                const isSel = bulkSel.has(player.id);
-                return (
-                  <div key={player.id} onClick={() => { if (bulkMode) { const n=new Set(bulkSel); isSel?n.delete(player.id):n.add(player.id); setBulkSel(n); } else openSnap(activeEvent, player); }} style={{ background:isSel?C.gold+'18':C.card, borderRadius:10, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${isSel?C.gold:C.border+'44'}`, WebkitTapHighlightColor:'transparent' }}>
-                    {bulkMode && <div style={{ width:22, height:22, borderRadius:'50%', border:`2px solid ${isSel?C.gold:C.border}`, background:isSel?C.gold:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{isSel && <span style={{ fontSize:12, color:C.bg, fontWeight:700 }}>✓</span>}</div>}
-                    <div style={{ width:36, height:36, borderRadius:'50%', background:C.muted+'33', border:`1.5px solid ${C.muted}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:14, color:C.white, flexShrink:0 }}>{initials(dn)}</div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6, overflow:'hidden' }}>
-                        <div style={{ fontSize:15, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
-                        {player.furnaceLevel && <span style={{ fontSize:11, color:C.icy, fontWeight:600, flexShrink:0 }}>{player.furnaceLevel}</span>}
-                        {tracksTroopPower && snap?.troopPower != null && (
-                          <span style={{ fontSize:11, color:C.gold, fontWeight:700, flexShrink:0 }}>💪 {snap.troopPower.toLocaleString()}</span>
-                        )}
-                      </div>
+              {bulkMode && allEventPlayers.length>0 && (
+                <button onClick={() => setBulkSel(bulkSel.size===allEventPlayers.length ? new Set() : new Set(allEventPlayers.map(p=>p.id)))}
+                  style={{ height:36, padding:'0 14px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+                  {bulkSel.size===allEventPlayers.length ? 'Deselect all' : 'Select all'}
+                </button>
+              )}
+              {bulkMode && bulkSel.size>0 && bulkTags.map(([l,t,c]) => (
+                <button key={t} onClick={() => applyBulk(t)} style={{ height:36, padding:'0 12px', borderRadius:20, background:c+'18', border:`1px solid ${c}44`, color:c, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>{l}</button>
+              ))}
+            </div>
+          )}
+
+          {(() => {
+            function renderRow(player) {
+              const snap = getSnap(activeEvent, player.id);
+              const dn = player.username||player.alias||'Unknown';
+              const isSel = bulkSel.has(player.id);
+              const isLead = player.roles?.includes('Rally Lead');
+              return (
+                <div key={player.id} onClick={() => { if (bulkMode) { const n=new Set(bulkSel); isSel?n.delete(player.id):n.add(player.id); setBulkSel(n); } else openSnap(activeEvent, player); }} style={{ background:isSel?C.gold+'18':C.card, borderRadius:10, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${isSel?C.gold:isLead?C.gold+'55':C.border+'44'}`, WebkitTapHighlightColor:'transparent' }}>
+                  {bulkMode && <div style={{ width:22, height:22, borderRadius:'50%', border:`2px solid ${isSel?C.gold:C.border}`, background:isSel?C.gold:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{isSel && <span style={{ fontSize:12, color:C.bg, fontWeight:700 }}>✓</span>}</div>}
+                  <div style={{ width:36, height:36, borderRadius:'50%', background:(isLead?C.gold:C.muted)+'33', border:`1.5px solid ${isLead?C.gold:C.muted}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:14, color:C.white, flexShrink:0 }}>{initials(dn)}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, overflow:'hidden' }}>
+                      {isLead && <span style={{ fontSize:12, flexShrink:0 }}>👑</span>}
+                      <div style={{ fontSize:15, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+                      {player.furnaceLevel && <span style={{ fontSize:11, color:C.icy, fontWeight:600, flexShrink:0 }}>{player.furnaceLevel}</span>}
+                    </div>
+                    {tracksTroopPower && (
+                      <input
+                        type="number"
+                        value={snap?.troopPower ?? ''}
+                        onChange={e => setTroopPower(player.id, e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        placeholder="Troop power"
+                        style={{ marginTop:4, width:110, height:28, background:C.section, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 8px', fontSize:12, color:C.gold, fontWeight:700, fontFamily:'inherit' }}
+                      />
+                    )}
+                    {showsRsvp && (
                       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:3 }}>
                         {isUpcoming ? (
                           <>
@@ -309,7 +387,6 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                             {snap?.rsvp?.willLeaveEarly && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, fontWeight:600 }}>🏃 Early</span>}
                             {snap?.rsvp?.willJoinDiscord && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.icy+'18', color:C.icy, fontWeight:600 }}>🎙️</span>}
                             {snap?.rsvp?.presentWholeTime && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.green+'18', color:C.green, fontWeight:600 }}>✓ Full</span>}
-                            {snap?.rsvp?.substitute && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.muted+'22', color:C.muted, fontWeight:600 }}>🔄 Sub</span>}
                           </>
                         ) : (
                           <>
@@ -320,18 +397,43 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                           </>
                         )}
                       </div>
-                    </div>
-                    {!bulkMode && (
-                      <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-                        <button onClick={e => { e.stopPropagation(); removeParticipant(player.id); }}
-                          style={{ width:28, height:28, borderRadius:8, background:'none', border:`1px solid ${C.red}33`, color:C.red+'88', fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
-                        <span style={{ fontSize:18, color:C.muted }}>›</span>
-                      </div>
                     )}
                   </div>
-                );
-              })
-          }
+                  {!bulkMode && (
+                    <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                      <button onClick={e => { e.stopPropagation(); toggleSubstitute(player.id); }} title="Move to the other section"
+                        style={{ width:28, height:28, borderRadius:8, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>⇄</button>
+                      <button onClick={e => { e.stopPropagation(); removeParticipant(player.id); }}
+                        style={{ width:28, height:28, borderRadius:8, background:'none', border:`1px solid ${C.red}33`, color:C.red+'88', fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                      <span style={{ fontSize:18, color:C.muted }}>›</span>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            if (allEventPlayers.length === 0) {
+              return <div style={{ textAlign:'center', padding:'40px 0', color:C.muted }}>No one added yet — type a name above to add them.</div>;
+            }
+
+            return (
+              <>
+                <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
+                  Participants · {participantsList.length}
+                </div>
+                {participantsList.length === 0
+                  ? <div style={{ fontSize:13, color:C.muted, marginBottom:16 }}>None yet.</div>
+                  : participantsList.map(renderRow)}
+
+                <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginTop:16, marginBottom:8 }}>
+                  Substitutes · {substitutesList.length}
+                </div>
+                {substitutesList.length === 0
+                  ? <div style={{ fontSize:13, color:C.muted }}>None yet.</div>
+                  : substitutesList.map(renderRow)}
+              </>
+            );
+          })()}
         </div>
       ) : (
         <>
