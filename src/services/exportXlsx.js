@@ -88,6 +88,25 @@ function autoFilter(ws, range) {
   ws['!autofilter'] = { ref: range };
 }
 
+// Excel worksheet names must be unique (and ≤31 chars). Two events
+// sharing a name — same-day Legion 1/2 events before the auto-name
+// included Legion, or two manually-renamed Custom events — used to
+// throw "Worksheet with name X already exists!" and abort the whole
+// export. This disambiguates instead of crashing, regardless of why
+// the names collided.
+function uniqueSheetName(rawName, used) {
+  const base = (rawName || 'Event').replace(/[\\/:*?[\]]/g, '').slice(0, 28) || 'Event';
+  if (!used.has(base)) return base;
+  let n = 2;
+  let candidate;
+  do {
+    const suffix = ` (${n})`;
+    candidate = base.slice(0, 31 - suffix.length) + suffix;
+    n++;
+  } while (used.has(candidate));
+  return candidate;
+}
+
 // ── Sheet 1: Roster ────────────────────────────────────────────
 function buildRosterSheet(players) {
   const headers = [
@@ -382,13 +401,12 @@ export function exportWorkbook(data) {
 
   // 5. One sheet per event (most recent first)
   const sortedEvents = [...(data.events || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const usedEventSheetNames = new Set(['Overview', 'Roster', 'Joiner Coverage', 'Prep Scores', 'Roster Data', 'Events Data', 'Plans Data', 'Roles Data']);
   sortedEvents.forEach(event => {
     const includeJoiners = JOINER_COVERAGE_EVENTS.includes(event.type);
     const eventWs = buildEventSheet(event, data.players || [], includeJoiners);
-    // Sheet name max 31 chars, strip special chars
-    const sheetName = (event.name || event.type || 'Event')
-      .replace(/[\\/:*?[\]]/g, '')
-      .slice(0, 28);
+    const sheetName = uniqueSheetName(event.name || event.type || 'Event', usedEventSheetNames);
+    usedEventSheetNames.add(sheetName);
     XLSX.utils.book_append_sheet(wb, eventWs, sheetName);
   });
 

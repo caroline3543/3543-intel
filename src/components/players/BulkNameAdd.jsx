@@ -10,6 +10,28 @@ function parseNames(raw) {
     .filter(Boolean);
 }
 
+// Dedupes the pasted list case-insensitively (first occurrence wins)
+// and separates out any name that already exists on the roster. See
+// PlayerSheet.jsx for the single-add version of this same rule, which
+// offers a one-tap link into the existing record — bulk add just skips
+// duplicates automatically instead, since there's no single profile to
+// link an entire pasted list into.
+function classifyNames(raw, existingPlayers) {
+  const seen = new Set();
+  const existingLower = new Set(
+    existingPlayers.map(p => (p.username || p.alias || '').trim().toLowerCase()).filter(Boolean)
+  );
+  const toAdd = [];
+  const skipped = [];
+  parseNames(raw).forEach(name => {
+    const key = name.toLowerCase();
+    if (seen.has(key) || existingLower.has(key)) { skipped.push(name); return; }
+    seen.add(key);
+    toAdd.push(name);
+  });
+  return { toAdd, skipped };
+}
+
 // Replaces the old multi-step Batch Add wizard (Names → Review →
 // Details). Details — languages, troop tiers, joiner heroes, roles —
 // are now filled in afterward via Field Registry, which is faster for
@@ -17,16 +39,17 @@ function parseNames(raw) {
 // After adding, this screen offers a direct one-tap handoff into Field
 // Registry rather than closing silently — that's almost always the
 // very next thing you want to do with names you just bulk-added.
-export default function BulkNameAdd({ onAddPlayers, onClose, showToast, onGoToFieldRegistry }) {
+export default function BulkNameAdd({ onAddPlayers, onClose, showToast, onGoToFieldRegistry, existingPlayers = [] }) {
   const [raw, setRaw] = useState('');
   const [addedCount, setAddedCount] = useState(null); // null = still entering names
-  const names = parseNames(raw);
+  const { toAdd: names, skipped } = classifyNames(raw, existingPlayers);
 
   function handleAdd() {
     if (names.length === 0) return;
     const players = names.map(name => newPlayer({ username: name }));
     onAddPlayers(players);
-    showToast?.(`Added ${players.length} player${players.length !== 1 ? 's' : ''}`, 'success');
+    const skippedNote = skipped.length ? ` · skipped ${skipped.length} duplicate${skipped.length !== 1 ? 's' : ''}` : '';
+    showToast?.(`Added ${players.length} player${players.length !== 1 ? 's' : ''}${skippedNote}`, 'success');
     vibe(10);
     setAddedCount(players.length);
   }
@@ -78,12 +101,15 @@ export default function BulkNameAdd({ onAddPlayers, onClose, showToast, onGoToFi
           style={{ width: '100%', background: C.section, border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 14px', fontSize: 15, color: C.white, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }}
         />
         <div style={{ fontSize: 13, color: C.muted }}>
-          {names.length} name{names.length !== 1 ? 's' : ''} detected
+          {names.length} new name{names.length !== 1 ? 's' : ''} detected{skipped.length > 0 ? ` · ${skipped.length} skipped (duplicate)` : ''}
         </div>
-        {names.length > 0 && (
+        {(names.length > 0 || skipped.length > 0) && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {names.map((n, i) => (
-              <span key={i} style={{ padding: '6px 12px', borderRadius: 16, background: C.card, border: `1px solid ${C.border}`, color: C.icy, fontSize: 13 }}>{n}</span>
+              <span key={`a${i}`} style={{ padding: '6px 12px', borderRadius: 16, background: C.card, border: `1px solid ${C.border}`, color: C.icy, fontSize: 13 }}>{n}</span>
+            ))}
+            {skipped.map((n, i) => (
+              <span key={`s${i}`} title="Already on the roster, or repeated in this list — won't be added again" style={{ padding: '6px 12px', borderRadius: 16, background: C.gold+'14', border: `1px solid ${C.gold}55`, color: C.gold, fontSize: 13 }}>⚠ {n}</span>
             ))}
           </div>
         )}

@@ -38,6 +38,39 @@ export function addCustomOption(fieldId, value) {
   }
 }
 
+// localStorage key: svs_field_registry_custom_hero_gens
+// Owner: fieldRegistryService.js. Only covers joiner heroes an officer
+// typed in themselves that aren't already in HEROES_BY_GEN
+// (constants.js) — built-in heroes get their generation from there,
+// this just fills the gap for genuinely custom ones.
+const CUSTOM_HERO_GENS_KEY = 'svs_field_registry_custom_hero_gens';
+
+function loadCustomHeroGens() {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_HERO_GENS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCustomHeroGens(data) {
+  try {
+    localStorage.setItem(CUSTOM_HERO_GENS_KEY, JSON.stringify(data));
+  } catch {
+    // storage full or unavailable — generation tag simply won't persist
+  }
+}
+
+export function getCustomHeroGen(hero) {
+  return loadCustomHeroGens()[hero] || null;
+}
+
+export function setCustomHeroGen(hero, gen) {
+  const data = loadCustomHeroGens();
+  data[hero] = gen;
+  saveCustomHeroGens(data);
+}
+
 // Full set of values to show for a field: predefined options + any
 // custom ones added at runtime + anything already present on a player
 // (defensive — covers data set some other way, e.g. direct profile edit).

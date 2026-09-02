@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C, LANGUAGES, TIER_OPTIONS, ALLIANCE_RANKS } from '../../utils/constants.js';
+import { C, LANGUAGES, TIER_OPTIONS, ALLIANCE_RANKS, HEROES_BY_GEN } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { JOINER_HEROES } from '../../data/joinerMeta.js';
 import { addJoinerHeroToPlayer, removeJoinerHeroFromPlayer } from '../../services/joinerRegistryService.js';
@@ -10,7 +10,17 @@ import {
   assignFieldValue,
   removeFieldValue,
   addCustomOption,
+  getCustomHeroGen,
+  setCustomHeroGen,
 } from '../../services/fieldRegistryService.js';
+
+// Generation label for a joiner hero — built-in heroes resolve from
+// HEROES_BY_GEN (constants.js); anything an officer typed in that
+// isn't in that table falls back to the custom-hero-generation store.
+function heroGenLabel(hero) {
+  const builtIn = HEROES_BY_GEN.find(g => g.heroes.some(h => h.toLowerCase() === hero.toLowerCase()));
+  return builtIn ? builtIn.gen : getCustomHeroGen(hero);
+}
 
 // Add a new field here to extend the registry to any other profile
 // attribute — nothing else in this file needs to change.
@@ -99,7 +109,12 @@ function ValueCard({ field, value, players, onUpdatePlayer }) {
     <div style={{ background: C.card, borderRadius: 12, padding: 14, marginBottom: 8 }}>
       <div onClick={() => setOpen(!open)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.white }}>{value}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.white }}>
+            {value}
+            {isJoinerHero && heroGenLabel(value) && (
+              <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginLeft: 8 }}>· {heroGenLabel(value)}</span>
+            )}
+          </div>
           <div style={{ fontSize: 12, color: C.muted }}>{count} player{count !== 1 ? 's' : ''}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -193,6 +208,59 @@ function AddValueRow({ field, onAdd }) {
   );
 }
 
+// ── Add a brand-new joiner hero, tagged with its generation ──────
+// Separate from AddValueRow (used by every other field) because this
+// is the one field where a new value needs a second piece of metadata
+// captured alongside it — the generation isn't guessable from the name.
+function AddJoinerHeroRow({ onAdd }) {
+  const [text, setText] = useState('');
+  const [gen, setGen] = useState('');
+  const knownGen = HEROES_BY_GEN.find(g => g.heroes.some(h => h.toLowerCase() === text.trim().toLowerCase()))?.gen;
+  const needsGenChoice = !!text.trim() && !knownGen; // genuinely new — not in the built-in meta table
+
+  function submit() {
+    if (!text.trim()) return;
+    if (needsGenChoice && !gen) return; // require a generation before adding an unrecognized hero
+    onAdd(text.trim(), knownGen || gen || null);
+    setText(''); setGen('');
+    vibe(8);
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: needsGenChoice ? 10 : 0 }}>
+        <input
+          value={text}
+          onChange={e => { setText(e.target.value); setGen(''); }}
+          onKeyDown={e => { if (e.key === 'Enter' && !needsGenChoice) submit(); }}
+          placeholder="New joiner hero…"
+          style={{ flex: 1, background: C.section, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: C.white, boxSizing: 'border-box', fontFamily: 'inherit', minHeight: 44 }}
+        />
+        <button
+          onClick={submit}
+          disabled={needsGenChoice && !gen}
+          style={{ padding: '0 16px', borderRadius: 10, background: (needsGenChoice && !gen) ? C.section : C.gold + '22', border: `1px solid ${(needsGenChoice && !gen) ? C.border : C.gold}`, color: (needsGenChoice && !gen) ? C.muted : C.gold, fontWeight: 700, fontSize: 14, cursor: (needsGenChoice && !gen) ? 'default' : 'pointer', minHeight: 44 }}
+        >
+          + Add
+        </button>
+      </div>
+      {needsGenChoice && (
+        <div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Not in the built-in meta table — which generation is "{text.trim()}" from?</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {HEROES_BY_GEN.map(g => (
+              <button key={g.gen} onClick={() => setGen(g.gen)}
+                style={{ padding: '6px 12px', borderRadius: 16, minHeight: 36, border: `1px solid ${gen===g.gen?C.gold:C.border}`, background: gen===g.gen?C.gold+'22':C.section, color: gen===g.gen?C.gold:C.muted, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                {g.gen}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── FieldRegistry (main export) ──────────────────────────────────
 export default function FieldRegistry({ players, onUpdatePlayer, onClose }) {
   const [fieldId, setFieldId] = useState(FIELD_DEFS[0].id);
@@ -201,8 +269,9 @@ export default function FieldRegistry({ players, onUpdatePlayer, onClose }) {
   const field = FIELD_DEFS.find(f => f.id === fieldId);
   const values = sortValues(field, getFieldValues(players, field));
 
-  function handleAddCustomOption(value) {
+  function handleAddCustomOption(value, gen) {
     addCustomOption(field.id, value);
+    if (field.id === 'joinerHeroes' && gen) setCustomHeroGen(value, gen);
     bumpRefresh(n => n + 1);
   }
 
@@ -226,7 +295,9 @@ export default function FieldRegistry({ players, onUpdatePlayer, onClose }) {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', paddingBottom: 40 }}>
-        <AddValueRow field={field} onAdd={handleAddCustomOption} />
+        {field.id === 'joinerHeroes'
+          ? <AddJoinerHeroRow onAdd={handleAddCustomOption} />
+          : <AddValueRow field={field} onAdd={handleAddCustomOption} />}
         {values.length === 0 && (
           <div style={{ fontSize: 14, color: C.muted, textAlign: 'center', padding: '20px 0' }}>No values yet — add one above.</div>
         )}

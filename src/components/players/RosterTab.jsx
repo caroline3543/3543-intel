@@ -45,7 +45,6 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [filterRole, setFilterRole]       = useState('All');
   const [sortBy, setSortBy]               = useState('name');
   const [sortMenuOpen, setSortMenuOpen]   = useState(false);
-  const [moreMenuOpen, setMoreMenuOpen]   = useState(false);
   const [viewingPlayer, setViewingPlayer] = useState(null);
   const [profileOpen, setProfileOpen]     = useState(false);
   const [leaderProfileOpen, setLeaderProfileOpen] = useState(false);
@@ -54,6 +53,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [bulkAddOpen, setBulkAddOpen]     = useState(false);
   const [fieldRegistryOpen, setFieldRegistryOpen] = useState(false);
   const [roleManagerOpen, setRoleManagerOpen] = useState(false);
+  const [troopsCopied, setTroopsCopied] = useState(false);
 
   // How many of the "should be set" fields are actually missing —
   // higher = more incomplete. NOTE: having zero roles is no longer
@@ -80,6 +80,31 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
     onSavePlayer({ ...player, roles: nextRoles });
   }
 
+  // Discord-ready list of exactly who's missing which troop tier(s) —
+  // "missing info" elsewhere is broader (languages, joiner heroes,
+  // furnace level too), so this is scoped specifically to troop tiers,
+  // since that's the actionable, chase-people-down list an officer
+  // would actually post.
+  function generateMissingTroopsText() {
+    const missing = players.filter(p => !p.troops?.infantry || !p.troops?.lancer || !p.troops?.marksman);
+    const lines = ['📋 Missing Troop Levels', ''];
+    missing.forEach(p => {
+      const dn = p.username || p.alias || '?';
+      const gaps = [];
+      if (!p.troops?.infantry) gaps.push('🛡️ Infantry');
+      if (!p.troops?.lancer)   gaps.push('⚔️ Lancer');
+      if (!p.troops?.marksman) gaps.push('🏹 Marksman');
+      lines.push(`${dn} — missing ${gaps.join(', ')}`);
+    });
+    return '```\n' + lines.join('\n').trim() + '\n```';
+  }
+  function copyMissingTroops() {
+    navigator.clipboard.writeText(generateMissingTroopsText()).then(() => {
+      setTroopsCopied(true);
+      setTimeout(() => setTroopsCopied(false), 2000);
+    });
+  }
+
   const activeDerivedFilters = DERIVED_TIER_FILTERS.filter(d => players.some(d.match));
   const derivedMatch = DERIVED_TIER_FILTERS.find(d => d.id === filterRole);
 
@@ -88,7 +113,8 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
     const ms = !search
       || t.includes(search.toLowerCase())
       || (p.allianceTag||'').toLowerCase().includes(search.toLowerCase())
-      || (p.country||'').toLowerCase().includes(search.toLowerCase());
+      || (p.country||'').toLowerCase().includes(search.toLowerCase())
+      || (p.fid||'').toLowerCase().includes(search.toLowerCase());
     const mr = filterRole==='All' || (derivedMatch ? derivedMatch.match(p) : p.roles?.includes(filterRole));
     return ms && mr;
   });
@@ -111,7 +137,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search name, tag, country…"
+          placeholder="Search name, tag, country, player ID…"
           style={{ flex:1, height:48, background:'#152236', border:'1px solid #2A4A64', borderRadius:10, padding:'0 14px', fontSize:16, color:'#FFFFFF', fontFamily:'inherit' }}
         />
         <button onClick={() => setBulkAddOpen(true)} style={{ height:48, padding:'0 12px', borderRadius:10, background:'none', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer' }}>➕ Bulk Add</button>
@@ -123,22 +149,31 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         <button onClick={() => setRosterView('roles')} style={{ flex:1, height:36, borderRadius:20, background:rosterView==='roles'?C.gold+'22':C.section, border:`1px solid ${rosterView==='roles'?C.gold:C.border}`, color:rosterView==='roles'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>⚔️ By Role</button>
       </div>
 
-      {/* Consolidated utility row — was 3 separate chips (Fields, Roles,
-          Missing info toggle), now Sort dropdown (list view only) + a
-          single overflow menu for Fields/Roles. */}
+      {/* Utility row — Fields and Roles are now always-visible, labeled
+          buttons instead of hidden behind an unlabeled "⋯" overflow menu.
+          Nobody could tell that menu existed, let alone what was in it —
+          these are two of the most important entry points in the app
+          (they're how data actually gets filled in), so they get equal
+          visual weight to Sort, not a mystery icon. */}
       <div style={{ display:'flex', gap:6, marginBottom:12, position:'relative' }}>
         {rosterView==='list' && (
-          <button onClick={() => { setSortMenuOpen(!sortMenuOpen); setMoreMenuOpen(false); }}
-            style={{ flex:1, height:36, padding:'0 12px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <span>{SORT_OPTIONS.find(o=>o.id===sortBy)?.label}</span>
-            <span style={{ fontSize:10 }}>▼</span>
+          <button onClick={() => setSortMenuOpen(!sortMenuOpen)}
+            style={{ flex:1, minWidth:0, height:36, padding:'0 12px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', gap:6 }}>
+            <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{SORT_OPTIONS.find(o=>o.id===sortBy)?.label}</span>
+            <span style={{ fontSize:10, flexShrink:0 }}>▼</span>
           </button>
         )}
-        <button onClick={() => { setMoreMenuOpen(!moreMenuOpen); setSortMenuOpen(false); }}
-          style={{ width:44, height:36, borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.muted, fontSize:16, cursor:'pointer', flexShrink:0 }}>⋯</button>
+        <button onClick={() => setFieldRegistryOpen(true)}
+          style={{ ...(rosterView==='list' ? { flexShrink:0 } : { flex:1 }), height:36, padding:'0 14px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+          📋 Fields
+        </button>
+        <button onClick={() => setRoleManagerOpen(true)}
+          style={{ ...(rosterView==='list' ? { flexShrink:0 } : { flex:1 }), height:36, padding:'0 14px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+          ⚙ Roles
+        </button>
 
         {sortMenuOpen && (
-          <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:52, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:30, boxShadow:'0 8px 24px #000a' }}>
+          <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:30, boxShadow:'0 8px 24px #000a' }}>
             {SORT_OPTIONS.map(o => (
               <button key={o.id} onClick={() => { setSortBy(o.id); setSortMenuOpen(false); }}
                 style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', background:sortBy===o.id?C.gold+'18':'none', border:'none', color:sortBy===o.id?C.gold:C.white, fontSize:13, fontWeight:600, cursor:'pointer' }}>
@@ -147,13 +182,41 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             ))}
           </div>
         )}
-        {moreMenuOpen && (
-          <div style={{ position:'absolute', top:'calc(100% + 4px)', right:0, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:30, minWidth:150, boxShadow:'0 8px 24px #000a' }}>
-            <button onClick={() => { setFieldRegistryOpen(true); setMoreMenuOpen(false); }} style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', background:'none', border:'none', color:C.white, fontSize:13, fontWeight:600, cursor:'pointer' }}>📋 Fields</button>
-            <button onClick={() => { setRoleManagerOpen(true); setMoreMenuOpen(false); }} style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', background:'none', border:'none', color:C.white, fontSize:13, fontWeight:600, cursor:'pointer' }}>⚙ Roles</button>
-          </div>
-        )}
       </div>
+
+      {/* Contextual nudge — surfaces the Field Registry exactly when it's
+          useful (incomplete profiles exist) rather than relying on the
+          officer to remember it's there at all. Only shown when it's
+          actually true, so it never nags an alliance with a clean roster. */}
+      {(() => {
+        if (!players.length) return null;
+        const incompleteCount = players.filter(p => missingCount(p) > 0).length;
+        if (!incompleteCount) return null;
+        const troopGapCount = players.filter(p => !p.troops?.infantry || !p.troops?.lancer || !p.troops?.marksman).length;
+        return (
+          <div style={{ background:C.gold+'14', border:`1px solid ${C.gold}55`, borderRadius:12, padding:'12px 14px', marginBottom:12 }}>
+            <div
+              onClick={() => setFieldRegistryOpen(true)}
+              style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}
+            >
+              <div style={{ fontSize:13, color:C.white, fontWeight:600 }}>
+                ⚠ {incompleteCount} player{incompleteCount!==1?'s':''} missing info
+              </div>
+              <div style={{ fontSize:12, color:C.gold, fontWeight:700, whiteSpace:'nowrap', flexShrink:0 }}>
+                Open Field Registry ›
+              </div>
+            </div>
+            {troopGapCount > 0 && (
+              <button
+                onClick={e => { e.stopPropagation(); copyMissingTroops(); }}
+                style={{ marginTop:10, width:'100%', height:32, borderRadius:8, background:'none', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:12, cursor:'pointer' }}
+              >
+                {troopsCopied ? '✓ Copied' : `📋 Copy missing troop levels (${troopGapCount})`}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {rosterView==='list' && (
         <>
@@ -192,9 +255,10 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
               onClick={() => openProfile(p)}
               onDelete={onDeletePlayer}
               events={events}
-              missingCount={sortBy==='missing' ? missingCount(p) : 0}
+              missingCount={missingCount(p)}
               troopPower={getCurrentTroopPower(p, events)}
               onToggleRallyLead={() => toggleRallyLead(p)}
+              onOpenFields={() => setFieldRegistryOpen(true)}
             />
           ))}
         </>
@@ -284,6 +348,8 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         onClose={() => { setSheetOpen(false); setEditingPlayer(null); }}
         onSave={onSavePlayer}
         existingTags={[...new Set(players.map(p=>p.allianceTag).filter(Boolean))]}
+        existingPlayers={players}
+        onOpenExisting={openProfile}
         onGoToIntel={onGoToIntel}
       />
       <RoleManagerSheet
@@ -302,6 +368,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             onClose={() => setBulkAddOpen(false)}
             showToast={showToast}
             onGoToFieldRegistry={() => { setBulkAddOpen(false); setFieldRegistryOpen(true); }}
+            existingPlayers={players}
           />
         </div>
       )}

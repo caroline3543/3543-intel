@@ -92,7 +92,7 @@ function StepIndicator({ steps, current, onSelect }) {
 
 
 // ── PlayerSheet ────────────────────────────────────────────────
-export function PlayerSheet({ player, roles=[], open, onClose, onSave, existingTags=[], onGoToIntel }) {
+export function PlayerSheet({ player, roles=[], open, onClose, onSave, existingTags=[], onGoToIntel, existingPlayers=[], onOpenExisting }) {
   const [p, setP]               = useState(() => player || newPlayer());
   const [activeTab, setActiveTab] = useState('identity');
 
@@ -109,7 +109,20 @@ export function PlayerSheet({ player, roles=[], open, onClose, onSave, existingT
 
   function upd(k, v)   { setP(prev => ({...prev, [k]:v, profileLastUpdated:new Date().toISOString()})); }
   function updT(k, v)  { setP(prev => ({...prev, troops:{...prev.troops,[k]:v}, profileLastUpdated:new Date().toISOString()})); }
-  function save()      { onSave({...p, profileLastUpdated:p.profileLastUpdated||new Date().toISOString()}); onClose(); vibe(8); }
+  // Duplicate-name guard: names are how the rest of the app links a
+  // player across search, autosuggest, and Field Registry assignment —
+  // two players sharing one silently breaks all of that. Excludes the
+  // record currently being edited, so re-saving your own name isn't
+  // flagged against yourself.
+  const duplicateMatch = (p.username||'').trim()
+    ? existingPlayers.find(ep => ep.id !== p.id && (ep.username||'').trim().toLowerCase() === p.username.trim().toLowerCase())
+    : null;
+  function save() {
+    if (duplicateMatch) return; // blocked — resolve via the banner below instead
+    onSave({...p, profileLastUpdated:p.profileLastUpdated||new Date().toISOString()});
+    onClose();
+    vibe(8);
+  }
 
   const completion = checkCompletion(p);
   const STEPS = [
@@ -141,6 +154,19 @@ export function PlayerSheet({ player, roles=[], open, onClose, onSave, existingT
             <Field label="Username" hint="Their in-game display name">
               <Inp value={p.username} onChange={v=>upd('username',v)} placeholder="In-game username"/>
             </Field>
+            {duplicateMatch && (
+              <div style={{ background:C.gold+'14', border:`1px solid ${C.gold}55`, borderRadius:10, padding:'12px 14px', marginBottom:16 }}>
+                <div style={{ fontSize:13, color:C.white, fontWeight:600, marginBottom:8 }}>
+                  ⚠ "{p.username}" already exists — is this the same person?
+                </div>
+                <button
+                  onClick={() => { onOpenExisting?.(duplicateMatch); onClose(); }}
+                  style={{ width:'100%', height:40, borderRadius:8, background:C.gold+'22', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}
+                >
+                  → Open {duplicateMatch.username || duplicateMatch.alias}'s profile instead
+                </button>
+              </div>
+            )}
             <Field label="Nickname">
               <Inp value={p.alias} onChange={v=>upd('alias',v)} placeholder="Real name or nickname"/>
             </Field>
@@ -234,8 +260,8 @@ export function PlayerSheet({ player, roles=[], open, onClose, onSave, existingT
             {currentIdx < STEPS.length-1 ? (
               <button onClick={()=>{setActiveTab(STEPS[currentIdx+1].id);vibe(8);}} style={{ flex:2, height:52, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:16, border:'none', cursor:'pointer' }}>Next →</button>
             ) : (
-              <button onClick={save} style={{ flex:2, height:52, borderRadius:12, background:completion.identity&&completion.combat?C.green:C.gold, color:C.bg, fontWeight:700, fontSize:16, border:'none', cursor:'pointer' }}>
-                {completion.identity&&completion.combat ? '✓ Save member' : 'Save member'}
+              <button onClick={save} disabled={!!duplicateMatch} style={{ flex:2, height:52, borderRadius:12, background:duplicateMatch?C.section:(completion.identity&&completion.combat?C.green:C.gold), color:duplicateMatch?C.muted:C.bg, fontWeight:700, fontSize:16, border:duplicateMatch?`1px solid ${C.border}`:'none', cursor:duplicateMatch?'default':'pointer' }}>
+                {duplicateMatch ? '⚠ Resolve duplicate above' : (completion.identity&&completion.combat ? '✓ Save member' : 'Save member')}
               </button>
             )}
           </div>
