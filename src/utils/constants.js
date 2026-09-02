@@ -112,6 +112,11 @@ export const TROOP_POWER_EVENTS = ['Foundry', 'Canyon Clash'];
 // EventsTab.jsx's bulk actions regardless of this list.
 export const SHOWS_RSVP_TYPES = ['SvS Castle Battle', 'Internal Sunfire Castle'];
 
+// Alliance rank — mutually exclusive (a player holds exactly one), so
+// modeled as a single value (player.allianceRank), not another entry
+// in the multi-select roles array. R5 is highest.
+export const ALLIANCE_RANKS = ['R5', 'R4', 'R3', 'R2', 'R1'];
+
 // Shared "obviously selected" style for tier/FC chips (PlayerSheet,
 // RallySlotCard, BatchAddSheet all use this) — thicker border + solid
 // fill + bold text make selection unambiguous at a glance, instead of

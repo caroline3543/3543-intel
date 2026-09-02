@@ -29,7 +29,7 @@ function Row({ label, value }) {
   );
 }
 
-export function ProfileView({ player, roles = [], open, onClose, onEdit, events, onOpenLeaderProfile }) {
+export function ProfileView({ player, roles = [], open, onClose, onEdit, events }) {
   useEffect(() => {
     if (!open) return;
     function handler(e) { if (e.key === 'Escape') onClose(); }
@@ -71,6 +71,7 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
               {player.alias&&player.username&&<div style={{ fontSize:13, color:C.muted }}>{player.alias}</div>}
               <div style={{ display:'flex', gap:8, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
                 {player.allianceTag&&<span style={{ fontSize:12, color:C.icy, fontWeight:600 }}>[{player.allianceTag}]</span>}
+                {player.allianceRank&&<span style={{ fontSize:12, color:C.gold, fontWeight:700, padding:'1px 8px', borderRadius:8, background:C.gold+'18' }}>🎖️ {player.allianceRank}</span>}
                 {player.furnaceLevel&&<span style={{ fontSize:12, color:C.gold, fontWeight:700 }}>{player.furnaceLevel}</span>}
                 {metrics&&<ReliabilityBadge score={metrics.reliabilityScore}/>}
               </div>
@@ -95,64 +96,6 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
                 );
               })}
             </div>
-          </Section>
-        )}
-
-        {/* 1.5 Rally Leader Profile — reusable formation/joiner setup.
-             Shown fully expanded here (role, lead heroes + widgets,
-             ratio, recommended joiners) rather than hidden behind the
-             edit sheet — this needs to be visible at a glance, not an
-             extra tap away. */}
-        {onOpenLeaderProfile && (
-          <Section title="Rally Leader Profile">
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: (player.leaderProfile?.teams?.length > 0) ? 12 : 0 }}>
-              <div style={{ fontSize:14, fontWeight:600, color:C.white }}>
-                {{ leader:'👑 Rally Leader', substitute:'🔁 Substitute', both:'👑 Leader + Substitute', none:'Not set' }[player.leaderProfile?.role || 'none']}
-              </div>
-              <button onClick={onOpenLeaderProfile} style={{ height:36, padding:'0 14px', borderRadius:20, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:700, fontSize:13, cursor:'pointer', flexShrink:0 }}>
-                {player.leaderProfile?.teams?.length > 0 ? 'Edit' : '+ Set Up'}
-              </button>
-            </div>
-
-            {(player.leaderProfile?.teams || []).map(team => {
-              const leadHeroes = (team.leadHeroes || []).filter(Boolean);
-              const joinerHeroes = (team.priorityJoinerHeroes || []).filter(Boolean);
-              const typeColor = team.type === 'offense' ? C.gold : C.inf;
-              return (
-                <div key={team.id} style={{ background:C.card, borderRadius:10, padding:12, marginBottom:8 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-                    <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:8, background:typeColor+'22', color:typeColor, textTransform:'uppercase', letterSpacing:'0.05em' }}>
-                      {team.type === 'offense' ? '⚔️ Offense' : '🛡️ Defense'}
-                    </span>
-                    {team.ratio && <span style={{ fontSize:12, color:C.icy, fontWeight:700 }}>{team.ratio}</span>}
-                  </div>
-
-                  <div style={{ fontSize:10, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>Lead heroes</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:10 }}>
-                    {leadHeroes.length === 0 && <span style={{ fontSize:12, color:C.muted }}>None set</span>}
-                    {leadHeroes.map(h => (
-                      <span key={h} style={{ fontSize:12, padding:'4px 10px', borderRadius:10, background:C.gold+'18', color:C.gold, fontWeight:600 }}>
-                        {h}{team.widgets?.[h] != null && <span style={{ color:C.muted, fontWeight:400 }}> · {team.widgets[h]} widgets</span>}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div style={{ fontSize:10, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>Recommended joiners</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                    {joinerHeroes.length === 0 && <span style={{ fontSize:12, color:C.muted }}>None set</span>}
-                    {joinerHeroes.map(h => (
-                      <span key={h} style={{ fontSize:12, padding:'4px 10px', borderRadius:10, background:C.icy+'18', color:C.icy, fontWeight:600 }}>{h}</span>
-                    ))}
-                  </div>
-
-                  {team.notes && <div style={{ fontSize:12, color:C.muted, marginTop:10, fontStyle:'italic' }}>{team.notes}</div>}
-                </div>
-              );
-            })}
-
-            {(player.leaderProfile?.teams || []).length === 0 && (
-              <div style={{ fontSize:13, color:C.muted }}>No teams saved yet.</div>
-            )}
           </Section>
         )}
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C, LANGUAGES, TIER_OPTIONS } from '../../utils/constants.js';
+import { C, LANGUAGES, TIER_OPTIONS, ALLIANCE_RANKS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { JOINER_HEROES } from '../../data/joinerMeta.js';
 import { addJoinerHeroToPlayer, removeJoinerHeroFromPlayer } from '../../services/joinerRegistryService.js';
@@ -40,6 +40,11 @@ const FIELD_DEFS = [
     baseOptions: () => JOINER_HEROES,
     get: (p) => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero),
   },
+  {
+    id: 'allianceRank', label: 'Alliance Rank', icon: '🎖️', multi: false,
+    baseOptions: () => ALLIANCE_RANKS,
+    get: (p) => (p.allianceRank ? [p.allianceRank] : []),
+  },
 ];
 
 const TIER_FIELD_IDS = ['infantry', 'lancer', 'marksman'];
@@ -49,6 +54,9 @@ function initials(n) { return (n || '?').split(/\s+/).map(w => w[0] || '').join(
 function sortValues(field, values) {
   if (TIER_FIELD_IDS.includes(field.id)) {
     return [...values].sort((a, b) => TIER_OPTIONS.indexOf(a) - TIER_OPTIONS.indexOf(b));
+  }
+  if (field.id === 'allianceRank') {
+    return [...values].sort((a, b) => ALLIANCE_RANKS.indexOf(a) - ALLIANCE_RANKS.indexOf(b));
   }
   return [...values].sort((a, b) => a.localeCompare(b));
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS } from '../../utils/constants.js';
+import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES, ALLIANCE_RANKS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { fmtDateShort } from '../../utils/dates.js';
 import { newSnapshot } from '../../data/playerSchema.js';
@@ -8,15 +8,21 @@ import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 import { SnapshotEditor } from './SnapshotEditor.jsx';
 import { EventSheet } from './EventSheet.jsx';
 
-// RSVP prediction fields (arriving late / leaving early / discord /
-// present whole time) only make sense for the two SvS-related event
-// types — nobody needs to predict "will I be on time" for a Foundry
-// run. Every other event type skips straight to a plain roster; post-
-// event actuals (attended/no-show/voice) still apply universally,
-// that's a different, more general concept than a pre-event RSVP.
-const SHOWS_RSVP_TYPES = ['SvS Castle Battle', 'Internal Sunfire Castle'];
-
 function initials(n) { return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?'; }
+
+// Groups a player list by allianceRank, R5 first, unranked last —
+// used both for the on-screen subheadings and the copy-as-text output,
+// so the two never drift out of sync.
+function groupByRank(list) {
+  const groups = {};
+  ALLIANCE_RANKS.forEach(r => { groups[r] = []; });
+  groups.Unranked = [];
+  list.forEach(p => {
+    const key = ALLIANCE_RANKS.includes(p.allianceRank) ? p.allianceRank : 'Unranked';
+    groups[key].push(p);
+  });
+  return groups;
+}
 
 // ── EventsTab ──────────────────────────────────────────────────
 //
@@ -42,11 +48,12 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [bulkMode, setBulkMode]       = useState(false);
   const [bulkSel, setBulkSel]         = useState(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
-  const [sortMode, setSortMode]       = useState('alpha'); // 'alpha' | 'troopPower'
+  const [sortMode, setSortMode]       = useState('alpha'); // 'alpha' | 'troopPower' | 'lastAdded'
   const [addQuery, setAddQuery]       = useState('');
   const [addResults, setAddResults]   = useState([]);
   const [addAsSubstitute, setAddAsSubstitute] = useState(false);
   const [copyPickerOpen, setCopyPickerOpen] = useState(false);
+  const [participantsCopied, setParticipantsCopied] = useState(false);
 
   const activeEvent = events.find(e => e.id === activeEventId);
   const allTags = [...new Set(events.map(e => e.allianceTag).filter(Boolean))];
@@ -146,6 +153,25 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     onUpdateEvent({ ...activeEvent, snapshots: snaps });
   }
 
+  // Legion 1/2 — Foundry/Canyon Clash only (same gate as troop power).
+  // Tap again to clear.
+  function setLegion(playerId, legion) {
+    if (!activeEvent) return;
+    const player = players.find(p => p.id === playerId);
+    if (!player) return;
+    const snaps = [...(activeEvent.snapshots || [])];
+    const idx = snaps.findIndex(s => s.playerId === playerId);
+    const current = idx >= 0 ? snaps[idx].legion : null;
+    const next = current === legion ? null : legion;
+    if (idx >= 0) snaps[idx] = { ...snaps[idx], legion: next };
+    else {
+      const snap = newSnapshot(playerId, player, activeEvent.id);
+      snap.legion = next;
+      snaps.push(snap);
+    }
+    onUpdateEvent({ ...activeEvent, snapshots: snaps });
+  }
+
   // Brings over the roster only — never RSVP predictions from the
   // source event, since "was arriving late last week" says nothing
   // about this week. Saves re-typing everyone's name for a recurring
@@ -199,8 +225,14 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     setBulkSel(new Set()); setBulkMode(false); vibe(8);
   }
 
+  // Filtered to CURRENT participantIds membership — removing someone
+  // via the ✕ button only strips them from participantIds, it doesn't
+  // delete their snapshot, so counting raw snapshots here would let a
+  // removed person's stale data keep inflating "participating"/"total"
+  // even though they no longer appear anywhere in the visible list.
   function evSum(ev) {
-    const sn = ev.snapshots||[];
+    const idSet = new Set(ev.participantIds || []);
+    const sn = (ev.snapshots||[]).filter(s => idSet.has(s.playerId));
     if (ev.status === 'upcoming') {
       return { total:sn.length, participating:sn.filter(s=>s.rsvp?.participating).length };
     }
@@ -222,6 +254,11 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
       const aLead = a.roles?.includes('Rally Lead') ? 0 : 1;
       const bLead = b.roles?.includes('Rally Lead') ? 0 : 1;
       if (aLead !== bLead) return aLead - bLead;
+      if (sortMode === 'lastAdded') {
+        const ca = getSnap(activeEvent, a.id)?.createdAt || '';
+        const cb = getSnap(activeEvent, b.id)?.createdAt || '';
+        return new Date(cb) - new Date(ca);
+      }
       if (sortMode === 'troopPower' && tracksTroopPower) {
         const ta = getSnap(activeEvent, a.id)?.troopPower ?? -1;
         const tb = getSnap(activeEvent, b.id)?.troopPower ?? -1;
@@ -233,6 +270,30 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
   const participantsList = sortGroup(allEventPlayers.filter(p => !getSnap(activeEvent, p.id)?.rsvp?.substitute));
   const substitutesList  = sortGroup(allEventPlayers.filter(p => getSnap(activeEvent, p.id)?.rsvp?.substitute));
+
+  // Copyable, Discord-ready code block of the full roster — grouped by
+  // rank the same way the on-screen list is, so what you copy always
+  // matches what you see.
+  function generateParticipantsText() {
+    if (!activeEvent) return '';
+    const lines = [`📋 ${activeEvent.name || activeEvent.type} — ${fmtDateShort(activeEvent.date)}`, ''];
+    const groups = groupByRank(participantsList);
+    lines.push(`PARTICIPANTS (${participantsList.length})`);
+    [...ALLIANCE_RANKS, 'Unranked'].forEach(rank => {
+      const group = groups[rank];
+      if (!group.length) return;
+      lines.push(`${rank} (${group.length})`);
+      group.forEach(p => lines.push(`  ${p.username || p.alias || '?'}`));
+    });
+    if (substitutesList.length > 0) {
+      lines.push('', `SUBSTITUTES (${substitutesList.length})`);
+      substitutesList.forEach(p => lines.push(`  ${p.username || p.alias || '?'}`));
+    }
+    return '```\n' + lines.join('\n').trim() + '\n```';
+  }
+  function copyParticipants() {
+    navigator.clipboard.writeText(generateParticipantsText()).then(() => { setParticipantsCopied(true); setTimeout(() => setParticipantsCopied(false), 2000); });
+  }
 
   const bulkTags = isUpcoming
     ? (showsRsvp ? [['🕐 Arriving late','rsvpLate',C.gold],['🏃 Leaving early','early',C.gold],['🎙️ Will join Discord','discord',C.icy],['✓ Present whole time','wholetime',C.green]] : [])
@@ -249,7 +310,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
               <div>
                 <div style={{ fontSize:20, fontWeight:700, color:C.white }}>{EVENT_ICONS[activeEvent.type]||'📋'} {activeEvent.name||activeEvent.type}</div>
-                <div style={{ fontSize:13, color:C.muted }}>{fmtDateShort(activeEvent.date)}{activeEvent.time?` ${activeEvent.time}`:''}{activeEvent.allianceTag?` · [${activeEvent.allianceTag}]`:''}</div>
+                <div style={{ fontSize:16, fontWeight:700, color:C.icy }}>{fmtDateShort(activeEvent.date)}{activeEvent.time?` ${activeEvent.time}`:''}{activeEvent.allianceTag?` · [${activeEvent.allianceTag}]`:''}</div>
               </div>
               <button onClick={() => { setEditingEvent(activeEvent); setEventSheetOpen(true); }} style={{ height:34, padding:'0 12px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontSize:13, cursor:'pointer', flexShrink:0 }}>Edit</button>
             </div>
@@ -328,8 +389,9 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
           {/* Sort toggle */}
           {allEventPlayers.length > 1 && (
-            <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+            <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
               <button onClick={() => setSortMode('alpha')} style={{ height:32, padding:'0 12px', borderRadius:16, background:sortMode==='alpha'?C.gold+'22':C.section, border:`1px solid ${sortMode==='alpha'?C.gold:C.border}`, color:sortMode==='alpha'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>A–Z</button>
+              <button onClick={() => setSortMode('lastAdded')} style={{ height:32, padding:'0 12px', borderRadius:16, background:sortMode==='lastAdded'?C.gold+'22':C.section, border:`1px solid ${sortMode==='lastAdded'?C.gold:C.border}`, color:sortMode==='lastAdded'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>🕐 Last Added</button>
               {tracksTroopPower && (
                 <button onClick={() => setSortMode('troopPower')} style={{ height:32, padding:'0 12px', borderRadius:16, background:sortMode==='troopPower'?C.gold+'22':C.section, border:`1px solid ${sortMode==='troopPower'?C.gold:C.border}`, color:sortMode==='troopPower'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>💪 Troop Power</button>
               )}
@@ -367,17 +429,26 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                     <div style={{ display:'flex', alignItems:'center', gap:6, overflow:'hidden' }}>
                       {isLead && <span style={{ fontSize:12, flexShrink:0 }}>👑</span>}
                       <div style={{ fontSize:15, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+                      {player.allianceRank && <span style={{ fontSize:11, color:C.gold, fontWeight:700, flexShrink:0, padding:'0 6px', borderRadius:6, background:C.gold+'18' }}>{player.allianceRank}</span>}
                       {player.furnaceLevel && <span style={{ fontSize:11, color:C.icy, fontWeight:600, flexShrink:0 }}>{player.furnaceLevel}</span>}
                     </div>
                     {tracksTroopPower && (
-                      <input
-                        type="number"
-                        value={snap?.troopPower ?? ''}
-                        onChange={e => setTroopPower(player.id, e.target.value)}
-                        onClick={e => e.stopPropagation()}
-                        placeholder="Troop power"
-                        style={{ marginTop:4, width:110, height:28, background:C.section, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 8px', fontSize:12, color:C.gold, fontWeight:700, fontFamily:'inherit' }}
-                      />
+                      <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:4 }}>
+                        <input
+                          type="number"
+                          value={snap?.troopPower ?? ''}
+                          onChange={e => setTroopPower(player.id, e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          placeholder="Troop power"
+                          style={{ width:110, height:28, background:C.section, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 8px', fontSize:12, color:C.gold, fontWeight:700, fontFamily:'inherit' }}
+                        />
+                        {[1,2].map(l => (
+                          <button key={l} onClick={e => { e.stopPropagation(); setLegion(player.id, l); }}
+                            style={{ width:32, height:28, borderRadius:8, border:`1px solid ${snap?.legion===l?C.icy:C.border}`, background:snap?.legion===l?C.icy+'22':C.section, color:snap?.legion===l?C.icy:C.muted, fontWeight:700, fontSize:11, cursor:'pointer' }}>
+                            L{l}
+                          </button>
+                        ))}
+                      </div>
                     )}
                     {showsRsvp && (
                       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:3 }}>
@@ -416,14 +487,32 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               return <div style={{ textAlign:'center', padding:'40px 0', color:C.muted }}>No one added yet — type a name above to add them.</div>;
             }
 
+            const rankGroups = groupByRank(participantsList);
+
             return (
               <>
+                <button onClick={copyParticipants}
+                  style={{ width:'100%', height:40, borderRadius:10, marginBottom:14, background:participantsCopied?C.green+'18':C.gold+'18', border:`1px solid ${participantsCopied?C.green:C.gold}44`, color:participantsCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  {participantsCopied ? '✓ Copied' : '📋 Copy participants as code block'}
+                </button>
+
                 <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
                   Participants · {participantsList.length}
                 </div>
                 {participantsList.length === 0
                   ? <div style={{ fontSize:13, color:C.muted, marginBottom:16 }}>None yet.</div>
-                  : participantsList.map(renderRow)}
+                  : [...ALLIANCE_RANKS, 'Unranked'].map(rank => {
+                      const group = rankGroups[rank];
+                      if (!group.length) return null;
+                      return (
+                        <div key={rank}>
+                          <div style={{ fontSize:10, fontWeight:700, color:C.gold, textTransform:'uppercase', letterSpacing:'0.06em', marginTop:10, marginBottom:6 }}>
+                            {rank} ({group.length})
+                          </div>
+                          {group.map(renderRow)}
+                        </div>
+                      );
+                    })}
 
                 <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginTop:16, marginBottom:8 }}>
                   Substitutes · {substitutesList.length}

@@ -22,6 +22,7 @@ export function newPlayer(overrides = {}) {
     // Single source of truth for joiner heroes
     joinerHeroes:       [],   // [{ hero, skillLevel, verified, updatedAt }]
     roles:              [],
+    allianceRank:       null, // 'R5'|'R4'|'R3'|'R2'|'R1'|null — mutually exclusive, unlike roles (which are multi-select)
     teamAssignment:     null,
     notes:              '',
     profileLastUpdated: null,
@@ -137,6 +138,7 @@ export function newSnapshot(playerId, playerProfile, eventId) {
     // in constants.js) — shown next to the player's name in that
     // event's participant list, and charted over time in ProfileView.
     troopPower: null,
+    legion: null, // 1 | 2 | null — also Foundry/Canyon Clash only
     notes: '',
   };
 }
