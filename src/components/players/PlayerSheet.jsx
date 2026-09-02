@@ -5,7 +5,7 @@ import { newPlayer } from '../../data/playerSchema.js';
 import { Field, Inp, Sel, TierPill, SheetHandle } from '../common/Primitives.jsx';
 import { AlliancePicker } from '../common/AlliancePicker.jsx';
 
-const FC_OPTIONS = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios'];
+const FC_OPTIONS = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8'];
 
 // ── Completion logic ───────────────────────────────────────────
 function checkCompletion(p) {

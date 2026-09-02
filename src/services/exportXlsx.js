@@ -8,13 +8,13 @@
  * Export types:
  *   - Full roster
  *   - Event attendance (+ joiner coverage for SvS/Castle events)
- *   - Prep scores
+ *   - Battle plan records
  *
  * Called from DataPanel via exportWorkbook(data, options).
  */
 
 import * as XLSX from 'xlsx';
-import { JOINER_COVERAGE_EVENTS } from '../utils/constants.js';
+import { JOINER_COVERAGE_EVENTS, SHOWS_RSVP_TYPES } from '../utils/constants.js';
 import { buildRosterDataSheet, buildEventsDataSheet, buildPlansDataSheet, buildRolesDataSheet } from './xlsxDataSheets.js';
 
 // ── Styling helpers ────────────────────────────────────────────
@@ -151,15 +151,24 @@ function buildRosterSheet(players) {
 // ── Sheet 2: Event Attendance ──────────────────────────────────
 function buildEventSheet(event, players, includeJoiners) {
   const snapMap = Object.fromEntries((event.snapshots || []).map(s => [s.playerId, s]));
-  const eventPlayers = event.participantIds?.length > 0
-    ? players.filter(p => event.participantIds.includes(p.id))
-    : players;
+  // Explicit roster, no fallback — an event with nobody added yet
+  // exports as empty, not the entire player base. See EventsTab.jsx;
+  // the old "empty participantIds = show everyone" behavior was
+  // retired app-wide and this export had been left out of sync with it.
+  const eventPlayers = players.filter(p => (event.participantIds || []).includes(p.id));
   const isUpcoming = event.status === 'upcoming';
+  const showsRsvp = SHOWS_RSVP_TYPES.includes(event.type);
 
   // Base columns differ by phase — RSVP (a prediction) for upcoming
-  // events, post-event actuals otherwise. Never both at once.
+  // events, post-event actuals otherwise. Never both at once. RSVP
+  // behavior predictions (on time / late / early / Discord / whole
+  // time) only apply to the two SvS/Castle types — every other event
+  // type only ever records intention to participate during the
+  // registration period, matching SHOWS_RSVP_TYPES everywhere else.
   const baseHeaders = isUpcoming
-    ? ['Username', 'Alliance', 'Furnace', 'Participating', 'On Time', 'Will Be Late', 'Will Leave Early', 'Will Join Discord', 'Present Whole Time', 'Notes']
+    ? (showsRsvp
+        ? ['Username', 'Alliance', 'Furnace', 'Participating', 'On Time', 'Will Be Late', 'Will Leave Early', 'Will Join Discord', 'Present Whole Time', 'Notes']
+        : ['Username', 'Alliance', 'Furnace', 'Participating', 'Notes'])
     : ['Username', 'Alliance', 'Furnace', 'Attended', 'No-show', 'Late (No Notice)', 'Joined Voice', 'Notes'];
 
   // Joiner columns — added for SvS / Castle events
@@ -183,18 +192,26 @@ function buildEventSheet(event, players, includeJoiners) {
     const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
 
     const base = isUpcoming
-      ? [
-          cell(p.username || '', style),
-          cell(p.allianceTag || '', style),
-          cell(p.furnaceLevel || '', style),
-          yesNo(snap?.rsvp?.participating),
-          yesNo(snap?.rsvp?.onTime),
-          yesNo(snap?.rsvp?.willBeLate),
-          yesNo(snap?.rsvp?.willLeaveEarly),
-          yesNo(snap?.rsvp?.willJoinDiscord),
-          yesNo(snap?.rsvp?.presentWholeTime),
-          cell(snap?.notes || '', style),
-        ]
+      ? (showsRsvp
+          ? [
+              cell(p.username || '', style),
+              cell(p.allianceTag || '', style),
+              cell(p.furnaceLevel || '', style),
+              yesNo(snap?.rsvp?.participating),
+              yesNo(snap?.rsvp?.onTime),
+              yesNo(snap?.rsvp?.willBeLate),
+              yesNo(snap?.rsvp?.willLeaveEarly),
+              yesNo(snap?.rsvp?.willJoinDiscord),
+              yesNo(snap?.rsvp?.presentWholeTime),
+              cell(snap?.notes || '', style),
+            ]
+          : [
+              cell(p.username || '', style),
+              cell(p.allianceTag || '', style),
+              cell(p.furnaceLevel || '', style),
+              yesNo(snap?.rsvp?.participating),
+              cell(snap?.notes || '', style),
+            ])
       : [
           cell(p.username || '', style),
           cell(p.allianceTag || '', style),
@@ -218,11 +235,18 @@ function buildEventSheet(event, players, includeJoiners) {
     rows.push(base);
   });
 
-  // Summary row
+  // Summary row — filtered to CURRENT participantIds membership. Same
+  // fix as EventsTab.jsx's evSum(): removing someone only strips them
+  // from participantIds, their snapshot object isn't deleted, so
+  // counting raw snapshot values here let a removed person's stale
+  // "participating: true" keep inflating the numerator past the
+  // (correctly filtered) total — the literal "15/14 participating" bug.
   const total = eventPlayers.length;
+  const idSet = new Set(event.participantIds || []);
+  const activeSnaps = Object.values(snapMap).filter(s => idSet.has(s.playerId));
   rows.push([]);
   if (isUpcoming) {
-    const participating = Object.values(snapMap).filter(s => s.rsvp?.participating).length;
+    const participating = activeSnaps.filter(s => s.rsvp?.participating).length;
     rows.push([
       cell('SUMMARY', SUBHEADER_STYLE),
       cell('', SUBHEADER_STYLE),
@@ -230,9 +254,9 @@ function buildEventSheet(event, players, includeJoiners) {
       cell(`${participating}/${total} participating`, SUBHEADER_STYLE),
     ]);
   } else {
-    const attended = Object.values(snapMap).filter(s => s.attendance?.attended === true).length;
-    const noShow   = Object.values(snapMap).filter(s => s.attendance?.noShow).length;
-    const discord  = Object.values(snapMap).filter(s => s.voice?.joined === true).length;
+    const attended = activeSnaps.filter(s => s.attendance?.attended === true).length;
+    const noShow   = activeSnaps.filter(s => s.attendance?.noShow).length;
+    const discord  = activeSnaps.filter(s => s.voice?.joined === true).length;
     rows.push([
       cell('SUMMARY', SUBHEADER_STYLE),
       cell('', SUBHEADER_STYLE),
@@ -246,7 +270,7 @@ function buildEventSheet(event, players, includeJoiners) {
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const baseWidths = isUpcoming
-    ? [18, 10, 9, 13, 9, 12, 14, 14, 16, 24]
+    ? (showsRsvp ? [18, 10, 9, 13, 9, 12, 14, 14, 16, 24] : [18, 10, 9, 13, 24])
     : [18, 10, 9, 11, 9, 15, 11, 24];
   const joinerWidths = joinerHeroList.map(() => 10);
   setColWidths(ws, [...baseWidths, ...joinerWidths]);
@@ -307,41 +331,6 @@ function buildJoinerCoverageSheet(players) {
   return ws;
 }
 
-// ── Sheet 4: Prep Scores ───────────────────────────────────────
-function buildScoresSheet(prepScores, players) {
-  const headers = ['Member', 'Alliance', 'Prep Points', 'Target', 'Gap to Target', '% Complete', 'On Roster', 'Notes', 'Last Updated'];
-  const rows = [headers.map(hdr)];
-
-  const sorted = [...prepScores].sort((a, b) => (b.prepScore || 0) - (a.prepScore || 0));
-
-  sorted.forEach((entry, i) => {
-    const style    = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
-    const onRoster = players.some(p => p.id === entry.playerId || p.username === entry.playerName);
-    const gap      = entry.targetScore && entry.prepScore != null ? entry.targetScore - entry.prepScore : null;
-    const pct      = entry.targetScore && entry.prepScore != null
-      ? Math.min(100, Math.round((entry.prepScore / entry.targetScore) * 100))
-      : null;
-
-    rows.push([
-      cell(entry.playerName || '', style),
-      cell(entry.allianceTag || '', style),
-      cell(entry.prepScore ?? '', { ...style, numFmt: '#,##0' }),
-      cell(entry.targetScore ?? '', { ...style, numFmt: '#,##0' }),
-      cell(gap != null ? gap : '', { ...style, numFmt: '#,##0' }),
-      cell(pct != null ? `${pct}%` : '', pct >= 100 ? YES_STYLE : pct >= 50 ? GOLD_STYLE : NO_STYLE),
-      cell(onRoster ? '✓' : '', onRoster ? YES_STYLE : style),
-      cell(entry.notes || '', style),
-      cell(entry.lastUpdated ? new Date(entry.lastUpdated).toLocaleDateString() : '', style),
-    ]);
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  setColWidths(ws, [18, 10, 14, 14, 14, 12, 10, 24, 14]);
-  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  autoFilter(ws, 'A1:I1');
-  return ws;
-}
-
 // ── Cover sheet ────────────────────────────────────────────────
 function buildCoverSheet(data) {
   const now      = new Date().toLocaleString();
@@ -358,7 +347,6 @@ function buildCoverSheet(data) {
     [cell('Sheets in this file:', SUBHEADER_STYLE)],
     [cell('• Roster', ROW_STYLE), cell('All members and their combat stats', ROW_STYLE)],
     [cell('• Joiner Coverage', ROW_STYLE), cell('Hero Skill 5 ownership across the alliance', ROW_STYLE)],
-    [cell('• Prep Scores', ROW_STYLE), cell('SvS prep points and targets', ROW_STYLE)],
     [cell('• [Event sheets]', ROW_STYLE), cell('One sheet per event — attendance, Discord, performance', ROW_STYLE)],
     [],
     [cell('This file also contains hidden "…Data" sheets (Roster Data, Events Data, etc.) with one row per record. These are how this app reads a spreadsheet back in — leave them alone unless you know what you\'re doing.', { font: { italic: true, sz: 9, name: 'Arial', color: { rgb: '888888' } } })],
@@ -378,7 +366,24 @@ function buildCoverSheet(data) {
 }
 
 // ── Main export function ───────────────────────────────────────
-export function exportWorkbook(data) {
+// options lets a caller (e.g. a future DataPanel.jsx checklist) export
+// only part of the data instead of always generating everything:
+//   includeRoster – Roster + Roster Data + Joiner Coverage + Roles Data
+//   includeEvents – event attendance sheets + Events Data
+//   includePlans  – Plans Data (battle plan records)
+//   eventId       – when set, scopes BOTH events and plans to just that
+//                   one event (plans via plan.eventId) — "battle plans
+//                   due a specific event only"
+// Calling exportWorkbook(data) with no options exports everything, same
+// as before this option support existed.
+export function exportWorkbook(data, options = {}) {
+  const {
+    includeRoster = true,
+    includeEvents = true,
+    includePlans  = true,
+    eventId       = null,
+  } = options;
+
   const wb = XLSX.utils.book_new();
 
   // 1. Cover sheet
@@ -386,22 +391,18 @@ export function exportWorkbook(data) {
   XLSX.utils.book_append_sheet(wb, coverWs, 'Overview');
 
   // 2. Full roster
-  const rosterWs = buildRosterSheet(data.players || []);
-  XLSX.utils.book_append_sheet(wb, rosterWs, 'Roster');
+  if (includeRoster) {
+    const rosterWs = buildRosterSheet(data.players || []);
+    XLSX.utils.book_append_sheet(wb, rosterWs, 'Roster');
 
-  // 3. Joiner coverage
-  const joinerWs = buildJoinerCoverageSheet(data.players || []);
-  if (joinerWs) XLSX.utils.book_append_sheet(wb, joinerWs, 'Joiner Coverage');
-
-  // 4. Prep scores
-  if ((data.prepScores || []).length > 0) {
-    const scoresWs = buildScoresSheet(data.prepScores, data.players || []);
-    XLSX.utils.book_append_sheet(wb, scoresWs, 'Prep Scores');
+    const joinerWs = buildJoinerCoverageSheet(data.players || []);
+    if (joinerWs) XLSX.utils.book_append_sheet(wb, joinerWs, 'Joiner Coverage');
   }
 
-  // 5. One sheet per event (most recent first)
-  const sortedEvents = [...(data.events || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
-  const usedEventSheetNames = new Set(['Overview', 'Roster', 'Joiner Coverage', 'Prep Scores', 'Roster Data', 'Events Data', 'Plans Data', 'Roles Data']);
+  // 3. One sheet per event (most recent first) — scoped to eventId if set
+  const scopedEvents = eventId ? (data.events || []).filter(e => e.id === eventId) : (data.events || []);
+  const sortedEvents = includeEvents ? [...scopedEvents].sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
+  const usedEventSheetNames = new Set(['Overview', 'Roster', 'Joiner Coverage', 'Roster Data', 'Events Data', 'Plans Data', 'Roles Data']);
   sortedEvents.forEach(event => {
     const includeJoiners = JOINER_COVERAGE_EVENTS.includes(event.type);
     const eventWs = buildEventSheet(event, data.players || [], includeJoiners);
@@ -410,35 +411,44 @@ export function exportWorkbook(data) {
     XLSX.utils.book_append_sheet(wb, eventWs, sheetName);
   });
 
-  // 6. Raw "…Data" sheets — one row per record, for re-importing this
+  // 4. Raw "…Data" sheets — one row per record, for re-importing this
   // file back into the app later (see xlsxImportService.js). Hidden by
   // default (Sheet > Unhide to see them) so they don't clutter the
   // view for someone just reading the report.
   const dataSheetNames = [];
-  const rosterDataWs = buildRosterDataSheet(data.players || []);
-  XLSX.utils.book_append_sheet(wb, rosterDataWs, 'Roster Data');
-  dataSheetNames.push('Roster Data');
+  if (includeRoster) {
+    const rosterDataWs = buildRosterDataSheet(data.players || []);
+    XLSX.utils.book_append_sheet(wb, rosterDataWs, 'Roster Data');
+    dataSheetNames.push('Roster Data');
 
-  const eventsDataWs = buildEventsDataSheet(data.events || []);
-  XLSX.utils.book_append_sheet(wb, eventsDataWs, 'Events Data');
-  dataSheetNames.push('Events Data');
+    const rolesDataWs = buildRolesDataSheet(data.customRoles || []);
+    XLSX.utils.book_append_sheet(wb, rolesDataWs, 'Roles Data');
+    dataSheetNames.push('Roles Data');
+  }
 
-  const plansDataWs = buildPlansDataSheet(data.svsPlans || []);
-  XLSX.utils.book_append_sheet(wb, plansDataWs, 'Plans Data');
-  dataSheetNames.push('Plans Data');
+  if (includeEvents) {
+    const eventsDataWs = buildEventsDataSheet(scopedEvents);
+    XLSX.utils.book_append_sheet(wb, eventsDataWs, 'Events Data');
+    dataSheetNames.push('Events Data');
+  }
 
-  const rolesDataWs = buildRolesDataSheet(data.customRoles || []);
-  XLSX.utils.book_append_sheet(wb, rolesDataWs, 'Roles Data');
-  dataSheetNames.push('Roles Data');
+  if (includePlans) {
+    // "Battle plans due a specific event only" — plans link to an
+    // event via plan.eventId, so scoping by eventId filters here too.
+    const scopedPlans = eventId ? (data.svsPlans || []).filter(p => p.eventId === eventId) : (data.svsPlans || []);
+    const plansDataWs = buildPlansDataSheet(scopedPlans);
+    XLSX.utils.book_append_sheet(wb, plansDataWs, 'Plans Data');
+    dataSheetNames.push('Plans Data');
+  }
 
   wb.Workbook = wb.Workbook || {};
   wb.Workbook.Sheets = wb.SheetNames.map(name => ({ Hidden: dataSheetNames.includes(name) ? 1 : 0 }));
 
-  // 7. Generate filename
+  // 5. Generate filename
   const alliance  = data.settings?.allianceTag || 'export';
   const dateStr   = new Date().toISOString().slice(0, 10);
   const filename  = `alliance-manager-${alliance}-${dateStr}.xlsx`;
 
-  // 8. Write and download
+  // 6. Write and download
   XLSX.writeFile(wb, filename, { bookType: 'xlsx', type: 'binary', cellStyles: true });
 }

@@ -79,11 +79,13 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
   // hero they're bringing without any extra plumbing.
   function generateAllRalliesText() {
     const lines = ['📋 Live Rally Room — All Rallies', ''];
+    lines.push("Priority joiners must join FIRST, before anyone else. If a priority joiner is pulled from a rally, whoever joins in their place must match that slot's ratio and hero before joining.");
+    lines.push('');
     state.calculator.leaders.forEach(l => {
       lines.push(`${l.type || 'Rally'} — ${l.name}`);
       if (l.ratio) lines.push(`Ratio: ${l.ratio}`);
       const filled = (l.joiners || []).filter(j => j.heroName);
-      if (filled.length) lines.push(`Joiners: ${filled.map(j => `${j.heroName} → ${j.playerName || '?'}`).join(', ')}`);
+      if (filled.length) lines.push(`Priority joiners: ${filled.map(j => `${j.heroName} → ${j.playerName || '?'}`).join(', ')}`);
       lines.push('');
     });
     return '```\n' + lines.join('\n').trim() + '\n```';

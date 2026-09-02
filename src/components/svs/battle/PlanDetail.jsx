@@ -167,13 +167,15 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
   // the old per-rally-slot copy button entirely.
   function generateSummary() {
     const lines = [`📋 ${plan.name || 'Battle Plan'} — ${plan.date}`, ''];
+    lines.push("Priority joiners must join FIRST, before anyone else. If a priority joiner is pulled from a rally, whoever joins in their place must match that slot's ratio and hero before joining.");
+    lines.push('');
     slots.forEach(slot => {
       if (!slot.leaderName) return;
       lines.push(`${RALLY_ICONS[slot.type] || '⚔️'} ${slot.type} — ${slot.leaderName}`);
       if (slot.ratio) lines.push(`Ratio: ${slot.ratio}`);
       if ((slot.leaderRallyHeroes || []).length) lines.push(`Lead heroes: ${slot.leaderRallyHeroes.join(', ')}`);
       const filled = (slot.joiners || []).filter(j => j.heroName);
-      if (filled.length) lines.push(`Joiners: ${filled.map(j => `${j.heroName} → ${j.playerName || '?'}`).join(', ')}`);
+      if (filled.length) lines.push(`Priority joiners: ${filled.map(j => `${j.heroName} → ${j.playerName || '?'}`).join(', ')}`);
       lines.push('');
     });
     return lines.join('\n').trim();

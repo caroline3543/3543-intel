@@ -87,13 +87,13 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   // would actually post.
   function generateMissingTroopsText() {
     const missing = players.filter(p => !p.troops?.infantry || !p.troops?.lancer || !p.troops?.marksman);
-    const lines = ['📋 Missing Troop Levels', ''];
+    const lines = ['Missing Troop Levels', ''];
     missing.forEach(p => {
       const dn = p.username || p.alias || '?';
       const gaps = [];
-      if (!p.troops?.infantry) gaps.push('🛡️ Infantry');
-      if (!p.troops?.lancer)   gaps.push('⚔️ Lancer');
-      if (!p.troops?.marksman) gaps.push('🏹 Marksman');
+      if (!p.troops?.infantry) gaps.push('Infantry');
+      if (!p.troops?.lancer)   gaps.push('Lancer');
+      if (!p.troops?.marksman) gaps.push('Marksman');
       lines.push(`${dn} — missing ${gaps.join(', ')}`);
     });
     return '```\n' + lines.join('\n').trim() + '\n```';
