@@ -34,11 +34,24 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
   // selection is made (see selectFormation).
   const [showAll, setShowAll] = useState(false);
   const [expandedIndices, setExpandedIndices] = useState(new Set());
+  const [chosenGen, setChosenGen] = useState(null);
   const isCustom = slot.formationMode === 'custom';
 
-  const gensToShow = selectedGenerations.length > 0
-    ? selectedGenerations
-    : Array.from({ length: FORMATION_GEN_CUTOFF }, (_, i) => i + 1);
+  // Only ask "which generation" when Settings has genuinely more than
+  // one selected — with exactly one (or none, meaning "show
+  // everything"), there's nothing ambiguous to ask about, so this
+  // stays out of the way and behaves as before. This intentionally
+  // does NOT reopen the "no per-plan override" decision — Settings is
+  // still the only source of which generations are even choosable
+  // here; this just asks the officer to pick one FROM that set before
+  // browsing, instead of mixing every selected generation together.
+  const needsGenChoice = selectedGenerations.length > 1;
+
+  const gensToShow = needsGenChoice
+    ? (chosenGen ? [chosenGen] : [])
+    : selectedGenerations.length > 0
+      ? selectedGenerations
+      : Array.from({ length: FORMATION_GEN_CUTOFF }, (_, i) => i + 1);
 
   // Real formation data sometimes packs multiple heroes into one array
   // element (e.g. ['Jeronimo', 'Molly & Zinman']) — flatten to a clean
@@ -196,9 +209,11 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
     <div style={{ marginBottom:14 }}>
       <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Formation</label>
       <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>
-        {selectedGenerations.length > 0
-          ? `Showing Gen ${selectedGenerations.join(', ')}. Change in ⚙️ Settings.`
-          : 'Showing all generations — pick which ones apply to you in ⚙️ Settings.'}
+        {needsGenChoice
+          ? `Alliance uses Gen ${selectedGenerations.join(', ')} — pick one below for this rally.`
+          : selectedGenerations.length > 0
+            ? `Showing Gen ${selectedGenerations.join(', ')}. Change in ⚙️ Settings.`
+            : 'Showing all generations — pick which ones apply to you in ⚙️ Settings.'}
       </div>
 
       {/* Rally Leader's saved setup — MUCH more prominent than a
@@ -230,6 +245,30 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
             );
           })}
           <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>Tap to apply — based on {leaderPlayer.username || leaderPlayer.alias}'s saved rally setup. You can still change anything after.</div>
+        </div>
+      )}
+
+      {/* Which generation? — only asked when Settings has more than
+          one selected; otherwise this whole gate is skipped and the
+          toggle/cards show immediately as before. */}
+      {needsGenChoice && !chosenGen ? (
+        <div style={{ background:C.section, borderRadius:12, padding:16 }}>
+          <div style={{ fontSize:13, color:C.gold, fontWeight:700, marginBottom:10 }}>Which generation for this rally?</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+            {selectedGenerations.map(g => (
+              <button key={g} onClick={() => setChosenGen(g)}
+                style={{ padding:'12px 18px', borderRadius:12, border:`1px solid ${C.border}`, background:C.card, color:C.white, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                Gen {g}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+      <>
+      {needsGenChoice && chosenGen && (
+        <div style={{ fontSize:12, color:C.muted, marginBottom:10 }}>
+          Showing Gen {chosenGen}.{' '}
+          <button onClick={() => setChosenGen(null)} style={{ background:'none', border:'none', color:C.gold, fontSize:12, cursor:'pointer', padding:0, textDecoration:'underline' }}>Change</button>
         </div>
       )}
 
@@ -278,16 +317,34 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
           </div>
 
           <div style={{ marginBottom:10 }}>
-            <label style={{ fontSize:11, color:C.muted, display:'block', marginBottom:6 }}>Requested joiner heroes</label>
+            <label style={{ fontSize:11, color:C.muted, display:'block', marginBottom:2 }}>
+              Requested joiner heroes {(slot.requestedHeroes || []).length > 0 && <span style={{ color:C.gold, fontWeight:700 }}>· {(slot.requestedHeroes || []).length}/4</span>}
+            </label>
+            <div style={{ fontSize:11, color:C.muted, marginBottom:8 }}>Tap a hero to add it — tap the same one again to stack it (e.g. Norah ×3).</div>
+
+            {(slot.requestedHeroes || []).length > 0 && (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
+                {Object.entries((slot.requestedHeroes || []).reduce((acc, h) => { acc[h] = (acc[h]||0)+1; return acc; }, {})).map(([hero, count]) => (
+                  <button key={hero} onClick={() => {
+                    const c = [...(slot.requestedHeroes || [])];
+                    c.splice(c.lastIndexOf(hero), 1);
+                    upd({ requestedHeroes: c });
+                  }} style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${C.gold}`, background:C.gold+'22', color:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                    {hero}{count > 1 ? ` ×${count}` : ''} ✕
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {CUSTOM_HERO_OPTIONS.map(hero => {
-                const sel = (slot.requestedHeroes || []).includes(hero);
+                const atCap = (slot.requestedHeroes || []).length >= 4;
                 return (
-                  <button key={hero} onClick={() => {
-                    const c = slot.requestedHeroes || [];
-                    upd({ requestedHeroes: sel ? c.filter(h => h !== hero) : [...c, hero] });
-                  }} style={{ padding:'5px 10px', borderRadius:12, border:`1px solid ${sel?C.gold:C.border}`, background:sel?C.gold+'22':C.card, color:sel?C.gold:C.muted, fontWeight:sel?700:400, fontSize:12, cursor:'pointer' }}>
-                    {sel ? '✓ ' : ''}{hero}
+                  <button key={hero} disabled={atCap} onClick={() => {
+                    if (atCap) return;
+                    upd({ requestedHeroes: [...(slot.requestedHeroes || []), hero] });
+                  }} style={{ padding:'5px 10px', borderRadius:12, border:`1px solid ${C.border}`, background:C.card, color:atCap?C.muted+'66':C.muted, fontWeight:400, fontSize:12, cursor:atCap?'default':'pointer', opacity:atCap?0.5:1 }}>
+                    {hero}
                   </button>
                 );
               })}
@@ -404,6 +461,8 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
           </div>
         );
       })()}
+      </>
+      )}
     </div>
   );
 }

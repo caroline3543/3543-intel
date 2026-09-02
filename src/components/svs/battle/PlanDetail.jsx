@@ -96,18 +96,20 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
   //    the officer picked/changed something the leader hasn't
   //    confirmed, so it needs a real check-in before relying on it.
   //  - "coverage": a priority joiner hero has zero eligible attendees.
-  // Also the single source of truth for the plan-wide unfillable count
-  // (previously computed separately — now derived from this instead).
-  const autoFlags = [];
+  // Grouped ONE LINE PER RALLY, not one line per hero — three unset
+  // heroes for the same leader used to produce three separate "Ask
+  // Chaz..." lines; now it's one line naming all three. unfillableCount
+  // (the plan-wide banner) still counts individual heroes underneath,
+  // just the checklist TEXT is what's grouped for readability.
+  const askIssues = [];
+  const coverageIssues = [];
   slots.forEach(slot => {
     if (slot.leaderId && slot.leaderName) {
       const leaderPlayer = players.find(p => p.id === slot.leaderId);
       const savedHeroes = new Set();
       (leaderPlayer?.leaderProfile?.teams || []).forEach(t => (t.leadHeroes || []).forEach(h => h && savedHeroes.add(h)));
       (slot.leaderRallyHeroes || []).forEach(h => {
-        if (h && !savedHeroes.has(h)) {
-          autoFlags.push({ id:`${slot.id}-ask-${h}`, type:'ask', text:`Ask ${slot.leaderName} if they have ${h} — not in their saved setup` });
-        }
+        if (h && !savedHeroes.has(h)) askIssues.push({ slotId: slot.id, leaderName: slot.leaderName, hero: h });
       });
     }
     if (linkedEvent) {
@@ -119,13 +121,29 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
       (slot.joiners || []).forEach(j => {
         if (!j.heroName) return;
         const eligible = pool.filter(p => playerCanFillSlot(p, j.heroName) && (!hasReqs || meetsTroopReqs(p, slot.troopReqs).ok));
-        if (eligible.length === 0) {
-          autoFlags.push({ id:`${slot.id}-cov-${j.heroName}`, type:'coverage', text:`${j.heroName} needed for ${slot.leaderName || 'this'}'s rally — no one eligible yet` });
-        }
+        if (eligible.length === 0) coverageIssues.push({ slotId: slot.id, leaderName: slot.leaderName || 'this', hero: j.heroName });
       });
     }
   });
-  const unfillableCount = autoFlags.filter(f => f.type === 'coverage').length;
+
+  function groupFlags(issues, type, buildText) {
+    const bySlot = new Map();
+    issues.forEach(i => {
+      if (!bySlot.has(i.slotId)) bySlot.set(i.slotId, { leaderName: i.leaderName, heroes: [] });
+      bySlot.get(i.slotId).heroes.push(i.hero);
+    });
+    return Array.from(bySlot.entries()).map(([slotId, g]) => ({
+      id: `${slotId}-${type}`,
+      type,
+      text: buildText(g.leaderName, g.heroes),
+    }));
+  }
+
+  const autoFlags = [
+    ...groupFlags(askIssues, 'ask', (leader, heroes) => `Ask ${leader} if they have ${heroes.join(', ')} — not in their saved setup`),
+    ...groupFlags(coverageIssues, 'coverage', (leader, heroes) => `${heroes.join(', ')} needed for ${leader}'s rally — no one eligible yet`),
+  ];
+  const unfillableCount = coverageIssues.length;
 
   // ── Unallocated backups ────────────────────────────────────────
   // Attending roster members not currently used as a priority joiner
