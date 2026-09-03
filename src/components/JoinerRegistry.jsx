@@ -161,10 +161,24 @@ function StackingView({ players }) {
 }
 
 // ── Meta View ──────────────────────────────────────────────────
-function MetaView({ players }) {
-  const [selectedGen, setSelectedGen]   = useState(6);
+// selectedGenerations comes straight from Settings (see
+// SettingsPanel.jsx / FormationPicker.jsx) — explicit list, not
+// cumulative, empty means "no filter, show everything". Defaulting
+// this tab to that same scope means what you browse here actually
+// matches what Battle Plan will suggest, instead of always showing
+// every generation regardless of what the alliance is using.
+function MetaView({ players, selectedGenerations = [] }) {
+  const hasFilter = selectedGenerations.length > 0;
+  const [showAllGens, setShowAllGens] = useState(!hasFilter);
+  const [selectedGen, setSelectedGen] = useState(
+    hasFilter ? selectedGenerations[0] : (JOINER_META[JOINER_META.length - 1]?.gen ?? 1)
+  );
   const [selectedType, setSelectedType] = useState('Defense');
   const [selectedRatio, setSelectedRatio] = useState('Any');
+
+  const gensToShow = (hasFilter && !showAllGens)
+    ? JOINER_META.filter(g => selectedGenerations.includes(g.gen))
+    : JOINER_META;
 
   const genData = JOINER_META.find(g=>g.gen===selectedGen);
   let formations = genData?.formations||[];
@@ -188,13 +202,24 @@ function MetaView({ players }) {
       <div style={{ background:C.card, borderRadius:12, padding:16, marginBottom:16 }}>
         <div style={{ fontSize:15, fontWeight:700, color:C.white, marginBottom:14 }}>📐 Meta Recommendation</div>
         <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Generation</div>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:14 }}>
-          {JOINER_META.map(g=>(
-            <button key={g.gen} onClick={()=>{setSelectedGen(g.gen);setSelectedRatio('Any');}} style={{ padding:'8px 14px', borderRadius:20, border:`1px solid ${selectedGen===g.gen?C.gold:C.border}`, background:selectedGen===g.gen?C.gold+'22':C.section, color:selectedGen===g.gen?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
-              Gen {g.gen}
-            </button>
-          ))}
+        <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:8 }}>
+          {gensToShow.map(g=>{
+            const inSettings = !hasFilter || selectedGenerations.includes(g.gen);
+            return (
+              <button key={g.gen} onClick={()=>{setSelectedGen(g.gen);setSelectedRatio('Any');}} style={{ padding:'8px 14px', borderRadius:20, border:`1px solid ${selectedGen===g.gen?C.gold:C.border}`, background:selectedGen===g.gen?C.gold+'22':C.section, color:selectedGen===g.gen?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                Gen {g.gen}{!inSettings?' ⚠':''}
+              </button>
+            );
+          })}
         </div>
+        {hasFilter && (
+          <button onClick={()=>setShowAllGens(v=>!v)} style={{ background:'none', border:'none', color:C.gold, fontSize:12, fontWeight:600, cursor:'pointer', padding:0, marginBottom:8 }}>
+            {showAllGens ? '↑ Show only my Settings generations' : '↓ Show all generations'}
+          </button>
+        )}
+        {hasFilter && !selectedGenerations.includes(selectedGen) && (
+          <div style={{ fontSize:11, color:C.gold, marginBottom:14 }}>⚠ Gen {selectedGen} isn't in your current Settings selection — Battle Plan won't suggest this generation.</div>
+        )}
         <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Type</div>
         <div style={{ display:'flex', gap:8, marginBottom:14 }}>
           {['Defense','Offense'].map(t=>(
@@ -247,7 +272,7 @@ function MetaView({ players }) {
 }
 
 // ── JoinerRegistry (main export) ──────────────────────────────
-export default function JoinerRegistry({ players, onUpdatePlayer, onClose }) {
+export default function JoinerRegistry({ players, onUpdatePlayer, onClose, settings = {} }) {
   const [view, setView] = useState('registry');
 
   const counts = getJoinerHeroCounts(players, JOINER_HEROES);
@@ -292,7 +317,7 @@ export default function JoinerRegistry({ players, onUpdatePlayer, onClose }) {
         )}
         {view==='coverage'&&<CoverageView players={players}/>}
         {view==='stacking'&&<StackingView players={players}/>}
-        {view==='meta'&&<MetaView players={players}/>}
+        {view==='meta'&&<MetaView players={players} selectedGenerations={settings.selectedGenerations || []}/>}
       </div>
     </div>
   );
