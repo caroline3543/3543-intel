@@ -47,6 +47,14 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   // already sitting in BOTH (data predates this rule). Either way this
   // is a real decision, not a dismissible notice — no auto-timeout.
   const [legionModal, setLegionModal] = useState(null);
+  // Roster verification — session-only, not persisted. Resets when you
+  // leave the event or turn it off; there's no saved "verified as of"
+  // record. Confirmed names move into their own section rather than
+  // just getting a checkmark in place, so the unconfirmed list
+  // visibly shrinks as you work through the in-game roster.
+  const [verifyMode, setVerifyMode]   = useState(false);
+  const [confirmedIds, setConfirmedIds] = useState(new Set());
+  const [touchStartX, setTouchStartX] = useState(null);
   const [filterTag, setFilterTag]     = useState('');
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventSheetOpen, setEventSheetOpen] = useState(false);
@@ -93,6 +101,52 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     return allEvents.find(e => e.id !== ev.id && e.date === ev.date && e.type === ev.type && e.legion === otherLegion) || null;
   }
   const listedEvents = sorted.filter(ev => eventsView === 'archive' ? isArchived(ev) : !isArchived(ev));
+
+  // Persistent per-Legion color — applied everywhere on an event page
+  // (header, participant borders, list card accents) so which Legion
+  // you're looking at is a color you register at a glance, not text
+  // you have to read.
+  function legionColor(legion) {
+    if (legion === 1) return C.icy;
+    if (legion === 2) return C.lan;
+    return null;
+  }
+
+  // Swipe-eligible events — Active (non-archived) only, regardless of
+  // whatever type/tag filter or Active/Archive toggle is currently
+  // applied on the list screen. Swiping through an event's detail view
+  // always draws from this same full active set.
+  const activeSwipeList = sorted.filter(ev => !isArchived(ev));
+
+  // Consecutive no-shows for one player, at one event TYPE only — a
+  // Foundry streak and an SvS streak are tracked independently, never
+  // mixed. Walks backward through past (non-upcoming) events of the
+  // same type, most recent first, counting while they were marked
+  // no-show; stops at the first event they weren't. An event where the
+  // player has no snapshot at all (wasn't part of that event) is
+  // skipped rather than breaking the streak — we simply don't know
+  // anything about their attendance there.
+  function noShowStreak(playerId, eventType, excludeEventId) {
+    const sameType = events
+      .filter(e => e.type === eventType && e.id !== excludeEventId && e.status !== 'upcoming')
+      .sort((a,b) => `${b.date}T${b.time||'00:00'}`.localeCompare(`${a.date}T${a.time||'00:00'}`));
+    let streak = 0;
+    for (const ev of sameType) {
+      const snap = (ev.snapshots||[]).find(s => s.playerId === playerId);
+      if (!snap) continue;
+      if (snap.attendance?.noShow) streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  // Capped display — a wall of hearts past 3 stops being informative
+  // and starts breaking the row layout. This cap wasn't specified;
+  // easy to change.
+  function noShowBadge(streak) {
+    if (streak <= 0) return null;
+    return streak <= 3 ? '💔'.repeat(streak) : `💔×${streak}`;
+  }
 
   function getSnap(ev, pid) { return (ev.snapshots||[]).find(s => s.playerId===pid); }
 
@@ -437,18 +491,48 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           </div>
         </div>
       )}
-      {activeEvent ? (
-        <div>
-          <button onClick={() => { setActiveEventId(null); setBulkMode(false); setBulkSel(new Set()); setAddQuery(''); setAddResults([]); }} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', marginBottom:16, padding:0 }}>
-            ← Back to Events
-          </button>
-          <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
+      {activeEvent ? (() => {
+        const lc = legionColor(activeEvent.legion);
+        const swipeIdx = activeSwipeList.findIndex(ev => ev.id === activeEvent.id);
+        const canSwipeNext = swipeIdx !== -1 && swipeIdx < activeSwipeList.length - 1;
+        const canSwipePrev = swipeIdx > 0;
+        function goToEvent(ev) {
+          if (!ev) return;
+          setActiveEventId(ev.id);
+          setBulkMode(false); setBulkSel(new Set()); setAddQuery(''); setAddResults([]);
+          setVerifyMode(false); setConfirmedIds(new Set());
+          vibe(8);
+        }
+        function handleTouchStart(e) { setTouchStartX(e.touches[0].clientX); }
+        function handleTouchEnd(e) {
+          if (touchStartX == null) return;
+          const dx = e.changedTouches[0].clientX - touchStartX;
+          setTouchStartX(null);
+          if (Math.abs(dx) < 60) return; // minimum swipe distance — avoids misfiring on ordinary taps/scrolls
+          if (dx < 0 && canSwipeNext) goToEvent(activeSwipeList[swipeIdx + 1]);
+          else if (dx > 0 && canSwipePrev) goToEvent(activeSwipeList[swipeIdx - 1]);
+        }
+        return (
+        <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+            <button onClick={() => { setActiveEventId(null); setBulkMode(false); setBulkSel(new Set()); setAddQuery(''); setAddResults([]); setVerifyMode(false); setConfirmedIds(new Set()); }} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', padding:0 }}>
+              ← Back to Events
+            </button>
+            {swipeIdx !== -1 && (
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <button onClick={() => goToEvent(activeSwipeList[swipeIdx - 1])} disabled={!canSwipePrev} style={{ background:'none', border:'none', color:canSwipePrev?C.gold:C.border, fontSize:18, cursor:canSwipePrev?'pointer':'default', padding:0 }}>‹</button>
+                <span style={{ fontSize:11, color:C.muted }}>{swipeIdx + 1} of {activeSwipeList.length}</span>
+                <button onClick={() => goToEvent(activeSwipeList[swipeIdx + 1])} disabled={!canSwipeNext} style={{ background:'none', border:'none', color:canSwipeNext?C.gold:C.border, fontSize:18, cursor:canSwipeNext?'pointer':'default', padding:0 }}>›</button>
+              </div>
+            )}
+          </div>
+          <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16, borderTop:lc?`4px solid ${lc}`:'none' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
               <div>
                 <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                   <div style={{ fontSize:20, fontWeight:700, color:C.white }}>{EVENT_ICONS[activeEvent.type]||'📋'} {activeEvent.name||activeEvent.type}</div>
                   {activeEvent.legion && (
-                    <span style={{ fontSize:12, fontWeight:800, color:C.icy, padding:'2px 9px', borderRadius:10, background:C.icy+'22', border:`1px solid ${C.icy}55` }}>Legion {activeEvent.legion}</span>
+                    <span style={{ fontSize:12, fontWeight:800, color:lc, padding:'2px 9px', borderRadius:10, background:lc+'22', border:`1px solid ${lc}55` }}>Legion {activeEvent.legion}</span>
                   )}
                 </div>
                 <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:4 }}>
@@ -621,14 +705,17 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               const isSel = bulkSel.has(player.id);
               const isLead = player.roles?.includes('Rally Lead');
               const legionConflict = siblingConflictIds.has(player.id);
+              const streak = noShowStreak(player.id, activeEvent.type, activeEvent.id);
+              const heart = noShowBadge(streak);
               return (
-                <div key={player.id} onClick={() => { if (bulkMode) { const n=new Set(bulkSel); isSel?n.delete(player.id):n.add(player.id); setBulkSel(n); } else openSnap(activeEvent, player); }} style={{ background:isSel?C.gold+'18':C.card, borderRadius:10, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${legionConflict?C.red+'88':isSel?C.gold:isLead?C.gold+'55':C.border+'44'}`, WebkitTapHighlightColor:'transparent' }}>
+                <div key={player.id} onClick={() => { if (bulkMode) { const n=new Set(bulkSel); isSel?n.delete(player.id):n.add(player.id); setBulkSel(n); } else openSnap(activeEvent, player); }} style={{ background:isSel?C.gold+'18':C.card, borderRadius:10, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${legionConflict?C.red+'88':isSel?C.gold:isLead?C.gold+'55':(lc?lc+'44':C.border+'44')}`, WebkitTapHighlightColor:'transparent' }}>
                   {bulkMode && <div style={{ width:22, height:22, borderRadius:'50%', border:`2px solid ${isSel?C.gold:C.border}`, background:isSel?C.gold:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{isSel && <span style={{ fontSize:12, color:C.bg, fontWeight:700 }}>✓</span>}</div>}
                   <div style={{ width:36, height:36, borderRadius:'50%', background:(isLead?C.gold:C.muted)+'33', border:`1.5px solid ${isLead?C.gold:C.muted}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:14, color:C.white, flexShrink:0 }}>{initials(dn)}</div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:6, overflow:'hidden' }}>
                       {isLead && <span style={{ fontSize:12, flexShrink:0 }}>👑</span>}
                       <div style={{ fontSize:15, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+                      {heart && <span title={`${streak} consecutive ${activeEvent.type} no-shows`} style={{ fontSize:12, flexShrink:0 }}>{heart}</span>}
                       {player.allianceRank && <span style={{ fontSize:11, color:C.gold, fontWeight:700, flexShrink:0, padding:'0 6px', borderRadius:6, background:C.gold+'18' }}>{player.allianceRank}</span>}
                       {player.furnaceLevel && <span style={{ fontSize:11, color:C.icy, fontWeight:600, flexShrink:0 }}>{player.furnaceLevel}</span>}
                       {legionConflict && (
@@ -684,6 +771,34 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               );
             }
 
+            // Verify-mode row — tapping moves a name between the
+            // Unconfirmed and Confirmed sections instead of opening
+            // the snapshot editor. Session-only: nothing here is saved.
+            function renderVerifyRow(player, confirmed) {
+              const dn = player.username||player.alias||'Unknown';
+              const streak = noShowStreak(player.id, activeEvent.type, activeEvent.id);
+              const heart = noShowBadge(streak);
+              return (
+                <div key={player.id} onClick={() => {
+                    setConfirmedIds(prev => {
+                      const n = new Set(prev);
+                      confirmed ? n.delete(player.id) : n.add(player.id);
+                      return n;
+                    });
+                    vibe(6);
+                  }}
+                  style={{ background:confirmed?C.green+'14':C.card, borderRadius:10, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${confirmed?C.green+'66':(lc?lc+'44':C.border+'44')}`, WebkitTapHighlightColor:'transparent' }}>
+                  <div style={{ width:26, height:26, borderRadius:'50%', border:`2px solid ${confirmed?C.green:C.border}`, background:confirmed?C.green:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    {confirmed && <span style={{ fontSize:13, color:C.bg, fontWeight:700 }}>✓</span>}
+                  </div>
+                  <div style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', gap:6 }}>
+                    <div style={{ fontSize:15, fontWeight:700, color:confirmed?C.green:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+                    {heart && <span title={`${streak} consecutive ${activeEvent.type} no-shows`} style={{ fontSize:12, flexShrink:0 }}>{heart}</span>}
+                  </div>
+                </div>
+              );
+            }
+
             if (allEventPlayers.length === 0) {
               return <div style={{ textAlign:'center', padding:'40px 0', color:C.muted }}>No one added yet — type a name above to add them.</div>;
             }
@@ -692,28 +807,62 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
             return (
               <>
-                <button onClick={copyParticipants}
-                  style={{ width:'100%', height:40, borderRadius:10, marginBottom:14, background:participantsCopied?C.green+'18':C.gold+'18', border:`1px solid ${participantsCopied?C.green:C.gold}44`, color:participantsCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                  {participantsCopied ? '✓ Copied' : '📋 Copy participants as code block'}
-                </button>
-
-                <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
-                  Participants · {participantsList.length}
+                <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+                  <button onClick={copyParticipants}
+                    style={{ flex:1, height:40, borderRadius:10, background:participantsCopied?C.green+'18':C.gold+'18', border:`1px solid ${participantsCopied?C.green:C.gold}44`, color:participantsCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                    {participantsCopied ? '✓ Copied' : '📋 Copy participants as code block'}
+                  </button>
+                  <button onClick={() => { setVerifyMode(v => !v); setBulkMode(false); setBulkSel(new Set()); setConfirmedIds(new Set()); }}
+                    style={{ height:40, padding:'0 14px', borderRadius:10, background:verifyMode?C.gold+'22':C.section, border:`1px solid ${verifyMode?C.gold:C.border}`, color:verifyMode?C.gold:C.muted, fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+                    🔒 {verifyMode ? 'Exit Verify' : 'Verify Roster'}
+                  </button>
                 </div>
-                {participantsList.length === 0
-                  ? <div style={{ fontSize:13, color:C.muted, marginBottom:16 }}>None yet.</div>
-                  : [...ALLIANCE_RANKS, 'Unranked'].map(rank => {
-                      const group = rankGroups[rank];
-                      if (!group.length) return null;
-                      return (
-                        <div key={rank}>
-                          <div style={{ fontSize:10, fontWeight:700, color:C.gold, textTransform:'uppercase', letterSpacing:'0.06em', marginTop:10, marginBottom:6 }}>
-                            {rank} ({group.length})
+
+                {verifyMode ? (() => {
+                  const unconfirmed = participantsList.filter(p => !confirmedIds.has(p.id));
+                  const confirmedPlayers = participantsList.filter(p => confirmedIds.has(p.id));
+                  return (
+                    <>
+                      <div style={{ background:C.gold+'14', border:`1px solid ${C.gold}55`, borderRadius:10, padding:'10px 14px', marginBottom:14, fontSize:12, color:C.white }}>
+                        🔒 Tap a name as you find them in-game — it moves down to Confirmed.
+                      </div>
+                      <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
+                        Unconfirmed · {unconfirmed.length}
+                      </div>
+                      {unconfirmed.length === 0
+                        ? <div style={{ fontSize:13, color:C.green, marginBottom:16 }}>✓ Everyone confirmed.</div>
+                        : unconfirmed.map(p => renderVerifyRow(p, false))}
+                      {confirmedPlayers.length > 0 && (
+                        <>
+                          <div style={{ fontSize:11, fontWeight:700, color:C.green, textTransform:'uppercase', letterSpacing:'0.07em', marginTop:16, marginBottom:8 }}>
+                            ✓ Confirmed · {confirmedPlayers.length}
                           </div>
-                          {group.map(renderRow)}
-                        </div>
-                      );
-                    })}
+                          {confirmedPlayers.map(p => renderVerifyRow(p, true))}
+                        </>
+                      )}
+                    </>
+                  );
+                })() : (
+                  <>
+                    <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
+                      Participants · {participantsList.length}
+                    </div>
+                    {participantsList.length === 0
+                      ? <div style={{ fontSize:13, color:C.muted, marginBottom:16 }}>None yet.</div>
+                      : [...ALLIANCE_RANKS, 'Unranked'].map(rank => {
+                          const group = rankGroups[rank];
+                          if (!group.length) return null;
+                          return (
+                            <div key={rank}>
+                              <div style={{ fontSize:10, fontWeight:700, color:C.gold, textTransform:'uppercase', letterSpacing:'0.06em', marginTop:10, marginBottom:6 }}>
+                                {rank} ({group.length})
+                              </div>
+                              {group.map(renderRow)}
+                            </div>
+                          );
+                        })}
+                  </>
+                )}
 
                 <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginTop:16, marginBottom:8 }}>
                   Substitutes · {substitutesList.length}
@@ -725,7 +874,8 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             );
           })()}
         </div>
-      ) : (
+        );
+      })() : (
         <>
           <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:8 }}>
             {['All',...EVENT_TYPES].map(t => (
@@ -761,13 +911,14 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             function renderEventCard(ev) {
               const s = evSum(ev);
               const sc = ev.status==='active'?C.green:ev.status==='completed'?C.muted:C.icy;
+              const lc = legionColor(ev.legion);
               return (
-                <div key={ev.id} onClick={() => setActiveEventId(ev.id)} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, cursor:'pointer', border:`1px solid ${ev.status==='active'?C.green+'44':C.border+'44'}`, WebkitTapHighlightColor:'transparent' }}>
+                <div key={ev.id} onClick={() => setActiveEventId(ev.id)} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, cursor:'pointer', border:`1px solid ${ev.status==='active'?C.green+'44':C.border+'44'}`, borderLeft:lc?`4px solid ${lc}`:undefined, WebkitTapHighlightColor:'transparent' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                         <div style={{ fontSize:16, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{EVENT_ICONS[ev.type]||'📋'} {ev.name||ev.type}</div>
-                        {ev.legion && <span style={{ fontSize:10, fontWeight:800, color:C.icy, padding:'1px 7px', borderRadius:8, background:C.icy+'22', flexShrink:0 }}>L{ev.legion}</span>}
+                        {ev.legion && <span style={{ fontSize:10, fontWeight:800, color:lc, padding:'1px 7px', borderRadius:8, background:lc+'22', flexShrink:0 }}>L{ev.legion}</span>}
                       </div>
                       <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:3 }}>
                         <span style={{ fontSize:12, color:C.muted }}>{fmtDateShort(ev.date)}</span>
@@ -827,13 +978,13 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                   <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>{fmtDateShort(date)}</div>
                   {l1.length > 0 && (
                     <div style={{ marginBottom:10 }}>
-                      <div style={{ fontSize:11, fontWeight:800, color:C.icy, marginBottom:6 }}>⚔️ Legion 1</div>
+                      <div style={{ fontSize:11, fontWeight:800, color:legionColor(1), marginBottom:6 }}>⚔️ Legion 1</div>
                       {l1.map(renderEventCard)}
                     </div>
                   )}
                   {l2.length > 0 && (
                     <div style={{ marginBottom:10 }}>
-                      <div style={{ fontSize:11, fontWeight:800, color:C.icy, marginBottom:6 }}>⚔️ Legion 2</div>
+                      <div style={{ fontSize:11, fontWeight:800, color:legionColor(2), marginBottom:6 }}>⚔️ Legion 2</div>
                       {l2.map(renderEventCard)}
                     </div>
                   )}
