@@ -40,6 +40,8 @@ function groupByRank(list) {
 // automatically the moment someone is added here, not chosen manually.
 export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent }) {
   const [filterType, setFilterType]   = useState('All');
+  const [toastMsg, setToastMsg]       = useState(null);
+  function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); }
   const [filterTag, setFilterTag]     = useState('');
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventSheetOpen, setEventSheetOpen] = useState(false);
@@ -76,6 +78,15 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   // timezone math involved.
   const todayStr = new Date().toISOString().slice(0, 10);
   function isArchived(ev) { return ev.status === 'completed' || ev.date < todayStr; }
+
+  // Legion 1 and Legion 2 events on the same date are the SAME real
+  // occasion split into two groups — a player can only physically be
+  // in one. "Sibling" = same date, same type, the opposite Legion.
+  function findSiblingLegionEvent(ev, allEvents) {
+    if (!ev?.legion) return null;
+    const otherLegion = ev.legion === 1 ? 2 : 1;
+    return allEvents.find(e => e.id !== ev.id && e.date === ev.date && e.type === ev.type && e.legion === otherLegion) || null;
+  }
   const listedEvents = sorted.filter(ev => eventsView === 'archive' ? isArchived(ev) : !isArchived(ev));
 
   function getSnap(ev, pid) { return (ev.snapshots||[]).find(s => s.playerId===pid); }
@@ -107,6 +118,11 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
   function addParticipant(player) {
     if (!activeEvent) return;
+    const sibling = findSiblingLegionEvent(activeEvent, events);
+    if (sibling && (sibling.participantIds || []).includes(player.id)) {
+      showToast(`${player.username || player.alias || 'That player'} is already in Legion ${sibling.legion} for this event — can't be in both`);
+      return;
+    }
     const participantIds = [...new Set([...(activeEvent.participantIds || []), player.id])];
     const snaps = [...(activeEvent.snapshots || [])];
     const idx = snaps.findIndex(s => s.playerId === player.id);
@@ -129,9 +145,18 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   // and silently drop all but the last person.
   function addParticipantsBatch(playersToAdd) {
     if (!activeEvent || playersToAdd.length === 0) return;
-    const participantIds = [...new Set([...(activeEvent.participantIds || []), ...playersToAdd.map(p => p.id)])];
+    const sibling = findSiblingLegionEvent(activeEvent, events);
+    const siblingIds = new Set(sibling?.participantIds || []);
+    const blocked = playersToAdd.filter(p => siblingIds.has(p.id));
+    const allowed = playersToAdd.filter(p => !siblingIds.has(p.id));
+    if (blocked.length > 0) {
+      const names = blocked.map(p => p.username || p.alias || '?').join(', ');
+      showToast(`Already in Legion ${sibling.legion} — skipped: ${names}`);
+    }
+    if (allowed.length === 0) return;
+    const participantIds = [...new Set([...(activeEvent.participantIds || []), ...allowed.map(p => p.id)])];
     const snaps = [...(activeEvent.snapshots || [])];
-    playersToAdd.forEach(player => {
+    allowed.forEach(player => {
       const idx = snaps.findIndex(s => s.playerId === player.id);
       if (idx >= 0) {
         snaps[idx] = { ...snaps[idx], rsvp: { ...snaps[idx].rsvp, participating: true, substitute: addAsSubstitute } };
@@ -334,6 +359,11 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
   return (
     <div style={{ padding:'16px 20px 0' }}>
+      {toastMsg && (
+        <div style={{ position:'fixed', top:20, left:'50%', transform:'translateX(-50%)', background:C.card+'ee', backdropFilter:'blur(12px)', border:`1px solid ${C.gold}44`, borderRadius:20, padding:'10px 20px', fontSize:13, fontWeight:600, color:C.gold, zIndex:800, maxWidth:'90%', textAlign:'center', pointerEvents:'none' }}>
+          {toastMsg}
+        </div>
+      )}
       {activeEvent ? (
         <div>
           <button onClick={() => { setActiveEventId(null); setBulkMode(false); setBulkSel(new Set()); setAddQuery(''); setAddResults([]); }} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', marginBottom:16, padding:0 }}>
@@ -416,7 +446,11 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           ) : (() => {
             const already = new Set(activeEvent.participantIds || []);
             const pool = players.filter(p => !already.has(p.id));
-            const { matched: addMatched, unmatched: addUnmatched } = matchNamesToPlayers(pasteAddText, pool);
+            const { matched: rawMatched, unmatched: addUnmatched } = matchNamesToPlayers(pasteAddText, pool);
+            const sibling = findSiblingLegionEvent(activeEvent, events);
+            const siblingIds = new Set(sibling?.participantIds || []);
+            const addMatched = rawMatched.filter(p => !siblingIds.has(p.id));
+            const addBlocked = rawMatched.filter(p => siblingIds.has(p.id));
             return (
               <div style={{ marginBottom:12 }}>
                 <textarea
@@ -426,10 +460,13 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                   rows={3}
                   style={{ width:'100%', background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 14px', fontSize:14, color:C.white, boxSizing:'border-box', fontFamily:'inherit', resize:'vertical', marginBottom:8 }}
                 />
-                {(addMatched.length > 0 || addUnmatched.length > 0) && (
+                {(addMatched.length > 0 || addUnmatched.length > 0 || addBlocked.length > 0) && (
                   <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
                     {addMatched.map(p => (
                       <span key={p.id} style={{ padding:'5px 10px', borderRadius:14, background:C.green+'18', border:`1px solid ${C.green}44`, color:C.green, fontSize:12 }}>✓ {p.username||p.alias}</span>
+                    ))}
+                    {addBlocked.map(p => (
+                      <span key={p.id} title={`Already in Legion ${sibling?.legion} for this event`} style={{ padding:'5px 10px', borderRadius:14, background:C.red+'14', border:`1px solid ${C.red}44`, color:C.red+'cc', fontSize:12 }}>⚠ {p.username||p.alias} (Legion {sibling?.legion})</span>
                     ))}
                     {addUnmatched.map((n, i) => (
                       <span key={i} title="No roster match for this name" style={{ padding:'5px 10px', borderRadius:14, background:C.red+'14', border:`1px solid ${C.red}44`, color:C.red+'cc', fontSize:12 }}>? {n}</span>
@@ -499,13 +536,16 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           )}
 
           {(() => {
+            const sibling = findSiblingLegionEvent(activeEvent, events);
+            const siblingConflictIds = new Set(sibling?.participantIds || []);
             function renderRow(player) {
               const snap = getSnap(activeEvent, player.id);
               const dn = player.username||player.alias||'Unknown';
               const isSel = bulkSel.has(player.id);
               const isLead = player.roles?.includes('Rally Lead');
+              const legionConflict = siblingConflictIds.has(player.id);
               return (
-                <div key={player.id} onClick={() => { if (bulkMode) { const n=new Set(bulkSel); isSel?n.delete(player.id):n.add(player.id); setBulkSel(n); } else openSnap(activeEvent, player); }} style={{ background:isSel?C.gold+'18':C.card, borderRadius:10, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${isSel?C.gold:isLead?C.gold+'55':C.border+'44'}`, WebkitTapHighlightColor:'transparent' }}>
+                <div key={player.id} onClick={() => { if (bulkMode) { const n=new Set(bulkSel); isSel?n.delete(player.id):n.add(player.id); setBulkSel(n); } else openSnap(activeEvent, player); }} style={{ background:isSel?C.gold+'18':C.card, borderRadius:10, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${legionConflict?C.red+'88':isSel?C.gold:isLead?C.gold+'55':C.border+'44'}`, WebkitTapHighlightColor:'transparent' }}>
                   {bulkMode && <div style={{ width:22, height:22, borderRadius:'50%', border:`2px solid ${isSel?C.gold:C.border}`, background:isSel?C.gold:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{isSel && <span style={{ fontSize:12, color:C.bg, fontWeight:700 }}>✓</span>}</div>}
                   <div style={{ width:36, height:36, borderRadius:'50%', background:(isLead?C.gold:C.muted)+'33', border:`1.5px solid ${isLead?C.gold:C.muted}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:14, color:C.white, flexShrink:0 }}>{initials(dn)}</div>
                   <div style={{ flex:1, minWidth:0 }}>
@@ -514,6 +554,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                       <div style={{ fontSize:15, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
                       {player.allianceRank && <span style={{ fontSize:11, color:C.gold, fontWeight:700, flexShrink:0, padding:'0 6px', borderRadius:6, background:C.gold+'18' }}>{player.allianceRank}</span>}
                       {player.furnaceLevel && <span style={{ fontSize:11, color:C.icy, fontWeight:600, flexShrink:0 }}>{player.furnaceLevel}</span>}
+                      {legionConflict && <span title={`Also in Legion ${sibling?.legion} for this event`} style={{ fontSize:11, color:C.red, fontWeight:700, flexShrink:0, padding:'0 6px', borderRadius:6, background:C.red+'18' }}>⚠ Also Legion {sibling?.legion}</span>}
                     </div>
                     {tracksTroopPower && (
                       <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:4 }}>
