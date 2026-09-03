@@ -198,6 +198,16 @@ export function PlayerSheet({ player, roles=[], open, onClose, onSave, existingT
             <Field label="Notes">
               <textarea value={p.notes||''} onChange={e=>upd('notes',e.target.value)} placeholder="Anything officers should know…" style={{ width:'100%', minHeight:80, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'12px 14px', fontSize:16, color:C.white, resize:'none', boxSizing:'border-box', fontFamily:'inherit' }}/>
             </Field>
+            <Field label="Blacklist" hint="Excluded from rally leader/joiner selection in Battle Plans. Their roster entry and history are kept — this isn't a delete.">
+              <button onClick={()=>upd('blacklisted', !p.blacklisted)}
+                style={{ width:'100%', height:44, borderRadius:10, border:`1px solid ${p.blacklisted?C.red:C.border}`, background:p.blacklisted?C.red+'18':C.section, color:p.blacklisted?C.red:C.muted, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                {p.blacklisted ? '⚠ Blacklisted — tap to remove' : 'Not blacklisted — tap to blacklist'}
+              </button>
+              {p.blacklisted && (
+                <textarea value={p.blacklistReason||''} onChange={e=>upd('blacklistReason',e.target.value)} placeholder="Reason (officers only)…"
+                  style={{ width:'100%', minHeight:56, marginTop:8, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:14, color:C.white, resize:'none', boxSizing:'border-box', fontFamily:'inherit' }}/>
+              )}
+            </Field>
           </div>
         )}
 

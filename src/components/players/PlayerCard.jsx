@@ -15,7 +15,7 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
   const isRallyLead = player.roles?.includes('Rally Lead');
 
   return (
-    <div onClick={onClick} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none' }}>
+    <div onClick={onClick} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none', opacity:player.blacklisted?0.6:1 }}>
 
       {/* Avatar */}
       <div style={{ width:46, height:46, borderRadius:'50%', flexShrink:0, background:rc+'33', border:`2px solid ${rc}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:17, color:C.white }}>
@@ -27,6 +27,9 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
         {/* Row 1 — name */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
           <div style={{ fontSize:16, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+          {player.blacklisted && (
+            <span title={player.blacklistReason || ''} style={{ fontSize:11, color:C.red, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.red+'18', flexShrink:0 }}>⚠ Blacklisted</span>
+          )}
           {missingCount > 0 && (
             <button
               onClick={e => { e.stopPropagation(); onOpenFields?.(); }}

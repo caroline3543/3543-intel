@@ -279,7 +279,7 @@ function AddJoinerHeroRow({ onAdd }) {
         <input
           value={text}
           onChange={e => { setText(e.target.value); setGen(''); }}
-          onKeyDown={e => { if (e.key === 'Enter' && !needsGenChoice) submit(); }}
+          onKeyDown={e => { if (e.key === 'Enter' && !(needsGenChoice && !gen)) submit(); }}
           placeholder="New joiner hero…"
           style={{ flex: 1, background: C.section, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: C.white, boxSizing: 'border-box', fontFamily: 'inherit', minHeight: 44 }}
         />

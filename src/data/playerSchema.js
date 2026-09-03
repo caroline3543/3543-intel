@@ -24,6 +24,8 @@ export function newPlayer(overrides = {}) {
     roles:              [],
     allianceRank:       null, // 'R5'|'R4'|'R3'|'R2'|'R1'|null — mutually exclusive, unlike roles (which are multi-select)
     teamAssignment:     null,
+    blacklisted:        false, // excludes from Battle Plan leader/joiner selection — roster entry and history are kept, not hidden
+    blacklistReason:    '',
     notes:              '',
     profileLastUpdated: null,
     createdAt:          Date.now(),

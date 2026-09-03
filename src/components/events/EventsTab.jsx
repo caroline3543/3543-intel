@@ -63,7 +63,11 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const allTags = [...new Set(events.map(e => e.allianceTag).filter(Boolean))];
   let filtered = filterType==='All' ? events : events.filter(e => e.type===filterType);
   if (filterTag) filtered = filtered.filter(e => e.allianceTag===filterTag);
-  const sorted = [...filtered].sort((a,b) => new Date(b.date) - new Date(a.date));
+  // Date, then time — events sharing a date (e.g. Legion 1/2) previously
+  // fell back to insertion order among themselves since only .date was
+  // compared. Date strings are 'YYYY-MM-DD' and times are 'HH:MM' 24hr,
+  // so a plain string comparison on the combined key sorts correctly.
+  const sorted = [...filtered].sort((a,b) => `${b.date}T${b.time||'00:00'}`.localeCompare(`${a.date}T${a.time||'00:00'}`));
 
   // An event archives itself the moment either is true — no need to
   // remember to tap "Done" for it to stop cluttering the main list.
@@ -347,7 +351,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                 <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:4 }}>
                   <span style={{ fontSize:13, color:C.muted }}>{fmtDateShort(activeEvent.date)}</span>
                   {activeEvent.time && (
-                    <span style={{ fontSize:16, fontWeight:800, color:C.gold, padding:'1px 10px', borderRadius:10, background:C.gold+'18' }}>🕐 {activeEvent.time}</span>
+                    <span style={{ fontSize:16, fontWeight:800, color:C.gold, padding:'1px 10px', borderRadius:10, background:C.gold+'18' }}>🕐 {activeEvent.time} UTC</span>
                   )}
                   {activeEvent.allianceTag && <span style={{ fontSize:13, color:C.muted }}>[{activeEvent.allianceTag}]</span>}
                 </div>
@@ -643,7 +647,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                       </div>
                       <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:3 }}>
                         <span style={{ fontSize:12, color:C.muted }}>{fmtDateShort(ev.date)}</span>
-                        {ev.time && <span style={{ fontSize:13, fontWeight:800, color:C.gold, padding:'0 7px', borderRadius:8, background:C.gold+'18' }}>🕐 {ev.time}</span>}
+                        {ev.time && <span style={{ fontSize:13, fontWeight:800, color:C.gold, padding:'0 7px', borderRadius:8, background:C.gold+'18' }}>🕐 {ev.time} UTC</span>}
                         {ev.allianceTag && <span style={{ fontSize:12, color:C.muted }}>[{ev.allianceTag}]</span>}
                       </div>
                     </div>

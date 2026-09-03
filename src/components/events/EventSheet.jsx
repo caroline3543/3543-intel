@@ -12,7 +12,8 @@ import { AlliancePicker } from '../common/AlliancePicker.jsx';
 function suggestName(ev) {
   const d = ev.date ? new Date(ev.date + 'T00:00:00') : null;
   const dateStr = d && !isNaN(d) ? d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '';
-  return [ev.type, dateStr].filter(Boolean).join(' — ');
+  const typeStr = ev.legion ? `${ev.type} — Legion ${ev.legion}` : ev.type;
+  return [typeStr, dateStr].filter(Boolean).join(' — ');
 }
 
 // ── Event Sheet ────────────────────────────────────────────────
@@ -42,7 +43,7 @@ export function EventSheet({ event, open, onClose, onSave, players }) {
   // officer types something themselves.
   useEffect(() => {
     if (!nameTouched) setEv(prev => ({ ...prev, name: suggestName(prev) }));
-  }, [ev.type, ev.date, nameTouched]);
+  }, [ev.type, ev.date, ev.legion, nameTouched]);
 
   // Legion only makes sense for Foundry/Canyon Clash — clear it if the
   // officer switches to a type that doesn't use it, so a stale value
@@ -98,7 +99,7 @@ export function EventSheet({ event, open, onClose, onSave, players }) {
         </Field>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
           <Field label="Date"><Inp type="date" value={ev.date} onChange={v => upd('date', v)}/></Field>
-          <Field label="Time"><Inp type="time" value={ev.time||'12:00'} onChange={v => upd('time', v)}/></Field>
+          <Field label="Time (24hr UTC)"><Inp type="time" value={ev.time||'12:00'} onChange={v => upd('time', v)}/></Field>
         </div>
         <Field label="Notes">
           <textarea value={ev.notes||''} onChange={e => upd('notes', e.target.value)} placeholder="Pre-event notes…" style={{ width:'100%', minHeight:72, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'12px 14px', fontSize:16, color:C.white, resize:'none', boxSizing:'border-box', fontFamily:'inherit' }}/>

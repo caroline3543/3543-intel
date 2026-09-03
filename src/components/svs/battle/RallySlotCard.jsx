@@ -65,6 +65,7 @@ export function RallySlotCard({
     ? players
         .filter(p => isAttending(p.id, linkedEvent))
         .filter(p => !slot.allianceTag || p.allianceTag === slot.allianceTag)
+        .filter(p => !p.blacklisted)
     : [];
 
   // The Rally Leader can never appear as their own joiner — this feeds
