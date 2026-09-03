@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { C } from '../../../utils/constants.js';
-import { getRecommendedFormation, FORMATION_GEN_CUTOFF } from '../../../data/joinerMeta.js';
+import { getAllFormations, FORMATION_GEN_CUTOFF } from '../../../data/joinerMeta.js';
 import { suggestPriorityJoiners } from '../../../data/metrics.js';
 import { newJoinerSlot } from '../../../data/playerSchema.js';
 import { resolveHero, playerCanFillSlot, meetsTroopReqs, CUSTOM_HERO_OPTIONS, LEADER_HERO_OPTIONS } from './battleConstants.js';
@@ -8,14 +8,17 @@ import { resolveHero, playerCanFillSlot, meetsTroopReqs, CUSTOM_HERO_OPTIONS, LE
 // ── FormationPicker ────────────────────────────────────────────
 // Renders the guided/custom formation section inside a RallySlotCard.
 //
-// Redesigned: instead of browsing every formation for every generation
-// up to a cumulative cap, this shows ONE clear recommendation per
-// selected generation (via joinerMeta.js's getRecommendedFormation) —
-// exactly the generations chosen in Settings, nothing else. Selecting
-// a recommendation auto-fills the leader heroes, ratio, AND the 4
-// priority joiner slots (via suggestPriorityJoiners, weighted by who
-// owns the required heroes and is currently available) — the officer
-// can still hand-edit anything afterward.
+// Shows EVERY community formation for each selected generation (via
+// joinerMeta.js's getAllFormations) — reversing an earlier redesign
+// that showed just one curated pick per gen. Formations that overlap
+// with the leader's own saved Rally Leader Profile teams are flagged
+// and sorted first, since those are the ones this specific leader can
+// actually execute — but nothing is hidden, the officer sees the full
+// picture and decides. Selecting a formation auto-fills the leader
+// heroes, ratio, AND the 4 priority joiner slots (via
+// suggestPriorityJoiners, weighted by who owns the required heroes
+// and is currently available) — the officer can still hand-edit
+// anything afterward.
 //
 // Props:
 //   slot           – rally slot object
@@ -64,16 +67,33 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
       .filter(Boolean);
   }
 
-  function recsForGen(gen) {
-    if (slot.formationFilter) {
-      const rec = getRecommendedFormation(gen, slot.formationFilter);
-      return rec ? [rec] : [];
-    }
-    // "All" — one offense pick and one defense pick, not a full browse list
-    return [getRecommendedFormation(gen, 'offense'), getRecommendedFormation(gen, 'defense')].filter(Boolean);
+  // Does this formation's lead heroes overlap with any of the leader's
+  // own saved Rally Leader Profile teams (either offense or defense —
+  // checked against both, not just the slot's current type)? A match
+  // here means this specific leader can actually execute the
+  // formation, not just that it's a generic community pick.
+  function matchesLeaderProfile(f) {
+    const teams = leaderPlayer?.leaderProfile?.teams || [];
+    if (!teams.length) return false;
+    const formationHeroes = flattenLeaders(f.leaders);
+    return teams.some(t => {
+      const teamHeroes = (t.leadHeroes || []).filter(Boolean);
+      if (!teamHeroes.length) return false;
+      const overlap = teamHeroes.filter(h => formationHeroes.some(fh => fh.toLowerCase() === h.toLowerCase()));
+      return overlap.length >= Math.min(2, formationHeroes.length || 1);
+    });
   }
 
-  const recommendations = gensToShow.flatMap(recsForGen);
+  function recsForGen(gen) {
+    if (slot.formationFilter) {
+      return getAllFormations(gen, slot.formationFilter);
+    }
+    // "All" — every formation of both types, not just one of each
+    return [...getAllFormations(gen, 'offense'), ...getAllFormations(gen, 'defense')];
+  }
+
+  const recommendations = gensToShow.flatMap(recsForGen)
+    .sort((a, b) => (matchesLeaderProfile(b) ? 1 : 0) - (matchesLeaderProfile(a) ? 1 : 0));
 
   // Coverage should reflect true remaining availability — excluding
   // anyone already committed as a joiner elsewhere (this slot's other
@@ -385,6 +405,7 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
           const allCovered = coverage.every(c => c.ok);
           const fColor     = f.type.toLowerCase().includes('offense') ? '#F5A623' : '#6B8CAE';
           const isExpanded = expandedIndices.has(i);
+          const leaderMatch = matchesLeaderProfile(f);
 
           return (
             <div key={i} style={{ background:isSelected?fColor+'18':C.section, border:`1.5px solid ${isSelected?fColor:C.border}`, borderRadius:12, marginBottom:8, overflow:'hidden' }}>
@@ -393,6 +414,9 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
                   <div style={{ fontSize:12, color:fColor, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>
                     Gen {f.gen} · {f.type}{f.isMeta ? ' · ⚠ unverified' : ''}
                   </div>
+                  {leaderMatch && (
+                    <div style={{ fontSize:11, color:C.green, fontWeight:700, marginBottom:2 }}>✓ Matches {leaderPlayer?.username || leaderPlayer?.alias || 'leader'}'s saved team</div>
+                  )}
                   <div style={{ fontSize:13, fontWeight:700, color:C.white }}>{f.leaders.join(' + ')}</div>
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>

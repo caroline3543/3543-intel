@@ -153,6 +153,20 @@ export function getRecommendedFormation(gen, type) {
 }
 
 /**
+ * Return EVERY formation for a generation (optionally filtered by
+ * offense/defense type) — unlike getRecommendedFormation above (one
+ * curated pick), this powers "show all meta recommendations, let the
+ * officer and the leader's own saved profile decide together" in
+ * FormationPicker.jsx.
+ */
+export function getAllFormations(gen, type) {
+  const genData = JOINER_META.find(g => g.gen === gen);
+  if (!genData) return [];
+  const wanted = (type || '').toLowerCase();
+  return wanted ? genData.formations.filter(f => f.type.toLowerCase().includes(wanted)) : genData.formations;
+}
+
+/**
  * Given gen/type/ratio filters, return the matching meta formation.
  */
 export function getMetaSuggestion(gen, type, ratio) {
