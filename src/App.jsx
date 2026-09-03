@@ -12,7 +12,6 @@ import { BattleTab }    from './components/svs/BattleTab.jsx';
 import { EventsTab }    from './components/events/EventsTab.jsx';
 import { IntelTab }     from './components/stats/IntelTab.jsx';
 import { TabErrorBoundary } from './components/common/TabErrorBoundary.jsx';
-import JoinerRegistry from './components/JoinerRegistry.jsx';
 import { LandingPage }  from './components/LandingPage.jsx';
 import { DataPanel }    from './components/DataPanel.jsx';
 import { SettingsPanel } from './components/SettingsPanel.jsx';
@@ -36,6 +35,8 @@ export default function App() {
     syncFromCloud, syncStatus, lastSyncedAt, isCloudConfigured,
     roles, saveCustomRoles,
     customChecklist, saveChecklistItems,
+    notices, saveNotice, deleteNotice,
+    asciiArts, saveAsciiArt, deleteAsciiArt,
   } = state;
 
   const [tab, setTab]               = useState(0);
@@ -43,7 +44,6 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [dataPanel, setDataPanel]   = useState(false);
   const [settingsPanel, setSettingsPanel] = useState(false);
-  const [joinerRegistryOpen, setJoinerRegistryOpen] = useState(false);
   const importFileRef = useRef();
 
   function handleGetStarted() {
@@ -77,7 +77,7 @@ export default function App() {
       </div>
 
       {tab===0 && <TabErrorBoundary><RosterTab players={players} events={events} roles={roles} onSaveCustomRoles={saveCustomRoles} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(1)} /></TabErrorBoundary>}
-      {tab===1 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} /></TabErrorBoundary>}
+      {tab===1 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} settings={settings} notices={notices} onSaveNotice={saveNotice} onDeleteNotice={deleteNotice} asciiArts={asciiArts} onSaveArt={saveAsciiArt} onDeleteArt={deleteAsciiArt} /></TabErrorBoundary>}
       {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} showToast={showToast} /></TabErrorBoundary>}
       {tab===3 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} checklist={customChecklist} onSaveChecklist={saveChecklistItems} /></TabErrorBoundary>}
 
@@ -96,15 +96,6 @@ export default function App() {
         />
       )}
       {settingsPanel && <SettingsPanel settings={settings} onSave={s=>{saveSettings(s);setSettingsPanel(false);vibe(8);}} onClose={()=>setSettingsPanel(false)} />}
-      {joinerRegistryOpen && (
-        <div style={{ position:'fixed', inset:0, zIndex:600, background:'#0A1628', display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          <JoinerRegistry
-            players={players}
-            onUpdatePlayer={savePlayer}
-            onClose={() => setJoinerRegistryOpen(false)}
-          />
-        </div>
-      )}
       {toast && <Toast msg={toast.msg} type={toast.type} />}
 
       <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(4,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>

@@ -4,10 +4,12 @@ import { calcMetrics } from '../../data/metrics.js';
 import { ReliabilityBadge } from '../common/Primitives.jsx';
 import JoinerRegistry from '../JoinerRegistry.jsx';
 import NoticeLibrary from '../notices/NoticeLibrary.jsx';
+import AsciiArtLibrary from '../ascii/AsciiArtLibrary.jsx';
 
-export function IntelTab({ players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice }) {
+export function IntelTab({ players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice, asciiArts = [], onSaveArt, onDeleteArt }) {
   const [registryOpen, setRegistryOpen] = useState(false);
   const [noticesOpen, setNoticesOpen]   = useState(false);
+  const [artOpen, setArtOpen]           = useState(false);
 
   const withM = players
     .map(p=>({player:p,metrics:calcMetrics(p,events)}))
@@ -53,9 +55,23 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
         <NoticeLibrary
           notices={notices}
           settings={settings}
+          asciiArts={asciiArts}
           onSaveNotice={onSaveNotice}
           onDeleteNotice={onDeleteNotice}
           onClose={()=>setNoticesOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  if (artOpen) {
+    return (
+      <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        <AsciiArtLibrary
+          asciiArts={asciiArts}
+          onSaveArt={onSaveArt}
+          onDeleteArt={onDeleteArt}
+          onClose={()=>setArtOpen(false)}
         />
       </div>
     );
@@ -95,6 +111,16 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
         <div>
           <div style={{ fontSize:15, fontWeight:700, color:C.gold }}>Notice Library</div>
           <div style={{ fontSize:13, color:C.muted, marginTop:2 }}>Reusable alliance notices · learns your 4-week cycle</div>
+        </div>
+        <span style={{ marginLeft:'auto', fontSize:20, color:C.gold }}>›</span>
+      </button>
+
+      {/* ASCII Art Library — prominent card */}
+      <button onClick={()=>setArtOpen(true)} style={{ width:'100%', borderRadius:12, background:C.card, border:`1px solid ${C.gold}44`, padding:'16px', marginBottom:16, cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', gap:14 }}>
+        <span style={{ fontSize:32 }}>🎨</span>
+        <div>
+          <div style={{ fontSize:15, fontWeight:700, color:C.gold }}>ASCII Art Library</div>
+          <div style={{ fontSize:13, color:C.muted, marginTop:2 }}>Save and copy banners, dividers, and decorations</div>
         </div>
         <span style={{ marginLeft:'auto', fontSize:20, color:C.gold }}>›</span>
       </button>

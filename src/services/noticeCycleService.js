@@ -72,14 +72,43 @@ export function suggestForToday(notices, anchorDateStr) {
 }
 
 /**
+ * Whether a notice has already been logged as posted today.
+ */
+export function postedToday(notice) {
+  const today = new Date().toISOString().slice(0, 10);
+  return (notice.postedDates || []).includes(today);
+}
+
+/**
  * Records that a notice was just posted today — returns the updated
- * notice object (does not mutate).
+ * notice object (does not mutate). Idempotent: copying the same
+ * notice twice in one day doesn't add a duplicate log entry, which
+ * would otherwise inflate "posted N times" and throw off matchScore.
  */
 export function markPostedToday(notice) {
   const today = new Date().toISOString().slice(0, 10);
+  if ((notice.postedDates || []).includes(today)) return notice;
   return {
     ...notice,
     postedDates: [...(notice.postedDates || []), today],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Reminders-style checkbox for Notice/Info — tapping toggles today
+ * in/out of postedDates (add if not logged yet, remove if it is, so a
+ * mis-tap is undoable). Only meaningful for Notice/Info; To-Do uses
+ * its own sticky `completed` flag instead — see NoticeLibrary.jsx.
+ */
+export function toggleCheckedToday(notice) {
+  const today = new Date().toISOString().slice(0, 10);
+  const already = (notice.postedDates || []).includes(today);
+  return {
+    ...notice,
+    postedDates: already
+      ? notice.postedDates.filter(d => d !== today)
+      : [...(notice.postedDates || []), today],
     updatedAt: new Date().toISOString(),
   };
 }

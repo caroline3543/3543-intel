@@ -4,6 +4,7 @@ import {
   pushPlayer, deletePlayerRemote, pushPlan, deletePlanRemote, pullAll, isCloudConfigured,
 } from '../services/cloudSyncService.js';
 import { newPlayer } from '../data/playerSchema.js';
+import { newAsciiArt, SEED_ASCII_ART } from '../data/asciiArtSchema.js';
 import { withBuiltinRole } from '../utils/roles.js';
 
 import defaultData from '../data/defaultData.json';
@@ -24,6 +25,18 @@ export function useAppState() {
 
   // Auto-save on every data change
   useEffect(() => { saveToStorage(data); }, [data]);
+
+  // One-time seed for the ASCII Art library — only runs if asciiArts
+  // has never been set at all (undefined, not just empty), so
+  // deliberately deleting every seeded piece doesn't bring them back.
+  // After this it's persisted with stable IDs via the auto-save above,
+  // same as anything the user saves themselves.
+  useEffect(() => {
+    if (data.asciiArts === undefined) {
+      setData(prev => ({ ...prev, asciiArts: SEED_ASCII_ART.map(a => newAsciiArt(a)) }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Toast ─────────────────────────────────────────────────
   const showToast = useCallback((msg, type = 'success') => {
@@ -177,6 +190,30 @@ export function useAppState() {
     showToast('Notice deleted');
   }, [showToast]);
 
+  // ── ASCII Art library ─────────────────────────────────────
+  // Same shape as Notice Library ops — local-only, no cloud push.
+  const saveAsciiArt = useCallback((art) => {
+    setData(prev => {
+      const isEdit = (prev.asciiArts || []).some(a => a.id === art.id);
+      return {
+        ...prev,
+        asciiArts: isEdit
+          ? prev.asciiArts.map(a => a.id === art.id ? art : a)
+          : [...(prev.asciiArts || []), art],
+        lastUpdated: new Date().toISOString(),
+      };
+    });
+  }, []);
+
+  const deleteAsciiArt = useCallback((id) => {
+    setData(prev => ({
+      ...prev,
+      asciiArts: (prev.asciiArts || []).filter(a => a.id !== id),
+      lastUpdated: new Date().toISOString(),
+    }));
+    showToast('Art deleted');
+  }, [showToast]);
+
   // ── Settings ──────────────────────────────────────────────
   const saveSettings = useCallback((settings) => {
     setData(prev => ({ ...prev, settings, lastUpdated: new Date().toISOString() }));
@@ -239,6 +276,7 @@ export function useAppState() {
   const svsPlans    = data.svsPlans    || [];
   const prepScores  = data.prepScores  || [];
   const notices     = data.notices     || [];
+  const asciiArts   = data.asciiArts   || [];
   const settings    = data.settings    || {};
   const customRoles = data.customRoles || [];
   const roles       = withBuiltinRole(customRoles);
@@ -254,6 +292,7 @@ export function useAppState() {
     svsPlans,
     prepScores,
     notices,
+    asciiArts,
     settings,
 
     // Toast
@@ -278,6 +317,10 @@ export function useAppState() {
     // Notice Library
     saveNotice,
     deleteNotice,
+
+    // ASCII Art library
+    saveAsciiArt,
+    deleteAsciiArt,
 
     // Prep scores
     updatePrepScores,
