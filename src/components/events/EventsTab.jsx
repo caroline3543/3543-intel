@@ -42,6 +42,11 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [filterType, setFilterType]   = useState('All');
   const [toastMsg, setToastMsg]       = useState(null);
   function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); }
+  // { mode:'swap', player, sibling } — trying to add someone already in
+  // the other Legion. { mode:'resolve', player, sibling } — someone
+  // already sitting in BOTH (data predates this rule). Either way this
+  // is a real decision, not a dismissible notice — no auto-timeout.
+  const [legionModal, setLegionModal] = useState(null);
   const [filterTag, setFilterTag]     = useState('');
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventSheetOpen, setEventSheetOpen] = useState(false);
@@ -120,7 +125,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     if (!activeEvent) return;
     const sibling = findSiblingLegionEvent(activeEvent, events);
     if (sibling && (sibling.participantIds || []).includes(player.id)) {
-      showToast(`${player.username || player.alias || 'That player'} is already in Legion ${sibling.legion} for this event — can't be in both`);
+      setLegionModal({ mode:'swap', player, sibling });
       return;
     }
     const participantIds = [...new Set([...(activeEvent.participantIds || []), player.id])];
@@ -143,20 +148,16 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   // whole batch in a single onUpdateEvent call. Looping addParticipant()
   // per name would read the same stale activeEvent on every iteration
   // and silently drop all but the last person.
+  //
+  // Callers are expected to have already filtered out anyone in the
+  // sibling Legion event — the paste-list UI does this itself, giving
+  // each conflicting name its own tap-to-swap chip instead of silently
+  // dropping them here.
   function addParticipantsBatch(playersToAdd) {
     if (!activeEvent || playersToAdd.length === 0) return;
-    const sibling = findSiblingLegionEvent(activeEvent, events);
-    const siblingIds = new Set(sibling?.participantIds || []);
-    const blocked = playersToAdd.filter(p => siblingIds.has(p.id));
-    const allowed = playersToAdd.filter(p => !siblingIds.has(p.id));
-    if (blocked.length > 0) {
-      const names = blocked.map(p => p.username || p.alias || '?').join(', ');
-      showToast(`Already in Legion ${sibling.legion} — skipped: ${names}`);
-    }
-    if (allowed.length === 0) return;
-    const participantIds = [...new Set([...(activeEvent.participantIds || []), ...allowed.map(p => p.id)])];
+    const participantIds = [...new Set([...(activeEvent.participantIds || []), ...playersToAdd.map(p => p.id)])];
     const snaps = [...(activeEvent.snapshots || [])];
-    allowed.forEach(player => {
+    playersToAdd.forEach(player => {
       const idx = snaps.findIndex(s => s.playerId === player.id);
       if (idx >= 0) {
         snaps[idx] = { ...snaps[idx], rsvp: { ...snaps[idx].rsvp, participating: true, substitute: addAsSubstitute } };
@@ -170,6 +171,42 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     onUpdateEvent({ ...activeEvent, participantIds, snapshots: snaps });
     setPasteAddText('');
     vibe(8);
+  }
+
+  // Confirmed swap — moves a player from the sibling Legion event into
+  // the current one. Both onUpdateEvent calls are built from data known
+  // at call time rather than one reading the result of the other, since
+  // parent state won't reflect the first update until next render.
+  function confirmLegionSwap() {
+    if (!legionModal) return;
+    const { player, sibling } = legionModal;
+    onUpdateEvent({ ...sibling, participantIds: (sibling.participantIds || []).filter(id => id !== player.id) });
+    const participantIds = [...new Set([...(activeEvent.participantIds || []), player.id])];
+    const snaps = [...(activeEvent.snapshots || [])];
+    const idx = snaps.findIndex(s => s.playerId === player.id);
+    if (idx >= 0) {
+      snaps[idx] = { ...snaps[idx], rsvp: { ...snaps[idx].rsvp, participating: true, substitute: addAsSubstitute } };
+    } else {
+      const snap = newSnapshot(player.id, player, activeEvent.id);
+      snap.rsvp.participating = true;
+      snap.rsvp.substitute = addAsSubstitute;
+      snaps.push(snap);
+    }
+    onUpdateEvent({ ...activeEvent, participantIds, snapshots: snaps });
+    showToast(`${player.username || player.alias || 'Player'} moved to Legion ${activeEvent.legion}`);
+    setLegionModal(null);
+    vibe(8);
+  }
+
+  // Resolving a pre-existing conflict (someone already in both) — pick
+  // which event to keep them in; they're removed from the other.
+  function resolveLegionConflict(keepEvent) {
+    if (!legionModal) return;
+    const { player, sibling } = legionModal;
+    const removeEvent = keepEvent.id === activeEvent.id ? sibling : activeEvent;
+    onUpdateEvent({ ...removeEvent, participantIds: (removeEvent.participantIds || []).filter(id => id !== player.id) });
+    showToast(`${player.username || player.alias || 'Player'} kept in Legion ${keepEvent.legion} only`);
+    setLegionModal(null);
   }
 
   function commitTopMatch() {
@@ -364,6 +401,42 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           {toastMsg}
         </div>
       )}
+
+      {legionModal && (
+        <div onClick={() => setLegionModal(null)} style={{ position:'fixed', inset:0, background:'#000c', zIndex:700, display:'flex', alignItems:'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:480, margin:'0 auto', padding:'20px 20px 28px' }}>
+            <div style={{ fontSize:17, fontWeight:800, color:C.red, marginBottom:10 }}>⚠ Legion Conflict</div>
+            {legionModal.mode === 'swap' ? (
+              <>
+                <div style={{ fontSize:14, color:C.white, marginBottom:20, lineHeight:1.5 }}>
+                  <strong>{legionModal.player.username || legionModal.player.alias}</strong> is currently in <strong>Legion {legionModal.sibling.legion}</strong> for this event. Are they switching to <strong>Legion {activeEvent?.legion}</strong>?
+                </div>
+                <button onClick={confirmLegionSwap} style={{ width:'100%', height:50, borderRadius:12, background:C.gold, color:C.bg, fontWeight:800, fontSize:15, border:'none', cursor:'pointer', marginBottom:10 }}>
+                  Yes — move to Legion {activeEvent?.legion}
+                </button>
+                <button onClick={() => setLegionModal(null)} style={{ width:'100%', height:46, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:14, cursor:'pointer' }}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize:14, color:C.white, marginBottom:20, lineHeight:1.5 }}>
+                  <strong>{legionModal.player.username || legionModal.player.alias}</strong> is in <strong>both Legion 1 and Legion 2</strong> for this event. Which one should they actually be in?
+                </div>
+                <button onClick={() => resolveLegionConflict(activeEvent)} style={{ width:'100%', height:50, borderRadius:12, background:C.gold+'22', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:15, cursor:'pointer', marginBottom:8 }}>
+                  Keep in Legion {activeEvent?.legion} <span style={{ opacity:0.7 }}>(remove from Legion {legionModal.sibling.legion})</span>
+                </button>
+                <button onClick={() => resolveLegionConflict(legionModal.sibling)} style={{ width:'100%', height:50, borderRadius:12, background:C.gold+'22', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:15, cursor:'pointer', marginBottom:10 }}>
+                  Keep in Legion {legionModal.sibling.legion} <span style={{ opacity:0.7 }}>(remove from Legion {activeEvent?.legion})</span>
+                </button>
+                <button onClick={() => setLegionModal(null)} style={{ width:'100%', height:46, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:14, cursor:'pointer' }}>
+                  Decide later
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {activeEvent ? (
         <div>
           <button onClick={() => { setActiveEventId(null); setBulkMode(false); setBulkSel(new Set()); setAddQuery(''); setAddResults([]); }} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', marginBottom:16, padding:0 }}>
@@ -466,7 +539,11 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                       <span key={p.id} style={{ padding:'5px 10px', borderRadius:14, background:C.green+'18', border:`1px solid ${C.green}44`, color:C.green, fontSize:12 }}>✓ {p.username||p.alias}</span>
                     ))}
                     {addBlocked.map(p => (
-                      <span key={p.id} title={`Already in Legion ${sibling?.legion} for this event`} style={{ padding:'5px 10px', borderRadius:14, background:C.red+'14', border:`1px solid ${C.red}44`, color:C.red+'cc', fontSize:12 }}>⚠ {p.username||p.alias} (Legion {sibling?.legion})</span>
+                      <button key={p.id} onClick={() => setLegionModal({ mode:'swap', player:p, sibling })}
+                        title={`Tap to move from Legion ${sibling?.legion}`}
+                        style={{ padding:'5px 10px', borderRadius:14, background:C.red+'14', border:`1px solid ${C.red}44`, color:C.red+'cc', fontSize:12, cursor:'pointer' }}>
+                        ⚠ {p.username||p.alias} (Legion {sibling?.legion}) — swap?
+                      </button>
                     ))}
                     {addUnmatched.map((n, i) => (
                       <span key={i} title="No roster match for this name" style={{ padding:'5px 10px', borderRadius:14, background:C.red+'14', border:`1px solid ${C.red}44`, color:C.red+'cc', fontSize:12 }}>? {n}</span>
@@ -554,7 +631,13 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                       <div style={{ fontSize:15, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
                       {player.allianceRank && <span style={{ fontSize:11, color:C.gold, fontWeight:700, flexShrink:0, padding:'0 6px', borderRadius:6, background:C.gold+'18' }}>{player.allianceRank}</span>}
                       {player.furnaceLevel && <span style={{ fontSize:11, color:C.icy, fontWeight:600, flexShrink:0 }}>{player.furnaceLevel}</span>}
-                      {legionConflict && <span title={`Also in Legion ${sibling?.legion} for this event`} style={{ fontSize:11, color:C.red, fontWeight:700, flexShrink:0, padding:'0 6px', borderRadius:6, background:C.red+'18' }}>⚠ Also Legion {sibling?.legion}</span>}
+                      {legionConflict && (
+                        <button onClick={e => { e.stopPropagation(); setLegionModal({ mode:'resolve', player, sibling }); }}
+                          title={`Also in Legion ${sibling?.legion} — tap to resolve`}
+                          style={{ fontSize:11, color:C.red, fontWeight:700, flexShrink:0, padding:'0 6px', borderRadius:6, background:C.red+'18', border:'none', cursor:'pointer' }}>
+                          ⚠ Also Legion {sibling?.legion}
+                        </button>
+                      )}
                     </div>
                     {tracksTroopPower && (
                       <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:4 }}>
