@@ -22,6 +22,10 @@ export function DataPanel({
   const [msg, setMsg]           = useState(null);
   const [xlsxLoading, setXlsxLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [includeRoster, setIncludeRoster] = useState(true);
+  const [includeEvents, setIncludeEvents] = useState(true);
+  const [includePlans, setIncludePlans]   = useState(true);
+  const [scopeEventId, setScopeEventId]   = useState(''); // '' = all events
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
@@ -44,7 +48,12 @@ export function DataPanel({
   async function handleXlsxExport() {
     setXlsxLoading(true);
     try {
-      exportWorkbook(data);
+      exportWorkbook(data, {
+        includeRoster,
+        includeEvents,
+        includePlans,
+        eventId: scopeEventId || null,
+      });
       showToast('Spreadsheet downloaded ✓');
       onClose();
     } catch (err) {
@@ -59,8 +68,16 @@ export function DataPanel({
   const eventCount    = (data.events||[]).length;
   const memberCount   = (data.players||[]).length;
   const hasJoiners    = (data.players||[]).some(p=>(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5));
-  const joinerEvents  = (data.events||[]).filter(e=>JOINER_COVERAGE_EVENTS.includes(e.type));
   const syncing       = syncStatus === 'syncing';
+
+  // What the export will actually contain, given the current toggles
+  // and event scope — "battle plans due a specific event only" scopes
+  // both events and plans together, since a plan links to an event via
+  // plan.eventId.
+  const scopedEvents      = scopeEventId ? (data.events||[]).filter(e => e.id === scopeEventId) : (data.events||[]);
+  const scopedPlans       = scopeEventId ? (data.svsPlans||[]).filter(p => p.eventId === scopeEventId) : (data.svsPlans||[]);
+  const scopedJoinerEvents = scopedEvents.filter(e => JOINER_COVERAGE_EVENTS.includes(e.type));
+  const nothingSelected   = !includeRoster && !includeEvents && !includePlans;
 
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'#000c', zIndex:300, display:'flex', alignItems:'flex-end' }}>
@@ -134,16 +151,45 @@ export function DataPanel({
             </div>
           </div>
 
+          {/* What to include */}
+          <div style={{ marginBottom:14 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>What to include</div>
+            <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+              {[
+                ['Roster', includeRoster, setIncludeRoster],
+                ['Events', includeEvents, setIncludeEvents],
+                ['Battle Plans', includePlans, setIncludePlans],
+              ].map(([label, val, setter]) => (
+                <button key={label} onClick={() => setter(!val)}
+                  style={{ flex:1, height:36, borderRadius:10, border:`1px solid ${val?C.gold:C.border}`, background:val?C.gold+'22':C.card, color:val?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>
+                  {val?'✓ ':''}{label}
+                </button>
+              ))}
+            </div>
+            {(includeEvents || includePlans) && eventCount > 0 && (
+              <div>
+                <div style={{ fontSize:11, color:C.muted, marginBottom:6 }}>Scope events &amp; battle plans to:</div>
+                <select value={scopeEventId} onChange={e => setScopeEventId(e.target.value)}
+                  style={{ width:'100%', height:40, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 10px', fontSize:13, color:C.white, fontFamily:'inherit' }}>
+                  <option value="">All events</option>
+                  {(data.events||[]).map(ev => (
+                    <option key={ev.id} value={ev.id}>{ev.name || ev.type} · {ev.date}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
           {/* What's included */}
           <div style={{ background:C.bg, borderRadius:10, padding:12, marginBottom:14 }}>
             <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>What's included</div>
             {[
-              ['✓', `${memberCount} members — troops, furnace, roles, heroes`, C.green],
-              ['✓', 'Joiner Coverage — who owns each hero at Skill 5', C.green],
-              (data.prepScores||[]).length > 0 ? ['✓', `Prep Scores — ${(data.prepScores||[]).length} entries`, C.green] : null,
-              eventCount > 0 ? ['✓', `${eventCount} event${eventCount!==1?'s':''} — attendance, Discord, performance`, C.green] : null,
-              joinerEvents.length > 0 ? ['✓', `${joinerEvents.length} Castle event${joinerEvents.length!==1?'s':''} include joiner coverage columns`, C.gold] : null,
-              ['✓', 'Can be re-imported on another device — nothing is lost round-tripping', C.icy],
+              includeRoster ? ['✓', `${memberCount} members — troops, furnace, roles, heroes`, C.green] : null,
+              includeRoster && hasJoiners ? ['✓', 'Joiner Coverage — who owns each hero at Skill 5', C.green] : null,
+              includeEvents && scopedEvents.length > 0 ? ['✓', `${scopedEvents.length} event${scopedEvents.length!==1?'s':''} — attendance, Discord, performance`, C.green] : null,
+              includeEvents && scopedJoinerEvents.length > 0 ? ['✓', `${scopedJoinerEvents.length} Castle event${scopedJoinerEvents.length!==1?'s':''} include joiner coverage columns`, C.gold] : null,
+              includePlans && scopedPlans.length > 0 ? ['✓', `${scopedPlans.length} battle plan${scopedPlans.length!==1?'s':''}`, C.green] : null,
+              nothingSelected ? ['⚠', 'Nothing selected — pick at least one above', C.red] : ['✓', 'Can be re-imported on another device — nothing is lost round-tripping', C.icy],
             ].filter(Boolean).map(([icon, text, color], i) => (
               <div key={i} style={{ display:'flex', gap:8, marginBottom:4 }}>
                 <span style={{ fontSize:12, color, flexShrink:0 }}>{icon}</span>
@@ -154,8 +200,8 @@ export function DataPanel({
 
           <button
             onClick={handleXlsxExport}
-            disabled={xlsxLoading}
-            style={{ width:'100%', height:52, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:16, border:'none', cursor:xlsxLoading?'default':'pointer', opacity:xlsxLoading?0.7:1 }}
+            disabled={xlsxLoading || nothingSelected}
+            style={{ width:'100%', height:52, borderRadius:12, background:nothingSelected?C.card:C.gold, color:nothingSelected?C.muted:C.bg, fontWeight:700, fontSize:16, border:nothingSelected?`1px solid ${C.border}`:'none', cursor:(xlsxLoading||nothingSelected)?'default':'pointer', opacity:xlsxLoading?0.7:1 }}
           >
             {xlsxLoading ? 'Preparing…' : '⬇️ Download .xlsx'}
           </button>
