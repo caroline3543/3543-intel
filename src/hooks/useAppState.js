@@ -145,6 +145,38 @@ export function useAppState() {
     setData(prev => ({ ...prev, prepScores: scores, lastUpdated: new Date().toISOString() }));
   }, []);
 
+  // ── Notice Library ────────────────────────────────────────
+  // Local-only for now — no cloud push, unlike players/plans. Wiring
+  // notices into cloud sync would need a push-notice equivalent added
+  // to cloudSyncService.js first; not assumed here since that file
+  // wasn't available to confirm against.
+  //
+  // No toast on save: copyAndMark in NoticeLibrary.jsx calls this on
+  // every single copy (that's the whole "log a post" mechanism), and a
+  // toast every time would be redundant with the in-component "✓
+  // Copied & logged" button state it already shows.
+  const saveNotice = useCallback((notice) => {
+    setData(prev => {
+      const isEdit = (prev.notices || []).some(n => n.id === notice.id);
+      return {
+        ...prev,
+        notices: isEdit
+          ? prev.notices.map(n => n.id === notice.id ? notice : n)
+          : [...(prev.notices || []), notice],
+        lastUpdated: new Date().toISOString(),
+      };
+    });
+  }, []);
+
+  const deleteNotice = useCallback((id) => {
+    setData(prev => ({
+      ...prev,
+      notices: (prev.notices || []).filter(n => n.id !== id),
+      lastUpdated: new Date().toISOString(),
+    }));
+    showToast('Notice deleted');
+  }, [showToast]);
+
   // ── Settings ──────────────────────────────────────────────
   const saveSettings = useCallback((settings) => {
     setData(prev => ({ ...prev, settings, lastUpdated: new Date().toISOString() }));
@@ -206,6 +238,7 @@ export function useAppState() {
   const events      = data.events      || [];
   const svsPlans    = data.svsPlans    || [];
   const prepScores  = data.prepScores  || [];
+  const notices     = data.notices     || [];
   const settings    = data.settings    || {};
   const customRoles = data.customRoles || [];
   const roles       = withBuiltinRole(customRoles);
@@ -220,6 +253,7 @@ export function useAppState() {
     events,
     svsPlans,
     prepScores,
+    notices,
     settings,
 
     // Toast
@@ -240,6 +274,10 @@ export function useAppState() {
     // SvS plan ops
     saveSvsPlans,
     deleteSvsPlan,
+
+    // Notice Library
+    saveNotice,
+    deleteNotice,
 
     // Prep scores
     updatePrepScores,

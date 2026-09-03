@@ -50,6 +50,10 @@ export function SettingsPanel({ settings, onSave, onClose }) {
           <Inp value={s.stateId} onChange={v => upd('stateId', v)} placeholder="e.g. 1234" inputMode="numeric" />
         </Field>
 
+        <Field label="4-Week Cycle Start" hint="Any date that was Day 1 of a known cycle — used by the Notice Library to work out where today falls in the 28-day schedule, so it can learn what you usually post at this point and suggest it.">
+          <Inp type="date" value={s.cycleAnchorDate || ''} onChange={v => upd('cycleAnchorDate', v)} />
+        </Field>
+
         {/* Generation setting — multi-select */}
         <Field label="Hero Generations" hint="Select every generation your alliance is actively using. Only these will be suggested in battle planning. Generations marked ⚠ don't have guided formations authored yet — Battle Plan's Custom mode still works for those.">
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>

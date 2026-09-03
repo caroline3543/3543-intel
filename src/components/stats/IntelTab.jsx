@@ -3,9 +3,11 @@ import { C } from '../../utils/constants.js';
 import { calcMetrics } from '../../data/metrics.js';
 import { ReliabilityBadge } from '../common/Primitives.jsx';
 import JoinerRegistry from '../JoinerRegistry.jsx';
+import NoticeLibrary from '../notices/NoticeLibrary.jsx';
 
-export function IntelTab({ players, events, onUpdatePlayer, showToast }) {
+export function IntelTab({ players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice }) {
   const [registryOpen, setRegistryOpen] = useState(false);
+  const [noticesOpen, setNoticesOpen]   = useState(false);
 
   const withM = players
     .map(p=>({player:p,metrics:calcMetrics(p,events)}))
@@ -37,8 +39,23 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast }) {
       <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <JoinerRegistry
           players={players}
+          settings={settings}
           onUpdatePlayer={player=>{ onUpdatePlayer(player); showToast('Saved ✓'); }}
           onClose={()=>setRegistryOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  if (noticesOpen) {
+    return (
+      <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        <NoticeLibrary
+          notices={notices}
+          settings={settings}
+          onSaveNotice={onSaveNotice}
+          onDeleteNotice={onDeleteNotice}
+          onClose={()=>setNoticesOpen(false)}
         />
       </div>
     );
@@ -68,6 +85,16 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast }) {
         <div>
           <div style={{ fontSize:15, fontWeight:700, color:C.gold }}>Joiner Registry</div>
           <div style={{ fontSize:13, color:C.muted, marginTop:2 }}>Track Skill 5 joiner heroes · coverage · meta formations</div>
+        </div>
+        <span style={{ marginLeft:'auto', fontSize:20, color:C.gold }}>›</span>
+      </button>
+
+      {/* Notice Library — prominent card */}
+      <button onClick={()=>setNoticesOpen(true)} style={{ width:'100%', borderRadius:12, background:C.card, border:`1px solid ${C.gold}44`, padding:'16px', marginBottom:16, cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', gap:14 }}>
+        <span style={{ fontSize:32 }}>📋</span>
+        <div>
+          <div style={{ fontSize:15, fontWeight:700, color:C.gold }}>Notice Library</div>
+          <div style={{ fontSize:13, color:C.muted, marginTop:2 }}>Reusable alliance notices · learns your 4-week cycle</div>
         </div>
         <span style={{ marginLeft:'auto', fontSize:20, color:C.gold }}>›</span>
       </button>
