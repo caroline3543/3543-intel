@@ -33,9 +33,12 @@ import { AlliancePicker }  from '../../common/AlliancePicker.jsx';
 //   onGoToMembers – () => void  (navigation shortcut)
 //   selectedGenerations – number[] from Settings, explicit not cumulative
 //   assignedInOtherSlots – Set of playerIds already used as a priority
-//                          joiner in a DIFFERENT slot in this same plan
-//                          (plan-wide exclusivity — a priority joiner
-//                          can only be used in one rally per event)
+//                          joiner OR Rally Leader in a DIFFERENT slot in
+//                          this same plan (plan-wide exclusivity — a
+//                          priority joiner can only be used in one
+//                          rally per event, and a Rally Leader can't
+//                          also be someone else's joiner at the same
+//                          time)
 //   linkedEvent   – the Event this plan is linked to (or null). Leader
 //                   selection and joiner eligibility are BOTH gated on
 //                   this existing — no event linked means no attendance

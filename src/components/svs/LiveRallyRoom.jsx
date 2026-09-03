@@ -45,8 +45,8 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
       offset:0, notes:s.notes||'', joiners:s.joiners||[], ratio:s.ratio||'',
     }));
     setState(prev => ({ ...prev, calculator:{ ...prev.calculator, leaders, rallyDuration:slots[0]?.rallyDuration||3 } }));
-    setView('calc');
-    showToast(`${slots.length} rally slots loaded from "${planData.name || 'Battle Plan'}"`);
+    setView('registry');
+    showToast(`${slots.length} rally slots loaded from "${planData.name || 'Battle Plan'}" — enter march times to begin`);
   }, [planData]);
 
   // Persist on every state change

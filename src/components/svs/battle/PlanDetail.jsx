@@ -71,10 +71,12 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
     slots.forEach(s => {
       if (s.id === currentSlotId) return;
       (s.joiners || []).forEach(j => { if (j.playerId) ids.add(j.playerId); });
+      if (s.leaderId) ids.add(s.leaderId); // leading elsewhere rules out joining here
     });
     siblingPlans.forEach(sp => {
       (sp.rallySlots || []).forEach(s => {
         (s.joiners || []).forEach(j => { if (j.playerId) ids.add(j.playerId); });
+        if (s.leaderId) ids.add(s.leaderId);
       });
     });
     return ids;
