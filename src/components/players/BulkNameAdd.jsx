@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { newPlayer } from '../../data/playerSchema.js';
-import { parseNames } from '../../utils/nameList.js';
+import { parseNames, findCloseMatches } from '../../utils/nameList.js';
 
 // Dedupes the pasted list case-insensitively (first occurrence wins)
 // and separates out any name that already exists on the roster. See
@@ -10,6 +10,11 @@ import { parseNames } from '../../utils/nameList.js';
 // offers a one-tap link into the existing record — bulk add just skips
 // duplicates automatically instead, since there's no single profile to
 // link an entire pasted list into.
+//
+// Also flags NEAR-duplicates among what's left (closeMatches) — a
+// likely typo of an existing player's name, e.g. "Jonh" vs "John".
+// Unlike an exact match, these aren't auto-skipped — they might
+// genuinely be a different person — just surfaced as a suggestion.
 function classifyNames(raw, existingPlayers) {
   const seen = new Set();
   const existingLower = new Set(
@@ -23,7 +28,10 @@ function classifyNames(raw, existingPlayers) {
     seen.add(key);
     toAdd.push(name);
   });
-  return { toAdd, skipped };
+  const closeMatches = toAdd
+    .map(name => ({ name, matches: findCloseMatches(name, existingPlayers) }))
+    .filter(({ matches }) => matches.length > 0);
+  return { toAdd, skipped, closeMatches };
 }
 
 // Replaces the old multi-step Batch Add wizard (Names → Review →
@@ -36,7 +44,15 @@ function classifyNames(raw, existingPlayers) {
 export default function BulkNameAdd({ onAddPlayers, onClose, showToast, onGoToFieldRegistry, existingPlayers = [] }) {
   const [raw, setRaw] = useState('');
   const [addedCount, setAddedCount] = useState(null); // null = still entering names
-  const { toAdd: names, skipped } = classifyNames(raw, existingPlayers);
+  const { toAdd: names, skipped, closeMatches } = classifyNames(raw, existingPlayers);
+
+  // "Remove from list" on a flagged close match — rebuilds the
+  // textarea one name per line rather than trying to preserve the
+  // original comma/newline mix, which isn't worth the complexity here.
+  function removeNameFromRaw(nameToRemove) {
+    const remaining = parseNames(raw).filter(n => n.toLowerCase() !== nameToRemove.toLowerCase());
+    setRaw(remaining.join('\n'));
+  }
 
   function handleAdd() {
     if (names.length === 0) return;
@@ -99,11 +115,28 @@ export default function BulkNameAdd({ onAddPlayers, onClose, showToast, onGoToFi
         </div>
         {(names.length > 0 || skipped.length > 0) && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {names.map((n, i) => (
-              <span key={`a${i}`} style={{ padding: '6px 12px', borderRadius: 16, background: C.card, border: `1px solid ${C.border}`, color: C.icy, fontSize: 13 }}>{n}</span>
-            ))}
+            {names.map((n, i) => {
+              const flagged = closeMatches.some(cm => cm.name === n);
+              return (
+                <span key={`a${i}`} style={{ padding: '6px 12px', borderRadius: 16, background: C.card, border: `1px solid ${flagged?C.gold:C.border}`, color: flagged?C.gold:C.icy, fontSize: 13 }}>
+                  {flagged ? '≈ ' : ''}{n}
+                </span>
+              );
+            })}
             {skipped.map((n, i) => (
               <span key={`s${i}`} title="Already on the roster, or repeated in this list — won't be added again" style={{ padding: '6px 12px', borderRadius: 16, background: C.gold+'14', border: `1px solid ${C.gold}55`, color: C.gold, fontSize: 13 }}>⚠ {n}</span>
+            ))}
+          </div>
+        )}
+
+        {closeMatches.length > 0 && (
+          <div style={{ background: C.gold+'14', border: `1px solid ${C.gold}55`, borderRadius: 10, padding: '10px 14px' }}>
+            <div style={{ fontSize: 12, color: C.gold, fontWeight: 700, marginBottom: 6 }}>⚠ Possible typos — similar to names already on the roster</div>
+            {closeMatches.map(({ name, matches }) => (
+              <div key={name} style={{ fontSize: 12, color: C.icy, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>"{name}" looks like <strong style={{ color: C.white }}>{matches[0].player.username || matches[0].player.alias}</strong> — same person?</span>
+                <button onClick={() => removeNameFromRaw(name)} style={{ fontSize: 11, color: C.gold, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Remove from list</button>
+              </div>
             ))}
           </div>
         )}

@@ -91,6 +91,10 @@ function setFieldValue(player, fieldId, value) {
   switch (fieldId) {
     case 'languages':
       return { ...player, languages: value, profileLastUpdated: stamp };
+    case 'furnace':
+      return { ...player, furnaceLevel: value, profileLastUpdated: stamp };
+    case 'allianceTag':
+      return { ...player, allianceTag: value, profileLastUpdated: stamp };
     case 'infantry':
       return { ...player, troops: { ...player.troops, infantry: value }, profileLastUpdated: stamp };
     case 'lancer':

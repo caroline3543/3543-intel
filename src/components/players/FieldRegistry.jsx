@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C, LANGUAGES, TIER_OPTIONS, ALLIANCE_RANKS, HEROES_BY_GEN } from '../../utils/constants.js';
+import { C, LANGUAGES, TIER_OPTIONS, ALLIANCE_RANKS, HEROES_BY_GEN, FC_OPTIONS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { JOINER_HEROES } from '../../data/joinerMeta.js';
 import { addJoinerHeroToPlayer, removeJoinerHeroFromPlayer } from '../../services/joinerRegistryService.js';
@@ -30,6 +30,19 @@ const FIELD_DEFS = [
     id: 'languages', label: 'Languages', icon: '🗣️', multi: true,
     baseOptions: () => LANGUAGES,
     get: (p) => p.languages || [],
+  },
+  {
+    id: 'furnace', label: 'Furnace Level', icon: '🔥', multi: false,
+    baseOptions: () => FC_OPTIONS,
+    get: (p) => (p.furnaceLevel ? [p.furnaceLevel] : []),
+  },
+  {
+    id: 'allianceTag', label: 'Alliance', icon: '🚩', multi: false,
+    // No fixed base list — alliance tags are entirely alliance-defined,
+    // not a preset table. Values come from whatever's already on
+    // someone's profile, plus anything typed into the custom-add row.
+    baseOptions: () => [],
+    get: (p) => (p.allianceTag ? [p.allianceTag] : []),
   },
   {
     id: 'infantry', label: 'Infantry Tier', icon: '⚔️', multi: false,
@@ -63,6 +76,9 @@ const TIER_FIELD_IDS = ['infantry', 'lancer', 'marksman'];
 function initials(n) { return (n || '?').split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '?'; }
 
 function sortValues(field, values) {
+  if (field.id === 'furnace') {
+    return [...values].sort((a, b) => FC_OPTIONS.indexOf(a) - FC_OPTIONS.indexOf(b));
+  }
   if (TIER_FIELD_IDS.includes(field.id)) {
     return [...values].sort((a, b) => TIER_OPTIONS.indexOf(a) - TIER_OPTIONS.indexOf(b));
   }

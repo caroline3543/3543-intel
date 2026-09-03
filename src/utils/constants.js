@@ -24,6 +24,11 @@ export const C = {
 // a 'T12'. Worth confirming whether T12 is real or a leftover/typo.
 export const TIER_OPTIONS = ['T10','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios','T12'];
 
+// Furnace level options — separate from TIER_OPTIONS above. Furnace is
+// FC1-FC8 only; T10/T11/Helios/T12 are troop camp tiers, not furnace
+// levels (see the "T11/Helios is not a furnace" fix in PlayerSheet.jsx).
+export const FC_OPTIONS = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8'];
+
 // NOTE: player roles are no longer a fixed list. "Rally Lead" is the only
 // permanent, built-in role (see src/utils/roles.js) — every other role is
 // created by the alliance itself and stored in app data, not here.
