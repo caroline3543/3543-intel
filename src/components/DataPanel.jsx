@@ -26,6 +26,7 @@ export function DataPanel({
   const [includeEvents, setIncludeEvents] = useState(true);
   const [includePlans, setIncludePlans]   = useState(true);
   const [scopeEventId, setScopeEventId]   = useState(''); // '' = all events
+  const [selectedAllianceTags, setSelectedAllianceTags] = useState([]); // [] = every alliance
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
@@ -50,6 +51,7 @@ export function DataPanel({
     try {
       exportWorkbook(data, {
         includeRoster,
+        rosterAllianceTags: selectedAllianceTags.length ? selectedAllianceTags : null,
         includeEvents,
         includePlans,
         eventId: scopeEventId || null,
@@ -78,6 +80,16 @@ export function DataPanel({
   const scopedPlans       = scopeEventId ? (data.svsPlans||[]).filter(p => p.eventId === scopeEventId) : (data.svsPlans||[]);
   const scopedJoinerEvents = scopedEvents.filter(e => JOINER_COVERAGE_EVENTS.includes(e.type));
   const nothingSelected   = !includeRoster && !includeEvents && !includePlans;
+
+  // Alliance filter for the roster — "export one alliance or more than
+  // one". Empty selection means no filter, every alliance included.
+  const allAllianceTags = [...new Set((data.players||[]).map(p => p.allianceTag).filter(Boolean))].sort();
+  const scopedRosterPlayers = selectedAllianceTags.length
+    ? (data.players||[]).filter(p => selectedAllianceTags.includes(p.allianceTag))
+    : (data.players||[]);
+  function toggleAllianceTag(tag) {
+    setSelectedAllianceTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  }
 
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'#000c', zIndex:300, display:'flex', alignItems:'flex-end' }}>
@@ -178,13 +190,29 @@ export function DataPanel({
                 </select>
               </div>
             )}
+            {includeRoster && allAllianceTags.length > 1 && (
+              <div style={{ marginTop:10 }}>
+                <div style={{ fontSize:11, color:C.muted, marginBottom:6 }}>Scope roster to alliance{selectedAllianceTags.length!==1?'(s)':''} — none selected means all:</div>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  {allAllianceTags.map(tag => {
+                    const sel = selectedAllianceTags.includes(tag);
+                    return (
+                      <button key={tag} onClick={() => toggleAllianceTag(tag)}
+                        style={{ padding:'6px 12px', borderRadius:16, background:sel?C.gold+'22':C.card, border:`1px solid ${sel?C.gold:C.border}`, color:sel?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>
+                        {sel?'✓ ':''}[{tag}]
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* What's included */}
           <div style={{ background:C.bg, borderRadius:10, padding:12, marginBottom:14 }}>
             <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>What's included</div>
             {[
-              includeRoster ? ['✓', `${memberCount} members — troops, furnace, roles, heroes`, C.green] : null,
+              includeRoster ? ['✓', `${scopedRosterPlayers.length} member${scopedRosterPlayers.length!==1?'s':''} — name, alliance, troop tiers${selectedAllianceTags.length ? ` (${selectedAllianceTags.map(t=>`[${t}]`).join(', ')})` : ''}`, C.green] : null,
               includeRoster && hasJoiners ? ['✓', 'Joiner Coverage — who owns each hero at Skill 5', C.green] : null,
               includeEvents && scopedEvents.length > 0 ? ['✓', `${scopedEvents.length} event${scopedEvents.length!==1?'s':''} — attendance, Discord, performance`, C.green] : null,
               includeEvents && scopedJoinerEvents.length > 0 ? ['✓', `${scopedJoinerEvents.length} Castle event${scopedJoinerEvents.length!==1?'s':''} include joiner coverage columns`, C.gold] : null,

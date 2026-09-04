@@ -107,44 +107,50 @@ function uniqueSheetName(rawName, used) {
   return candidate;
 }
 
-// ── Sheet 1: Roster ────────────────────────────────────────────
-function buildRosterSheet(players) {
-  const headers = [
-    'Username', 'Nickname', 'Alliance', 'Furnace',
-    'Infantry', 'Lancer', 'Marksman',
-    'Role(s)', 'Joiner Heroes',
-    'Country', 'Languages',
-    'Player ID', 'Reliability', 'Last Updated',
-  ];
+// A "Helios" player has any troop type at the T11/Helios tier or
+// above — T12 counts too since it's a step past Helios, if that tier
+// is ever actually used (see the T12 accuracy note in constants.js).
+function isHeliosPlayer(p) {
+  const tiers = [p.troops?.infantry, p.troops?.lancer, p.troops?.marksman];
+  return tiers.some(t => t === 'T11/Helios' || t === 'T12');
+}
 
+// ── Sheet 1: Roster ────────────────────────────────────────────
+// Trimmed to exactly what's needed for a quick roster reference: name
+// (flagged), alliance, troop tiers, and — only for Rally Leaders —
+// their Skill 5 ("5-star") joiner heroes. Everything else that used to
+// be here (furnace, country, languages, role list, player ID,
+// last-updated) still lives in the hidden Roster Data sheet for
+// re-import; this pretty sheet is just for reading.
+function buildRosterSheet(players) {
+  const headers = ['Name', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes (5★)'];
   const rows = [headers.map(hdr)];
 
   players.forEach((p, i) => {
-    const joiners = (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero).join(', ');
-    const style   = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
+    const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
+    const isLead = p.roles?.includes('Rally Lead');
+    const helios = isHeliosPlayer(p);
+    const flags = `${isLead ? '👑' : ''}${helios ? '☀️' : ''}`;
+    const displayName = p.username || p.alias || '';
+    const nameCell = flags ? `${flags} ${displayName}` : displayName;
+    const leaderHeroes = isLead
+      ? (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero).join(', ')
+      : '';
 
     rows.push([
-      cell(p.username || '', style),
-      cell(p.alias || '', style),
+      cell(nameCell, style),
       cell(p.allianceTag || '', style),
-      cell(p.furnaceLevel || '', style),
       cell(p.troops?.infantry || '', style),
       cell(p.troops?.lancer || '', style),
       cell(p.troops?.marksman || '', style),
-      cell((p.roles || []).join(', '), style),
-      cell(joiners, style),
-      cell(p.country || '', style),
-      cell((p.languages || []).join(', '), style),
-      cell(p.fid || '', style),
-      cell('', style),   // reliability — calculated in Intel tab, not stored
-      cell(p.profileLastUpdated ? new Date(p.profileLastUpdated).toLocaleDateString() : '', style),
+      cell(leaderHeroes, style),
     ]);
   });
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  setColWidths(ws, [18, 14, 10, 9, 9, 9, 9, 22, 30, 16, 20, 12, 12, 14]);
+  setColWidths(ws, [22, 10, 9, 9, 9, 34]);
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  autoFilter(ws, `A1:N1`);
+  autoFilter(ws, `A1:F1`);
   return ws;
 }
 
@@ -332,20 +338,21 @@ function buildJoinerCoverageSheet(players) {
 }
 
 // ── Cover sheet ────────────────────────────────────────────────
-function buildCoverSheet(data) {
+function buildCoverSheet(data, rosterCount = null) {
   const now      = new Date().toLocaleString();
   const alliance = data.settings?.allianceName || data.settings?.allianceTag || 'Alliance';
+  const memberCount = rosterCount != null ? rosterCount : (data.players?.length || 0);
   const rows = [
     [cell('CAROLINE', { font: { bold: true, sz: 18, name: 'Arial', color: { rgb: 'F5A623' } } })],
     [cell(alliance, { font: { bold: true, sz: 14, name: 'Arial', color: { rgb: 'FFFFFF' } } })],
     [],
     [cell('Exported:', SUBHEADER_STYLE), cell(now, ROW_STYLE)],
-    [cell('Members:', SUBHEADER_STYLE), cell(data.players?.length || 0, ROW_STYLE)],
+    [cell('Members:', SUBHEADER_STYLE), cell(memberCount, ROW_STYLE)],
     [cell('Events:', SUBHEADER_STYLE), cell(data.events?.length || 0, ROW_STYLE)],
     [cell('State:', SUBHEADER_STYLE), cell(data.settings?.stateId || '', ROW_STYLE)],
     [],
     [cell('Sheets in this file:', SUBHEADER_STYLE)],
-    [cell('• Roster', ROW_STYLE), cell('All members and their combat stats', ROW_STYLE)],
+    [cell('• Roster', ROW_STYLE), cell('Name, alliance, troop tiers — Rally Leaders also show their Skill 5 heroes', ROW_STYLE)],
     [cell('• Joiner Coverage', ROW_STYLE), cell('Hero Skill 5 ownership across the alliance', ROW_STYLE)],
     [cell('• [Event sheets]', ROW_STYLE), cell('One sheet per event — attendance, Discord, performance', ROW_STYLE)],
     [],
@@ -368,34 +375,44 @@ function buildCoverSheet(data) {
 // ── Main export function ───────────────────────────────────────
 // options lets a caller (e.g. a future DataPanel.jsx checklist) export
 // only part of the data instead of always generating everything:
-//   includeRoster – Roster + Roster Data + Joiner Coverage + Roles Data
-//   includeEvents – event attendance sheets + Events Data
-//   includePlans  – Plans Data (battle plan records)
-//   eventId       – when set, scopes BOTH events and plans to just that
-//                   one event (plans via plan.eventId) — "battle plans
-//                   due a specific event only"
+//   includeRoster      – Roster + Roster Data + Joiner Coverage + Roles Data
+//   rosterAllianceTags – array of alliance tags to include in the
+//                        roster (and Joiner Coverage / Roster Data);
+//                        null or [] means every alliance, unfiltered —
+//                        "export one alliance or more than one"
+//   includeEvents      – event attendance sheets + Events Data
+//   includePlans       – Plans Data (battle plan records)
+//   eventId            – when set, scopes BOTH events and plans to just
+//                        that one event (plans via plan.eventId) —
+//                        "battle plans due a specific event only"
 // Calling exportWorkbook(data) with no options exports everything, same
 // as before this option support existed.
 export function exportWorkbook(data, options = {}) {
   const {
-    includeRoster = true,
-    includeEvents = true,
-    includePlans  = true,
-    eventId       = null,
+    includeRoster      = true,
+    rosterAllianceTags = null,
+    includeEvents      = true,
+    includePlans       = true,
+    eventId            = null,
   } = options;
 
   const wb = XLSX.utils.book_new();
 
+  // Alliance-scoped roster — null/empty means no filter (every alliance)
+  const scopedPlayers = (rosterAllianceTags && rosterAllianceTags.length > 0)
+    ? (data.players || []).filter(p => rosterAllianceTags.includes(p.allianceTag))
+    : (data.players || []);
+
   // 1. Cover sheet
-  const coverWs = buildCoverSheet(data);
+  const coverWs = buildCoverSheet(data, includeRoster ? scopedPlayers.length : null);
   XLSX.utils.book_append_sheet(wb, coverWs, 'Overview');
 
-  // 2. Full roster
+  // 2. Roster (alliance-scoped)
   if (includeRoster) {
-    const rosterWs = buildRosterSheet(data.players || []);
+    const rosterWs = buildRosterSheet(scopedPlayers);
     XLSX.utils.book_append_sheet(wb, rosterWs, 'Roster');
 
-    const joinerWs = buildJoinerCoverageSheet(data.players || []);
+    const joinerWs = buildJoinerCoverageSheet(scopedPlayers);
     if (joinerWs) XLSX.utils.book_append_sheet(wb, joinerWs, 'Joiner Coverage');
   }
 
@@ -417,7 +434,7 @@ export function exportWorkbook(data, options = {}) {
   // view for someone just reading the report.
   const dataSheetNames = [];
   if (includeRoster) {
-    const rosterDataWs = buildRosterDataSheet(data.players || []);
+    const rosterDataWs = buildRosterDataSheet(scopedPlayers);
     XLSX.utils.book_append_sheet(wb, rosterDataWs, 'Roster Data');
     dataSheetNames.push('Roster Data');
 
