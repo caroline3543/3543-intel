@@ -57,8 +57,8 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [troopsCopied, setTroopsCopied] = useState(false);
   const [bulkMode, setBulkMode]         = useState(false);
   const [bulkSel, setBulkSel]           = useState(new Set());
-  const [bulkField, setBulkField]       = useState(null);
-  const [bulkValue, setBulkValue]       = useState('');
+  const [activeField, setActiveField]   = useState(null); // which field's value picker is open
+  const [stagedFields, setStagedFields] = useState({});   // { [fieldId]: value } — built up before one combined Apply
 
   // How many of the "should be set" fields are actually missing —
   // higher = more incomplete. NOTE: having zero roles is no longer
@@ -85,19 +85,28 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
     onSavePlayer({ ...player, roles: nextRoles });
   }
 
-  // Applies one field value to every selected player in one batch —
-  // reuses assignFieldValue from fieldRegistryService.js, the exact
-  // same function Field Registry itself uses, just driven the other
-  // direction (pick players first, then a value) instead of Field
-  // Registry's value-first flow.
-  function applyBulkField() {
-    const field = FIELD_DEFS.find(f => f.id === bulkField);
-    if (!field || !bulkValue) return;
+  // Folds every staged field=value pair into one combined update per
+  // selected player — e.g. Furnace: FC5 AND Infantry: FC5 AND
+  // Marksman: FC5 all land in the same object, then one onUpdatePlayers
+  // batch for everyone. Chaining assignFieldValue locally like this
+  // (not one onUpdatePlayers call per field) avoids each call needing
+  // to read the result of the previous one from parent state that
+  // hasn't re-rendered yet.
+  function applyBulkFields() {
+    const entries = Object.entries(stagedFields);
+    if (entries.length === 0) return;
     const selected = players.filter(p => bulkSel.has(p.id));
-    const updated = selected.map(p => assignFieldValue(p, field, bulkValue));
+    const updated = selected.map(p => {
+      let result = p;
+      entries.forEach(([fieldId, value]) => {
+        const field = FIELD_DEFS.find(f => f.id === fieldId);
+        if (field) result = assignFieldValue(result, field, value);
+      });
+      return result;
+    });
     onUpdatePlayers(updated);
-    showToast?.(`Updated ${updated.length} player${updated.length!==1?'s':''} ✓`);
-    setBulkSel(new Set()); setBulkMode(false); setBulkField(null); setBulkValue('');
+    showToast?.(`Updated ${updated.length} player${updated.length!==1?'s':''} with ${entries.length} field${entries.length!==1?'s':''} ✓`);
+    setBulkSel(new Set()); setBulkMode(false); setActiveField(null); setStagedFields({});
   }
 
   function toggleBulkSel(id) {
@@ -200,7 +209,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
           ⚙ Roles
         </button>
         {rosterView==='list' && (
-          <button onClick={() => { setBulkMode(v => !v); setBulkSel(new Set()); setBulkField(null); setBulkValue(''); }}
+          <button onClick={() => { setBulkMode(v => !v); setBulkSel(new Set()); setActiveField(null); setStagedFields({}); }}
             style={{ flexShrink:0, height:36, padding:'0 14px', borderRadius:20, background:bulkMode?C.gold+'22':C.section, border:`1px solid ${bulkMode?C.gold:C.border}`, color:bulkMode?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
             ☑️ {bulkMode ? `${bulkSel.size} selected` : 'Select'}
           </button>
@@ -268,36 +277,57 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             </div>
           )}
           {bulkMode && bulkSel.size > 0 && (() => {
-            const field = FIELD_DEFS.find(f => f.id === bulkField);
-            const options = field ? getFieldValues(players, field) : [];
+            const activeFieldDef = FIELD_DEFS.find(f => f.id === activeField);
+            const options = activeFieldDef ? getFieldValues(players, activeFieldDef) : [];
+            const stagedEntries = Object.entries(stagedFields);
             return (
               <div style={{ background:C.card, border:`1px solid ${C.gold}44`, borderRadius:12, padding:14, marginBottom:14 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:C.white, marginBottom:10 }}>Assign to {bulkSel.size} selected</div>
-                <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:field?10:0 }}>
-                  {FIELD_DEFS.map(f => (
-                    <button key={f.id} onClick={() => { setBulkField(f.id); setBulkValue(''); }}
-                      style={{ padding:'7px 12px', borderRadius:16, whiteSpace:'nowrap', background:bulkField===f.id?C.gold+'22':C.section, border:`1px solid ${bulkField===f.id?C.gold:C.border}`, color:bulkField===f.id?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', flexShrink:0 }}>
-                      {f.icon} {f.label}
-                    </button>
-                  ))}
-                </div>
-                {field && (
-                  <>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:12 }}>
-                      {options.length === 0 && <div style={{ fontSize:12, color:C.muted }}>No existing values yet — add one via 📋 Fields first.</div>}
-                      {options.map(opt => (
-                        <button key={opt} onClick={() => setBulkValue(opt)}
-                          style={{ padding:'6px 12px', borderRadius:16, background:bulkValue===opt?C.gold+'22':C.section, border:`1px solid ${bulkValue===opt?C.gold:C.border}`, color:bulkValue===opt?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                    <button onClick={applyBulkField} disabled={!bulkValue}
-                      style={{ width:'100%', height:44, borderRadius:10, background:bulkValue?C.gold:C.section, color:bulkValue?C.bg:C.muted, fontWeight:700, fontSize:14, border:bulkValue?'none':`1px solid ${C.border}`, cursor:bulkValue?'pointer':'default' }}>
-                      Apply{bulkValue?` "${bulkValue}"`:''} to {bulkSel.size} player{bulkSel.size!==1?'s':''}
-                    </button>
-                  </>
+
+                {stagedEntries.length > 0 && (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:10 }}>
+                    {stagedEntries.map(([fid, val]) => {
+                      const f = FIELD_DEFS.find(fd => fd.id === fid);
+                      return (
+                        <span key={fid} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 10px', borderRadius:16, background:C.green+'18', border:`1px solid ${C.green}44`, color:C.green, fontSize:12, fontWeight:600 }}>
+                          {f?.icon} {f?.label}: {val}
+                          <button onClick={() => setStagedFields(prev => { const n = { ...prev }; delete n[fid]; return n; })}
+                            style={{ background:'none', border:'none', color:C.green, cursor:'pointer', fontWeight:700, padding:0, fontSize:13, lineHeight:1 }}>✕</button>
+                        </span>
+                      );
+                    })}
+                  </div>
                 )}
+
+                <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:activeField?10:0 }}>
+                  {FIELD_DEFS.map(f => {
+                    const staged = stagedFields[f.id] !== undefined;
+                    const open = activeField === f.id;
+                    return (
+                      <button key={f.id} onClick={() => setActiveField(open ? null : f.id)}
+                        style={{ padding:'7px 12px', borderRadius:16, whiteSpace:'nowrap', background:open?C.gold+'22':(staged?C.green+'14':C.section), border:`1px solid ${open?C.gold:(staged?C.green+'66':C.border)}`, color:open?C.gold:(staged?C.green:C.muted), fontWeight:600, fontSize:12, cursor:'pointer', flexShrink:0 }}>
+                        {staged?'✓ ':''}{f.icon} {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {activeFieldDef && (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:12 }}>
+                    {options.length === 0 && <div style={{ fontSize:12, color:C.muted }}>No existing values yet — add one via 📋 Fields first.</div>}
+                    {options.map(opt => (
+                      <button key={opt} onClick={() => { setStagedFields(prev => ({ ...prev, [activeField]: opt })); setActiveField(null); }}
+                        style={{ padding:'6px 12px', borderRadius:16, background:stagedFields[activeField]===opt?C.gold+'22':C.section, border:`1px solid ${stagedFields[activeField]===opt?C.gold:C.border}`, color:stagedFields[activeField]===opt?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button onClick={applyBulkFields} disabled={stagedEntries.length===0}
+                  style={{ width:'100%', height:44, borderRadius:10, background:stagedEntries.length?C.gold:C.section, color:stagedEntries.length?C.bg:C.muted, fontWeight:700, fontSize:14, border:stagedEntries.length?'none':`1px solid ${C.border}`, cursor:stagedEntries.length?'pointer':'default' }}>
+                  Apply {stagedEntries.length || ''} field{stagedEntries.length!==1?'s':''} to {bulkSel.size} player{bulkSel.size!==1?'s':''}
+                </button>
               </div>
             );
           })()}
