@@ -36,7 +36,7 @@ export default function App() {
     roles, saveCustomRoles,
     customChecklist, saveChecklistItems,
     notices, saveNotice, deleteNotice,
-    asciiArts, saveAsciiArt, deleteAsciiArt,
+    asciiArts, saveAsciiArt, deleteAsciiArt, resetAsciiArtsToDefaults,
   } = state;
 
   const [tab, setTab]               = useState(0);
@@ -77,7 +77,7 @@ export default function App() {
       </div>
 
       {tab===0 && <TabErrorBoundary><RosterTab players={players} events={events} roles={roles} onSaveCustomRoles={saveCustomRoles} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(1)} /></TabErrorBoundary>}
-      {tab===1 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} settings={settings} notices={notices} onSaveNotice={saveNotice} onDeleteNotice={deleteNotice} asciiArts={asciiArts} onSaveArt={saveAsciiArt} onDeleteArt={deleteAsciiArt} /></TabErrorBoundary>}
+      {tab===1 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} settings={settings} notices={notices} onSaveNotice={saveNotice} onDeleteNotice={deleteNotice} asciiArts={asciiArts} onSaveArt={saveAsciiArt} onDeleteArt={deleteAsciiArt} onResetArtToDefaults={resetAsciiArtsToDefaults} /></TabErrorBoundary>}
       {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} showToast={showToast} /></TabErrorBoundary>}
       {tab===3 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} checklist={customChecklist} onSaveChecklist={saveChecklistItems} /></TabErrorBoundary>}
 

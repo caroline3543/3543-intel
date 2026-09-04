@@ -6,7 +6,7 @@ import JoinerRegistry from '../JoinerRegistry.jsx';
 import NoticeLibrary from '../notices/NoticeLibrary.jsx';
 import AsciiArtLibrary from '../ascii/AsciiArtLibrary.jsx';
 
-export function IntelTab({ players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice, asciiArts = [], onSaveArt, onDeleteArt }) {
+export function IntelTab({ players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice, asciiArts = [], onSaveArt, onDeleteArt, onResetArtToDefaults }) {
   const [registryOpen, setRegistryOpen] = useState(false);
   const [noticesOpen, setNoticesOpen]   = useState(false);
   const [artOpen, setArtOpen]           = useState(false);
@@ -71,6 +71,7 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
           asciiArts={asciiArts}
           onSaveArt={onSaveArt}
           onDeleteArt={onDeleteArt}
+          onResetToDefaults={onResetArtToDefaults}
           onClose={()=>setArtOpen(false)}
         />
       </div>

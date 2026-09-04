@@ -214,6 +214,20 @@ export function useAppState() {
     showToast('Art deleted');
   }, [showToast]);
 
+  // Explicit, user-initiated wholesale replace — the one-time seed
+  // effect above only ever fires if asciiArts has never been set at
+  // all, so it won't re-seed on its own after the schema's default set
+  // changes. This is the deliberate escape hatch for "replace what's
+  // currently there with the current defaults."
+  const resetAsciiArtsToDefaults = useCallback(() => {
+    setData(prev => ({
+      ...prev,
+      asciiArts: SEED_ASCII_ART.map(a => newAsciiArt(a)),
+      lastUpdated: new Date().toISOString(),
+    }));
+    showToast('Library reset to defaults');
+  }, [showToast]);
+
   // ── Settings ──────────────────────────────────────────────
   const saveSettings = useCallback((settings) => {
     setData(prev => ({ ...prev, settings, lastUpdated: new Date().toISOString() }));
@@ -321,6 +335,7 @@ export function useAppState() {
     // ASCII Art library
     saveAsciiArt,
     deleteAsciiArt,
+    resetAsciiArtsToDefaults,
 
     // Prep scores
     updatePrepScores,

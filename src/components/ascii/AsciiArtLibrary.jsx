@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { C } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
-import { newAsciiArt } from '../../data/asciiArtSchema.js';
+import { newAsciiArt, WOS_PUA_ICONS } from '../../data/asciiArtSchema.js';
 import { Field, Inp, SheetHandle } from '../common/Primitives.jsx';
 
 // Shared preview styling — used identically on the card list, the
@@ -123,14 +123,27 @@ export function AsciiArtPickerSheet({ asciiArts = [], open, onClose, onPick }) {
   );
 }
 
+// Inspects one Unicode character — its own code point, not a UTF-16
+// surrogate half. Meaning comes from WOS_PUA_ICONS when it's a known
+// Whiteout Survival icon; otherwise null, not guessed.
+function inspectChar(ch) {
+  const cp = ch.codePointAt(0);
+  const hex = cp.toString(16).toUpperCase().padStart(4, '0');
+  const known = WOS_PUA_ICONS[hex];
+  return { char: ch, hex, decimal: cp, meaning: known?.name || null };
+}
+
 // ── AsciiArtLibrary (main export) — standalone browse/save/copy screen
-export default function AsciiArtLibrary({ asciiArts = [], onSaveArt, onDeleteArt, onClose }) {
+export default function AsciiArtLibrary({ asciiArts = [], onSaveArt, onDeleteArt, onResetToDefaults, onClose }) {
   const [search, setSearch]       = useState('');
   const [filterCat, setFilterCat] = useState('All');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingArt, setEditingArt] = useState(null);
   const [copiedId, setCopiedId]   = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [inspectMode, setInspectMode] = useState(false);
+  const [inspecting, setInspecting]   = useState(null); // result of inspectChar(), or null
+  const [resetConfirm, setResetConfirm] = useState(false);
 
   const categories = [...new Set(asciiArts.map(a => a.category).filter(Boolean))].sort();
 
@@ -145,9 +158,12 @@ export default function AsciiArtLibrary({ asciiArts = [], onSaveArt, onDeleteArt
     });
 
   // Copies the raw art string exactly as stored — no code fences, no
-  // added quotes, no alteration of any character. This is what gets
-  // pasted straight into the game or Discord, so it has to be pixel-
-  // perfect (well — character-perfect) with what's on screen.
+  // added quotes, no normalization, no alteration of any character.
+  // This writes a.art (the JS string held in state/data) directly to
+  // the clipboard — it never reads from the rendered <pre> element's
+  // textContent/innerText, which is the one thing that could silently
+  // differ from the stored value (e.g. if a browser ever normalized
+  // whitespace on render). Source of truth in, source of truth out.
   function copyArt(a) {
     navigator.clipboard.writeText(a.art).then(() => {
       setCopiedId(a.id);
@@ -161,11 +177,18 @@ export default function AsciiArtLibrary({ asciiArts = [], onSaveArt, onDeleteArt
       <div style={{ padding:'16px 20px', borderBottom:`1px solid ${C.border}`, background:C.bg, flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
           <button onClick={onClose} style={{ background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', padding:0 }}>← Back</button>
-          <div>
+          <div style={{ flex:1 }}>
             <div style={{ fontSize:17, fontWeight:700, color:C.white }}>🎨 ASCII Art Library</div>
             <div style={{ fontSize:12, color:C.muted }}>{asciiArts.length} saved</div>
           </div>
+          <button onClick={() => setInspectMode(v => !v)}
+            style={{ height:32, padding:'0 12px', borderRadius:16, background:inspectMode?C.gold+'22':C.section, border:`1px solid ${inspectMode?C.gold:C.border}`, color:inspectMode?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', whiteSpace:'nowrap' }}>
+            🔍 Inspect
+          </button>
         </div>
+        {inspectMode && (
+          <div style={{ fontSize:11, color:C.gold, marginBottom:10 }}>Tap any character in a preview to identify it.</div>
+        )}
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search title, category, tags…"
           style={{ width:'100%', height:40, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 14px', fontSize:14, color:C.white, boxSizing:'border-box', fontFamily:'inherit', marginBottom:10 }} />
         {categories.length > 0 && (
@@ -182,9 +205,15 @@ export default function AsciiArtLibrary({ asciiArts = [], onSaveArt, onDeleteArt
 
       <div style={{ flex:1, overflowY:'auto', padding:'16px 20px', paddingBottom:100 }}>
         <button onClick={() => { setEditingArt(null); setSheetOpen(true); }}
-          style={{ width:'100%', height:48, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer', marginBottom:16 }}>
+          style={{ width:'100%', height:48, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer', marginBottom:10 }}>
           ＋ Create ASCII
         </button>
+        {onResetToDefaults && (
+          <button onClick={() => setResetConfirm(true)}
+            style={{ width:'100%', height:36, borderRadius:10, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', marginBottom:16 }}>
+            🔄 Reset library to defaults
+          </button>
+        )}
 
         {filtered.length === 0 && (
           <div style={{ textAlign:'center', padding:'40px 20px' }}>
@@ -210,7 +239,15 @@ export default function AsciiArtLibrary({ asciiArts = [], onSaveArt, onDeleteArt
                 <button onClick={() => setDeleteConfirmId(a.id)} style={{ background:'none', border:'none', color:C.red+'88', fontSize:15, cursor:'pointer', padding:0 }}>✕</button>
               </div>
             </div>
-            <pre style={{ ...PREVIEW_STYLE, marginBottom:10, maxHeight:220, overflowY:'auto' }}>{a.art}</pre>
+            {inspectMode ? (
+              <pre style={{ ...PREVIEW_STYLE, marginBottom:10, maxHeight:220, overflowY:'auto' }}>
+                {[...a.art].map((ch, i) => (
+                  <span key={i} onClick={() => setInspecting(inspectChar(ch))} style={{ cursor:'pointer', outline:`1px dotted ${C.border}` }}>{ch}</span>
+                ))}
+              </pre>
+            ) : (
+              <pre style={{ ...PREVIEW_STYLE, marginBottom:10, maxHeight:220, overflowY:'auto' }}>{a.art}</pre>
+            )}
             <button onClick={() => copyArt(a)}
               style={{ width:'100%', height:40, borderRadius:10, background:copiedId===a.id?C.green+'18':C.gold+'18', border:`1px solid ${copiedId===a.id?C.green:C.gold}44`, color:copiedId===a.id?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
               {copiedId===a.id ? '✓ Copied!' : '📋 Copy'}
@@ -234,6 +271,48 @@ export default function AsciiArtLibrary({ asciiArts = [], onSaveArt, onDeleteArt
             <div style={{ display:'flex', gap:10 }}>
               <button onClick={() => setDeleteConfirmId(null)} style={{ flex:1, height:50, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:15, cursor:'pointer' }}>Cancel</button>
               <button onClick={() => { onDeleteArt(deleteConfirmId); setDeleteConfirmId(null); }} style={{ flex:1, height:50, borderRadius:12, background:C.red, color:'#fff', fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inspecting && (
+        <div onClick={() => setInspecting(null)} style={{ position:'fixed', inset:0, background:'#000c', zIndex:970, display:'flex', alignItems:'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', padding:'20px 20px 28px' }}>
+            <div style={{ fontSize:16, fontWeight:700, color:C.white, marginBottom:16 }}>Character Inspector</div>
+            <div style={{ background:C.section, borderRadius:10, padding:16, marginBottom:10 }}>
+              <div style={{ fontSize:11, color:C.muted, marginBottom:4 }}>Character</div>
+              <pre style={{ ...PREVIEW_STYLE, fontSize:28, padding:'12px 16px', marginBottom:12 }}>{inspecting.char}</pre>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div>
+                  <div style={{ fontSize:11, color:C.muted, marginBottom:2 }}>Unicode</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:C.white }}>U+{inspecting.hex}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize:11, color:C.muted, marginBottom:2 }}>Decimal</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:C.white }}>{inspecting.decimal}</div>
+                </div>
+                <div style={{ gridColumn:'1 / -1' }}>
+                  <div style={{ fontSize:11, color:C.muted, marginBottom:2 }}>Meaning</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:inspecting.meaning?C.gold:C.muted }}>{inspecting.meaning || 'Not a known Whiteout Survival icon'}</div>
+                </div>
+              </div>
+            </div>
+            <button onClick={() => setInspecting(null)} style={{ width:'100%', height:46, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:15, cursor:'pointer' }}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {resetConfirm && (
+        <div onClick={() => setResetConfirm(false)} style={{ position:'fixed', inset:0, background:'#000c', zIndex:970, display:'flex', alignItems:'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', padding:'20px 20px 28px' }}>
+            <div style={{ fontSize:16, fontWeight:700, color:C.red, marginBottom:10 }}>⚠ Reset library to defaults?</div>
+            <div style={{ fontSize:13, color:C.white, marginBottom:20, lineHeight:1.5 }}>
+              This replaces every saved entry — including anything you've created yourself — with the default set. This can't be undone.
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => setResetConfirm(false)} style={{ flex:1, height:50, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:15, cursor:'pointer' }}>Cancel</button>
+              <button onClick={() => { onResetToDefaults(); setResetConfirm(false); }} style={{ flex:1, height:50, borderRadius:12, background:C.red, color:'#fff', fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>Reset</button>
             </div>
           </div>
         </div>
