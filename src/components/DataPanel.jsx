@@ -227,7 +227,7 @@ export function DataPanel({
             <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>What's included</div>
             {[
               includeRoster ? ['✓', `${scopedRosterPlayers.length} member${scopedRosterPlayers.length!==1?'s':''} — name, alliance, troop tiers${selectedAllianceTags.length ? ` (${selectedAllianceTags.map(t=>`[${t}]`).join(', ')})` : ''}`, C.green] : null,
-              includeRoster && hasJoiners ? ['✓', 'Joiner Coverage — who owns each hero at Skill 5', C.green] : null,
+              includeRoster && hasJoiners ? ['✓', 'Includes joiner hero coverage (✓ per hero) right in the roster', C.green] : null,
               includeEvents && scopedEvents.length > 0 ? ['✓', `${scopedEvents.length} event${scopedEvents.length!==1?'s':''} — attendance, Discord, performance`, C.green] : null,
               includeEvents && scopedJoinerEvents.length > 0 ? ['✓', `${scopedJoinerEvents.length} Castle event${scopedJoinerEvents.length!==1?'s':''} include joiner coverage columns`, C.gold] : null,
               includePlans && scopedPlans.length > 0 ? ['✓', `${scopedPlans.length} battle plan${scopedPlans.length!==1?'s':''}`, C.green] : null,

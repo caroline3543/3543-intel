@@ -115,42 +115,120 @@ function isHeliosPlayer(p) {
   return tiers.some(t => t === 'T11/Helios' || t === 'T12');
 }
 
+// Roster sort order: Rally Leaders first, then Helios players, then by
+// troop tier — ranked by the WORST of their three troops first (an
+// "all FC5" player outranks one who's FC5/FC5/FC4, who in turn
+// outranks a player who's FC4/FC4/FC4 even though both of the latter
+// share the same worst tier — the sum of all three tiers breaks that
+// tie, since more troops at a higher tier should rank higher within
+// the same "worst tier" bracket).
+const TIER_RANK_ORDER = ['T10','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios','T12'];
+function tierRank(t) { const i = TIER_RANK_ORDER.indexOf(t); return i === -1 ? -1 : i; }
+
+function rosterSortKey(p) {
+  const ranks = [p.troops?.infantry, p.troops?.lancer, p.troops?.marksman].map(tierRank);
+  return {
+    isLead: p.roles?.includes('Rally Lead') ? 1 : 0,
+    helios: isHeliosPlayer(p) ? 1 : 0,
+    minRank: Math.min(...ranks),
+    sumRank: ranks.reduce((a, b) => a + b, 0),
+  };
+}
+
+function compareRosterOrder(a, b) {
+  const ka = rosterSortKey(a), kb = rosterSortKey(b);
+  if (ka.isLead  !== kb.isLead)  return kb.isLead  - ka.isLead;
+  if (ka.helios  !== kb.helios)  return kb.helios  - ka.helios;
+  if (ka.minRank !== kb.minRank) return kb.minRank - ka.minRank;
+  if (ka.sumRank !== kb.sumRank) return kb.sumRank - ka.sumRank;
+  return (a.username || a.alias || '').localeCompare(b.username || b.alias || '');
+}
+
+// Rally Leader heroes are NOT the same as joiner heroes — this was
+// wrong in an earlier version of this export, which used joinerHeroes
+// as a stand-in. A Rally Leader's actual heroes are the preset squad
+// lead heroes saved on their Rally Leader Profile (leaderProfile.teams
+// — see RallyLeaderProfileSheet.jsx), grouped by team type since
+// offense and defense loadouts are different heroes, not one flat list.
+function leaderHeroesText(p) {
+  const teams = p.leaderProfile?.teams || [];
+  return teams
+    .map(t => {
+      const heroes = (t.leadHeroes || []).filter(Boolean);
+      if (heroes.length === 0) return null;
+      const label = t.type === 'offense' ? 'Offense' : t.type === 'defense' ? 'Defense' : 'Team';
+      return `${label}: ${heroes.join(', ')}`;
+    })
+    .filter(Boolean)
+    .join(' | ');
+}
+
 // ── Sheet 1: Roster ────────────────────────────────────────────
-// Trimmed to exactly what's needed for a quick roster reference: name
-// (flagged), alliance, troop tiers, and — only for Rally Leaders —
-// their Skill 5 ("5-star") joiner heroes. Everything else that used to
-// be here (furnace, country, languages, role list, player ID,
-// last-updated) still lives in the hidden Roster Data sheet for
-// re-import; this pretty sheet is just for reading.
+// Merged with what used to be the separate Joiner Coverage sheet — one
+// tick-mark column per joiner hero (✓ if that player has it at Skill
+// 5), same style as the old coverage sheet, plus a totals row at the
+// bottom. Name/Furnace/Alliance/Troops/Rally Leader Heroes cover the
+// rest. Everything not shown here (country, languages, full role list,
+// player ID, last-updated) still lives in the hidden Roster Data sheet
+// for re-import; this pretty sheet is just for reading.
 function buildRosterSheet(players) {
-  const headers = ['Name', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes (5★)'];
+  const sorted = [...players].sort(compareRosterOrder);
+
+  const allJoiners = [...new Set(
+    players.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
+  )].sort();
+
+  const headers = ['Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
   const rows = [headers.map(hdr)];
 
-  players.forEach((p, i) => {
+  sorted.forEach((p, i) => {
     const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
     const isLead = p.roles?.includes('Rally Lead');
     const helios = isHeliosPlayer(p);
     const flags = `${isLead ? '👑' : ''}${helios ? '☀️' : ''}`;
     const displayName = p.username || p.alias || '';
     const nameCell = flags ? `${flags} ${displayName}` : displayName;
-    const leaderHeroes = isLead
-      ? (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero).join(', ')
-      : '';
+    const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
 
     rows.push([
       cell(nameCell, style),
+      cell(p.furnaceLevel || '', style),
       cell(p.allianceTag || '', style),
       cell(p.troops?.infantry || '', style),
       cell(p.troops?.lancer || '', style),
       cell(p.troops?.marksman || '', style),
-      cell(leaderHeroes, style),
+      cell(isLead ? leaderHeroesText(p) : '', style),
+      ...allJoiners.map(h => owned.has(h) ? cell('✓', YES_STYLE) : cell('', style)),
+      cell(owned.size, owned.size >= 3 ? YES_STYLE : owned.size >= 1 ? GOLD_STYLE : NO_STYLE),
     ]);
   });
 
+  // Coverage totals row — same "how many people have this hero"
+  // summary the old standalone Joiner Coverage sheet had.
+  if (allJoiners.length > 0) {
+    rows.push([]);
+    rows.push([
+      cell('COVERAGE', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      ...allJoiners.map(h => {
+        const count = players.filter(p => (p.joinerHeroes || []).some(jh => jh.hero === h && jh.skillLevel >= 5)).length;
+        return cell(count, count === 0 ? NO_STYLE : count < 3 ? GOLD_STYLE : YES_STYLE);
+      }),
+      cell('', SUBHEADER_STYLE),
+    ]);
+  }
+
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  setColWidths(ws, [22, 10, 9, 9, 9, 34]);
+  const baseWidths = [22, 9, 10, 9, 9, 9, 30];
+  const heroWidths = allJoiners.map(() => 10);
+  setColWidths(ws, [...baseWidths, ...heroWidths, 14]);
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  autoFilter(ws, `A1:F1`);
+  autoFilter(ws, `A1:${XLSX.utils.encode_col(headers.length - 1)}1`);
   return ws;
 }
 
@@ -284,59 +362,6 @@ function buildEventSheet(event, players, includeJoiners) {
   return ws;
 }
 
-// ── Sheet 3: Joiner Coverage ───────────────────────────────────
-function buildJoinerCoverageSheet(players) {
-  const allJoiners = [...new Set(
-    players.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
-  )].sort();
-
-  if (allJoiners.length === 0) return null;
-
-  const headers = ['Username', 'Alliance', 'Furnace', 'Role(s)', ...allJoiners, 'Total Heroes'];
-  const rows = [headers.map(hdr)];
-
-  players.forEach((p, i) => {
-    const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
-    const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
-    const count = owned.size;
-
-    const row = [
-      cell(p.username || '', style),
-      cell(p.allianceTag || '', style),
-      cell(p.furnaceLevel || '', style),
-      cell((p.roles || []).join(', '), style),
-      ...allJoiners.map(h => owned.has(h) ? cell('✓', YES_STYLE) : cell('', style)),
-      cell(count, count >= 3 ? YES_STYLE : count >= 1 ? GOLD_STYLE : NO_STYLE),
-    ];
-    rows.push(row);
-  });
-
-  // Coverage totals row
-  rows.push([]);
-  const totalsRow = [
-    cell('COVERAGE', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    ...allJoiners.map(h => {
-      const count = players.filter(p =>
-        (p.joinerHeroes || []).some(jh => jh.hero === h && jh.skillLevel >= 5)
-      ).length;
-      return cell(count, count === 0 ? NO_STYLE : count < 3 ? GOLD_STYLE : YES_STYLE);
-    }),
-    cell('', SUBHEADER_STYLE),
-  ];
-  rows.push(totalsRow);
-
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  const baseWidths = [18, 10, 9, 22];
-  const heroWidths = allJoiners.map(() => 10);
-  setColWidths(ws, [...baseWidths, ...heroWidths, 12]);
-  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  autoFilter(ws, `A1:${XLSX.utils.encode_col(headers.length - 1)}1`);
-  return ws;
-}
-
 // ── Cover sheet ────────────────────────────────────────────────
 function buildCoverSheet(data, rosterCount = null) {
   const now      = new Date().toLocaleString();
@@ -351,9 +376,10 @@ function buildCoverSheet(data, rosterCount = null) {
     [cell('Events:', SUBHEADER_STYLE), cell(data.events?.length || 0, ROW_STYLE)],
     [cell('State:', SUBHEADER_STYLE), cell(data.settings?.stateId || '', ROW_STYLE)],
     [],
+    [cell('Questions about this file? Contact Caroline.', { font: { bold: true, sz: 11, name: 'Arial', color: { rgb: 'F5A623' } } })],
+    [],
     [cell('Sheets in this file:', SUBHEADER_STYLE)],
-    [cell('• Roster', ROW_STYLE), cell('Name, alliance, troop tiers — Rally Leaders also show their Skill 5 heroes', ROW_STYLE)],
-    [cell('• Joiner Coverage', ROW_STYLE), cell('Hero Skill 5 ownership across the alliance', ROW_STYLE)],
+    [cell('• Roster', ROW_STYLE), cell('Name, furnace, alliance, troop tiers, Rally Leader preset heroes, and joiner hero coverage (✓ per hero)', ROW_STYLE)],
     [cell('• [Event sheets]', ROW_STYLE), cell('One sheet per event — attendance, Discord, performance', ROW_STYLE)],
     [],
     [cell('This file also contains hidden "…Data" sheets (Roster Data, Events Data, etc.) with one row per record. These are how this app reads a spreadsheet back in — leave them alone unless you know what you\'re doing.', { font: { italic: true, sz: 9, name: 'Arial', color: { rgb: '888888' } } })],
@@ -380,16 +406,21 @@ function buildCoverSheet(data, rosterCount = null) {
 // encoding correctly (needed for the 👑/☀️ flags and any accented
 // names to render right instead of turning into garbled characters).
 // Same alliance scoping as the xlsx roster; everything else the xlsx
-// export has (Joiner Coverage, event sheets, hidden re-import data)
-// doesn't have a CSV equivalent — CSV is one flat table, not a
-// workbook, so this is Roster-only by nature, not by omission.
+// export has (event sheets, hidden re-import data) doesn't have a CSV
+// equivalent — CSV is one flat table, not a workbook, so this is
+// Roster-only by nature, not by omission.
 export function exportRosterCsv(data, options = {}) {
   const { rosterAllianceTags = null } = options;
   const scopedPlayers = (rosterAllianceTags && rosterAllianceTags.length > 0)
     ? (data.players || []).filter(p => rosterAllianceTags.includes(p.allianceTag))
     : (data.players || []);
+  const sorted = [...scopedPlayers].sort(compareRosterOrder);
 
-  const headers = ['Name', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes (5 star)'];
+  const allJoiners = [...new Set(
+    scopedPlayers.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
+  )].sort();
+
+  const headers = ['Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
 
   function escapeCsv(value) {
     const s = String(value ?? '');
@@ -397,23 +428,24 @@ export function exportRosterCsv(data, options = {}) {
   }
 
   const rows = [headers];
-  scopedPlayers.forEach(p => {
+  sorted.forEach(p => {
     const isLead = p.roles?.includes('Rally Lead');
     const helios = isHeliosPlayer(p);
     const flags = `${isLead ? '👑' : ''}${helios ? '☀️' : ''}`;
     const displayName = p.username || p.alias || '';
     const nameCell = flags ? `${flags} ${displayName}` : displayName;
-    const leaderHeroes = isLead
-      ? (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero).join(', ')
-      : '';
+    const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
 
     rows.push([
       nameCell,
+      p.furnaceLevel || '',
       p.allianceTag || '',
       p.troops?.infantry || '',
       p.troops?.lancer || '',
       p.troops?.marksman || '',
-      leaderHeroes,
+      isLead ? leaderHeroesText(p) : '',
+      ...allJoiners.map(h => owned.has(h) ? '✓' : ''),
+      owned.size,
     ]);
   });
 
@@ -434,11 +466,13 @@ export function exportRosterCsv(data, options = {}) {
 // ── Main export function ───────────────────────────────────────
 // options lets a caller (e.g. a future DataPanel.jsx checklist) export
 // only part of the data instead of always generating everything:
-//   includeRoster      – Roster + Roster Data + Joiner Coverage + Roles Data
+//   includeRoster      – Roster (name/furnace/alliance/troops/leader
+//                        heroes/joiner coverage tick-grid, all in one
+//                        sheet) + Roster Data + Roles Data
 //   rosterAllianceTags – array of alliance tags to include in the
-//                        roster (and Joiner Coverage / Roster Data);
-//                        null or [] means every alliance, unfiltered —
-//                        "export one alliance or more than one"
+//                        roster (and Roster Data); null or [] means
+//                        every alliance, unfiltered — "export one
+//                        alliance or more than one"
 //   includeEvents      – event attendance sheets + Events Data
 //   includePlans       – Plans Data (battle plan records)
 //   eventId            – when set, scopes BOTH events and plans to just
@@ -466,19 +500,16 @@ export function exportWorkbook(data, options = {}) {
   const coverWs = buildCoverSheet(data, includeRoster ? scopedPlayers.length : null);
   XLSX.utils.book_append_sheet(wb, coverWs, 'Overview');
 
-  // 2. Roster (alliance-scoped)
+  // 2. Roster (alliance-scoped) — includes the merged joiner coverage tick-grid
   if (includeRoster) {
     const rosterWs = buildRosterSheet(scopedPlayers);
     XLSX.utils.book_append_sheet(wb, rosterWs, 'Roster');
-
-    const joinerWs = buildJoinerCoverageSheet(scopedPlayers);
-    if (joinerWs) XLSX.utils.book_append_sheet(wb, joinerWs, 'Joiner Coverage');
   }
 
   // 3. One sheet per event (most recent first) — scoped to eventId if set
   const scopedEvents = eventId ? (data.events || []).filter(e => e.id === eventId) : (data.events || []);
   const sortedEvents = includeEvents ? [...scopedEvents].sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
-  const usedEventSheetNames = new Set(['Overview', 'Roster', 'Joiner Coverage', 'Roster Data', 'Events Data', 'Plans Data', 'Roles Data']);
+  const usedEventSheetNames = new Set(['Overview', 'Roster', 'Roster Data', 'Events Data', 'Plans Data', 'Roles Data']);
   sortedEvents.forEach(event => {
     const includeJoiners = JOINER_COVERAGE_EVENTS.includes(event.type);
     const eventWs = buildEventSheet(event, data.players || [], includeJoiners);
