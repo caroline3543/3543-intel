@@ -93,9 +93,42 @@ export const WOS_PUA_ICONS = Object.fromEntries(
 // one new entry. The emoji-free `title` is metadata for humans
 // browsing the list; the stored `art` is always the actual PUA
 // character, never the emoji or the name.
-export const SEED_ASCII_ART = WOS_ICON_DEFS.map(([hex, name]) => ({
+const WOS_ICON_SEEDS = WOS_ICON_DEFS.map(([hex, name]) => ({
   title: name,
   category: 'Game Icons',
   tags: [hex],
   art: String.fromCodePoint(parseInt(hex, 16)),
 }));
+
+// Common Korean alliance-chat phrases. These are my best-effort
+// natural translations, not verified by a native speaker or pulled
+// from an in-game source the way the icon codes above were — if the
+// register or wording isn't quite what your alliance actually uses,
+// edit them directly in the library, same as anything else here.
+const KOREAN_PHRASE_SEEDS = [
+  { title: 'Thanks Everyone (Korean)', category: 'Korean Phrases', tags: ['korean','thanks'], art: '모두 감사합니다!' },
+  { title: 'Good Job (Korean)',        category: 'Korean Phrases', tags: ['korean','good job'], art: '수고하셨습니다!' },
+  { title: 'How Are You (Korean)',     category: 'Korean Phrases', tags: ['korean','greeting'], art: '잘 지내세요?' },
+];
+
+// Kaomoji and chat decorations, transcribed directly from what was
+// pasted in — these are ordinary Unicode (no Private Use Area
+// characters involved), so unlike the game icons above these actually
+// render and were visually checked before being written here. The
+// bullet markers from the original list were list formatting, not
+// part of the art, and were stripped; everything after each bullet —
+// including internal spacing — is preserved exactly as given. Worth
+// double-checking spacing once these are in the library, since chat
+// message formatting isn't always 100% preserved in transit.
+const KAOMOJI_SEEDS = [
+  { title: 'Cat Paws + Hello',        category: 'Kaomoji', tags: ['cat','hello','cute'], art: '/),,,,/).           ˗ˋˏ helloˎˊ˗' },
+  { title: 'Cute Cat + Cuties Label', category: 'Kaomoji', tags: ['cat','cuties','cute'], art: '(｡•ㅅ•｡)      ˗ˋˏ cutiesˎˊ˗' },
+  { title: 'Cat (Sitting, 2-line)',   category: 'Kaomoji', tags: ['cat','cute'], art:
+`  /)    /)
+(｡•ㅅ•｡)` },
+  { title: 'Bear Hug + Heart',        category: 'Kaomoji', tags: ['bear','hug','heart'], art: 'ʕ •ᴥ•ʔづ♡' },
+  { title: 'Card Border — Top',       category: 'Decorations', tags: ['border','frame'], art: '╭∪──∪──────────' },
+  { title: 'Card Border — Connector', category: 'Decorations', tags: ['border','frame'], art: '┊' },
+];
+
+export const SEED_ASCII_ART = [...WOS_ICON_SEEDS, ...KOREAN_PHRASE_SEEDS, ...KAOMOJI_SEEDS];
