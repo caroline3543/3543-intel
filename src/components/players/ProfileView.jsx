@@ -29,7 +29,7 @@ function Row({ label, value }) {
   );
 }
 
-export function ProfileView({ player, roles = [], open, onClose, onEdit, events }) {
+export function ProfileView({ player, roles = [], open, onClose, onEdit, events, onOpenLeaderProfile }) {
   useEffect(() => {
     if (!open) return;
     function handler(e) { if (e.key === 'Escape') onClose(); }
@@ -82,6 +82,18 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events 
             <button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, fontSize:28, cursor:'pointer', lineHeight:1, padding:'0 4px' }}>✕</button>
           </div>
         </div>
+
+        {/* Rally Leader Profile — preset offense/defense squads. Not
+            gated behind the "Rally Lead" role tag, since a player's
+            saved leader profile and their role tag are deliberately
+            separate concepts (see playerSchema.js) — anyone could have
+            presets set up regardless of their current roles. */}
+        <button
+          onClick={onOpenLeaderProfile}
+          style={{ width:'100%', height:44, borderRadius:10, background:'none', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:12 }}
+        >
+          👑 Rally Leader Profile — preset squads →
+        </button>
 
         {/* 1. Role in SvS — most important, shown first */}
         {player.roles?.length>0 && (
