@@ -7,7 +7,7 @@ function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
 }
 
-export function PlayerCard({ player, roles = [], onClick, onDelete, events, missingCount, troopPower, onToggleRallyLead, onOpenFields }) {
+export function PlayerCard({ player, roles = [], onClick, onDelete, events, missingCount, troopPower, onToggleRallyLead, onOpenFields, bulkMode, isSelected }) {
   const dn      = player.username||player.alias||'Unknown';
   const rc      = roleColor(player.roles?.[0], roles);
   const metrics = calcMetrics(player, events||[]);
@@ -15,7 +15,13 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
   const isRallyLead = player.roles?.includes('Rally Lead');
 
   return (
-    <div onClick={onClick} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none', opacity:player.blacklisted?0.6:1 }}>
+    <div onClick={onClick} style={{ background:isSelected?C.gold+'18':C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none', opacity:player.blacklisted?0.6:1, border:`1px solid ${isSelected?C.gold:'transparent'}` }}>
+
+      {bulkMode && (
+        <div style={{ width:24, height:24, borderRadius:'50%', border:`2px solid ${isSelected?C.gold:C.border}`, background:isSelected?C.gold:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          {isSelected && <span style={{ fontSize:13, color:C.bg, fontWeight:700 }}>✓</span>}
+        </div>
+      )}
 
       {/* Avatar */}
       <div style={{ width:46, height:46, borderRadius:'50%', flexShrink:0, background:rc+'33', border:`2px solid ${rc}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:17, color:C.white }}>
@@ -69,19 +75,23 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
 
       </div>
 
-      {/* One-tap Rally Lead toggle — no need to open the profile just
-          to flag someone as a leader */}
-      <button
-        onClick={e => { e.stopPropagation(); onToggleRallyLead?.(); }}
-        title={isRallyLead ? 'Rally Lead — tap to remove' : 'Tap to make Rally Lead'}
-        style={{ width:36, height:36, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:isRallyLead?C.gold+'22':'none', border:`1.5px solid ${isRallyLead?C.gold:C.border}`, color:isRallyLead?C.gold:C.muted+'88', fontSize:16, cursor:'pointer', flexShrink:0 }}
-      >👑</button>
+      {!bulkMode && (
+        <>
+          {/* One-tap Rally Lead toggle — no need to open the profile just
+              to flag someone as a leader */}
+          <button
+            onClick={e => { e.stopPropagation(); onToggleRallyLead?.(); }}
+            title={isRallyLead ? 'Rally Lead — tap to remove' : 'Tap to make Rally Lead'}
+            style={{ width:36, height:36, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:isRallyLead?C.gold+'22':'none', border:`1.5px solid ${isRallyLead?C.gold:C.border}`, color:isRallyLead?C.gold:C.muted+'88', fontSize:16, cursor:'pointer', flexShrink:0 }}
+          >👑</button>
 
-      {/* Delete */}
-      <button
-        onClick={e=>{e.stopPropagation();onDelete(player.id);}}
-        style={{ background:'none', border:'none', color:C.red+'66', fontSize:20, cursor:'pointer', padding:'8px 4px', flexShrink:0, lineHeight:1 }}
-      >✕</button>
+          {/* Delete */}
+          <button
+            onClick={e=>{e.stopPropagation();onDelete(player.id);}}
+            style={{ background:'none', border:'none', color:C.red+'66', fontSize:20, cursor:'pointer', padding:'8px 4px', flexShrink:0, lineHeight:1 }}
+          >✕</button>
+        </>
+      )}
     </div>
   );
 }

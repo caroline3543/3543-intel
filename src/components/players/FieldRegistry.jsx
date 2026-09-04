@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { C, LANGUAGES, TIER_OPTIONS, ALLIANCE_RANKS, HEROES_BY_GEN, FC_OPTIONS } from '../../utils/constants.js';
+import { C, TIER_OPTIONS, ALLIANCE_RANKS, HEROES_BY_GEN, FC_OPTIONS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
-import { JOINER_HEROES } from '../../data/joinerMeta.js';
 import { addJoinerHeroToPlayer, removeJoinerHeroFromPlayer } from '../../services/joinerRegistryService.js';
 import { searchPlayers } from '../../services/playerAutosuggest.js';
 import {
+  FIELD_DEFS,
   getFieldValues,
   getPlayersWithFieldValue,
   assignFieldValue,
@@ -22,54 +22,6 @@ function heroGenLabel(hero) {
   const builtIn = HEROES_BY_GEN.find(g => g.heroes.some(h => h.toLowerCase() === hero.toLowerCase()));
   return builtIn ? builtIn.gen : getCustomHeroGen(hero);
 }
-
-// Add a new field here to extend the registry to any other profile
-// attribute — nothing else in this file needs to change.
-const FIELD_DEFS = [
-  {
-    id: 'languages', label: 'Languages', icon: '🗣️', multi: true,
-    baseOptions: () => LANGUAGES,
-    get: (p) => p.languages || [],
-  },
-  {
-    id: 'furnace', label: 'Furnace Level', icon: '🔥', multi: false,
-    baseOptions: () => FC_OPTIONS,
-    get: (p) => (p.furnaceLevel ? [p.furnaceLevel] : []),
-  },
-  {
-    id: 'allianceTag', label: 'Alliance', icon: '🚩', multi: false,
-    // No fixed base list — alliance tags are entirely alliance-defined,
-    // not a preset table. Values come from whatever's already on
-    // someone's profile, plus anything typed into the custom-add row.
-    baseOptions: () => [],
-    get: (p) => (p.allianceTag ? [p.allianceTag] : []),
-  },
-  {
-    id: 'infantry', label: 'Infantry Tier', icon: '⚔️', multi: false,
-    baseOptions: () => TIER_OPTIONS,
-    get: (p) => (p.troops?.infantry ? [p.troops.infantry] : []),
-  },
-  {
-    id: 'lancer', label: 'Lancer Tier', icon: '🐎', multi: false,
-    baseOptions: () => TIER_OPTIONS,
-    get: (p) => (p.troops?.lancer ? [p.troops.lancer] : []),
-  },
-  {
-    id: 'marksman', label: 'Marksman Tier', icon: '🏹', multi: false,
-    baseOptions: () => TIER_OPTIONS,
-    get: (p) => (p.troops?.marksman ? [p.troops.marksman] : []),
-  },
-  {
-    id: 'joinerHeroes', label: 'Joiner Heroes (Skill 5)', icon: '🦸', multi: true,
-    baseOptions: () => JOINER_HEROES,
-    get: (p) => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero),
-  },
-  {
-    id: 'allianceRank', label: 'Alliance Rank', icon: '🎖️', multi: false,
-    baseOptions: () => ALLIANCE_RANKS,
-    get: (p) => (p.allianceRank ? [p.allianceRank] : []),
-  },
-];
 
 const TIER_FIELD_IDS = ['infantry', 'lancer', 'marksman'];
 

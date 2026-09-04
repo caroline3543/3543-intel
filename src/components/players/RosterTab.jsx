@@ -7,6 +7,7 @@ import { RoleManagerSheet } from './RoleManagerSheet.jsx';
 import { RallyLeaderProfileSheet } from './RallyLeaderProfileSheet.jsx';
 import BulkNameAdd          from './BulkNameAdd.jsx';
 import FieldRegistry        from './FieldRegistry.jsx';
+import { FIELD_DEFS, getFieldValues, assignFieldValue } from '../../services/fieldRegistryService.js';
 
 // Auto-derived "role-like" filters computed straight from existing
 // troop-tier data — no manual role to create or assign. Only shown as
@@ -54,6 +55,10 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [fieldRegistryOpen, setFieldRegistryOpen] = useState(false);
   const [roleManagerOpen, setRoleManagerOpen] = useState(false);
   const [troopsCopied, setTroopsCopied] = useState(false);
+  const [bulkMode, setBulkMode]         = useState(false);
+  const [bulkSel, setBulkSel]           = useState(new Set());
+  const [bulkField, setBulkField]       = useState(null);
+  const [bulkValue, setBulkValue]       = useState('');
 
   // How many of the "should be set" fields are actually missing —
   // higher = more incomplete. NOTE: having zero roles is no longer
@@ -80,6 +85,29 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
     onSavePlayer({ ...player, roles: nextRoles });
   }
 
+  // Applies one field value to every selected player in one batch —
+  // reuses assignFieldValue from fieldRegistryService.js, the exact
+  // same function Field Registry itself uses, just driven the other
+  // direction (pick players first, then a value) instead of Field
+  // Registry's value-first flow.
+  function applyBulkField() {
+    const field = FIELD_DEFS.find(f => f.id === bulkField);
+    if (!field || !bulkValue) return;
+    const selected = players.filter(p => bulkSel.has(p.id));
+    const updated = selected.map(p => assignFieldValue(p, field, bulkValue));
+    onUpdatePlayers(updated);
+    showToast?.(`Updated ${updated.length} player${updated.length!==1?'s':''} ✓`);
+    setBulkSel(new Set()); setBulkMode(false); setBulkField(null); setBulkValue('');
+  }
+
+  function toggleBulkSel(id) {
+    setBulkSel(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
   // Discord-ready list of exactly who's missing which troop tier(s) —
   // "missing info" elsewhere is broader (languages, joiner heroes,
   // furnace level too), so this is scoped specifically to troop tiers,
@@ -96,7 +124,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
       if (!p.troops?.marksman) gaps.push('Marksman');
       lines.push(`${dn} — missing ${gaps.join(', ')}`);
     });
-    return '```\n' + lines.join('\n').trim() + '\n```';
+    return lines.join('\n').trim();
   }
   function copyMissingTroops() {
     navigator.clipboard.writeText(generateMissingTroopsText()).then(() => {
@@ -171,6 +199,12 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
           style={{ ...(rosterView==='list' ? { flexShrink:0 } : { flex:1 }), height:36, padding:'0 14px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
           ⚙ Roles
         </button>
+        {rosterView==='list' && (
+          <button onClick={() => { setBulkMode(v => !v); setBulkSel(new Set()); setBulkField(null); setBulkValue(''); }}
+            style={{ flexShrink:0, height:36, padding:'0 14px', borderRadius:20, background:bulkMode?C.gold+'22':C.section, border:`1px solid ${bulkMode?C.gold:C.border}`, color:bulkMode?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+            ☑️ {bulkMode ? `${bulkSel.size} selected` : 'Select'}
+          </button>
+        )}
 
         {sortMenuOpen && (
           <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:30, boxShadow:'0 8px 24px #000a' }}>
@@ -233,6 +267,40 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
               {filteredPlayers.length} of {players.length} player{players.length!==1?'s':''}
             </div>
           )}
+          {bulkMode && bulkSel.size > 0 && (() => {
+            const field = FIELD_DEFS.find(f => f.id === bulkField);
+            const options = field ? getFieldValues(players, field) : [];
+            return (
+              <div style={{ background:C.card, border:`1px solid ${C.gold}44`, borderRadius:12, padding:14, marginBottom:14 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:C.white, marginBottom:10 }}>Assign to {bulkSel.size} selected</div>
+                <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:field?10:0 }}>
+                  {FIELD_DEFS.map(f => (
+                    <button key={f.id} onClick={() => { setBulkField(f.id); setBulkValue(''); }}
+                      style={{ padding:'7px 12px', borderRadius:16, whiteSpace:'nowrap', background:bulkField===f.id?C.gold+'22':C.section, border:`1px solid ${bulkField===f.id?C.gold:C.border}`, color:bulkField===f.id?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', flexShrink:0 }}>
+                      {f.icon} {f.label}
+                    </button>
+                  ))}
+                </div>
+                {field && (
+                  <>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:12 }}>
+                      {options.length === 0 && <div style={{ fontSize:12, color:C.muted }}>No existing values yet — add one via 📋 Fields first.</div>}
+                      {options.map(opt => (
+                        <button key={opt} onClick={() => setBulkValue(opt)}
+                          style={{ padding:'6px 12px', borderRadius:16, background:bulkValue===opt?C.gold+'22':C.section, border:`1px solid ${bulkValue===opt?C.gold:C.border}`, color:bulkValue===opt?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={applyBulkField} disabled={!bulkValue}
+                      style={{ width:'100%', height:44, borderRadius:10, background:bulkValue?C.gold:C.section, color:bulkValue?C.bg:C.muted, fontWeight:700, fontSize:14, border:bulkValue?'none':`1px solid ${C.border}`, cursor:bulkValue?'pointer':'default' }}>
+                      Apply{bulkValue?` "${bulkValue}"`:''} to {bulkSel.size} player{bulkSel.size!==1?'s':''}
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })()}
           {players.length === 0 && (
             <div style={{ textAlign:'center', padding:'60px 20px' }}>
               <div style={{ fontSize:52, marginBottom:16 }}>👥</div>
@@ -252,13 +320,15 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
               key={p.id}
               player={p}
               roles={roles}
-              onClick={() => openProfile(p)}
+              onClick={() => { if (bulkMode) toggleBulkSel(p.id); else openProfile(p); }}
               onDelete={onDeletePlayer}
               events={events}
               missingCount={sortBy==='missing' ? missingCount(p) : 0}
               troopPower={getCurrentTroopPower(p, events)}
               onToggleRallyLead={() => toggleRallyLead(p)}
               onOpenFields={() => setFieldRegistryOpen(true)}
+              bulkMode={bulkMode}
+              isSelected={bulkSel.has(p.id)}
             />
           ))}
         </>

@@ -1,9 +1,62 @@
-// Pure functions backing FieldRegistry.jsx — no React, no side effects
-// beyond the isolated custom-option localStorage store below.
+// Pure functions backing FieldRegistry.jsx and RosterTab.jsx's bulk-
+// assign — no React, no side effects beyond the isolated custom-option
+// localStorage store below.
 //
 // localStorage key: svs_field_registry_custom_options
 // Owner: fieldRegistryService.js (never write to it elsewhere — see
 // CONSTITUTION.md localStorage key registry, add this key there).
+
+import { LANGUAGES, TIER_OPTIONS, ALLIANCE_RANKS, FC_OPTIONS } from '../utils/constants.js';
+import { JOINER_HEROES } from '../data/joinerMeta.js';
+
+// Add a new field here to extend BOTH the Field Registry and the
+// roster's bulk-assign to any other profile attribute — nothing else
+// in either file needs to change.
+export const FIELD_DEFS = [
+  {
+    id: 'languages', label: 'Languages', icon: '🗣️', multi: true,
+    baseOptions: () => LANGUAGES,
+    get: (p) => p.languages || [],
+  },
+  {
+    id: 'furnace', label: 'Furnace Level', icon: '🔥', multi: false,
+    baseOptions: () => FC_OPTIONS,
+    get: (p) => (p.furnaceLevel ? [p.furnaceLevel] : []),
+  },
+  {
+    id: 'allianceTag', label: 'Alliance', icon: '🚩', multi: false,
+    // No fixed base list — alliance tags are entirely alliance-defined,
+    // not a preset table. Values come from whatever's already on
+    // someone's profile, plus anything typed into the custom-add row.
+    baseOptions: () => [],
+    get: (p) => (p.allianceTag ? [p.allianceTag] : []),
+  },
+  {
+    id: 'infantry', label: 'Infantry Tier', icon: '⚔️', multi: false,
+    baseOptions: () => TIER_OPTIONS,
+    get: (p) => (p.troops?.infantry ? [p.troops.infantry] : []),
+  },
+  {
+    id: 'lancer', label: 'Lancer Tier', icon: '🐎', multi: false,
+    baseOptions: () => TIER_OPTIONS,
+    get: (p) => (p.troops?.lancer ? [p.troops.lancer] : []),
+  },
+  {
+    id: 'marksman', label: 'Marksman Tier', icon: '🏹', multi: false,
+    baseOptions: () => TIER_OPTIONS,
+    get: (p) => (p.troops?.marksman ? [p.troops.marksman] : []),
+  },
+  {
+    id: 'joinerHeroes', label: 'Joiner Heroes (Skill 5)', icon: '🦸', multi: true,
+    baseOptions: () => JOINER_HEROES,
+    get: (p) => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero),
+  },
+  {
+    id: 'allianceRank', label: 'Alliance Rank', icon: '🎖️', multi: false,
+    baseOptions: () => ALLIANCE_RANKS,
+    get: (p) => (p.allianceRank ? [p.allianceRank] : []),
+  },
+];
 
 const CUSTOM_OPTIONS_KEY = 'svs_field_registry_custom_options';
 
