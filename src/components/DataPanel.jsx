@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { C, JOINER_COVERAGE_EVENTS } from '../utils/constants.js';
 import { SheetHandle } from './common/Primitives.jsx';
-import { exportWorkbook } from '../services/exportXlsx.js';
+import { exportWorkbook, exportRosterCsv } from '../services/exportXlsx.js';
 import { importFromXlsxFile } from '../services/xlsxImportService.js';
 import { importFromFile } from '../services/exportImportService.js';
 
@@ -64,6 +64,20 @@ export function DataPanel({
       setTimeout(() => setMsg(null), 5000);
     } finally {
       setXlsxLoading(false);
+    }
+  }
+
+  function handleCsvExport() {
+    try {
+      exportRosterCsv(data, {
+        rosterAllianceTags: selectedAllianceTags.length ? selectedAllianceTags : null,
+      });
+      showToast('Roster CSV downloaded ✓');
+      onClose();
+    } catch (err) {
+      console.error(err);
+      setMsg({ text:`CSV export failed: ${err.message}`, type:'error' });
+      setTimeout(() => setMsg(null), 5000);
     }
   }
 
@@ -232,6 +246,16 @@ export function DataPanel({
             style={{ width:'100%', height:52, borderRadius:12, background:nothingSelected?C.card:C.gold, color:nothingSelected?C.muted:C.bg, fontWeight:700, fontSize:16, border:nothingSelected?`1px solid ${C.border}`:'none', cursor:(xlsxLoading||nothingSelected)?'default':'pointer', opacity:xlsxLoading?0.7:1 }}
           >
             {xlsxLoading ? 'Preparing…' : '⬇️ Download .xlsx'}
+          </button>
+
+          <div style={{ fontSize:11, color:C.muted, marginTop:10, marginBottom:6 }}>
+            .xlsx not opening? A plain CSV has none of the multi-sheet/styling complexity that can go wrong — just the roster table, works everywhere.
+          </div>
+          <button
+            onClick={handleCsvExport}
+            style={{ width:'100%', height:44, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:14, cursor:'pointer' }}
+          >
+            ⬇️ Download roster as .csv
           </button>
         </div>
 

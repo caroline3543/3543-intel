@@ -372,6 +372,65 @@ function buildCoverSheet(data, rosterCount = null) {
   return ws;
 }
 
+// ── CSV fallback — Roster only ─────────────────────────────────
+// A flat CSV sidesteps everything that could go wrong with the xlsx
+// binary format entirely: no cell styling, no multiple sheets, no
+// hidden sheets, no bookType — just plain comma-separated text with a
+// UTF-8 byte-order mark so Excel/Numbers/Sheets all detect the
+// encoding correctly (needed for the 👑/☀️ flags and any accented
+// names to render right instead of turning into garbled characters).
+// Same alliance scoping as the xlsx roster; everything else the xlsx
+// export has (Joiner Coverage, event sheets, hidden re-import data)
+// doesn't have a CSV equivalent — CSV is one flat table, not a
+// workbook, so this is Roster-only by nature, not by omission.
+export function exportRosterCsv(data, options = {}) {
+  const { rosterAllianceTags = null } = options;
+  const scopedPlayers = (rosterAllianceTags && rosterAllianceTags.length > 0)
+    ? (data.players || []).filter(p => rosterAllianceTags.includes(p.allianceTag))
+    : (data.players || []);
+
+  const headers = ['Name', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes (5 star)'];
+
+  function escapeCsv(value) {
+    const s = String(value ?? '');
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  const rows = [headers];
+  scopedPlayers.forEach(p => {
+    const isLead = p.roles?.includes('Rally Lead');
+    const helios = isHeliosPlayer(p);
+    const flags = `${isLead ? '👑' : ''}${helios ? '☀️' : ''}`;
+    const displayName = p.username || p.alias || '';
+    const nameCell = flags ? `${flags} ${displayName}` : displayName;
+    const leaderHeroes = isLead
+      ? (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero).join(', ')
+      : '';
+
+    rows.push([
+      nameCell,
+      p.allianceTag || '',
+      p.troops?.infantry || '',
+      p.troops?.lancer || '',
+      p.troops?.marksman || '',
+      leaderHeroes,
+    ]);
+  });
+
+  const csvBody = rows.map(r => r.map(escapeCsv).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csvBody], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const alliance = data.settings?.allianceTag || 'export';
+  const dateStr  = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `alliance-manager-roster-${alliance}-${dateStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ── Main export function ───────────────────────────────────────
 // options lets a caller (e.g. a future DataPanel.jsx checklist) export
 // only part of the data instead of always generating everything:
@@ -467,5 +526,12 @@ export function exportWorkbook(data, options = {}) {
   const filename  = `alliance-manager-${alliance}-${dateStr}.xlsx`;
 
   // 6. Write and download
-  XLSX.writeFile(wb, filename, { bookType: 'xlsx', type: 'binary', cellStyles: true });
+  // Note: no `type` option here — that's for XLSX.write(), which
+  // returns raw data; writeFile() handles the browser download/file
+  // write itself and picks the right encoding automatically. Passing
+  // type:'binary' here was almost certainly why exported files failed
+  // to open anywhere (Excel, Numbers, Google Sheets alike) — a
+  // genuinely corrupt file fails everywhere, which is exactly what was
+  // reported.
+  XLSX.writeFile(wb, filename, { bookType: 'xlsx', cellStyles: true });
 }
