@@ -16,6 +16,7 @@ import { ParticipantRow } from './ParticipantRow.jsx';
 import { VerifyRosterPanel } from './VerifyRosterPanel.jsx';
 import { LegionConflictModal } from './LegionConflictModal.jsx';
 import { AddParticipantPanel } from './AddParticipantPanel.jsx';
+import { SquadBalancerPanel } from './SquadBalancerPanel.jsx';
 
 // ── EventsTab ──────────────────────────────────────────────────
 //
@@ -553,6 +554,15 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               );
             })()}
           </div>
+
+          {tracksTroopPower && (activeEvent.participantIds || []).length > 0 && (
+            <SquadBalancerPanel
+              activeEvent={activeEvent}
+              players={players}
+              events={events}
+              onUpdateEvent={onUpdateEvent}
+            />
+          )}
 
           <AddParticipantPanel
             addAsSubstitute={addAsSubstitute} setAddAsSubstitute={setAddAsSubstitute}
