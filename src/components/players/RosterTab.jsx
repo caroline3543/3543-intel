@@ -8,6 +8,7 @@ import { RallyLeaderProfileSheet } from './RallyLeaderProfileSheet.jsx';
 import BulkNameAdd          from './BulkNameAdd.jsx';
 import FieldRegistry        from './FieldRegistry.jsx';
 import { FIELD_DEFS, getFieldValues, assignFieldValue } from '../../services/fieldRegistryService.js';
+import { getCurrentTroopPower } from '../../data/metrics.js';
 
 // Auto-derived "role-like" filters computed straight from existing
 // troop-tier data — no manual role to create or assign. Only shown as
@@ -39,21 +40,6 @@ const HELP_ITEMS = [
   { title: '👑 Rally Lead', body: "Tap the crown on a player's card to toggle whether they're a Rally Lead. This changes who's eligible to lead rallies when you build a Battle Plan." },
   { title: '⚙ Roles', body: "Create, rename, or recolor the roles your alliance uses (besides the built-in Rally Lead role)." },
 ];
-
-// Troop power isn't a standing field on the player profile — it's
-// derived from the most recent event snapshot that recorded one (see
-// EventsTab.jsx / TROOP_POWER_EVENTS), so there's one source of truth
-// instead of a second, separately-maintained number that can drift.
-function getCurrentTroopPower(player, events) {
-  let best = null;
-  (events || []).forEach(ev => {
-    const snap = (ev.snapshots || []).find(s => s.playerId === player.id);
-    if (snap?.troopPower != null && (!best || new Date(ev.date) > new Date(best.date))) {
-      best = { value: snap.troopPower, date: ev.date };
-    }
-  });
-  return best?.value ?? null;
-}
 
 export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePlayer, onAddPlayers, onUpdatePlayers, onDeletePlayer, onGoToIntel, showToast }) {
   const [rosterView, setRosterView]       = useState('list');

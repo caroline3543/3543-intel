@@ -1,4 +1,26 @@
 /**
+ * A player's most recently recorded troop power, from ANY event's
+ * snapshot (not just the event currently being viewed) — the single
+ * general-purpose "how strong is this player right now" number used
+ * across the app (roster sort, squad balancing, Castle Battle
+ * auto-fill). Troop power is only ever entered on Foundry/Canyon Clash
+ * events (see TROOP_POWER_EVENTS in constants.js), but once recorded
+ * it's treated as a standing proxy for the player's overall strength
+ * everywhere else, since there's no separate "power" field on the
+ * player profile itself.
+ */
+export function getCurrentTroopPower(player, events) {
+  let best = null;
+  (events || []).forEach(ev => {
+    const snap = (ev.snapshots || []).find(s => s.playerId === player.id);
+    if (snap?.troopPower != null && (!best || new Date(ev.date) > new Date(best.date))) {
+      best = { value: snap.troopPower, date: ev.date };
+    }
+  });
+  return best?.value ?? null;
+}
+
+/**
  * Calculate reliability metrics for a player across all events.
  * Returns null if the player has no qualifying event history.
  *

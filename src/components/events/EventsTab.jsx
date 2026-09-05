@@ -52,6 +52,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [swipeDX, setSwipeDX]         = useState(0);     // live drag offset while swiping between events
   const [swiping, setSwiping]         = useState(false);
   const [stickyVisible, setStickyVisible] = useState(false);
+  const [confirmDoneArmed, setConfirmDoneArmed] = useState(false); // Marking Done bulk-writes attendance for everyone — this guards the single tap that triggers it
   const headerRef = useRef(null);
   const [filterTag, setFilterTag]     = useState('');
   const [editingEvent, setEditingEvent] = useState(null);
@@ -521,12 +522,22 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               <button onClick={() => { setEditingEvent(activeEvent); setEventSheetOpen(true); }} style={{ height:34, padding:'0 12px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontSize:13, cursor:'pointer', flexShrink:0 }}>Edit</button>
             </div>
             <div style={{ display:'flex', gap:6, marginBottom:12 }}>
-              {[['upcoming','Upcoming',C.icy],['active','🔴 Live',C.green],['completed','✓ Done',C.muted]].map(([s,l,c]) => (
-                <button key={s} onClick={() => markStatus(s)}
-                  style={{ flex:1, height:34, borderRadius:20, border:`1px solid ${activeEvent.status===s?c:C.border}`, background:activeEvent.status===s?c+'22':C.section, color:activeEvent.status===s?c:C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                  {l}
-                </button>
-              ))}
+              {[['upcoming','Upcoming',C.icy],['active','🔴 Live',C.green],['completed','✓ Done',C.muted]].map(([s,l,c]) => {
+                const isDoneArmed = s === 'completed' && confirmDoneArmed && activeEvent.status !== 'completed';
+                function handleClick() {
+                  if (s === 'completed' && activeEvent.status !== 'completed') {
+                    if (!confirmDoneArmed) { setConfirmDoneArmed(true); setTimeout(() => setConfirmDoneArmed(false), 3000); return; }
+                    setConfirmDoneArmed(false);
+                  }
+                  markStatus(s);
+                }
+                return (
+                  <button key={s} onClick={handleClick}
+                    style={{ flex:1, height:44, borderRadius:20, border:`1px solid ${isDoneArmed?C.gold:activeEvent.status===s?c:C.border}`, background:isDoneArmed?C.gold+'22':activeEvent.status===s?c+'22':C.section, color:isDoneArmed?C.gold:activeEvent.status===s?c:C.muted, fontWeight:700, fontSize:isDoneArmed?12:13, cursor:'pointer' }}>
+                    {isDoneArmed ? 'Tap again — marks all attended' : l}
+                  </button>
+                );
+              })}
             </div>
             {(() => {
               const s = evSum(activeEvent);

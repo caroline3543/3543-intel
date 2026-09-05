@@ -10,6 +10,7 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
   const [registryOpen, setRegistryOpen] = useState(false);
   const [noticesOpen, setNoticesOpen]   = useState(false);
   const [artOpen, setArtOpen]           = useState(false);
+  const [englishDiscordOpen, setEnglishDiscordOpen] = useState(false);
 
   const withM = players
     .map(p=>({player:p,metrics:calcMetrics(p,events)}))
@@ -35,10 +36,11 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
   const available    = players.filter(p=>p.availability?.present==='available').length;
   const rallyLeads   = players.filter(p=>p.roles?.includes('Rally Lead')).length;
   const withJoiners  = players.filter(p=>(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5)).length;
+  const englishDiscordPlayers = players.filter(p=>p.languages?.includes('English') && p.availability?.discord==='yes');
 
   if (registryOpen) {
     return (
-      <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:480, margin:'0 auto' }}>
         <JoinerRegistry
           players={players}
           settings={settings}
@@ -51,7 +53,7 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
 
   if (noticesOpen) {
     return (
-      <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:480, margin:'0 auto' }}>
         <NoticeLibrary
           notices={notices}
           settings={settings}
@@ -66,7 +68,7 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
 
   if (artOpen) {
     return (
-      <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:480, margin:'0 auto' }}>
         <AsciiArtLibrary
           asciiArts={asciiArts}
           onSaveArt={onSaveArt}
@@ -82,19 +84,43 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
     <div style={{ padding:'16px 20px' }}>
 
       {/* Summary line — replaces the 6-card grid */}
-      <div style={{ background:C.section, borderRadius:12, padding:'14px 16px', marginBottom:16, display:'flex', gap:0, flexWrap:'wrap' }}>
+      <div style={{ background:C.section, borderRadius:12, padding:'14px 16px', marginBottom:16, display:'flex', flexWrap:'wrap' }}>
         {[
-          [`${players.length}`, 'members'],
-          [`${available}`, 'available'],
-          [`${rallyLeads}`, 'rally leads'],
-          [`${withJoiners}`, 'joiner heroes set'],
-        ].map(([num, label], i) => (
-          <div key={label} style={{ flex:'1 1 auto', textAlign:'center', padding:'4px 8px', borderRight: i<3 ? `1px solid ${C.border}` : 'none' }}>
+          [`${players.length}`, 'members', null],
+          [`${available}`, 'available', null],
+          [`${rallyLeads}`, 'rally leads', null],
+          [`${withJoiners}`, 'joiner heroes set', null],
+          [`${englishDiscordPlayers.length}`, 'English + Discord', () => setEnglishDiscordOpen(true)],
+        ].map(([num, label, onClick], i, arr) => (
+          <div key={label} onClick={onClick || undefined}
+            style={{ flex:'1 1 auto', textAlign:'center', padding:'4px 8px', borderRight: i<arr.length-1 ? `1px solid ${C.border}` : 'none', cursor:onClick?'pointer':'default' }}>
             <div style={{ fontSize:22, fontWeight:700, color:C.gold }}>{num}</div>
-            <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{label}</div>
+            <div style={{ fontSize:11, color:onClick?C.icy:C.muted, marginTop:2, textDecoration:onClick?'underline':'none' }}>{label}{onClick?' ›':''}</div>
           </div>
         ))}
       </div>
+
+      {englishDiscordOpen && (
+        <div onClick={() => setEnglishDiscordOpen(false)} style={{ position:'fixed', inset:0, background:'#000c', zIndex:700, display:'flex', alignItems:'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:480, margin:'0 auto', maxHeight:'80vh', overflowY:'auto', padding:'16px 20px 32px' }}>
+            <div style={{ width:40, height:4, borderRadius:2, background:C.border, margin:'0 auto 16px' }} />
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+              <div style={{ fontSize:16, fontWeight:700, color:C.white }}>🎙️ English + Discord · {englishDiscordPlayers.length}</div>
+              <button onClick={() => setEnglishDiscordOpen(false)} style={{ background:'none', border:'none', color:C.muted, fontSize:28, cursor:'pointer', lineHeight:1, padding:'0 4px' }}>✕</button>
+            </div>
+            {englishDiscordPlayers.length === 0 ? (
+              <div style={{ fontSize:13, color:C.muted, textAlign:'center', padding:'20px 0' }}>Nobody matches yet — mark Discord and English in each player's profile.</div>
+            ) : (
+              englishDiscordPlayers.map(p => (
+                <div key={p.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:`1px solid ${C.border}22` }}>
+                  <div style={{ fontSize:14, fontWeight:600, color:C.white }}>{p.username||p.alias||'?'}</div>
+                  <div style={{ fontSize:12, color:C.muted }}>{[p.allianceTag&&`[${p.allianceTag}]`, p.furnaceLevel].filter(Boolean).join(' · ')}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Joiner Registry — prominent card */}
       <button onClick={()=>setRegistryOpen(true)} style={{ width:'100%', borderRadius:12, background:C.card, border:`1px solid ${C.gold}44`, padding:'16px', marginBottom:16, cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', gap:14 }}>

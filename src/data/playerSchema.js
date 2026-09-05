@@ -93,10 +93,26 @@ export function newEvent(overrides = {}) {
     // actually split, not the people in them).
     legion:         null,
     participantIds: [],
+    // Squad Balancer output — only meaningful for Foundry/Canyon Clash
+    // (see TROOP_POWER_EVENTS in constants.js), where an alliance's own
+    // contingent splits into several independent teams rather than
+    // rallies. Each squad is { id, name, leaderId, memberIds[] }. Empty
+    // until the officer runs the balancer; never auto-populated.
+    squads:         [],
     notes:          '',
     createdAt:      new Date().toISOString(),
     updatedAt:      new Date().toISOString(),
     snapshots:      [],
+    ...overrides,
+  };
+}
+
+export function newSquad(overrides = {}) {
+  return {
+    id:         uid(),
+    name:       '',       // e.g. "Team 1" — officer-editable, not auto-numbered in the data itself
+    leaderId:   null,
+    memberIds:  [],       // does NOT include leaderId — leader is tracked separately so they're never double-counted
     ...overrides,
   };
 }
