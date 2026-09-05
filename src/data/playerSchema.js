@@ -138,6 +138,7 @@ export function newSnapshot(playerId, playerProfile, eventId) {
     attendance: {
       attended:           null,
       noShow:             false,
+      excused:            false, // only meaningful when noShow is true — a sanctioned absence, not a discipline flag
       joinedLateNoNotice: false,
     },
     voice: {

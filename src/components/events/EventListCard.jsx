@@ -5,7 +5,7 @@ import { evSum, legionColor } from '../../services/eventListHelpers.js';
 export function EventListCard({ ev, onOpen, onDelete }) {
   const s = evSum(ev);
   const sc = ev.status==='active'?C.green:ev.status==='completed'?C.muted:C.icy;
-  const lc = legionColor(ev.legion);
+  const lc = legionColor(ev.type, ev.legion);
   return (
     <div onClick={() => onOpen(ev.id)} style={{ background:C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, cursor:'pointer', border:`1px solid ${ev.status==='active'?C.green+'44':C.border+'44'}`, borderLeft:lc?`4px solid ${lc}`:undefined, WebkitTapHighlightColor:'transparent' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>

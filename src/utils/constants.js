@@ -14,6 +14,19 @@ export const C = {
   border:  '#2A4A64',
 };
 
+// Legion accent colors — only Foundry and Canyon Clash actually split
+// into two same-day Legion events (see TROOP_POWER_EVENTS below);
+// every other event type has no legion field at all. L1 gets the
+// darker shade, L2 the lighter tint, so the two events read as
+// obviously-related-but-distinct at a glance without reading text.
+// Canyon Clash L2 reuses the existing lancer green (C.lan) directly
+// since it already sits well in this palette; Foundry uses a new
+// purple pair since nothing existing filled that role.
+export const LEGION_COLORS = {
+  'Foundry':      { 1: '#6B4C9A', 2: '#A78BC9' },
+  'Canyon Clash': { 1: '#2F6B4A', 2: C.lan },
+};
+
 // Tier order, low to high. FC1–FC8 all enhance T10 troops without
 // changing their tier name; T11 is unlocked separately; Helios
 // ("Helios T11") is a further War Academy research tier above T11 —

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES, ALLIANCE_RANKS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { fmtDateShort } from '../../utils/dates.js';
@@ -49,6 +49,10 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [verifyInputMode, setVerifyInputMode] = useState('tap'); // 'tap' | 'paste'
   const [verifyPasteText, setVerifyPasteText] = useState('');
   const [touchStartX, setTouchStartX] = useState(null);
+  const [swipeDX, setSwipeDX]         = useState(0);     // live drag offset while swiping between events
+  const [swiping, setSwiping]         = useState(false);
+  const [stickyVisible, setStickyVisible] = useState(false);
+  const headerRef = useRef(null);
   const [filterTag, setFilterTag]     = useState('');
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventSheetOpen, setEventSheetOpen] = useState(false);
@@ -69,6 +73,25 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [eventsView, setEventsView] = useState('active'); // 'active' | 'archive'
 
   const activeEvent = events.find(e => e.id === activeEventId);
+
+  // Sticky context bar — appears once the event's own header card has
+  // scrolled out from under the app's fixed top header, so scrolling
+  // deep into a long roster never loses track of which event this is.
+  // rootMargin's top offset matches the app's own sticky header height
+  // (~60px per CONSTITUTION.md) — adjust this if that header's actual
+  // height ever changes.
+  useEffect(() => {
+    if (!activeEvent) { setStickyVisible(false); return; }
+    const el = headerRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setStickyVisible(!entry.isIntersecting),
+      { threshold: 0, rootMargin: '-60px 0px 0px 0px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [activeEvent?.id]);
+
   const allTags = [...new Set(events.map(e => e.allianceTag).filter(Boolean))];
   let filtered = filterType==='All' ? events : events.filter(e => e.type===filterType);
   if (filterTag) filtered = filtered.filter(e => e.allianceTag===filterTag);
@@ -303,14 +326,46 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
       if (tag==='early')      s = { ...s, rsvp:{ ...s.rsvp, willLeaveEarly:true } };
       if (tag==='discord')    s = { ...s, rsvp:{ ...s.rsvp, willJoinDiscord:true } };
       if (tag==='wholetime')  s = { ...s, rsvp:{ ...s.rsvp, presentWholeTime:true } };
-      if (tag==='attended')   s = { ...s, attendance:{ ...s.attendance, attended:true, noShow:false } };
+      if (tag==='attended')   s = { ...s, attendance:{ ...s.attendance, attended:true, noShow:false, excused:false } };
       if (tag==='noshow')     s = { ...s, attendance:{ ...s.attendance, attended:false, noShow:true } };
+      if (tag==='excused')    s = { ...s, attendance:{ ...s.attendance, attended:false, noShow:true, excused:true } };
       if (tag==='late')       s = { ...s, attendance:{ ...s.attendance, joinedLateNoNotice:true } };
       if (tag==='voice')      s = { ...s, voice:{ ...s.voice, joined:true } };
       if (idx>=0) snaps[idx]=s; else snaps.push(s);
     });
     onUpdateEvent({ ...activeEvent, snapshots:snaps });
     setBulkSel(new Set()); setBulkMode(false); vibe(8);
+  }
+
+  // Marking an event Done auto-marks everyone still unrecorded as
+  // attended — by far the common case during a live event is "everyone
+  // who showed up is fine," so this saves re-tapping every single
+  // person just to confirm the default. Only fills in blanks
+  // (attendance.attended === null, i.e. never touched) — any snapshot
+  // where someone already explicitly recorded attended/no-show is left
+  // exactly as-is.
+  function markStatus(newStatus) {
+    if (newStatus === 'completed' && activeEvent.status !== 'completed') {
+      const snaps = [...(activeEvent.snapshots || [])];
+      (activeEvent.participantIds || []).forEach(pid => {
+        const player = players.find(p => p.id === pid);
+        if (!player) return;
+        const idx = snaps.findIndex(s => s.playerId === pid);
+        if (idx >= 0) {
+          if (snaps[idx].attendance?.attended === null || snaps[idx].attendance?.attended === undefined) {
+            snaps[idx] = { ...snaps[idx], attendance: { ...snaps[idx].attendance, attended: true, noShow: false } };
+          }
+        } else {
+          const snap = newSnapshot(pid, player, activeEvent.id);
+          snap.attendance.attended = true;
+          snaps.push(snap);
+        }
+      });
+      onUpdateEvent({ ...activeEvent, status: newStatus, snapshots: snaps });
+    } else {
+      onUpdateEvent({ ...activeEvent, status: newStatus });
+    }
+    vibe(8);
   }
 
   const isUpcoming = activeEvent?.status === 'upcoming';
@@ -351,7 +406,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
   const bulkTags = isUpcoming
     ? (showsRsvp ? [['🕐 Arriving late','rsvpLate',C.gold],['🏃 Leaving early','early',C.gold],['🎙️ Will join Discord','discord',C.icy],['✓ Present whole time','wholetime',C.green]] : [])
-    : [['✓ Attended','attended',C.green],['✗ No-show','noshow',C.red],['🕐 Late (no notice)','late',C.gold],['🎙️ Voice','voice',C.icy]];
+    : [['✓ Attended','attended',C.green],['✗ No-show','noshow',C.red],['📝 Excused absence','excused',C.mar],['🕐 Late (no notice)','late',C.gold],['🎙️ Voice','voice',C.icy]];
 
   return (
     <div style={{ padding:'16px 20px 0' }}>
@@ -368,8 +423,23 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
         onResolveConflict={resolveLegionConflict}
         onClose={() => setLegionModal(null)}
       />
+
+      {stickyVisible && activeEvent && (() => {
+        const stickyLc = legionColor(activeEvent.type, activeEvent.legion);
+        return (
+          <div style={{ position:'fixed', top:60, left:0, right:0, zIndex:150, maxWidth:480, margin:'0 auto', background:C.card+'f2', backdropFilter:'blur(10px)', borderBottom:`1px solid ${stickyLc?stickyLc+'66':C.border}`, padding:'10px 20px', display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ fontSize:14, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>
+              {EVENT_ICONS[activeEvent.type]||'📋'} {activeEvent.name||activeEvent.type}
+            </div>
+            {activeEvent.legion && <span style={{ fontSize:10, fontWeight:800, color:stickyLc, padding:'1px 7px', borderRadius:8, background:stickyLc+'22', flexShrink:0 }}>L{activeEvent.legion}</span>}
+            <span style={{ fontSize:11, color:C.muted, flexShrink:0 }}>{fmtDateShort(activeEvent.date)}</span>
+            {activeEvent.time && <span style={{ fontSize:11, fontWeight:700, color:C.gold, flexShrink:0 }}>🕐 {activeEvent.time}</span>}
+          </div>
+        );
+      })()}
+
       {activeEvent ? (() => {
-        const lc = legionColor(activeEvent.legion);
+        const lc = legionColor(activeEvent.type, activeEvent.legion);
         const swipeIdx = activeSwipeList.findIndex(ev => ev.id === activeEvent.id);
         const canSwipeNext = swipeIdx !== -1 && swipeIdx < activeSwipeList.length - 1;
         const canSwipePrev = swipeIdx > 0;
@@ -380,17 +450,29 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           setVerifyMode(false); setConfirmedIds(new Set()); setVerifyPasteText('');
           vibe(8);
         }
-        function handleTouchStart(e) { setTouchStartX(e.touches[0].clientX); }
-        function handleTouchEnd(e) {
+        function handleTouchStart(e) { setTouchStartX(e.touches[0].clientX); setSwiping(true); setSwipeDX(0); }
+        function handleTouchMove(e) {
           if (touchStartX == null) return;
-          const dx = e.changedTouches[0].clientX - touchStartX;
+          let dx = e.touches[0].clientX - touchStartX;
+          // Rubber-band at the ends of the list — dragging toward a
+          // direction you can't actually swipe still moves a little,
+          // so it's visibly "stuck" rather than looking unresponsive.
+          if (dx > 0 && !canSwipePrev) dx *= 0.25;
+          if (dx < 0 && !canSwipeNext) dx *= 0.25;
+          setSwipeDX(Math.max(-140, Math.min(140, dx)));
+        }
+        function handleTouchEnd(e) {
+          setSwiping(false);
+          if (touchStartX == null) { setSwipeDX(0); return; }
+          const dx = swipeDX;
           setTouchStartX(null);
+          setSwipeDX(0);
           if (Math.abs(dx) < 60) return; // minimum swipe distance — avoids misfiring on ordinary taps/scrolls
           if (dx < 0 && canSwipeNext) goToEvent(activeSwipeList[swipeIdx + 1]);
           else if (dx > 0 && canSwipePrev) goToEvent(activeSwipeList[swipeIdx - 1]);
         }
         return (
-        <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
             <button onClick={() => { setActiveEventId(null); setBulkMode(false); setBulkSel(new Set()); setAddQuery(''); setAddResults([]); setVerifyMode(false); setConfirmedIds(new Set()); setVerifyPasteText(''); }} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:C.gold, fontSize:14, fontWeight:600, cursor:'pointer', padding:0 }}>
               ← Back to Events
@@ -403,7 +485,17 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               </div>
             )}
           </div>
-          <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16, borderTop:lc?`4px solid ${lc}`:'none' }}>
+
+          <div style={{ position:'relative' }}>
+            {swiping && swipeDX < -12 && canSwipeNext && (
+              <div style={{ position:'absolute', right:6, top:80, fontSize:30, fontWeight:900, color:C.gold, opacity:Math.min(Math.abs(swipeDX)/60, 1), zIndex:5, pointerEvents:'none', textShadow:`0 0 10px ${C.gold}88` }}>›</div>
+            )}
+            {swiping && swipeDX > 12 && canSwipePrev && (
+              <div style={{ position:'absolute', left:6, top:80, fontSize:30, fontWeight:900, color:C.gold, opacity:Math.min(Math.abs(swipeDX)/60, 1), zIndex:5, pointerEvents:'none', textShadow:`0 0 10px ${C.gold}88` }}>‹</div>
+            )}
+            <div style={{ transform:`translateX(${swiping ? swipeDX : 0}px)`, transition: swiping ? 'none' : 'transform 0.25s ease', opacity: swiping ? 1 - Math.min(Math.abs(swipeDX)/280, 0.35) : 1 }}>
+
+          <div ref={headerRef} style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16, borderTop:lc?`4px solid ${lc}`:'none' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
               <div>
                 <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
@@ -424,7 +516,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             </div>
             <div style={{ display:'flex', gap:6, marginBottom:12 }}>
               {[['upcoming','Upcoming',C.icy],['active','🔴 Live',C.green],['completed','✓ Done',C.muted]].map(([s,l,c]) => (
-                <button key={s} onClick={() => onUpdateEvent({ ...activeEvent, status:s })}
+                <button key={s} onClick={() => markStatus(s)}
                   style={{ flex:1, height:34, borderRadius:20, border:`1px solid ${activeEvent.status===s?c:C.border}`, background:activeEvent.status===s?c+'22':C.section, color:activeEvent.status===s?c:C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}>
                   {l}
                 </button>
@@ -561,6 +653,9 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               </>
             );
           })()}
+
+            </div>
+          </div>
         </div>
         );
       })() : (
@@ -638,13 +733,13 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                   <div style={{ fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>{fmtDateShort(date)}</div>
                   {l1.length > 0 && (
                     <div style={{ marginBottom:10 }}>
-                      <div style={{ fontSize:11, fontWeight:800, color:legionColor(1), marginBottom:6 }}>⚔️ Legion 1</div>
+                      <div style={{ fontSize:11, fontWeight:800, color:legionColor(l1[0].type, 1), marginBottom:6 }}>⚔️ Legion 1</div>
                       {l1.map(renderEventCard)}
                     </div>
                   )}
                   {l2.length > 0 && (
                     <div style={{ marginBottom:10 }}>
-                      <div style={{ fontSize:11, fontWeight:800, color:legionColor(2), marginBottom:6 }}>⚔️ Legion 2</div>
+                      <div style={{ fontSize:11, fontWeight:800, color:legionColor(l2[0].type, 2), marginBottom:6 }}>⚔️ Legion 2</div>
                       {l2.map(renderEventCard)}
                     </div>
                   )}

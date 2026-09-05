@@ -1,4 +1,4 @@
-import { C, ALLIANCE_RANKS } from '../utils/constants.js';
+import { C, ALLIANCE_RANKS, LEGION_COLORS } from '../utils/constants.js';
 import { fmtDateShort } from '../utils/dates.js';
 
 export function initials(n) {
@@ -37,14 +37,16 @@ export function findSiblingLegionEvent(ev, allEvents) {
   return allEvents.find(e => e.id !== ev.id && e.date === ev.date && e.type === ev.type && e.legion === otherLegion) || null;
 }
 
-// Persistent per-Legion color — applied everywhere on an event page
-// (header, participant borders, list card accents) so which Legion
-// you're looking at is a color you register at a glance, not text
-// you have to read.
-export function legionColor(legion) {
-  if (legion === 1) return C.icy;
-  if (legion === 2) return C.lan;
-  return null;
+// Persistent accent color for Legion-split events — only Foundry and
+// Canyon Clash actually split into Legion 1/2 (see TROOP_POWER_EVENTS
+// in constants.js), so this returns null for every other event type.
+// Applied everywhere on an event page (header, participant borders,
+// list card accents) so which Legion you're looking at is a color you
+// register at a glance, not text you have to read. See LEGION_COLORS
+// in constants.js for the actual dark/light pairs per event type.
+export function legionColor(type, legion) {
+  if (!legion) return null;
+  return LEGION_COLORS[type]?.[legion] || null;
 }
 
 export function eventMs(ev) {
@@ -62,7 +64,13 @@ export function evSum(ev) {
   if (ev.status === 'upcoming') {
     return { total:sn.length, participating:sn.filter(s=>s.rsvp?.participating).length };
   }
-  return { total:sn.length, attended:sn.filter(s=>s.attendance?.attended===true).length, noShow:sn.filter(s=>s.attendance?.noShow).length, voice:sn.filter(s=>s.voice?.joined===true).length };
+  return {
+    total:sn.length,
+    attended:sn.filter(s=>s.attendance?.attended===true).length,
+    noShow:sn.filter(s=>s.attendance?.noShow).length,
+    excused:sn.filter(s=>s.attendance?.noShow && s.attendance?.excused).length,
+    voice:sn.filter(s=>s.voice?.joined===true).length,
+  };
 }
 
 // Consecutive no-shows for one player, at one event TYPE only — a
@@ -81,6 +89,10 @@ export function noShowStreak(playerId, eventType, excludeEventId, events) {
   for (const ev of sameType) {
     const snap = (ev.snapshots||[]).find(s => s.playerId === playerId);
     if (!snap) continue;
+    // An excused absence is a sanctioned no-show — it neither extends
+    // nor breaks the streak, it's simply set aside, same as an event
+    // the player wasn't part of at all.
+    if (snap.attendance?.noShow && snap.attendance?.excused) continue;
     if (snap.attendance?.noShow) streak++;
     else break;
   }

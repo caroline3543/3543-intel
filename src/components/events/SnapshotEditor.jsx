@@ -80,7 +80,10 @@ export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, o
             <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
               <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:12 }}>📅 Attendance</div>
               <ToggleRow label="Attended"                    value={s.attendance?.attended}           onChange={v=>updA({attended:v})}           tristate={true}/>
-              <ToggleRow label="No-show"                     value={s.attendance?.noShow}             onChange={v=>updA({noShow:v})}             colorOn={C.red}  colorOff={C.muted}/>
+              <ToggleRow label="No-show"                     value={s.attendance?.noShow}             onChange={v=>updA({noShow:v, ...(v ? {} : {excused:false})})} colorOn={C.red}  colorOff={C.muted}/>
+              {s.attendance?.noShow && (
+                <ToggleRow label="Excused absence" value={s.attendance?.excused} onChange={v=>updA({excused:v})} colorOn={C.mar} colorOff={C.muted}/>
+              )}
               <ToggleRow label="Joined late without notice"  value={s.attendance?.joinedLateNoNotice} onChange={v=>updA({joinedLateNoNotice:v})} colorOn={C.gold} colorOff={C.muted}/>
             </div>
             <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>

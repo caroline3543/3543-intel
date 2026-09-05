@@ -12,8 +12,9 @@ import { AlliancePicker } from '../common/AlliancePicker.jsx';
 function suggestName(ev) {
   const d = ev.date ? new Date(ev.date + 'T00:00:00') : null;
   const dateStr = d && !isNaN(d) ? d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '';
+  const timeStr = ev.time ? `${ev.time} UTC` : '';
   const typeStr = ev.legion ? `${ev.type} — Legion ${ev.legion}` : ev.type;
-  return [typeStr, dateStr].filter(Boolean).join(' — ');
+  return [typeStr, dateStr, timeStr].filter(Boolean).join(' — ');
 }
 
 // ── Event Sheet ────────────────────────────────────────────────
@@ -43,7 +44,7 @@ export function EventSheet({ event, open, onClose, onSave, players }) {
   // officer types something themselves.
   useEffect(() => {
     if (!nameTouched) setEv(prev => ({ ...prev, name: suggestName(prev) }));
-  }, [ev.type, ev.date, ev.legion, nameTouched]);
+  }, [ev.type, ev.date, ev.legion, ev.time, nameTouched]);
 
   // Legion only makes sense for Foundry/Canyon Clash — clear it if the
   // officer switches to a type that doesn't use it, so a stale value
