@@ -123,14 +123,31 @@ const KOREAN_PHRASE_SEEDS = [
 // "cleaned up" — every space, including trailing whitespace, is kept
 // exactly as given.
 const KAOMOJI_SEEDS = [
-  { title: 'Cat Paws + Hello',        category: 'Kaomoji', tags: ['cat','hello','cute'], art: '•     /),,,,/).           ˗ˋˏ helloˎˊ˗  ' },
-  { title: 'Cute Cat + Cuties Label', category: 'Kaomoji', tags: ['cat','cuties','cute'], art: '•    (｡•ㅅ•｡)      ˗ˋˏ cutiesˎˊ˗ ' },
+  // These four lines were originally pasted together as ONE piece —
+  // a hello/cuties card opener followed by its own border — and had
+  // been wrongly split into four separate library entries (two
+  // kaomoji + two "Card Border" pieces, with the connector line only
+  // saved once instead of the four times it actually repeats).
+  // Restored here as the single multi-line entry it always was.
+  // Same rule as elsewhere in this file: every character, every
+  // trailing space, and every repeated line is kept exactly as given.
+  { title: 'Hello / Cuties Card', category: 'Decorations', tags: ['cat','hello','cuties','border','frame'], art:
+`•     /),,,,/).           ˗ˋˏ helloˎˊ˗  
+•    (｡•ㅅ•｡)      ˗ˋˏ cutiesˎˊ˗ 
+• ╭∪──∪──────────
+• ┊
+• ┊
+• ┊
+• ┊` },
   { title: 'Cat (Sitting, 2-line)',   category: 'Kaomoji', tags: ['cat','cute'], art:
 `  /)    /)
 (｡•ㅅ•｡)` },
   { title: 'Bear Hug + Heart',        category: 'Kaomoji', tags: ['bear','hug','heart'], art: 'ʕ •ᴥ•ʔづ♡' },
-  { title: 'Card Border — Top',       category: 'Decorations', tags: ['border','frame'], art: '• ╭∪──∪──────────' },
-  { title: 'Card Border — Connector', category: 'Decorations', tags: ['border','frame'], art: '• ┊' },
+  // Built from its codepoint (U+2501, BOX DRAWINGS HEAVY HORIZONTAL)
+  // repeated a measured 15 times, rather than hand-typed and eyeballed
+  // — same reasoning as the PUA icons above: verify by construction,
+  // not by looking at it.
+  { title: 'Heavy Line Divider',      category: 'Decorations', tags: ['border','divider','line'], art: String.fromCodePoint(0x2501).repeat(15) },
 ];
 
 // A larger batch of bear/emote-style kaomoji, transcribed the same

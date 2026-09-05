@@ -65,6 +65,9 @@ export function ParticipantRow({
             ) : (
               <>
                 {snap?.attendance?.attended===true && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.green+'18', color:C.green, fontWeight:600 }}>✓</span>}
+                {snap?.rsvp?.substitute && snap?.attendance?.attended === null && !snap?.attendance?.noShow && (
+                  <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.muted+'18', color:C.muted, fontWeight:600 }}>— not required</span>
+                )}
                 {snap?.attendance?.noShow && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.red+'18', color:C.red, fontWeight:600 }}>✗</span>}
                 {snap?.attendance?.noShow && snap?.attendance?.excused && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.mar+'18', color:C.mar, fontWeight:600 }}>📝 Excused</span>}
                 {snap?.attendance?.joinedLateNoNotice && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, fontWeight:600 }}>🕐</span>}

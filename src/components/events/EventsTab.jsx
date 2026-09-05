@@ -352,6 +352,12 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
         if (!player) return;
         const idx = snaps.findIndex(s => s.playerId === pid);
         if (idx >= 0) {
+          // Substitutes aren't part of the required roster — they
+          // don't auto-attend just because the event ended. Leaving
+          // their attendance untouched keeps them reliability-neutral
+          // (see metrics.js) unless an officer manually records that
+          // they actually showed up.
+          if (snaps[idx].rsvp?.substitute) return;
           if (snaps[idx].attendance?.attended === null || snaps[idx].attendance?.attended === undefined) {
             snaps[idx] = { ...snaps[idx], attendance: { ...snaps[idx].attendance, attended: true, noShow: false } };
           }

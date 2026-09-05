@@ -18,7 +18,19 @@
  */
 export function calcMetrics(player, events) {
   const snaps = (events || []).filter(ev => ev.status !== 'upcoming').flatMap(ev =>
-    (ev.snapshots || []).filter(s => s.playerId === player.id)
+    (ev.snapshots || []).filter(s => {
+      if (s.playerId !== player.id) return false;
+      // Substitutes aren't part of the required roster — if an event
+      // ended and nobody ever recorded whether they actually showed
+      // up, that's neutral, not a miss. Excluding the snapshot from
+      // the qualifying set entirely (rather than just not counting it
+      // as attended) keeps it out of the denominator too, so it can't
+      // quietly drag attendancePct down. The moment an officer
+      // explicitly records attendance either way — they showed up, or
+      // were explicitly marked no-show — it counts like anyone else's.
+      if (s.rsvp?.substitute && s.attendance?.attended === null && !s.attendance?.noShow) return false;
+      return true;
+    })
   );
   if (!snaps.length) return null;
 

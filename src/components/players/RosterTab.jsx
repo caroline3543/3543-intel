@@ -17,6 +17,8 @@ const DERIVED_TIER_FILTERS = [
   { id:'helios-marksman', label:'🏹 Helios Marksman', match:p => p.troops?.marksman === 'T11/Helios' },
   { id:'helios-lancer',   label:'⚔️ Helios Lancer',   match:p => p.troops?.lancer   === 'T11/Helios' },
   { id:'helios-infantry', label:'🛡️ Helios Infantry', match:p => p.troops?.infantry === 'T11/Helios' },
+  { id:'full-fc5', label:'💯 Full FC5', match:p => p.troops?.infantry==='FC5' && p.troops?.lancer==='FC5' && p.troops?.marksman==='FC5' },
+  { id:'full-fc6', label:'💯 Full FC6', match:p => p.troops?.infantry==='FC6' && p.troops?.lancer==='FC6' && p.troops?.marksman==='FC6' },
 ];
 
 const SORT_OPTIONS = [
@@ -44,6 +46,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [rosterView, setRosterView]       = useState('list');
   const [search, setSearch]               = useState('');
   const [filterRole, setFilterRole]       = useState('All');
+  const [filterTag, setFilterTag]         = useState('');
   const [sortBy, setSortBy]               = useState('name');
   const [sortMenuOpen, setSortMenuOpen]   = useState(false);
   const [viewingPlayer, setViewingPlayer] = useState(null);
@@ -72,7 +75,6 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
     if (!p.troops?.infantry) n++;
     if (!p.troops?.lancer) n++;
     if (!p.troops?.marksman) n++;
-    if (!p.languages?.length) n++;
     if (!(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5)) n++;
     return n;
   }
@@ -144,6 +146,8 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
 
   const activeDerivedFilters = DERIVED_TIER_FILTERS.filter(d => players.some(d.match));
   const derivedMatch = DERIVED_TIER_FILTERS.find(d => d.id === filterRole);
+  const allTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
+  const troopGapCount = players.filter(p => !p.troops?.infantry || !p.troops?.lancer || !p.troops?.marksman).length;
 
   const filteredPlayers = players.filter(p => {
     const t = (p.username||p.alias||'').toLowerCase();
@@ -153,7 +157,8 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
       || (p.country||'').toLowerCase().includes(search.toLowerCase())
       || (p.fid||'').toLowerCase().includes(search.toLowerCase());
     const mr = filterRole==='All' || (derivedMatch ? derivedMatch.match(p) : p.roles?.includes(filterRole));
-    return ms && mr;
+    const ma = !filterTag || p.allianceTag === filterTag;
+    return ms && mr && ma;
   });
   if (sortBy === 'missing') {
     filteredPlayers.sort((a,b) => missingCount(b) - missingCount(a));
@@ -227,39 +232,26 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         )}
       </div>
 
-      {/* Contextual nudge — surfaces the Field Registry exactly when it's
-          useful (incomplete profiles exist) rather than relying on the
-          officer to remember it's there at all. Only shown when it's
-          actually true, so it never nags an alliance with a clean roster. */}
-      {(() => {
-        if (!players.length) return null;
-        const incompleteCount = players.filter(p => missingCount(p) > 0).length;
-        if (!incompleteCount) return null;
-        const troopGapCount = players.filter(p => !p.troops?.infantry || !p.troops?.lancer || !p.troops?.marksman).length;
-        return (
-          <div style={{ background:C.gold+'14', border:`1px solid ${C.gold}55`, borderRadius:12, padding:'12px 14px', marginBottom:12 }}>
-            <div
-              onClick={() => setFieldRegistryOpen(true)}
-              style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}
-            >
-              <div style={{ fontSize:13, color:C.white, fontWeight:600 }}>
-                ⚠ {incompleteCount} player{incompleteCount!==1?'s':''} missing info
-              </div>
-              <div style={{ fontSize:12, color:C.gold, fontWeight:700, whiteSpace:'nowrap', flexShrink:0 }}>
-                Open Field Registry ›
-              </div>
-            </div>
-            {sortBy==='missing' && troopGapCount > 0 && (
-              <button
-                onClick={e => { e.stopPropagation(); copyMissingTroops(); }}
-                style={{ marginTop:10, width:'100%', height:32, borderRadius:8, background:'none', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:12, cursor:'pointer' }}
-              >
-                {troopsCopied ? '✓ Copied' : `📋 Copy missing troop levels (${troopGapCount})`}
-              </button>
-            )}
-          </div>
-        );
-      })()}
+      {/* Field Registry entry point — a plain, always-visible way in,
+          not a warning. Missing profile info isn't a problem needing a
+          red flag; it's just normal roster upkeep, so this doesn't
+          gate on incompleteCount or use alarmed styling. */}
+      {players.length > 0 && (
+        <button
+          onClick={() => setFieldRegistryOpen(true)}
+          style={{ width:'100%', height:48, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:14, cursor:'pointer', marginBottom:12 }}
+        >
+          📋 Open Field Registry
+        </button>
+      )}
+      {sortBy==='missing' && troopGapCount > 0 && (
+        <button
+          onClick={copyMissingTroops}
+          style={{ width:'100%', height:36, borderRadius:8, background:'none', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:12, cursor:'pointer', marginBottom:12 }}
+        >
+          {troopsCopied ? '✓ Copied' : `📋 Copy missing troop levels (${troopGapCount})`}
+        </button>
+      )}
 
       {rosterView==='list' && (
         <>
@@ -271,6 +263,14 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
               <button key={d.id} onClick={() => setFilterRole(d.id)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===d.id?C.icy+'22':C.section, border:`1px solid ${filterRole===d.id?C.icy:C.border}`, color:filterRole===d.id?C.icy:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{d.label}</button>
             ))}
           </div>
+          {allTags.length > 0 && (
+            <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
+              <button onClick={() => setFilterTag('')} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===''?C.icy+'22':C.section, border:`1px solid ${filterTag===''?C.icy:C.border}`, color:filterTag===''?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>All Alliances</button>
+              {allTags.map(t => (
+                <button key={t} onClick={() => setFilterTag(filterTag===t?'':t)} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===t?C.icy+'22':C.section, border:`1px solid ${filterTag===t?C.icy:C.border}`, color:filterTag===t?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>[{t}]</button>
+              ))}
+            </div>
+          )}
           {players.length > 0 && (
             <div style={{ fontSize:13, color:C.muted, marginBottom:12 }}>
               {filteredPlayers.length} of {players.length} player{players.length!==1?'s':''}

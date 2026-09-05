@@ -3,12 +3,11 @@ import { C, HEROES_BY_GEN } from '../utils/constants.js';
 import { vibe } from '../utils/vibe.js';
 import { JOINER_HEROES, JOINER_META, buildCoverageReport, getMetaSuggestion } from '../data/joinerMeta.js';
 import { addJoinerHeroToPlayer, removeJoinerHeroFromPlayer, getPlayersWithJoinerHero, getJoinerHeroCounts } from '../services/joinerRegistryService.js';
-import { detectStacking } from '../services/svsTimingService.js';import { searchPlayers } from '../services/playerAutosuggest.js';
+import { searchPlayers } from '../services/playerAutosuggest.js';
 
 const VIEWS = [
   { id:'registry', label:'🦸 Registry' },
   { id:'coverage', label:'📊 Coverage' },
-  { id:'stacking', label:'⚠️ Stacking' },
   { id:'meta',     label:'📐 Meta' },
 ];
 
@@ -118,44 +117,6 @@ function CoverageView({ players }) {
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-// ── Stacking View ──────────────────────────────────────────────
-function StackingView({ players }) {
-  // Build a joiner list from all players' joinerHeroes
-  const allJoiners = players.flatMap(p=>(p.joinerHeroes||[]).filter(jh=>jh.skillLevel>=5).map(jh=>jh.hero));
-  const stacks = detectStacking(allJoiners);
-
-  if (stacks.length===0) {
-    return (
-      <div style={{ textAlign:'center', padding:'40px 20px' }}>
-        <div style={{ fontSize:40, marginBottom:12 }}>✅</div>
-        <div style={{ fontSize:16, fontWeight:700, color:C.white, marginBottom:8 }}>No stacking issues</div>
-        <div style={{ fontSize:14, color:C.muted }}>No joiner hero appears 3+ times across your roster.</div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <div style={{ background:C.red+'18', border:`1px solid ${C.red}33`, borderRadius:12, padding:14, marginBottom:16 }}>
-        <div style={{ fontSize:14, fontWeight:700, color:C.red, marginBottom:4 }}>⚠️ Stacking Detected</div>
-        <div style={{ fontSize:13, color:C.muted }}>Same hero joining 3+ times means their skill buffs don't stack — you're wasting joiner slots.</div>
-      </div>
-      {stacks.map(({hero,count,risk})=>{
-        const owners = getPlayersWithJoinerHero(players, hero);
-        return (
-          <div key={hero} style={{ background:C.card, borderRadius:12, padding:14, marginBottom:8, border:`1px solid ${risk==='high'?C.red:C.gold}33` }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-              <div style={{ fontSize:15, fontWeight:700, color:C.white }}>{hero}</div>
-              <span style={{ fontSize:12, fontWeight:700, color:risk==='high'?C.red:C.gold, padding:'2px 8px', borderRadius:10, background:(risk==='high'?C.red:C.gold)+'18' }}>×{count} {risk==='high'?'HIGH RISK':'medium'}</span>
-            </div>
-            <div style={{ fontSize:12, color:C.muted }}>Players with this hero: {owners.map(p=>p.username||p.alias||'?').join(', ')}</div>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -316,7 +277,6 @@ export default function JoinerRegistry({ players, onUpdatePlayer, onClose, setti
           </div>
         )}
         {view==='coverage'&&<CoverageView players={players}/>}
-        {view==='stacking'&&<StackingView players={players}/>}
         {view==='meta'&&<MetaView players={players} selectedGenerations={settings.selectedGenerations || []}/>}
       </div>
     </div>
