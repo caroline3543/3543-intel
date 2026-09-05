@@ -22,6 +22,8 @@ export function newAsciiArt(overrides = {}) {
     category:  'Uncategorized', // free-form, alliance-defined — no fixed list, same pattern as Alliance tags elsewhere in the app
     tags:      [],               // optional, free-form, searchable
     art:       '',               // raw text — copied verbatim, no code-fence wrapping, no normalization
+    copyCount: 0,                // increments each time this entry is copied — powers "sort by most copied" in the library UI
+    sortOrder: 0,                // manual drag-reorder position, set by the library UI — not used by seed data (seed order is source order)
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
@@ -228,4 +230,88 @@ blood of your soldiers` },
 (ᵔ ᴥ ᵔ)` },
 ];
 
-export const SEED_ASCII_ART = [...WOS_ICON_SEEDS, ...KOREAN_PHRASE_SEEDS, ...KAOMOJI_SEEDS, ...BEAR_KAOMOJI_SEEDS];
+// A second batch of larger, alliance-specific graphics and mass-message
+// templates, added later. Each is stored exactly as pasted — same rule
+// as everything above: no reformatting, no line-count "fixes", no
+// re-wrapping.
+const EVENT_BANNER_SEEDS = [
+  // Same shy-bear face as the existing "Shy Bear" kaomoji entry, but
+  // this is a distinct piece as given — different spacing throughout
+  // and its own border line underneath — so it's kept separate rather
+  // than merged into or replacing that entry.
+  { title: 'Shy Bear + Border', category: 'Kaomoji', tags: ['bear','shy','border'], art:
+`.       Ი  Ი
+     („• ᴗ •„)       
+━∪ ━━ ∪ ━━━━━━━━━━` },
+  { title: 'SvS Phase Banner — Bubble or Burn', category: 'Event Banners', tags: ['svs','shields','banner'], art:
+`- SVS battle phase 
+🚨 Bubble or Burn! 🚨 
+
+Shields up by 10:00 UTC!
+Borders open: 10:00- 22:00 UTC
+                 🔥    🔥 
+          🔥                 🔥 
+      🔥     _Π_____     🔥 
+    🔥    /______/ ~＼   🔥  
+   🔥   ｜ 田田 ｜門｜   🔥
+  🔥  ╬╬ 🔥  ╬╬ 🔥  ╬╬ 🔥 ` },
+  // FLAGGED: this one arrived as a single unbroken line with no row/
+  // column breaks — it reads like a checklist table (5 columns of
+  // ✅｜🆗｜🚫 symbols against a list of labels: Fc shards, Hero shard,
+  // Wheel, Gathering, E. skills, Expert sigils, 📘 knowledge, Beast,
+  // Pets advance, Chief Charm, Chief Gear, Widget gear, Mithril) that
+  // lost its structure somewhere before it got here — most likely
+  // copied out of an actual spreadsheet/table rather than typed as
+  // plain text. Storing it verbatim rather than guessing at where the
+  // row breaks should go, since reconstructing it wrong would be worse
+  // than leaving it visibly broken. Worth re-pasting from the original
+  // source (or exporting that table as text) if you want this one
+  // usable as an actual checklist.
+  { title: 'SvS Prep Guide Checklist (⚠ needs reformatting — see notes)', category: 'Event Banners', tags: ['svs','prep','checklist','needs-fix'], art:
+`👑SVS Prep Guide👑
+ １   ２　３    ４    ５ ✅｜🆗｜🚫｜🚫｜🆗｜ 🆗｜✅｜🚫｜🚫｜🆗｜Fc shards 🚫｜✅｜🆗｜🚫｜🚫｜Hero shard ✅｜🆗｜🚫｜🚫｜🆗｜ 🚫｜🚫｜🚫｜✅｜🆗｜ 🆗｜✅｜🚫｜🚫｜🆗｜ 🚫｜✅｜🆗｜🚫｜🚫｜Wheel 🚫｜✅｜🚫｜🚫｜🚫｜Gathering 🆗｜✅｜🚫｜🚫｜🆗｜E. skills  🚫｜✅｜🆗｜🚫｜🚫｜Expert sigils 🚫｜✅｜🆗｜🚫｜🚫｜📘 knowledge 🚫｜🚫｜✅｜🚫｜🚫｜Beast 🚫｜🚫｜🆗｜🚫｜✅｜Pets advance 🆗｜🚫｜🆗｜✅｜🚫｜Chief Charm 🚫｜🚫｜🚫｜🚫｜✅｜Chief Gear 🚫｜🚫｜🚫｜🆗｜✅｜Widget gear 🚫｜🚫｜🚫｜🆗｜✅｜Mithril 🚫｜🚫｜🚫｜🆗｜✅｜` },
+  { title: 'Sparkle Scene + Gathering Caption', category: 'Event Banners', tags: ['gathering','scene','decorative'], art:
+`*      🌕   *                 —̳͟͞͞              +  
+                        —̳͟͞͞           —̳͟͞͞        * 
+      *  —̳͟͞͞    
+  +              .              —̳͟͞͞          
+ —̳͟͞͞                       +                   *.         
+                                       +
+                             (\\_(\\         
+                             (      )       
+                             /     |         
+                           ( O    |         
+Looking at all those 💎 pouches that I missed` },
+  { title: 'Registration Open — Canyon Clash / Foundry', category: 'Mass Messages', tags: ['registration','canyon clash','foundry'], art:
+` REGISTRATION’S OPEN!
+
+Canyon Clash
+Legion 1: 
+Legion 2:
+
+Foundry
+Legion 1:
+Legion 2: 
+
+To participate in events:
+
+✅ Battle Request the legion you want. 
+
+❌ Click abstention if you’re not participating in that Legion. 
+
+You will only be added by battle requesting. If you leave the alliance and re-enter, you need to request again. ` },
+  { title: 'Save Your Spot — Castle Battle', category: 'Mass Messages', tags: ['castle battle','city placement'], art:
+`Please save your spot before the Castle Battle!
+
+1. Go to the World Map, tap your city, and click the yellow star ⭐ in the top-right corner.
+
+2. Tap “Edit Label” to save your location and or take a screenshot if it’s easier. 
+
+3. After the battle is over, please return to your original spot.
+
+Make sure to align your city carefully so you don’t take over another player’s space.
+
+Thank you! 🙏` },
+];
+
+export const SEED_ASCII_ART = [...WOS_ICON_SEEDS, ...KOREAN_PHRASE_SEEDS, ...KAOMOJI_SEEDS, ...BEAR_KAOMOJI_SEEDS, ...EVENT_BANNER_SEEDS];

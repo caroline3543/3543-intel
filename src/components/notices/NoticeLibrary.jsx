@@ -275,8 +275,10 @@ export default function NoticeLibrary({ notices = [], settings = {}, asciiArts =
             </div>
           </div>
         </div>
-        <div style={{ background:C.gold+'14', border:`1px solid ${C.gold}55`, borderRadius:10, padding:'8px 12px', marginBottom:10, fontSize:12, fontWeight:700, color:C.gold, textAlign:'center' }}>
-          🚧 Under Construction
+        <div style={{ background:C.gold+'22', border:`2px solid ${C.gold}`, borderRadius:14, padding:'16px 16px', marginBottom:12, textAlign:'center' }}>
+          <div style={{ fontSize:26, marginBottom:4 }}>🚧</div>
+          <div style={{ fontSize:16, fontWeight:800, color:C.gold, textTransform:'uppercase', letterSpacing:'0.05em' }}>Under Construction</div>
+          <div style={{ fontSize:12, color:C.icy, marginTop:4 }}>This feature is still being built — things may change or move.</div>
         </div>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search title, message, tags…"
           style={{ width:'100%', height:40, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 14px', fontSize:14, color:C.white, boxSizing:'border-box', fontFamily:'inherit', marginBottom:10 }} />

@@ -27,6 +27,19 @@ const SORT_OPTIONS = [
   { id:'missing',    label:'⚠ Missing info first' },
 ];
 
+// Plain-language explanations for the [?] help sheet — written for
+// someone opening this page for the first time, not for an officer
+// who already knows the app.
+const HELP_ITEMS = [
+  { title: '📋 Field Registry', body: "Fill in or bulk-update furnace level, troop tiers, languages, and joiner heroes — for one player, or several at once." },
+  { title: '☑️ Select', body: "Tap Select, then tap players to choose several. With players selected, stage multiple fields (like Furnace + all three troop tiers) and apply them all in one tap instead of editing each person one by one." },
+  { title: '↕ Sort', body: "Reorder the list — alphabetical, by troop power, or missing-info-first to quickly see who still needs their profile filled in." },
+  { title: '🔎 Filters', body: "Filter by role, by alliance, or by fully-upgraded troop tiers (Full FC5, Full FC6, or Helios) to narrow the list down to who you're looking for." },
+  { title: '⚔️ By Role', body: "Switch to see everyone grouped by their assigned role instead of one flat list." },
+  { title: '👑 Rally Lead', body: "Tap the crown on a player's card to toggle whether they're a Rally Lead. This changes who's eligible to lead rallies when you build a Battle Plan." },
+  { title: '⚙ Roles', body: "Create, rename, or recolor the roles your alliance uses (besides the built-in Rally Lead role)." },
+];
+
 // Troop power isn't a standing field on the player profile — it's
 // derived from the most recent event snapshot that recorded one (see
 // EventsTab.jsx / TROOP_POWER_EVENTS), so there's one source of truth
@@ -62,6 +75,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [bulkSel, setBulkSel]           = useState(new Set());
   const [activeField, setActiveField]   = useState(null); // which field's value picker is open
   const [stagedFields, setStagedFields] = useState({});   // { [fieldId]: value } — built up before one combined Apply
+  const [helpOpen, setHelpOpen]         = useState(false);
 
   // How many of the "should be set" fields are actually missing —
   // higher = more incomplete. NOTE: having zero roles is no longer
@@ -189,6 +203,10 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
       <div style={{ display:'flex', gap:8, marginBottom:10 }}>
         <button onClick={() => setRosterView('list')} style={{ flex:1, height:36, borderRadius:20, background:rosterView==='list'?C.gold+'22':C.section, border:`1px solid ${rosterView==='list'?C.gold:C.border}`, color:rosterView==='list'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>≡ List</button>
         <button onClick={() => setRosterView('roles')} style={{ flex:1, height:36, borderRadius:20, background:rosterView==='roles'?C.gold+'22':C.section, border:`1px solid ${rosterView==='roles'?C.gold:C.border}`, color:rosterView==='roles'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>⚔️ By Role</button>
+        <button onClick={() => setHelpOpen(true)} aria-label="How this page works"
+          style={{ flexShrink:0, width:36, height:36, borderRadius:'50%', background:C.section, border:`1px solid ${C.border}`, color:C.gold, fontWeight:800, fontSize:14, cursor:'pointer' }}>
+          ?
+        </button>
       </div>
 
       {/* Utility row — Fields and Roles are now always-visible, labeled
@@ -205,10 +223,6 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             <span style={{ fontSize:10, flexShrink:0 }}>▼</span>
           </button>
         )}
-        <button onClick={() => setFieldRegistryOpen(true)}
-          style={{ ...(rosterView==='list' ? { flexShrink:0 } : { flex:1 }), height:36, padding:'0 14px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
-          📋 Fields
-        </button>
         <button onClick={() => setRoleManagerOpen(true)}
           style={{ ...(rosterView==='list' ? { flexShrink:0 } : { flex:1 }), height:36, padding:'0 14px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
           ⚙ Roles
@@ -237,12 +251,17 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
           red flag; it's just normal roster upkeep, so this doesn't
           gate on incompleteCount or use alarmed styling. */}
       {players.length > 0 && (
-        <button
-          onClick={() => setFieldRegistryOpen(true)}
-          style={{ width:'100%', height:48, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:14, cursor:'pointer', marginBottom:12 }}
-        >
-          📋 Open Field Registry
-        </button>
+        <>
+          <button
+            onClick={() => setFieldRegistryOpen(true)}
+            style={{ width:'100%', height:48, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:14, cursor:'pointer', marginBottom:6 }}
+          >
+            📋 Open Field Registry
+          </button>
+          <div style={{ fontSize:11, color:C.muted, textAlign:'center', marginBottom:12 }}>
+            Fill in furnace, troops, languages, and joiner heroes — for one player or many at once.
+          </div>
+        </>
       )}
       {sortBy==='missing' && troopGapCount > 0 && (
         <button
@@ -314,7 +333,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
 
                 {activeFieldDef && (
                   <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:12 }}>
-                    {options.length === 0 && <div style={{ fontSize:12, color:C.muted }}>No existing values yet — add one via 📋 Fields first.</div>}
+                    {options.length === 0 && <div style={{ fontSize:12, color:C.muted }}>No existing values yet — add one via Field Registry first.</div>}
                     {options.map(opt => (
                       <button key={opt} onClick={() => { setStagedFields(prev => ({ ...prev, [activeField]: opt })); setActiveField(null); }}
                         style={{ padding:'6px 12px', borderRadius:16, background:stagedFields[activeField]===opt?C.gold+'22':C.section, border:`1px solid ${stagedFields[activeField]===opt?C.gold:C.border}`, color:stagedFields[activeField]===opt?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>
@@ -460,6 +479,27 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         players={players}
         onUpdatePlayers={onUpdatePlayers}
       />
+
+      {helpOpen && (
+        <div onClick={() => setHelpOpen(false)} style={{ position:'fixed', inset:0, background:'#000c', zIndex:700, display:'flex', alignItems:'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', maxHeight:'80vh', overflowY:'auto', padding:'16px 20px 32px' }}>
+            <div style={{ width:40, height:4, borderRadius:2, background:C.border, margin:'0 auto 16px' }} />
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+              <div style={{ fontSize:18, fontWeight:700, color:C.white }}>How this page works</div>
+              <button onClick={() => setHelpOpen(false)} style={{ background:'none', border:'none', color:C.muted, fontSize:28, cursor:'pointer', lineHeight:1, padding:'0 4px' }}>✕</button>
+            </div>
+            {HELP_ITEMS.map(h => (
+              <div key={h.title} style={{ marginBottom:16 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:C.gold, marginBottom:4 }}>{h.title}</div>
+                <div style={{ fontSize:13, color:C.icy, lineHeight:1.5 }}>{h.body}</div>
+              </div>
+            ))}
+            <button onClick={() => setHelpOpen(false)} style={{ width:'100%', height:48, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer', marginTop:4 }}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       {bulkAddOpen && (
         <div style={{ position:'fixed', inset:0, zIndex:600 }}>
