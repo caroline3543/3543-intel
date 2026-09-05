@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { initials, noShowStreak, noShowBadge } from '../../services/eventListHelpers.js';
 
@@ -21,6 +22,18 @@ export function ParticipantRow({
   const legionConflict = !!sibling && (sibling.participantIds||[]).includes(player.id);
   const streak = noShowStreak(player.id, activeEvent.type, activeEvent.id, events);
   const heart = noShowBadge(streak);
+  // Removing someone used to be a single mis-tap away with no way back
+  // — this is a small inline two-step confirm instead (tap once to
+  // arm, tap again within ~2.5s to actually remove), matching the "no
+  // window.confirm, inline confirmation instead" house rule without
+  // needing a separate modal for something this size.
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  function handleRemoveTap(e) {
+    e.stopPropagation();
+    if (confirmingRemove) { onRemove(player.id); setConfirmingRemove(false); return; }
+    setConfirmingRemove(true);
+    setTimeout(() => setConfirmingRemove(false), 2500);
+  }
 
   return (
     <div onClick={() => { if (bulkMode) onToggleBulkSel(player.id); else onOpenSnap(activeEvent, player); }} style={{ background:isSel?C.gold+'18':C.card, borderRadius:10, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${legionConflict?C.red+'88':isSel?C.gold:isLead?C.gold+'55':(lc?lc+'44':C.border+'44')}`, WebkitTapHighlightColor:'transparent' }}>
@@ -78,11 +91,13 @@ export function ParticipantRow({
         )}
       </div>
       {!bulkMode && (
-        <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
           <button onClick={e => { e.stopPropagation(); onToggleSubstitute(player.id); }} title="Move to the other section"
-            style={{ width:28, height:28, borderRadius:8, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>⇄</button>
-          <button onClick={e => { e.stopPropagation(); onRemove(player.id); }}
-            style={{ width:28, height:28, borderRadius:8, background:'none', border:`1px solid ${C.red}33`, color:C.red+'88', fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+            style={{ width:44, height:44, borderRadius:10, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>⇄</button>
+          <button onClick={handleRemoveTap}
+            style={{ height:44, minWidth:confirmingRemove?76:44, padding:confirmingRemove?'0 12px':0, borderRadius:10, background:confirmingRemove?C.red:'none', border:`1px solid ${confirmingRemove?C.red:C.red+'33'}`, color:confirmingRemove?C.white:C.red+'88', fontSize:confirmingRemove?12:15, fontWeight:confirmingRemove?700:400, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', whiteSpace:'nowrap', transition:'all 150ms ease' }}>
+            {confirmingRemove ? 'Remove?' : '✕'}
+          </button>
           <span style={{ fontSize:18, color:C.muted }}>›</span>
         </div>
       )}

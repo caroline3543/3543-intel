@@ -193,6 +193,12 @@ export function PlayerSheet({ player, roles=[], open, onClose, onSave, existingT
                 })}
               </div>
             </Field>
+            <Field label="Discord" hint="Used for the alliance's English+Discord stat in Intel, and for joiner auto-suggestions">
+              <button onClick={()=>upd('availability', { ...p.availability, discord: p.availability?.discord==='yes' ? 'no' : 'yes' })}
+                style={{ width:'100%', height:44, borderRadius:10, border:`1px solid ${p.availability?.discord==='yes'?C.icy:C.border}`, background:p.availability?.discord==='yes'?C.icy+'18':C.section, color:p.availability?.discord==='yes'?C.icy:C.muted, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                {p.availability?.discord==='yes' ? '🎙️ On Discord — tap to remove' : 'Not on Discord — tap to mark'}
+              </button>
+            </Field>
             <Field label="Notes">
               <textarea value={p.notes||''} onChange={e=>upd('notes',e.target.value)} placeholder="Anything officers should know…" style={{ width:'100%', minHeight:80, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'12px 14px', fontSize:16, color:C.white, resize:'none', boxSizing:'border-box', fontFamily:'inherit' }}/>
             </Field>

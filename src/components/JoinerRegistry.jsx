@@ -18,12 +18,16 @@ function HeroCard({ hero, count, players, onUpdatePlayer }) {
   const [open, setOpen]       = useState(false);
   const [query, setQuery]     = useState('');
   const [results, setResults] = useState([]);
+  const [confirmingRemoveId, setConfirmingRemoveId] = useState(null); // playerId currently armed for removal, or null
+  const [addMode, setAddMode] = useState('search'); // 'search' | 'batch'
+  const [batchText, setBatchText] = useState('');
   const owners = getPlayersWithJoinerHero(players, hero);
+  const notOwners = players.filter(p=>!(p.joinerHeroes||[]).some(jh=>jh.hero===hero&&jh.skillLevel>=5));
 
   function search(q) {
     setQuery(q);
     if (!q.trim()) { setResults([]); return; }
-    setResults(searchPlayers(players.filter(p=>!(p.joinerHeroes||[]).some(jh=>jh.hero===hero&&jh.skillLevel>=5)), q, 5));
+    setResults(searchPlayers(notOwners, q, 5));
   }
 
   function addOwner(player) {
@@ -31,7 +35,30 @@ function HeroCard({ hero, count, players, onUpdatePlayer }) {
     setQuery(''); setResults([]);
   }
 
+  // One name per line, matched against the roster the same way the
+  // single-add search does (best match wins) — for when several
+  // people all turn out to own the same hero and re-searching each
+  // one individually would be repetitive.
+  const batchLines = batchText.split('\n').map(l => l.trim()).filter(Boolean);
+  const batchMatches = batchLines.map(line => {
+    const [player] = searchPlayers(notOwners, line, 1);
+    return { line, player: player || null };
+  });
+  const batchMatchedCount = batchMatches.filter(m => m.player).length;
+
+  function commitBatch() {
+    batchMatches.forEach(m => { if (m.player) onUpdatePlayer(addJoinerHeroToPlayer(m.player, hero)); });
+    setBatchText('');
+    vibe(8);
+  }
+
   function removeOwner(player) {
+    if (confirmingRemoveId !== player.id) {
+      setConfirmingRemoveId(player.id);
+      setTimeout(() => setConfirmingRemoveId(prev => prev === player.id ? null : prev), 2500);
+      return;
+    }
+    setConfirmingRemoveId(null);
     onUpdatePlayer(removeJoinerHeroFromPlayer(player, hero));
   }
 
@@ -61,14 +88,49 @@ function HeroCard({ hero, count, players, onUpdatePlayer }) {
                     <div style={{ fontSize:14, fontWeight:700, color:C.white, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.username||p.alias||'?'}</div>
                     <div style={{ fontSize:11, color:C.muted, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.allianceTag?`[${p.allianceTag}]`:''}{p.furnaceLevel?` FC${p.furnaceLevel}`:''}</div>
                   </div>
-                  <button onClick={()=>removeOwner(p)} style={{ background:'none', border:'none', color:C.red+'88', fontSize:16, cursor:'pointer', padding:'4px', flexShrink:0 }}>✕</button>
+                  <button onClick={()=>removeOwner(p)}
+                    style={{ height:44, minWidth:confirmingRemoveId===p.id?76:44, padding:confirmingRemoveId===p.id?'0 10px':0, borderRadius:8, background:confirmingRemoveId===p.id?C.red:'none', border:confirmingRemoveId===p.id?`1px solid ${C.red}`:'none', color:confirmingRemoveId===p.id?C.white:C.red+'88', fontSize:confirmingRemoveId===p.id?11:16, fontWeight:confirmingRemoveId===p.id?700:400, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' }}>
+                    {confirmingRemoveId===p.id ? 'Remove?' : '✕'}
+                  </button>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Add owner search */}
-          <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Add Player</div>
+          {/* Add owner — one at a time by search, or several at once by paste */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em' }}>Add Player</div>
+            <button onClick={()=>{setAddMode(addMode==='search'?'batch':'search'); setQuery(''); setResults([]); setBatchText('');}}
+              style={{ fontSize:12, color:C.gold, background:'none', border:'none', cursor:'pointer', fontWeight:600, padding:0 }}>
+              {addMode==='search' ? '📋 Add several at once' : '← Back to single search'}
+            </button>
+          </div>
+          {addMode==='batch' ? (
+            <div>
+              <textarea
+                value={batchText}
+                onChange={e=>setBatchText(e.target.value)}
+                placeholder={'One name per line…\ne.g.\nCaroline\nJessie99\nBahiti_Main'}
+                style={{ width:'100%', minHeight:100, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'12px 14px', fontSize:14, color:C.white, resize:'vertical', boxSizing:'border-box', fontFamily:'inherit', marginBottom:8 }}
+              />
+              {batchLines.length>0 && (
+                <div style={{ marginBottom:10 }}>
+                  {batchMatches.map((m,i)=>(
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', fontSize:13 }}>
+                      <span style={{ color:m.player?C.green:C.red, flexShrink:0 }}>{m.player?'✓':'✕'}</span>
+                      <span style={{ color:C.muted, flexShrink:0 }}>{m.line}</span>
+                      {m.player && <span style={{ color:C.icy, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>→ {m.player.username||m.player.alias}</span>}
+                      {!m.player && <span style={{ color:C.red+'99', fontSize:11 }}>no match — check spelling or add via single search</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={commitBatch} disabled={batchMatchedCount===0}
+                style={{ width:'100%', height:44, borderRadius:10, background:batchMatchedCount?C.gold:C.section, color:batchMatchedCount?C.bg:C.muted, fontWeight:700, fontSize:14, border:batchMatchedCount?'none':`1px solid ${C.border}`, cursor:batchMatchedCount?'pointer':'default' }}>
+                {batchMatchedCount>0 ? `Add ${batchMatchedCount} player${batchMatchedCount!==1?'s':''} to ${hero}` : 'No matches yet'}
+              </button>
+            </div>
+          ) : (
           <div style={{ position:'relative' }}>
             <input
               value={query}
@@ -91,6 +153,7 @@ function HeroCard({ hero, count, players, onUpdatePlayer }) {
               </div>
             )}
           </div>
+          )}
         </div>
       )}
     </div>
