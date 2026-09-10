@@ -422,14 +422,36 @@ function buildEventSheet(event, players, includeJoiners) {
 }
 
 // ── Cover sheet ────────────────────────────────────────────────
-function buildCoverSheet(data, rosterCount = null) {
+// authorNote is optional free text from whoever's exporting — a place
+// to say something to whoever opens this file (what changed, what to
+// look at first, a heads-up) without needing to explain it separately
+// over Discord. Entirely optional; the cover sheet looks exactly as it
+// did before this if nothing's written.
+function buildCoverSheet(data, rosterCount = null, authorNote = '') {
   const now      = new Date().toLocaleString();
   const alliance = data.settings?.allianceName || data.settings?.allianceTag || 'Alliance';
   const memberCount = rosterCount != null ? rosterCount : (data.players?.length || 0);
+
   const rows = [
     [cell('CAROLINE', { font: { bold: true, sz: 18, name: 'Arial', color: { rgb: 'F5A623' } } })],
     [cell(alliance, { font: { bold: true, sz: 14, name: 'Arial', color: { rgb: 'FFFFFF' } } })],
     [],
+  ];
+
+  const merges = [];
+  const trimmedNote = (authorNote || '').trim();
+  if (trimmedNote) {
+    rows.push([cell('📝 A note from the officer:', SUBHEADER_STYLE)]);
+    const noteRow = rows.length; // 0-indexed row this note's text will land on, for the merge below
+    rows.push([cell(trimmedNote, {
+      font:      { italic: true, sz: 12, name: 'Arial', color: { rgb: 'FFFFFF' } },
+      alignment: { wrapText: true, vertical: 'top' },
+    })]);
+    merges.push({ s: { r: noteRow, c: 0 }, e: { r: noteRow, c: 1 } }); // spans both columns so long notes aren't squeezed into column A alone
+    rows.push([]);
+  }
+
+  rows.push(
     [cell('Exported:', SUBHEADER_STYLE), cell(now, ROW_STYLE)],
     [cell('Members:', SUBHEADER_STYLE), cell(memberCount, ROW_STYLE)],
     [cell('Events:', SUBHEADER_STYLE), cell(data.events?.length || 0, ROW_STYLE)],
@@ -448,10 +470,11 @@ function buildCoverSheet(data, rosterCount = null) {
     [cell('This file also contains hidden "…Data" sheets (Roster Data, Events Data, etc.) with one row per record. These are how this app reads a spreadsheet back in — leave them alone unless you know what you\'re doing.', { font: { italic: true, sz: 9, name: 'Arial', color: { rgb: '888888' } } })],
     [],
     [cell('Note: SvS and Castle events include joiner coverage columns in their attendance sheet.', { font: { italic: true, sz: 9, name: 'Arial', color: { rgb: '888888' } } })],
-  ];
+  );
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{ wch: 22 }, { wch: 60 }];
+  if (merges.length) ws['!merges'] = merges;
 
   // Dark background for the whole cover
   applyStyle(ws, 'A1:B2', {
@@ -473,7 +496,7 @@ function buildCoverSheet(data, rosterCount = null) {
 // equivalent — CSV is one flat table, not a workbook, so this is
 // Roster-only by nature, not by omission.
 export function exportRosterCsv(data, options = {}) {
-  const { rosterAllianceTags = null } = options;
+  const { rosterAllianceTags = null, authorNote = '' } = options;
   const scopedPlayers = (rosterAllianceTags && rosterAllianceTags.length > 0)
     ? (data.players || []).filter(p => rosterAllianceTags.includes(p.allianceTag))
     : (data.players || []);
@@ -490,7 +513,17 @@ export function exportRosterCsv(data, options = {}) {
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
-  const rows = [headers];
+  const rows = [];
+  // CSV has no cover sheet to hold this, so it goes as leading rows
+  // above the header instead — still the first thing anyone sees when
+  // they open the file.
+  const trimmedNote = (authorNote || '').trim();
+  if (trimmedNote) {
+    rows.push(['A note from the officer:']);
+    rows.push([trimmedNote]);
+    rows.push([]);
+  }
+  rows.push(headers);
   groups.forEach(group => {
     // CSV can't carry cell styling like the xlsx subheader row does,
     // so a plain row with just the alliance name in the Name column
@@ -547,6 +580,9 @@ export function exportRosterCsv(data, options = {}) {
 //   eventId            – when set, scopes BOTH events and plans to just
 //                        that one event (plans via plan.eventId) —
 //                        "battle plans due a specific event only"
+//   authorNote         – optional free text shown prominently on the
+//                        cover sheet, for whoever's exporting to leave
+//                        a message for whoever opens the file
 // Calling exportWorkbook(data) with no options exports everything, same
 // as before this option support existed.
 export function exportWorkbook(data, options = {}) {
@@ -556,6 +592,7 @@ export function exportWorkbook(data, options = {}) {
     includeEvents      = true,
     includePlans       = true,
     eventId            = null,
+    authorNote         = '',
   } = options;
 
   const wb = XLSX.utils.book_new();
@@ -566,7 +603,7 @@ export function exportWorkbook(data, options = {}) {
     : (data.players || []);
 
   // 1. Cover sheet
-  const coverWs = buildCoverSheet(data, includeRoster ? scopedPlayers.length : null);
+  const coverWs = buildCoverSheet(data, includeRoster ? scopedPlayers.length : null, authorNote);
   XLSX.utils.book_append_sheet(wb, coverWs, 'Overview');
 
   // 2. Roster (alliance-scoped) — includes the merged joiner coverage tick-grid
