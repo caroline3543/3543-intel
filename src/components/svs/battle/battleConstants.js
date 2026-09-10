@@ -147,7 +147,12 @@ export function suggestJoinerHeroes(leaderPlayer, slotType, leaderRallyHeroes) {
   };
 }
 
-export const FC_ORDER = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios'];
+// Deliberately ascending (low to high) — used only for indexOf-based
+// "does this player meet the minimum" comparisons in meetsTroopReqs
+// below, never rendered directly as a picker. Kept separate from
+// constants.js's TIER_OPTIONS, which is display-order (highest-first)
+// and therefore wrong to use for this kind of comparison math.
+export const FC_ORDER = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','Helios FC5','Helios FC6','Helios FC7','Helios FC8'];
 
 /**
  * Whether a player counts as attending a linked Event, for the purpose

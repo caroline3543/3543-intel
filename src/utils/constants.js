@@ -27,20 +27,44 @@ export const LEGION_COLORS = {
   'Canyon Clash': { 1: '#2F6B4A', 2: C.lan },
 };
 
-// Tier order, low to high. FC1–FC8 all enhance T10 troops without
-// changing their tier name; T11 is unlocked separately; Helios
-// ("Helios T11") is a further War Academy research tier above T11 —
-// not a camp-level milestone like the FC tiers.
-// NOTE: 'T12' was already in this list before this edit and is kept
-// as-is (not removing data that may already be stored on players) —
-// but current sourcing only confirms Helios as the tier above T11, not
-// a 'T12'. Worth confirming whether T12 is real or a leftover/typo.
-export const TIER_OPTIONS = ['T10','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios','T12'];
+// Tier order — HIGHEST FIRST for display (picker buttons render in
+// this order), per explicit request to stop listing weakest-to-
+// strongest. This is a DISPLAY convention only — comparison logic
+// (see battleConstants.js's FC_ORDER, used for "does this player meet
+// the minimum troop tier" checks) keeps its own ascending order
+// separately; the two arrays are intentionally not the same list.
+//
+// Helios was previously a single combined 'T11/Helios' bucket. Split
+// into 4 distinct research stages (Helios FC5–FC8) mirroring the same
+// FC-stage naming already used for T10, since Helios troops apparently
+// have their own FC-style research progression rather than being one
+// flat tier. NOTE: whether a separate plain "T11" stage (before Helios
+// research begins) should also exist as its own tier is genuinely
+// unclear from available sourcing — not added here since it wasn't
+// asked for and guessing at unconfirmed mechanics seemed worse than
+// leaving it out. Flag this if T11-without-Helios turns out to be a
+// real, distinct state your alliance needs to track.
+// T12 kept at the very top, still unconfirmed (see original note below).
+export const TIER_OPTIONS = [
+  'T12','Helios FC8','Helios FC7','Helios FC6','Helios FC5',
+  'FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1','T10',
+];
 
 // Furnace level options — separate from TIER_OPTIONS above. Furnace is
 // FC1-FC8 only; T10/T11/Helios/T12 are troop camp tiers, not furnace
 // levels (see the "T11/Helios is not a furnace" fix in PlayerSheet.jsx).
-export const FC_OPTIONS = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8'];
+// Highest-first, matching TIER_OPTIONS' display convention above.
+export const FC_OPTIONS = ['FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1'];
+
+// Furnace-level badge icons (FC5–FC8 only — no badges supplied for
+// FC1–4). Served from /public/furnace-badges/ — see terminal
+// instructions for where these files need to land in the repo.
+export const FC_BADGE_IMAGES = {
+  FC5: '/furnace-badges/fc5.png',
+  FC6: '/furnace-badges/fc6.png',
+  FC7: '/furnace-badges/fc7.png',
+  FC8: '/furnace-badges/fc8.png',
+};
 
 // NOTE: player roles are no longer a fixed list. "Rally Lead" is the only
 // permanent, built-in role (see src/utils/roles.js) — every other role is

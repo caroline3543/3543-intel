@@ -326,7 +326,7 @@ export function RallySlotCard({
             <div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>Members below these tiers shouldn't join this rally.</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', marginBottom:10 }}>
               <span style={{ fontSize:11, color:C.muted, marginRight:2 }}>Set all three:</span>
-              {['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios'].map(fc => {
+              {['Helios FC8','Helios FC7','Helios FC6','Helios FC5','FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1'].map(fc => {
                 const allMatch = ['infantry','lancer','marksman'].every(k => (slot.troopReqs||{})[k] === fc);
                 return (
                   <button key={fc} onClick={() => upd({ troopReqs:{ infantry:fc, lancer:fc, marksman:fc } })}
@@ -345,7 +345,7 @@ export function RallySlotCard({
                 <div key={key}>
                   <div style={{ fontSize:11, color:tc, fontWeight:700, marginBottom:4 }}>{label}</div>
                   <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                    {['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios'].map(fc => {
+                    {['Helios FC8','Helios FC7','Helios FC6','Helios FC5','FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1'].map(fc => {
                       const sel = (slot.troopReqs || {})[key] === fc;
                       return (
                         <button key={fc} onClick={() => upd({ troopReqs:{ ...(slot.troopReqs||{}), [key]:sel?null:fc } })}

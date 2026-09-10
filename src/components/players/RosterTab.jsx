@@ -15,9 +15,9 @@ import { getCurrentTroopPower } from '../../data/metrics.js';
 // filter chips when at least one player actually qualifies, so an
 // alliance with nobody at Helios tier yet doesn't see empty chips.
 const DERIVED_TIER_FILTERS = [
-  { id:'helios-marksman', label:'🏹 Helios Marksman', match:p => p.troops?.marksman === 'T11/Helios' },
-  { id:'helios-lancer',   label:'⚔️ Helios Lancer',   match:p => p.troops?.lancer   === 'T11/Helios' },
-  { id:'helios-infantry', label:'🛡️ Helios Infantry', match:p => p.troops?.infantry === 'T11/Helios' },
+  { id:'helios-marksman', label:'🏹 Helios Marksman', match:p => !!p.troops?.marksman?.startsWith('Helios') },
+  { id:'helios-lancer',   label:'⚔️ Helios Lancer',   match:p => !!p.troops?.lancer?.startsWith('Helios') },
+  { id:'helios-infantry', label:'🛡️ Helios Infantry', match:p => !!p.troops?.infantry?.startsWith('Helios') },
   { id:'full-fc5', label:'💯 Full FC5', match:p => p.troops?.infantry==='FC5' && p.troops?.lancer==='FC5' && p.troops?.marksman==='FC5' },
   { id:'full-fc6', label:'💯 Full FC6', match:p => p.troops?.infantry==='FC6' && p.troops?.lancer==='FC6' && p.troops?.marksman==='FC6' },
 ];
@@ -150,12 +150,13 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const troopGapCount = players.filter(p => !p.troops?.infantry || !p.troops?.lancer || !p.troops?.marksman).length;
 
   const filteredPlayers = players.filter(p => {
-    const t = (p.username||p.alias||'').toLowerCase();
+    const q = search.toLowerCase();
     const ms = !search
-      || t.includes(search.toLowerCase())
-      || (p.allianceTag||'').toLowerCase().includes(search.toLowerCase())
-      || (p.country||'').toLowerCase().includes(search.toLowerCase())
-      || (p.fid||'').toLowerCase().includes(search.toLowerCase());
+      || (p.username||'').toLowerCase().includes(q)
+      || (p.alias||'').toLowerCase().includes(q)
+      || (p.allianceTag||'').toLowerCase().includes(q)
+      || (p.country||'').toLowerCase().includes(q)
+      || (p.fid||'').toLowerCase().includes(q);
     const mr = filterRole==='All' || (derivedMatch ? derivedMatch.match(p) : p.roles?.includes(filterRole));
     const ma = !filterTag || p.allianceTag === filterTag;
     return ms && mr && ma;
@@ -179,7 +180,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search name, tag, country, player ID…"
+          placeholder="Search name, nickname, tag, country, player ID…"
           style={{ flex:1, height:48, background:'#152236', border:'1px solid #2A4A64', borderRadius:10, padding:'0 14px', fontSize:16, color:'#FFFFFF', fontFamily:'inherit' }}
         />
         <button onClick={() => setBulkAddOpen(true)} style={{ height:48, padding:'0 12px', borderRadius:10, background:'none', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer' }}>➕ Bulk Add</button>

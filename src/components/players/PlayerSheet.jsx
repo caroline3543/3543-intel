@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { C, LANGUAGES, COUNTRIES, EVENT_TYPES, EVENT_ICONS, tierChipStyle, FC_OPTIONS } from '../../utils/constants.js';
+import { C, LANGUAGES, COUNTRIES, EVENT_TYPES, EVENT_ICONS, tierChipStyle, FC_OPTIONS, FC_BADGE_IMAGES } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { newPlayer } from '../../data/playerSchema.js';
 import { Field, Inp, Sel, TierPill, SheetHandle } from '../common/Primitives.jsx';
@@ -138,10 +138,16 @@ export function PlayerSheet({ player, roles=[], open, onClose, onSave, existingT
         <SheetHandle />
 
         {/* Header */}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
           <div style={{ fontSize:18, fontWeight:700, color:C.white }}>{player ? 'Edit member' : 'Add member'}</div>
           <button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, fontSize:28, cursor:'pointer', lineHeight:1, padding:'0 4px' }}>✕</button>
         </div>
+        {p.profileLastUpdated && (
+          <div style={{ fontSize:11, color:C.muted, marginBottom:16 }}>
+            Last updated {new Date(p.profileLastUpdated).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}
+          </div>
+        )}
+        {!p.profileLastUpdated && <div style={{ marginBottom:16 }} />}
 
         {/* Step wizard */}
         <StepIndicator steps={STEPS} current={activeTab} onSelect={setActiveTab} />
@@ -178,9 +184,21 @@ export function PlayerSheet({ player, roles=[], open, onClose, onSave, existingT
               <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                 {FC_OPTIONS.map(fc => {
                   const sel = p.furnaceLevel===fc;
-                  return <button key={fc} onClick={()=>upd('furnaceLevel',sel?null:fc)} style={tierChipStyle(sel)}>{sel?'✓ ':''}{fc}</button>;
+                  const badge = FC_BADGE_IMAGES[fc];
+                  return (
+                    <button key={fc} onClick={()=>upd('furnaceLevel',sel?null:fc)} style={{ ...tierChipStyle(sel), display:'flex', alignItems:'center', gap:6 }}>
+                      {badge && <img src={badge} alt="" style={{ width:20, height:20, flexShrink:0 }}/>}
+                      {sel?'✓ ':''}{fc}
+                    </button>
+                  );
                 })}
               </div>
+              {p.furnaceLevel && FC_BADGE_IMAGES[p.furnaceLevel] && (
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:10 }}>
+                  <img src={FC_BADGE_IMAGES[p.furnaceLevel]} alt={p.furnaceLevel} style={{ width:44, height:44 }}/>
+                  <div style={{ fontSize:13, color:C.icy }}>{p.furnaceLevel}</div>
+                </div>
+              )}
             </Field>
             <Field label="Country">
               <Sel value={p.country} onChange={v=>upd('country',v)} options={COUNTRIES} placeholder="Select country…"/>
