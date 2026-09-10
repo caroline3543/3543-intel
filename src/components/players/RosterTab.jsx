@@ -14,6 +14,10 @@ import { getCurrentTroopPower } from '../../data/metrics.js';
 // troop-tier data — no manual role to create or assign. Only shown as
 // filter chips when at least one player actually qualifies, so an
 // alliance with nobody at Helios tier yet doesn't see empty chips.
+// Sentinel value for the "No Alliance" filter chip — distinct from ''
+// (which means "All Alliances", i.e. no filter applied at all).
+const NO_ALLIANCE = '__no_alliance__';
+
 const DERIVED_TIER_FILTERS = [
   { id:'helios-marksman', label:'🏹 Helios Marksman', match:p => !!p.troops?.marksman?.startsWith('Helios') },
   { id:'helios-lancer',   label:'⚔️ Helios Lancer',   match:p => !!p.troops?.lancer?.startsWith('Helios') },
@@ -69,13 +73,17 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   // functionally (Battle Plan eligibility never checks for a "Joiner"
   // tag), so an untagged member is a normal joiner, not an incomplete
   // profile.
+  // Restricted to troop tiers + alliance name specifically — furnace
+  // level and joiner heroes are useful to have but aren't what this
+  // flag is for; it exists to catch profiles that can't be used for
+  // eligibility/coverage checks elsewhere in the app, and those two
+  // fields don't gate anything the way troop tiers and alliance do.
   function missingCount(p) {
     let n = 0;
-    if (!p.furnaceLevel) n++;
     if (!p.troops?.infantry) n++;
     if (!p.troops?.lancer) n++;
     if (!p.troops?.marksman) n++;
-    if (!(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5)) n++;
+    if (!p.allianceTag) n++;
     return n;
   }
 
@@ -148,6 +156,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const derivedMatch = DERIVED_TIER_FILTERS.find(d => d.id === filterRole);
   const allTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
   const troopGapCount = players.filter(p => !p.troops?.infantry || !p.troops?.lancer || !p.troops?.marksman).length;
+  const noAllianceCount = players.filter(p => !p.allianceTag).length;
 
   const filteredPlayers = players.filter(p => {
     const q = search.toLowerCase();
@@ -158,7 +167,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
       || (p.country||'').toLowerCase().includes(q)
       || (p.fid||'').toLowerCase().includes(q);
     const mr = filterRole==='All' || (derivedMatch ? derivedMatch.match(p) : p.roles?.includes(filterRole));
-    const ma = !filterTag || p.allianceTag === filterTag;
+    const ma = !filterTag || (filterTag===NO_ALLIANCE ? !p.allianceTag : p.allianceTag === filterTag);
     return ms && mr && ma;
   });
   if (sortBy === 'missing') {
@@ -269,9 +278,14 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
               <button key={d.id} onClick={() => setFilterRole(d.id)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===d.id?C.icy+'22':C.section, border:`1px solid ${filterRole===d.id?C.icy:C.border}`, color:filterRole===d.id?C.icy:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{d.label}</button>
             ))}
           </div>
-          {allTags.length > 0 && (
+          {(allTags.length > 0 || noAllianceCount > 0) && (
             <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
               <button onClick={() => setFilterTag('')} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===''?C.icy+'22':C.section, border:`1px solid ${filterTag===''?C.icy:C.border}`, color:filterTag===''?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>All Alliances</button>
+              {noAllianceCount > 0 && (
+                <button onClick={() => setFilterTag(filterTag===NO_ALLIANCE?'':NO_ALLIANCE)} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===NO_ALLIANCE?C.red+'22':C.section, border:`1px solid ${filterTag===NO_ALLIANCE?C.red:C.border}`, color:filterTag===NO_ALLIANCE?C.red:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>
+                  🚫 No Alliance ({noAllianceCount})
+                </button>
+              )}
               {allTags.map(t => (
                 <button key={t} onClick={() => setFilterTag(filterTag===t?'':t)} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===t?C.icy+'22':C.section, border:`1px solid ${filterTag===t?C.icy:C.border}`, color:filterTag===t?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>[{t}]</button>
               ))}
