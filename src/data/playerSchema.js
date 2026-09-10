@@ -83,7 +83,7 @@ export function newEvent(overrides = {}) {
     id:             uid(),
     type:           'SvS Castle Battle',
     name:           '',
-    allianceTag:    '',
+    allianceTags:   [], // multiple alliances can run one event together (was a single allianceTag string — migrated to support this)
     date:           new Date().toISOString().slice(0, 10),
     time:           '12:00',
     status:         'upcoming',

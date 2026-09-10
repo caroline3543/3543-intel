@@ -22,13 +22,22 @@ function suggestName(ev) {
 // moved entirely to EventsTab.jsx's type-and-enter add flow, opened
 // once the event actually exists. This sheet is just the event shell:
 // type, alliance, name (auto-suggested), date/time, notes.
+// Old events may still only have the legacy single `allianceTag`
+// string (pre-multi-select) instead of `allianceTags`. Wraps it into
+// the new array shape so editing an old event doesn't silently drop
+// its alliance — never touches events that already have the new field.
+function withMigratedAlliance(ev) {
+  if (!ev || ev.allianceTags) return ev;
+  return { ...ev, allianceTags: ev.allianceTag ? [ev.allianceTag] : [] };
+}
+
 export function EventSheet({ event, open, onClose, onSave, players }) {
-  const [ev, setEv] = useState(() => event || newEvent());
+  const [ev, setEv] = useState(() => withMigratedAlliance(event) || newEvent());
   const [nameTouched, setNameTouched] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setEv(event ? { ...event } : newEvent());
+      setEv(event ? withMigratedAlliance({ ...event }) : newEvent());
       setNameTouched(!!event); // editing an existing event — don't auto-overwrite its real name
     }
   }, [open, event?.id]);
@@ -88,10 +97,11 @@ export function EventSheet({ event, open, onClose, onSave, players }) {
             </div>
           </Field>
         )}
-        <Field label="Alliance">
+        <Field label="Alliance(s)" hint="Select every alliance running this event together — participant search will only offer players from these alliances.">
           <AlliancePicker
-            value={ev.allianceTag}
-            onChange={v => upd('allianceTag', v)}
+            multi
+            value={ev.allianceTags}
+            onChange={v => upd('allianceTags', v)}
             existingTags={allTags}
           />
         </Field>

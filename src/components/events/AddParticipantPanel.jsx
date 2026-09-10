@@ -25,13 +25,18 @@ export function AddParticipantPanel({
       {/* Add participant — type a name (Enter commits the top match)
           or paste a whole list at once. Adding-as toggle decides
           which section they land in, for either mode. */}
+      {activeEvent.allianceTags?.length > 0 && (
+        <div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>
+          Only showing {activeEvent.allianceTags.map(t=>`[${t}]`).join(' ')} players — set in the event's alliance field.
+        </div>
+      )}
       <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-        <button onClick={() => setAddAsSubstitute(false)} style={{ flex:1, height:36, borderRadius:10, border:`1px solid ${!addAsSubstitute?C.gold:C.border}`, background:!addAsSubstitute?C.gold+'22':C.section, color:!addAsSubstitute?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>Add as Participant</button>
-        <button onClick={() => setAddAsSubstitute(true)} style={{ flex:1, height:36, borderRadius:10, border:`1px solid ${addAsSubstitute?C.gold:C.border}`, background:addAsSubstitute?C.gold+'22':C.section, color:addAsSubstitute?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>Add as Substitute</button>
+        <button onClick={() => setAddAsSubstitute(false)} style={{ flex:1, height:44, borderRadius:10, border:`1px solid ${!addAsSubstitute?C.gold:C.border}`, background:!addAsSubstitute?C.gold+'22':C.section, color:!addAsSubstitute?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>Add as Participant</button>
+        <button onClick={() => setAddAsSubstitute(true)} style={{ flex:1, height:44, borderRadius:10, border:`1px solid ${addAsSubstitute?C.gold:C.border}`, background:addAsSubstitute?C.gold+'22':C.section, color:addAsSubstitute?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>Add as Substitute</button>
       </div>
       <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-        <button onClick={() => setAddMode('type')} style={{ flex:1, height:32, borderRadius:16, background:addMode==='type'?C.gold+'22':C.section, border:`1px solid ${addMode==='type'?C.gold:C.border}`, color:addMode==='type'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>🔍 Type one</button>
-        <button onClick={() => setAddMode('paste')} style={{ flex:1, height:32, borderRadius:16, background:addMode==='paste'?C.gold+'22':C.section, border:`1px solid ${addMode==='paste'?C.gold:C.border}`, color:addMode==='paste'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>📋 Paste a list</button>
+        <button onClick={() => setAddMode('type')} style={{ flex:1, height:44, borderRadius:16, background:addMode==='type'?C.gold+'22':C.section, border:`1px solid ${addMode==='type'?C.gold:C.border}`, color:addMode==='type'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>🔍 Type one</button>
+        <button onClick={() => setAddMode('paste')} style={{ flex:1, height:44, borderRadius:16, background:addMode==='paste'?C.gold+'22':C.section, border:`1px solid ${addMode==='paste'?C.gold:C.border}`, color:addMode==='paste'?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>📋 Paste a list</button>
       </div>
       {addMode === 'type' ? (
         <div style={{ position:'relative', marginBottom:12 }}>
@@ -46,7 +51,7 @@ export function AddParticipantPanel({
             <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:20, boxShadow:'0 8px 24px #000a' }}>
               {addResults.map((p, i) => (
                 <button key={p.id} onClick={() => onAddParticipant(p)}
-                  style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', padding:'10px 14px', background:i===0?C.gold+'12':'none', border:'none', borderBottom:`1px solid ${C.border}22`, cursor:'pointer', textAlign:'left' }}>
+                  style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', minHeight:44, padding:'10px 14px', background:i===0?C.gold+'12':'none', border:'none', borderBottom:`1px solid ${C.border}22`, cursor:'pointer', textAlign:'left' }}>
                   <span style={{ fontSize:14, fontWeight:700, color:C.white }}>{p.username||p.alias||'?'}</span>
                   <span style={{ fontSize:11, color:C.muted }}>{p.furnaceLevel||''}{i===0?'  ↵ Enter':''}</span>
                 </button>
@@ -79,7 +84,7 @@ export function AddParticipantPanel({
                 {addBlocked.map(p => (
                   <button key={p.id} onClick={() => onOpenLegionSwap(p, sibling)}
                     title={`Tap to move from Legion ${sibling?.legion}`}
-                    style={{ padding:'5px 10px', borderRadius:14, background:C.red+'14', border:`1px solid ${C.red}44`, color:C.red+'cc', fontSize:12, cursor:'pointer' }}>
+                    style={{ padding:'5px 10px', minHeight:44, borderRadius:14, background:C.red+'14', border:`1px solid ${C.red}44`, color:C.red+'cc', fontSize:12, cursor:'pointer' }}>
                     ⚠ {p.username||p.alias} (Legion {sibling?.legion}) — swap?
                   </button>
                 ))}
@@ -113,7 +118,7 @@ export function AddParticipantPanel({
                 .sort((a,b) => new Date(b.date) - new Date(a.date))
                 .map(ev => (
                   <button key={ev.id} onClick={() => onCopyRosterFrom(ev)}
-                    style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 12px', borderRadius:8, background:C.section, border:`1px solid ${C.border}`, color:C.white, fontSize:13, marginBottom:6, cursor:'pointer' }}>
+                    style={{ display:'block', width:'100%', textAlign:'left', minHeight:44, padding:'10px 12px', borderRadius:8, background:C.section, border:`1px solid ${C.border}`, color:C.white, fontSize:13, marginBottom:6, cursor:'pointer' }}>
                     {EVENT_ICONS[ev.type]||'📋'} {ev.name||ev.type} · {fmtDateShort(ev.date)} · {ev.participantIds.length} people
                   </button>
                 ))}

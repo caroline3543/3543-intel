@@ -76,6 +76,16 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
   const activeEvent = events.find(e => e.id === activeEventId);
 
+  // When the event has one or more alliances selected, only players
+  // from those alliances are eligible to be added as participants —
+  // search and paste-add both draw from this instead of the full
+  // roster. No alliance selected on the event means no restriction
+  // (open to everyone), matching how the field already behaves as
+  // optional everywhere else.
+  const eventEligiblePlayers = (activeEvent?.allianceTags?.length > 0)
+    ? players.filter(p => activeEvent.allianceTags.includes(p.allianceTag))
+    : players;
+
   // Sticky context bar — appears once the event's own header card has
   // scrolled out from under the app's fixed top header, so scrolling
   // deep into a long roster never loses track of which event this is.
@@ -94,9 +104,9 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     return () => obs.disconnect();
   }, [activeEvent?.id]);
 
-  const allTags = [...new Set(events.map(e => e.allianceTag).filter(Boolean))];
+  const allTags = [...new Set(events.flatMap(e => e.allianceTags || []).filter(Boolean))];
   let filtered = filterType==='All' ? events : events.filter(e => e.type===filterType);
-  if (filterTag) filtered = filtered.filter(e => e.allianceTag===filterTag);
+  if (filterTag) filtered = filtered.filter(e => (e.allianceTags||[]).includes(filterTag));
   // Date, then time — events sharing a date (e.g. Legion 1/2) previously
   // fell back to insertion order among themselves since only .date was
   // compared. Date strings are 'YYYY-MM-DD' and times are 'HH:MM' 24hr,
@@ -146,7 +156,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     setAddQuery(q);
     if (!q.trim() || !activeEvent) { setAddResults([]); return; }
     const already = new Set(activeEvent.participantIds || []);
-    const pool = players.filter(p => !already.has(p.id));
+    const pool = eventEligiblePlayers.filter(p => !already.has(p.id));
     setAddResults(searchPlayers(pool, q, 5));
   }
 
@@ -293,7 +303,8 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   function copyRosterFrom(sourceEvent) {
     if (!activeEvent) return;
     const already = new Set(activeEvent.participantIds || []);
-    const toAdd = (sourceEvent.participantIds || []).filter(id => !already.has(id));
+    const eligibleIds = new Set(eventEligiblePlayers.map(p => p.id));
+    const toAdd = (sourceEvent.participantIds || []).filter(id => !already.has(id) && eligibleIds.has(id));
     const participantIds = [...(activeEvent.participantIds || []), ...toAdd];
     const snaps = [...(activeEvent.snapshots || [])];
     toAdd.forEach(pid => {
@@ -517,7 +528,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                   {activeEvent.time && (
                     <span style={{ fontSize:16, fontWeight:800, color:C.gold, padding:'1px 10px', borderRadius:10, background:C.gold+'18' }}>🕐 {activeEvent.time} UTC</span>
                   )}
-                  {activeEvent.allianceTag && <span style={{ fontSize:13, color:C.muted }}>[{activeEvent.allianceTag}]</span>}
+                  {activeEvent.allianceTags?.length > 0 && <span style={{ fontSize:13, color:C.muted }}>{activeEvent.allianceTags.map(t=>`[${t}]`).join(' ')}</span>}
                 </div>
               </div>
               <button onClick={() => { setEditingEvent(activeEvent); setEventSheetOpen(true); }} style={{ height:34, padding:'0 12px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontSize:13, cursor:'pointer', flexShrink:0 }}>Edit</button>
@@ -569,7 +580,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             addMode={addMode} setAddMode={setAddMode}
             addQuery={addQuery} addResults={addResults} onSearchAdd={searchAdd} onCommitTopMatch={commitTopMatch} onAddParticipant={addParticipant}
             pasteAddText={pasteAddText} setPasteAddText={setPasteAddText} onAddParticipantsBatch={addParticipantsBatch}
-            players={players} activeEvent={activeEvent} events={events}
+            players={eventEligiblePlayers} activeEvent={activeEvent} events={events}
             onOpenLegionSwap={(player, sibling) => setLegionModal({ mode:'swap', player, sibling })}
             copyPickerOpen={copyPickerOpen} setCopyPickerOpen={setCopyPickerOpen} onCopyRosterFrom={copyRosterFrom}
           />
@@ -609,7 +620,26 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               return <div style={{ textAlign:'center', padding:'40px 0', color:C.muted }}>No one added yet — type a name above to add them.</div>;
             }
 
-            const rankGroups = groupByRank(participantsList);
+            const multiAlliance = (activeEvent.allianceTags?.length || 0) > 1;
+
+            // Same rank-grouped rendering either way — just called once
+            // for the whole list normally, or once per alliance when
+            // there's more than one alliance to split by.
+            function renderRankSubgroups(list) {
+              const groups = groupByRank(list);
+              return [...ALLIANCE_RANKS, 'Unranked'].map(rank => {
+                const group = groups[rank];
+                if (!group.length) return null;
+                return (
+                  <div key={rank}>
+                    <div style={{ fontSize:10, fontWeight:700, color:C.gold, textTransform:'uppercase', letterSpacing:'0.06em', marginTop:10, marginBottom:6 }}>
+                      {rank} ({group.length})
+                    </div>
+                    {group.map(renderParticipantRow)}
+                  </div>
+                );
+              });
+            }
 
             function renderParticipantRow(player) {
               return (
@@ -656,18 +686,35 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                     </div>
                     {participantsList.length === 0
                       ? <div style={{ fontSize:13, color:C.muted, marginBottom:16 }}>None yet.</div>
-                      : [...ALLIANCE_RANKS, 'Unranked'].map(rank => {
-                          const group = rankGroups[rank];
-                          if (!group.length) return null;
-                          return (
-                            <div key={rank}>
-                              <div style={{ fontSize:10, fontWeight:700, color:C.gold, textTransform:'uppercase', letterSpacing:'0.06em', marginTop:10, marginBottom:6 }}>
-                                {rank} ({group.length})
-                              </div>
-                              {group.map(renderParticipantRow)}
-                            </div>
-                          );
-                        })}
+                      : multiAlliance
+                        ? (() => {
+                            const byAlliance = activeEvent.allianceTags.map(tag => ({
+                              tag,
+                              list: participantsList.filter(p => p.allianceTag === tag),
+                            })).filter(g => g.list.length > 0);
+                            const otherList = participantsList.filter(p => !activeEvent.allianceTags.includes(p.allianceTag));
+                            return (
+                              <>
+                                {byAlliance.map(g => (
+                                  <div key={g.tag} style={{ marginBottom:12 }}>
+                                    <div style={{ fontSize:12, fontWeight:800, color:C.icy, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4, paddingBottom:4, borderBottom:`1px solid ${C.border}` }}>
+                                      [{g.tag}] · {g.list.length}
+                                    </div>
+                                    {renderRankSubgroups(g.list)}
+                                  </div>
+                                ))}
+                                {otherList.length > 0 && (
+                                  <div style={{ marginBottom:12 }}>
+                                    <div style={{ fontSize:12, fontWeight:800, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4, paddingBottom:4, borderBottom:`1px solid ${C.border}` }}>
+                                      Other · {otherList.length}
+                                    </div>
+                                    {renderRankSubgroups(otherList)}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()
+                        : renderRankSubgroups(participantsList)}
                   </>
                 )}
 
