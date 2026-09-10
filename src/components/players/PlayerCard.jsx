@@ -69,8 +69,10 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
           )}
         </div>
 
-        {/* Row 2.5 — role/capability labels (Rally Lead, Substitute Rally Lead,
-            Helios Infantry/Lancer/Marksman, and any custom alliance roles) */}
+        {/* Row 2.5 — role/capability labels (Rally Lead, Substitute Rally
+            Lead, and any custom alliance roles). Helios status moved to
+            a badge on the troop icon below instead of a text pill here —
+            showing it in two places at once was redundant. */}
         {(player.roles?.length > 0 || player.leaderProfile?.role === 'substitute' || player.leaderProfile?.role === 'both') && (
           <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
             {(player.leaderProfile?.role === 'substitute' || player.leaderProfile?.role === 'both') && !player.roles?.includes('Rally Lead') && (
@@ -78,11 +80,6 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
             )}
             {player.roles?.map(r => (
               <span key={r} style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:8, background:r==='Rally Lead'?C.gold+'18':C.section, color:r==='Rally Lead'?C.gold:C.icy }}>{r}</span>
-            ))}
-            {['infantry','lancer','marksman'].filter(k => player.troops?.[k]?.startsWith('Helios')).map(k => (
-              <span key={k} style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:8, background:C.section, color:k==='infantry'?C.inf:k==='lancer'?C.lan:C.mar }}>
-                Helios {k.charAt(0).toUpperCase()+k.slice(1)}
-              </span>
             ))}
           </div>
         )}
@@ -92,29 +89,59 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
             per-player detail (opened by tapping the card), not inline
             on every list row. */}
 
-        {/* Row 3 — troop tier mismatches. Own row, independent of
-            joiner heroes below, so its presence/absence never shifts
-            based on unrelated data. Only rendered at all when at least
-            one troop DIFFERS from the overall furnace badge already
-            shown by the name; omitted entirely otherwise — never shows
-            three redundant matching icons. Each icon keeps its normal
-            type color (shield/sword/bow) always; a mismatch adds a
-            small gold dot rather than recoloring the whole chip, so
-            the type-color coding is never erased by the warning state. */}
+        {/* Row 3 — troop tier notable states: Helios badge and/or level
+            mismatch, kept as two INDEPENDENT signals that can coexist on
+            one chip without merging:
+              - Helios: a fact, never a warning. Small filled red square
+                on the icon itself (matching the game's own hexagonal
+                Helios badge language) — never amber, that color is
+                reserved entirely for the mismatch case.
+              - Mismatch: this troop's tier differs from the player's
+                OTHER troops (NOT from furnace level — furnace and troop
+                tier are different progression tracks that routinely
+                differ even when nothing's wrong, which was exactly the
+                noise/illegibility problem before this fix). This should
+                be rare — most players keep their three troops in sync.
+                Triggers amber background + amber text + a small ⚠ —
+                visually distinct from the Helios square.
+            A chip only renders at all when at least one of these two
+            conditions is true; a troop that's neither Helios-tier nor
+            mismatched shows nothing, same as before. */}
         {(() => {
           const troopEntries = [['🛡️','infantry',player.troops?.infantry,C.inf],['⚔️','lancer',player.troops?.lancer,C.lan],['🏹','marksman',player.troops?.marksman,C.mar]];
-          const hasFurnace = !!player.furnaceLevel;
-          const mismatches = hasFurnace ? troopEntries.filter(([,,t]) => t && t !== player.furnaceLevel) : [];
-          if (!hasFurnace || mismatches.length === 0) return null;
+          const setVals = troopEntries.filter(([,,t]) => t).map(([,,t]) => t);
+          const freq = {};
+          setVals.forEach(v => { freq[v] = (freq[v] || 0) + 1; });
+          const maxFreq = setVals.length ? Math.max(...Object.values(freq)) : 0;
+          // Flags the actual outlier(s), not everyone whenever ANY
+          // difference exists — with < 2 set troops there's nothing to
+          // compare; when nobody agrees at all (maxFreq === 1, e.g. all
+          // three distinct), every one of them is equally "odd" and all
+          // get flagged; otherwise only whoever's outside the majority.
+          function isMismatch(t) {
+            if (!t || setVals.length < 2) return false;
+            if (maxFreq === 1) return true;
+            return freq[t] < maxFreq;
+          }
+          const notable = troopEntries.filter(([,,t]) => t && (t.startsWith('Helios') || isMismatch(t)));
+          if (notable.length === 0) return null;
           return (
             <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
-              {mismatches.map(([icon, key, t, tc]) => (
-                <span key={key} title={`Differs from overall furnace level (${player.furnaceLevel})`}
-                  style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:tc+'18', color:tc }}>
-                  {icon} {t}
-                  <span style={{ width:6, height:6, borderRadius:'50%', background:C.gold, flexShrink:0 }}/>
-                </span>
-              ))}
+              {notable.map(([icon, key, t, tc]) => {
+                const helios = t.startsWith('Helios');
+                const mismatch = isMismatch(t);
+                return (
+                  <span key={key} title={mismatch ? "Differs from this player's other troops" : undefined}
+                    style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:mismatch?C.gold+'22':tc+'18', color:mismatch?C.gold:tc }}>
+                    <span style={{ position:'relative', display:'inline-flex', width:14, height:14, alignItems:'center', justifyContent:'center' }}>
+                      {icon}
+                      {helios && <span style={{ position:'absolute', top:-2, right:-3, width:6, height:6, background:C.red, borderRadius:1.5 }}/>}
+                    </span>
+                    {t}
+                    {mismatch && <span style={{ fontSize:10 }}>⚠</span>}
+                  </span>
+                );
+              })}
             </div>
           );
         })()}
