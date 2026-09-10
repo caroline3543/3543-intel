@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { roleColor } from '../../utils/roles.js';
 import { fmtDate } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
+import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 
 function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
@@ -18,9 +20,11 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
   // whatever's saved first if there's no offense team.
   const teams = player.leaderProfile?.teams || [];
   const leaderTeam = teams.find(t => t.type === 'offense') || teams[0] || null;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   return (
-    <div onClick={onClick} style={{ background:isSelected?C.gold+'18':C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none', opacity:player.blacklisted?0.6:1, border:`1px solid ${isSelected?C.gold:'transparent'}` }}>
+    <div onClick={onClick} style={{ background:isSelected?C.gold+'18':C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none', opacity:player.blacklisted?0.6:1, border:`1px solid ${isSelected?C.gold:C.border}`, boxShadow:'0 1px 3px rgba(0,0,0,0.35)' }}>
 
       {bulkMode && (
         <div style={{ width:24, height:24, borderRadius:'50%', border:`2px solid ${isSelected?C.gold:C.border}`, background:isSelected?C.gold:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -35,9 +39,12 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
 
       <div style={{ flex:1, minWidth:0 }}>
 
-        {/* Row 1 — name */}
+        {/* Row 1 — name + overall furnace badge together */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
           <div style={{ fontSize:16, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+          {player.furnaceLevel && (
+            <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, flexShrink:0 }}>{player.furnaceLevel}</span>
+          )}
           {player.blacklisted && (
             <span title={player.blacklistReason || ''} style={{ fontSize:11, color:C.red, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.red+'18', flexShrink:0 }}>⚠ Blacklisted</span>
           )}
@@ -50,10 +57,9 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
           )}
         </div>
 
-        {/* Row 2 — alliance · furnace · troop power · reliability */}
+        {/* Row 2 — alliance · troop power · reliability (furnace moved up next to the name) */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
           {player.allianceTag && <span style={{ fontSize:12, color:C.icy, fontWeight:600 }}>[{player.allianceTag}]</span>}
-          {player.furnaceLevel && <span style={{ fontSize:12, color:C.gold, fontWeight:700 }}>{player.furnaceLevel}</span>}
           {troopPower != null && <span style={{ fontSize:12, color:C.gold, fontWeight:700 }}>💪 {troopPower.toLocaleString()}</span>}
           {player.country && <span style={{ fontSize:12, color:C.muted }}>{player.country}</span>}
           {metrics && (
@@ -97,13 +103,25 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
           </div>
         )}
 
-        {/* Row 3 — troops + joiner heroes (secondary info) */}
+        {/* Row 3 — troop tier mismatches + joiner heroes (secondary info).
+            Per-troop tier is only shown when it DIFFERS from the overall
+            furnace badge already shown by the name — that's the signal
+            worth a glance, not confirmation that everything matches. */}
         <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-          {[['🛡️',player.troops?.infantry,C.inf],['⚔️',player.troops?.lancer,C.lan],['🏹',player.troops?.marksman,C.mar]].map(([i,t,c],idx) => (
-            <span key={idx} style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:(t?c:C.muted)+'18', color:t?c:C.muted }}>
-              {i} {t||'—'}
-            </span>
-          ))}
+          {[['🛡️',player.troops?.infantry,C.inf],['⚔️',player.troops?.lancer,C.lan],['🏹',player.troops?.marksman,C.mar]].map(([i,t,c],idx) => {
+            if (!t) return null;
+            const mismatch = player.furnaceLevel && t !== player.furnaceLevel;
+            // No furnace level set at all means there's nothing to compare
+            // against — fall back to always showing the tier, in its
+            // normal troop-type color, same as before this change.
+            if (player.furnaceLevel && !mismatch) return null;
+            return (
+              <span key={idx} title={mismatch ? `Differs from overall furnace level (${player.furnaceLevel})` : undefined}
+                style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:mismatch?C.gold+'22':(t?c:C.muted)+'18', color:mismatch?C.gold:(t?c:C.muted), border:mismatch?`1px solid ${C.gold}`:'none' }}>
+                {i} {t}{mismatch ? ' ⚠' : ''}
+              </span>
+            );
+          })}
           {joiners.slice(0,2).map(h => (
             <span key={h} style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:C.gold+'18', color:C.gold }}>
               ✓ {h}
@@ -117,18 +135,50 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
       {!bulkMode && (
         <>
           {/* One-tap Rally Lead toggle — no need to open the profile just
-              to flag someone as a leader */}
+              to flag someone as a leader. NOTE: this toggles the "Rally
+              Lead" role tag specifically, not Alliance Rank (R1-R5,
+              a separate field with no card control yet) — the
+              aria-label below describes what it actually does rather
+              than the "Set alliance rank" wording from the original
+              request, since the crown icon isn't tied to that field
+              and a mismatched label would make screen-reader use worse,
+              not better. Flagging this in case Alliance Rank should
+              also get its own control here. */}
           <button
             onClick={e => { e.stopPropagation(); onToggleRallyLead?.(); }}
             title={isRallyLead ? 'Rally Lead — tap to remove' : 'Tap to make Rally Lead'}
-            style={{ width:36, height:36, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:isRallyLead?C.gold+'22':'none', border:`1.5px solid ${isRallyLead?C.gold:C.border}`, color:isRallyLead?C.gold:C.muted+'88', fontSize:16, cursor:'pointer', flexShrink:0 }}
+            aria-label={isRallyLead ? 'Remove Rally Lead status' : 'Set as Rally Lead'}
+            style={{ width:36, height:36, minWidth:32, minHeight:32, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:isRallyLead?C.gold+'22':'none', border:`1.5px solid ${isRallyLead?C.gold:C.border}`, color:isRallyLead?C.gold:C.muted+'88', fontSize:16, cursor:'pointer', flexShrink:0 }}
           >👑</button>
 
-          {/* Delete */}
-          <button
-            onClick={e=>{e.stopPropagation();onDelete(player.id);}}
-            style={{ background:'none', border:'none', color:C.red+'66', fontSize:20, cursor:'pointer', padding:'8px 4px', flexShrink:0, lineHeight:1 }}
-          >✕</button>
+          {/* Overflow menu — a direct one-tap ✕ was too easy to hit by
+              accident in a long list. ⋮ opens a small menu; the actual
+              delete still requires confirming in DeleteConfirmModal. */}
+          <div style={{ position:'relative', flexShrink:0 }} onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setMenuOpen(v => !v)}
+              aria-label="More options"
+              aria-haspopup="true"
+              aria-expanded={menuOpen}
+              style={{ width:32, height:32, minWidth:32, minHeight:32, borderRadius:8, background:menuOpen?C.section:'none', border:'none', color:C.muted, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+            >⋮</button>
+            {menuOpen && (
+              <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.5)', zIndex:20, overflow:'hidden', minWidth:160 }}>
+                <button
+                  onClick={() => { setMenuOpen(false); setConfirmingDelete(true); }}
+                  style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'12px 14px', background:'none', border:'none', color:C.red, fontSize:14, fontWeight:600, cursor:'pointer', textAlign:'left', whiteSpace:'nowrap' }}
+                >🗑 Remove player</button>
+              </div>
+            )}
+          </div>
+
+          {confirmingDelete && (
+            <DeleteConfirmModal
+              message={`Remove ${dn} from the roster? This cannot be undone.`}
+              onConfirm={() => { setConfirmingDelete(false); onDelete(player.id); }}
+              onCancel={() => setConfirmingDelete(false)}
+            />
+          )}
         </>
       )}
     </div>

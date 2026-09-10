@@ -155,6 +155,8 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const activeDerivedFilters = DERIVED_TIER_FILTERS.filter(d => players.some(d.match));
   const derivedMatch = DERIVED_TIER_FILTERS.find(d => d.id === filterRole);
   const allTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
+  const allianceCounts = {};
+  players.forEach(p => { if (p.allianceTag) allianceCounts[p.allianceTag] = (allianceCounts[p.allianceTag] || 0) + 1; });
   const troopGapCount = players.filter(p => !p.troops?.infantry || !p.troops?.lancer || !p.troops?.marksman).length;
   const noAllianceCount = players.filter(p => !p.allianceTag).length;
 
@@ -189,7 +191,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search name, nickname, tag, country, player ID…"
+          placeholder="Search name or tag"
           style={{ flex:1, height:48, background:'#152236', border:'1px solid #2A4A64', borderRadius:10, padding:'0 14px', fontSize:16, color:'#FFFFFF', fontFamily:'inherit' }}
         />
         <button onClick={() => setBulkAddOpen(true)} style={{ height:48, padding:'0 12px', borderRadius:10, background:'none', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer' }}>➕ Bulk Add</button>
@@ -270,25 +272,31 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
 
       {rosterView==='list' && (
         <>
-          <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
-            {['All', ...roles.map(r=>r.name)].map(r => (
-              <button key={r} onClick={() => setFilterRole(r)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===r?C.gold+'22':C.section, border:`1px solid ${filterRole===r?C.gold:C.border}`, color:filterRole===r?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{r}</button>
-            ))}
-            {activeDerivedFilters.map(d => (
-              <button key={d.id} onClick={() => setFilterRole(d.id)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===d.id?C.icy+'22':C.section, border:`1px solid ${filterRole===d.id?C.icy:C.border}`, color:filterRole===d.id?C.icy:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{d.label}</button>
-            ))}
+          <div style={{ position:'relative' }}>
+            <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
+              {['All', ...roles.map(r=>r.name)].map(r => (
+                <button key={r} onClick={() => setFilterRole(r)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===r?C.gold+'22':C.section, border:`1px solid ${filterRole===r?C.gold:C.border}`, color:filterRole===r?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{r}</button>
+              ))}
+              {activeDerivedFilters.map(d => (
+                <button key={d.id} onClick={() => setFilterRole(d.id)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===d.id?C.icy+'22':C.section, border:`1px solid ${filterRole===d.id?C.icy:C.border}`, color:filterRole===d.id?C.icy:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{d.label}</button>
+              ))}
+            </div>
+            <div style={{ position:'absolute', top:0, right:0, bottom:10, width:28, background:`linear-gradient(to right, transparent, ${C.bg})`, pointerEvents:'none' }}/>
           </div>
           {(allTags.length > 0 || noAllianceCount > 0) && (
-            <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
-              <button onClick={() => setFilterTag('')} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===''?C.icy+'22':C.section, border:`1px solid ${filterTag===''?C.icy:C.border}`, color:filterTag===''?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>All Alliances</button>
-              {noAllianceCount > 0 && (
-                <button onClick={() => setFilterTag(filterTag===NO_ALLIANCE?'':NO_ALLIANCE)} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===NO_ALLIANCE?C.red+'22':C.section, border:`1px solid ${filterTag===NO_ALLIANCE?C.red:C.border}`, color:filterTag===NO_ALLIANCE?C.red:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>
-                  🚫 No Alliance ({noAllianceCount})
-                </button>
-              )}
-              {allTags.map(t => (
-                <button key={t} onClick={() => setFilterTag(filterTag===t?'':t)} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===t?C.icy+'22':C.section, border:`1px solid ${filterTag===t?C.icy:C.border}`, color:filterTag===t?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>[{t}]</button>
-              ))}
+            <div style={{ position:'relative' }}>
+              <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
+                <button onClick={() => setFilterTag('')} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===''?C.icy+'22':C.section, border:`1px solid ${filterTag===''?C.icy:C.border}`, color:filterTag===''?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>All Alliances</button>
+                {noAllianceCount > 0 && (
+                  <button onClick={() => setFilterTag(filterTag===NO_ALLIANCE?'':NO_ALLIANCE)} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===NO_ALLIANCE?C.red+'22':C.section, border:`1px solid ${filterTag===NO_ALLIANCE?C.red:C.border}`, color:filterTag===NO_ALLIANCE?C.red:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>
+                    🚫 No Alliance ({noAllianceCount})
+                  </button>
+                )}
+                {allTags.map(t => (
+                  <button key={t} onClick={() => setFilterTag(filterTag===t?'':t)} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===t?C.icy+'22':C.section, border:`1px solid ${filterTag===t?C.icy:C.border}`, color:filterTag===t?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>[{t}] ({allianceCounts[t]})</button>
+                ))}
+              </div>
+              <div style={{ position:'absolute', top:0, right:0, bottom:10, width:28, background:`linear-gradient(to right, transparent, ${C.bg})`, pointerEvents:'none' }}/>
             </div>
           )}
           {players.length > 0 && (() => {
