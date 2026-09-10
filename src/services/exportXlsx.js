@@ -107,12 +107,50 @@ function uniqueSheetName(rawName, used) {
   return candidate;
 }
 
-// A "Helios" player has any troop type at the T11/Helios tier or
-// above — T12 counts too since it's a step past Helios, if that tier
-// is ever actually used (see the T12 accuracy note in constants.js).
+// Ascending — matches the same convention used in constants.js
+// (TIER_OPTIONS, display-order, highest-first) and battleConstants.js
+// (FC_ORDER, comparison-order, ascending). This one stays ascending
+// since it's used for stage lookup (indexOf-based "which is higher").
+const HELIOS_ORDER = ['Helios FC5', 'Helios FC6', 'Helios FC7', 'Helios FC8'];
+
+// Repeated ☀️ by stage — FC5 gets one sun, FC8 gets four. Chosen over
+// four unrelated emoji so the marker is self-explanatory at a glance
+// (more suns = higher stage) without needing a legend, while still
+// genuinely differentiating the four stages the way a single flat
+// ☀️ couldn't. See the cover sheet for a written legend too.
+const HELIOS_EMOJI = {
+  'Helios FC5': '☀️',
+  'Helios FC6': '☀️☀️',
+  'Helios FC7': '☀️☀️☀️',
+  'Helios FC8': '☀️☀️☀️☀️',
+};
+
+// Highest Helios stage reached by ANY of a player's three troops —
+// they don't all need to match. Returns null if none of their troops
+// have reached Helios yet.
+function heliosStage(p) {
+  const tiers = [p.troops?.infantry, p.troops?.lancer, p.troops?.marksman];
+  let best = null, bestIdx = -1;
+  tiers.forEach(t => {
+    const idx = HELIOS_ORDER.indexOf(t);
+    if (idx > bestIdx) { bestIdx = idx; best = t; }
+  });
+  return best;
+}
+
+function heliosFlag(p) {
+  const stage = heliosStage(p);
+  return stage ? HELIOS_EMOJI[stage] : '';
+}
+
+// A "Helios" player has any troop type at ANY Helios stage (or T12,
+// still counted per the existing "step past Helios" convention, still
+// unconfirmed — see constants.js). Boolean version, used for sort
+// ranking where only "have they reached Helios at all" matters, not
+// which stage.
 function isHeliosPlayer(p) {
   const tiers = [p.troops?.infantry, p.troops?.lancer, p.troops?.marksman];
-  return tiers.some(t => t === 'T11/Helios' || t === 'T12');
+  return tiers.some(t => HELIOS_ORDER.includes(t) || t === 'T12');
 }
 
 // Roster sort order: Rally Leaders first, then Helios players, then by
@@ -122,7 +160,7 @@ function isHeliosPlayer(p) {
 // share the same worst tier — the sum of all three tiers breaks that
 // tie, since more troops at a higher tier should rank higher within
 // the same "worst tier" bracket).
-const TIER_RANK_ORDER = ['T10','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','T11/Helios','T12'];
+const TIER_RANK_ORDER = ['T10','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','Helios FC5','Helios FC6','Helios FC7','Helios FC8','T12'];
 function tierRank(t) { const i = TIER_RANK_ORDER.indexOf(t); return i === -1 ? -1 : i; }
 
 function rosterSortKey(p) {
@@ -184,8 +222,7 @@ function buildRosterSheet(players) {
   sorted.forEach((p, i) => {
     const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
     const isLead = p.roles?.includes('Rally Lead');
-    const helios = isHeliosPlayer(p);
-    const flags = `${isLead ? '👑' : ''}${helios ? '☀️' : ''}`;
+    const flags = `${isLead ? '👑' : ''}${heliosFlag(p)}`;
     const displayName = p.username || p.alias || '';
     const nameCell = flags ? `${flags} ${displayName}` : displayName;
     const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
@@ -382,6 +419,10 @@ function buildCoverSheet(data, rosterCount = null) {
     [cell('• Roster', ROW_STYLE), cell('Name, furnace, alliance, troop tiers, Rally Leader preset heroes, and joiner hero coverage (✓ per hero)', ROW_STYLE)],
     [cell('• [Event sheets]', ROW_STYLE), cell('One sheet per event — attendance, Discord, performance', ROW_STYLE)],
     [],
+    [cell('Name flags:', SUBHEADER_STYLE)],
+    [cell('👑', ROW_STYLE), cell('Rally Lead', ROW_STYLE)],
+    [cell('☀️ / ☀️☀️ / ☀️☀️☀️ / ☀️☀️☀️☀️', ROW_STYLE), cell('Helios FC5 / FC6 / FC7 / FC8 — one sun per stage, highest of their three troops', ROW_STYLE)],
+    [],
     [cell('This file also contains hidden "…Data" sheets (Roster Data, Events Data, etc.) with one row per record. These are how this app reads a spreadsheet back in — leave them alone unless you know what you\'re doing.', { font: { italic: true, sz: 9, name: 'Arial', color: { rgb: '888888' } } })],
     [],
     [cell('Note: SvS and Castle events include joiner coverage columns in their attendance sheet.', { font: { italic: true, sz: 9, name: 'Arial', color: { rgb: '888888' } } })],
@@ -430,8 +471,7 @@ export function exportRosterCsv(data, options = {}) {
   const rows = [headers];
   sorted.forEach(p => {
     const isLead = p.roles?.includes('Rally Lead');
-    const helios = isHeliosPlayer(p);
-    const flags = `${isLead ? '👑' : ''}${helios ? '☀️' : ''}`;
+    const flags = `${isLead ? '👑' : ''}${heliosFlag(p)}`;
     const displayName = p.username || p.alias || '';
     const nameCell = flags ? `${flags} ${displayName}` : displayName;
     const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
