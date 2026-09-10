@@ -143,31 +143,23 @@ function heliosFlag(p) {
   return stage ? HELIOS_EMOJI[stage] : '';
 }
 
-// A "Helios" player has any troop type at ANY Helios stage (or T12,
-// still counted per the existing "step past Helios" convention, still
-// unconfirmed — see constants.js). Boolean version, used for sort
-// ranking where only "have they reached Helios at all" matters, not
-// which stage.
-function isHeliosPlayer(p) {
-  const tiers = [p.troops?.infantry, p.troops?.lancer, p.troops?.marksman];
-  return tiers.some(t => HELIOS_ORDER.includes(t) || t === 'T12');
-}
-
-// Roster sort order: Rally Leaders first, then Helios players, then by
-// troop tier — ranked by the WORST of their three troops first (an
-// "all FC5" player outranks one who's FC5/FC5/FC4, who in turn
-// outranks a player who's FC4/FC4/FC4 even though both of the latter
-// share the same worst tier — the sum of all three tiers breaks that
-// tie, since more troops at a higher tier should rank higher within
-// the same "worst tier" bracket).
+// Within-alliance sort order: strongest troop tier to weakest — ranked
+// by the WORST of their three troops first (an "all FC5" player
+// outranks one who's FC5/FC5/FC4, who in turn outranks a player who's
+// FC4/FC4/FC4 even though both of the latter share the same worst
+// tier — the sum of all three tiers breaks that tie, since more troops
+// at a higher tier should rank higher within the same "worst tier"
+// bracket). Rally Lead / Helios status is no longer a sort priority —
+// the point of this ordering is to surface who's STRONG regardless of
+// existing tags, since that's what actually identifies rally leader
+// and joiner candidates. They're still shown as 👑/☀️ flags on the
+// name, just not used to reorder the list anymore.
 const TIER_RANK_ORDER = ['T10','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','Helios FC5','Helios FC6','Helios FC7','Helios FC8','T12'];
 function tierRank(t) { const i = TIER_RANK_ORDER.indexOf(t); return i === -1 ? -1 : i; }
 
 function rosterSortKey(p) {
   const ranks = [p.troops?.infantry, p.troops?.lancer, p.troops?.marksman].map(tierRank);
   return {
-    isLead: p.roles?.includes('Rally Lead') ? 1 : 0,
-    helios: isHeliosPlayer(p) ? 1 : 0,
     minRank: Math.min(...ranks),
     sumRank: ranks.reduce((a, b) => a + b, 0),
   };
@@ -175,11 +167,28 @@ function rosterSortKey(p) {
 
 function compareRosterOrder(a, b) {
   const ka = rosterSortKey(a), kb = rosterSortKey(b);
-  if (ka.isLead  !== kb.isLead)  return kb.isLead  - ka.isLead;
-  if (ka.helios  !== kb.helios)  return kb.helios  - ka.helios;
   if (ka.minRank !== kb.minRank) return kb.minRank - ka.minRank;
   if (ka.sumRank !== kb.sumRank) return kb.sumRank - ka.sumRank;
   return (a.username || a.alias || '').localeCompare(b.username || b.alias || '');
+}
+
+// Groups players by alliance — its own visible section rather than a
+// column value buried in a flat list — sorted alphabetically by tag,
+// with players who have no alliance set trailing in their own group
+// last rather than scattered through the alphabetical order. Within
+// each group, strongest-to-weakest via compareRosterOrder above.
+function groupByAllianceStrongest(players) {
+  const groups = {};
+  players.forEach(p => {
+    const key = p.allianceTag || '__none__';
+    (groups[key] = groups[key] || []).push(p);
+  });
+  const tags = Object.keys(groups).filter(k => k !== '__none__').sort((a, b) => a.localeCompare(b));
+  if (groups['__none__']) tags.push('__none__');
+  return tags.map(key => ({
+    label: key === '__none__' ? 'No Alliance' : key,
+    players: [...groups[key]].sort(compareRosterOrder),
+  }));
 }
 
 // Rally Leader heroes are NOT the same as joiner heroes — this was
@@ -210,7 +219,7 @@ function leaderHeroesText(p) {
 // player ID, last-updated) still lives in the hidden Roster Data sheet
 // for re-import; this pretty sheet is just for reading.
 function buildRosterSheet(players) {
-  const sorted = [...players].sort(compareRosterOrder);
+  const groups = groupByAllianceStrongest(players);
 
   const allJoiners = [...new Set(
     players.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
@@ -219,25 +228,38 @@ function buildRosterSheet(players) {
   const headers = ['Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
   const rows = [headers.map(hdr)];
 
-  sorted.forEach((p, i) => {
-    const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
-    const isLead = p.roles?.includes('Rally Lead');
-    const flags = `${isLead ? '👑' : ''}${heliosFlag(p)}`;
-    const displayName = p.username || p.alias || '';
-    const nameCell = flags ? `${flags} ${displayName}` : displayName;
-    const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
+  // Alternates across the WHOLE sheet, not reset per alliance group —
+  // a group boundary landing on an even/odd row shouldn't cause two
+  // same-styled rows to sit next to each other right after a subheader.
+  let rowIndex = 0;
 
+  groups.forEach(group => {
     rows.push([
-      cell(nameCell, style),
-      cell(p.furnaceLevel || '', style),
-      cell(p.allianceTag || '', style),
-      cell(p.troops?.infantry || '', style),
-      cell(p.troops?.lancer || '', style),
-      cell(p.troops?.marksman || '', style),
-      cell(isLead ? leaderHeroesText(p) : '', style),
-      ...allJoiners.map(h => owned.has(h) ? cell('✓', YES_STYLE) : cell('', style)),
-      cell(owned.size, owned.size >= 3 ? YES_STYLE : owned.size >= 1 ? GOLD_STYLE : NO_STYLE),
+      cell(`⚑ ${group.label} (${group.players.length})`, SUBHEADER_STYLE),
+      ...Array(headers.length - 1).fill(null).map(() => cell('', SUBHEADER_STYLE)),
     ]);
+
+    group.players.forEach(p => {
+      const style = rowIndex % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
+      rowIndex++;
+      const isLead = p.roles?.includes('Rally Lead');
+      const flags = `${isLead ? '👑' : ''}${heliosFlag(p)}`;
+      const displayName = p.username || p.alias || '';
+      const nameCell = flags ? `${flags} ${displayName}` : displayName;
+      const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
+
+      rows.push([
+        cell(nameCell, style),
+        cell(p.furnaceLevel || '', style),
+        cell(p.allianceTag || '', style),
+        cell(p.troops?.infantry || '', style),
+        cell(p.troops?.lancer || '', style),
+        cell(p.troops?.marksman || '', style),
+        cell(isLead ? leaderHeroesText(p) : '', style),
+        ...allJoiners.map(h => owned.has(h) ? cell('✓', YES_STYLE) : cell('', style)),
+        cell(owned.size, owned.size >= 3 ? YES_STYLE : owned.size >= 1 ? GOLD_STYLE : NO_STYLE),
+      ]);
+    });
   });
 
   // Coverage totals row — same "how many people have this hero"
@@ -455,7 +477,7 @@ export function exportRosterCsv(data, options = {}) {
   const scopedPlayers = (rosterAllianceTags && rosterAllianceTags.length > 0)
     ? (data.players || []).filter(p => rosterAllianceTags.includes(p.allianceTag))
     : (data.players || []);
-  const sorted = [...scopedPlayers].sort(compareRosterOrder);
+  const groups = groupByAllianceStrongest(scopedPlayers);
 
   const allJoiners = [...new Set(
     scopedPlayers.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
@@ -469,24 +491,31 @@ export function exportRosterCsv(data, options = {}) {
   }
 
   const rows = [headers];
-  sorted.forEach(p => {
-    const isLead = p.roles?.includes('Rally Lead');
-    const flags = `${isLead ? '👑' : ''}${heliosFlag(p)}`;
-    const displayName = p.username || p.alias || '';
-    const nameCell = flags ? `${flags} ${displayName}` : displayName;
-    const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
+  groups.forEach(group => {
+    // CSV can't carry cell styling like the xlsx subheader row does,
+    // so a plain row with just the alliance name in the Name column
+    // stands in as the visible section break instead.
+    rows.push([`⚑ ${group.label} (${group.players.length})`, ...Array(headers.length - 1).fill('')]);
 
-    rows.push([
-      nameCell,
-      p.furnaceLevel || '',
-      p.allianceTag || '',
-      p.troops?.infantry || '',
-      p.troops?.lancer || '',
-      p.troops?.marksman || '',
-      isLead ? leaderHeroesText(p) : '',
-      ...allJoiners.map(h => owned.has(h) ? '✓' : ''),
-      owned.size,
-    ]);
+    group.players.forEach(p => {
+      const isLead = p.roles?.includes('Rally Lead');
+      const flags = `${isLead ? '👑' : ''}${heliosFlag(p)}`;
+      const displayName = p.username || p.alias || '';
+      const nameCell = flags ? `${flags} ${displayName}` : displayName;
+      const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
+
+      rows.push([
+        nameCell,
+        p.furnaceLevel || '',
+        p.allianceTag || '',
+        p.troops?.infantry || '',
+        p.troops?.lancer || '',
+        p.troops?.marksman || '',
+        isLead ? leaderHeroesText(p) : '',
+        ...allJoiners.map(h => owned.has(h) ? '✓' : ''),
+        owned.size,
+      ]);
+    });
   });
 
   const csvBody = rows.map(r => r.map(escapeCsv).join(',')).join('\r\n');
