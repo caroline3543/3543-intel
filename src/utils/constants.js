@@ -56,10 +56,13 @@ export const TIER_OPTIONS = [
 // Highest-first, matching TIER_OPTIONS' display convention above.
 export const FC_OPTIONS = ['FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1'];
 
-// Furnace-level badge icons (FC5–FC8 only — no badges supplied for
-// FC1–4). Served from /public/furnace-badges/ — see terminal
-// instructions for where these files need to land in the repo.
+// Furnace-level badge icons — full FC1–FC8 set now that artwork exists
+// for all eight. Served from /public/furnace-badges/.
 export const FC_BADGE_IMAGES = {
+  FC1: '/furnace-badges/fc1.png',
+  FC2: '/furnace-badges/fc2.png',
+  FC3: '/furnace-badges/fc3.png',
+  FC4: '/furnace-badges/fc4.png',
   FC5: '/furnace-badges/fc5.png',
   FC6: '/furnace-badges/fc6.png',
   FC7: '/furnace-badges/fc7.png',

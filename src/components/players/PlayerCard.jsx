@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C } from '../../utils/constants.js';
+import { C, FC_BADGE_IMAGES } from '../../utils/constants.js';
 import { roleColor } from '../../utils/roles.js';
 import { fmtDate } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
@@ -43,7 +43,12 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
           <div style={{ fontSize:16, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
           {player.furnaceLevel && (
-            <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, flexShrink:0 }}>{player.furnaceLevel}</span>
+            FC_BADGE_IMAGES[player.furnaceLevel] ? (
+              <img src={FC_BADGE_IMAGES[player.furnaceLevel]} alt={player.furnaceLevel} title={player.furnaceLevel}
+                style={{ width:22, height:22, flexShrink:0 }}/>
+            ) : (
+              <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, flexShrink:0 }}>{player.furnaceLevel}</span>
+            )
           )}
           {player.blacklisted && (
             <span title={player.blacklistReason || ''} style={{ fontSize:11, color:C.red, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.red+'18', flexShrink:0 }}>⚠ Blacklisted</span>
