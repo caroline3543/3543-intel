@@ -23,7 +23,7 @@ const DERIVED_TIER_FILTERS = [
   { id:'helios-lancer',   label:'⚔️ Helios Lancer',   match:p => !!p.troops?.lancer?.startsWith('Helios') },
   { id:'helios-infantry', label:'🛡️ Helios Infantry', match:p => !!p.troops?.infantry?.startsWith('Helios') },
   { id:'full-fc5', label:'💯 Full FC5', match:p => p.troops?.infantry==='FC5' && p.troops?.lancer==='FC5' && p.troops?.marksman==='FC5' },
-  { id:'full-fc6', label:'💯 Full FC6', match:p => p.troops?.infantry==='FC6' && p.troops?.lancer==='FC6' && p.troops?.marksman==='FC6' },
+  { id:'full-fc6', label:'💯 Full FC6', match:p => ['FC6','Helios FC6'].includes(p.troops?.infantry) && ['FC6','Helios FC6'].includes(p.troops?.lancer) && ['FC6','Helios FC6'].includes(p.troops?.marksman) },
 ];
 
 const SORT_OPTIONS = [
@@ -281,7 +281,9 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
                 <button key={d.id} onClick={() => setFilterRole(d.id)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===d.id?C.icy+'22':C.section, border:`1px solid ${filterRole===d.id?C.icy:C.border}`, color:filterRole===d.id?C.icy:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{d.label}</button>
               ))}
             </div>
-            <div style={{ position:'absolute', top:0, right:0, bottom:10, width:28, background:`linear-gradient(to right, transparent, ${C.bg})`, pointerEvents:'none' }}/>
+            <div style={{ position:'absolute', top:0, right:0, bottom:10, width:32, background:`linear-gradient(to right, transparent, ${C.bg})`, pointerEvents:'none', display:'flex', alignItems:'center', justifyContent:'flex-end' }}>
+              <span style={{ fontSize:14, color:C.muted, paddingRight:2 }}>›</span>
+            </div>
           </div>
           {(allTags.length > 0 || noAllianceCount > 0) && (
             <div style={{ position:'relative' }}>
@@ -296,7 +298,9 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
                   <button key={t} onClick={() => setFilterTag(filterTag===t?'':t)} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===t?C.icy+'22':C.section, border:`1px solid ${filterTag===t?C.icy:C.border}`, color:filterTag===t?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>[{t}] ({allianceCounts[t]})</button>
                 ))}
               </div>
-              <div style={{ position:'absolute', top:0, right:0, bottom:10, width:28, background:`linear-gradient(to right, transparent, ${C.bg})`, pointerEvents:'none' }}/>
+              <div style={{ position:'absolute', top:0, right:0, bottom:10, width:32, background:`linear-gradient(to right, transparent, ${C.bg})`, pointerEvents:'none', display:'flex', alignItems:'center', justifyContent:'flex-end' }}>
+              <span style={{ fontSize:14, color:C.muted, paddingRight:2 }}>›</span>
+            </div>
             </div>
           )}
           {players.length > 0 && (() => {

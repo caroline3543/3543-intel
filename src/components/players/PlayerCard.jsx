@@ -15,11 +15,6 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
   const metrics = calcMetrics(player, events||[]);
   const joiners = (player.joinerHeroes||[]).filter(jh=>jh.skillLevel>=5).map(jh=>jh.hero);
   const isRallyLead = player.roles?.includes('Rally Lead');
-  // Shown on the card as a quick-scan summary — offense preferred
-  // since that's the more commonly relevant context, falling back to
-  // whatever's saved first if there's no offense team.
-  const teams = player.leaderProfile?.teams || [];
-  const leaderTeam = teams.find(t => t.type === 'offense') || teams[0] || null;
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -92,53 +87,56 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
           </div>
         )}
 
-        {/* Row 2.75 — rally leader's own lead heroes, with skill level and
-            widget count, when saved (see RallyLeaderProfileSheet.jsx) */}
-        {(leaderTeam?.leadHeroes || []).filter(Boolean).length > 0 && (
-          <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
-            {leaderTeam.leadHeroes.filter(Boolean).map(h => {
-              const skill = leaderTeam.heroSkillLevels?.[h];
-              const widgets = leaderTeam.widgets?.[h];
-              return (
-                <span key={h} style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:C.gold+'14', color:C.gold }}>
-                  👑 {h}{skill != null ? ` • ★${skill}` : ''}{widgets != null ? ` • ${widgets} widget${widgets!==1?'s':''}` : ''}
+        {/* Rally leader hero/skill/widget detail intentionally removed
+            from this card — it now lives only in ProfileView's
+            per-player detail (opened by tapping the card), not inline
+            on every list row. */}
+
+        {/* Row 3 — troop tier mismatches. Own row, independent of
+            joiner heroes below, so its presence/absence never shifts
+            based on unrelated data. Only rendered at all when at least
+            one troop DIFFERS from the overall furnace badge already
+            shown by the name; omitted entirely otherwise — never shows
+            three redundant matching icons. Each icon keeps its normal
+            type color (shield/sword/bow) always; a mismatch adds a
+            small gold dot rather than recoloring the whole chip, so
+            the type-color coding is never erased by the warning state. */}
+        {(() => {
+          const troopEntries = [['🛡️','infantry',player.troops?.infantry,C.inf],['⚔️','lancer',player.troops?.lancer,C.lan],['🏹','marksman',player.troops?.marksman,C.mar]];
+          const hasFurnace = !!player.furnaceLevel;
+          const mismatches = hasFurnace ? troopEntries.filter(([,,t]) => t && t !== player.furnaceLevel) : [];
+          if (!hasFurnace || mismatches.length === 0) return null;
+          return (
+            <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
+              {mismatches.map(([icon, key, t, tc]) => (
+                <span key={key} title={`Differs from overall furnace level (${player.furnaceLevel})`}
+                  style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:tc+'18', color:tc }}>
+                  {icon} {t}
+                  <span style={{ width:6, height:6, borderRadius:'50%', background:C.gold, flexShrink:0 }}/>
                 </span>
-              );
-            })}
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* Row 4 — joiner heroes. Own row, always the same structure
+            when present (first 2 heroes as pills, "+N heroes" beyond
+            that); omitted entirely when there are none. */}
+        {joiners.length > 0 && (
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+            {joiners.slice(0,2).map(h => (
+              <span key={h} style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:C.gold+'18', color:C.gold }}>
+                ✓ {h}
+              </span>
+            ))}
+            {joiners.length>2 && <span style={{ fontSize:11, color:C.muted }}>+{joiners.length-2} heroes</span>}
           </div>
         )}
-
-        {/* Row 3 — troop tier mismatches + joiner heroes (secondary info).
-            Per-troop tier is only shown when it DIFFERS from the overall
-            furnace badge already shown by the name — that's the signal
-            worth a glance, not confirmation that everything matches. */}
-        <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-          {[['🛡️',player.troops?.infantry,C.inf],['⚔️',player.troops?.lancer,C.lan],['🏹',player.troops?.marksman,C.mar]].map(([i,t,c],idx) => {
-            if (!t) return null;
-            const mismatch = player.furnaceLevel && t !== player.furnaceLevel;
-            // No furnace level set at all means there's nothing to compare
-            // against — fall back to always showing the tier, in its
-            // normal troop-type color, same as before this change.
-            if (player.furnaceLevel && !mismatch) return null;
-            return (
-              <span key={idx} title={mismatch ? `Differs from overall furnace level (${player.furnaceLevel})` : undefined}
-                style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:mismatch?C.gold+'22':(t?c:C.muted)+'18', color:mismatch?C.gold:(t?c:C.muted), border:mismatch?`1px solid ${C.gold}`:'none' }}>
-                {i} {t}{mismatch ? ' ⚠' : ''}
-              </span>
-            );
-          })}
-          {joiners.slice(0,2).map(h => (
-            <span key={h} style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:C.gold+'18', color:C.gold }}>
-              ✓ {h}
-            </span>
-          ))}
-          {joiners.length>2 && <span style={{ fontSize:11, color:C.muted }}>+{joiners.length-2} heroes</span>}
-        </div>
 
       </div>
 
       {!bulkMode && (
-        <>
+        <div style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
           {/* One-tap Rally Lead toggle — no need to open the profile just
               to flag someone as a leader. NOTE: this toggles the "Rally
               Lead" role tag specifically, not Alliance Rank (R1-R5,
@@ -153,7 +151,7 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
             onClick={e => { e.stopPropagation(); onToggleRallyLead?.(); }}
             title={isRallyLead ? 'Rally Lead — tap to remove' : 'Tap to make Rally Lead'}
             aria-label={isRallyLead ? 'Remove Rally Lead status' : 'Set as Rally Lead'}
-            style={{ width:36, height:36, minWidth:32, minHeight:32, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:isRallyLead?C.gold+'22':'none', border:`1.5px solid ${isRallyLead?C.gold:C.border}`, color:isRallyLead?C.gold:C.muted+'88', fontSize:16, cursor:'pointer', flexShrink:0 }}
+            style={{ width:44, height:44, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:isRallyLead?C.gold+'22':'none', border:`1.5px solid ${isRallyLead?C.gold:C.border}`, color:isRallyLead?C.gold:C.muted+'88', fontSize:17, cursor:'pointer', flexShrink:0 }}
           >👑</button>
 
           {/* Overflow menu — a direct one-tap ✕ was too easy to hit by
@@ -165,7 +163,7 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
               aria-label="More options"
               aria-haspopup="true"
               aria-expanded={menuOpen}
-              style={{ width:32, height:32, minWidth:32, minHeight:32, borderRadius:8, background:menuOpen?C.section:'none', border:'none', color:C.muted, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+              style={{ width:44, height:44, borderRadius:10, background:menuOpen?C.section:'none', border:'none', color:C.muted, fontSize:20, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
             >⋮</button>
             {menuOpen && (
               <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.5)', zIndex:20, overflow:'hidden', minWidth:160 }}>
@@ -184,7 +182,7 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
               onCancel={() => setConfirmingDelete(false)}
             />
           )}
-        </>
+        </div>
       )}
     </div>
   );
