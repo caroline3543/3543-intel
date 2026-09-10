@@ -226,7 +226,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         {rosterView==='list' && (
           <button onClick={() => { setBulkMode(v => !v); setBulkSel(new Set()); setActiveField(null); setStagedFields({}); }}
             style={{ flexShrink:0, height:36, padding:'0 14px', borderRadius:20, background:bulkMode?C.gold+'22':C.section, border:`1px solid ${bulkMode?C.gold:C.border}`, color:bulkMode?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
-            ☑️ {bulkMode ? `${bulkSel.size} selected` : 'Select'}
+            ☑️ {bulkMode ? `${bulkSel.size} selected` : 'Select Players'}
           </button>
         )}
 
@@ -252,7 +252,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             onClick={() => setFieldRegistryOpen(true)}
             style={{ width:'100%', height:48, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:14, cursor:'pointer', marginBottom:6 }}
           >
-            📋 Open Field Registry
+            📋 Player Information
           </button>
           <div style={{ fontSize:11, color:C.muted, textAlign:'center', marginBottom:12 }}>
             Fill in furnace, troops, languages, and joiner heroes — for one player or many at once.
@@ -291,11 +291,28 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
               ))}
             </div>
           )}
-          {players.length > 0 && (
-            <div style={{ fontSize:13, color:C.muted, marginBottom:12 }}>
-              {filteredPlayers.length} of {players.length} player{players.length!==1?'s':''}
-            </div>
-          )}
+          {players.length > 0 && (() => {
+            const activeFilterLabels = [];
+            if (search) activeFilterLabels.push(`"${search}"`);
+            if (filterRole !== 'All') activeFilterLabels.push(derivedMatch ? derivedMatch.label : filterRole);
+            if (filterTag) activeFilterLabels.push(filterTag===NO_ALLIANCE ? '🚫 No Alliance' : `[${filterTag}]`);
+            const hasFilters = activeFilterLabels.length > 0;
+            return (
+              <div style={{ fontSize:13, color:C.muted, marginBottom:12, display:'flex', alignItems:'center', flexWrap:'wrap', gap:6 }}>
+                <span>{hasFilters ? filteredPlayers.length : `${filteredPlayers.length} of ${players.length}`} player{filteredPlayers.length!==1?'s':''} shown</span>
+                {hasFilters && (
+                  <>
+                    <span style={{ color:C.border }}>·</span>
+                    <span style={{ color:C.icy, fontWeight:600 }}>Filters: {activeFilterLabels.join(' · ')}</span>
+                    <button onClick={() => { setSearch(''); setFilterRole('All'); setFilterTag(''); }}
+                      style={{ fontSize:12, color:C.gold, background:'none', border:'none', cursor:'pointer', fontWeight:700, padding:0, marginLeft:4 }}>
+                      Clear filters
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })()}
           {bulkMode && bulkSel.size > 0 && (() => {
             const activeFieldDef = FIELD_DEFS.find(f => f.id === activeField);
             const options = activeFieldDef ? getFieldValues(players, activeFieldDef) : [];
