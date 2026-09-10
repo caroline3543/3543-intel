@@ -9,6 +9,14 @@ function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
 }
 
+// Tabler Icons webfont (see index.html for the CDN <link>) — renders as
+// a glyph that inherits `color` via CSS, so every state (default,
+// Helios, mismatch) can be tinted in code instead of being locked to
+// whatever the OS's built-in emoji artwork looks like.
+function Icon({ name, size = 14, color, style }) {
+  return <i className={`ti ti-${name}`} style={{ fontSize:size, color, lineHeight:1, display:'inline-block', ...style }} aria-hidden="true"/>;
+}
+
 export function PlayerCard({ player, roles = [], onClick, onDelete, events, missingCount, troopPower, onToggleRallyLead, onOpenFields, bulkMode, isSelected }) {
   const dn      = player.username||player.alias||'Unknown';
   const rc      = roleColor(player.roles?.[0], roles);
@@ -46,20 +54,23 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
             )
           )}
           {player.blacklisted && (
-            <span title={player.blacklistReason || ''} style={{ fontSize:11, color:C.red, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.red+'18', flexShrink:0 }}>⚠ Blacklisted</span>
+            <span title={player.blacklistReason || ''} style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, color:C.red, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.red+'18', flexShrink:0 }}>
+              <Icon name="alert-triangle" size={11} color={C.red}/> Blacklisted
+            </span>
           )}
           {missingCount > 0 && (
             <button
               onClick={e => { e.stopPropagation(); onOpenFields?.(); }}
               title="Open Player Information"
-              style={{ fontSize:11, color:C.gold, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', border:'none', flexShrink:0, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}
-            >⚠ {missingCount} missing</button>
+              style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, color:C.gold, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', border:'none', flexShrink:0, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}
+            ><Icon name="alert-triangle" size={11} color={C.gold}/> {missingCount} missing</button>
           )}
         </div>
 
-        {/* Row 2 — alliance · troop power · reliability (furnace moved up next to the name) */}
+        {/* Row 2 — alliance · player ID · troop power · reliability (furnace moved up next to the name) */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
           {player.allianceTag && <span style={{ fontSize:12, color:C.icy, fontWeight:600 }}>[{player.allianceTag}]</span>}
+          {player.fid && <span style={{ fontSize:11, color:C.muted }}>ID {player.fid}</span>}
           {troopPower != null && <span style={{ fontSize:12, color:C.gold, fontWeight:700 }}>💪 {troopPower.toLocaleString()}</span>}
           {player.country && <span style={{ fontSize:12, color:C.muted }}>{player.country}</span>}
           {metrics && (
@@ -108,7 +119,7 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
             conditions is true; a troop that's neither Helios-tier nor
             mismatched shows nothing, same as before. */}
         {(() => {
-          const troopEntries = [['🛡️','infantry',player.troops?.infantry,C.inf],['⚔️','lancer',player.troops?.lancer,C.lan],['🏹','marksman',player.troops?.marksman,C.mar]];
+          const troopEntries = [['shield','infantry',player.troops?.infantry,C.inf],['sword','lancer',player.troops?.lancer,C.lan],['target-arrow','marksman',player.troops?.marksman,C.mar]];
           const setVals = troopEntries.filter(([,,t]) => t).map(([,,t]) => t);
           const freq = {};
           setVals.forEach(v => { freq[v] = (freq[v] || 0) + 1; });
@@ -127,18 +138,18 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
           if (notable.length === 0) return null;
           return (
             <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
-              {notable.map(([icon, key, t, tc]) => {
+              {notable.map(([iconName, key, t, tc]) => {
                 const helios = t.startsWith('Helios');
                 const mismatch = isMismatch(t);
                 return (
                   <span key={key} title={mismatch ? "Differs from this player's other troops" : undefined}
                     style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:mismatch?C.gold+'22':tc+'18', color:mismatch?C.gold:tc }}>
                     <span style={{ position:'relative', display:'inline-flex', width:14, height:14, alignItems:'center', justifyContent:'center' }}>
-                      {icon}
+                      <Icon name={iconName} size={13} color={mismatch?C.gold:tc}/>
                       {helios && <span style={{ position:'absolute', top:-2, right:-3, width:6, height:6, background:C.red, borderRadius:1.5 }}/>}
                     </span>
                     {t}
-                    {mismatch && <span style={{ fontSize:10 }}>⚠</span>}
+                    {mismatch && <Icon name="alert-triangle" size={10} color={C.gold}/>}
                   </span>
                 );
               })}
@@ -178,8 +189,8 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
             onClick={e => { e.stopPropagation(); onToggleRallyLead?.(); }}
             title={isRallyLead ? 'Rally Lead — tap to remove' : 'Tap to make Rally Lead'}
             aria-label={isRallyLead ? 'Remove Rally Lead status' : 'Set as Rally Lead'}
-            style={{ width:44, height:44, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:isRallyLead?C.gold+'22':'none', border:`1.5px solid ${isRallyLead?C.gold:C.border}`, color:isRallyLead?C.gold:C.muted+'88', fontSize:17, cursor:'pointer', flexShrink:0 }}
-          >👑</button>
+            style={{ width:44, height:44, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:isRallyLead?C.gold+'22':'none', border:`1.5px solid ${isRallyLead?C.gold:C.border}`, cursor:'pointer', flexShrink:0 }}
+          ><Icon name="crown" size={19} color={isRallyLead?C.gold:C.muted+'88'}/></button>
 
           {/* Overflow menu — a direct one-tap ✕ was too easy to hit by
               accident in a long list. ⋮ opens a small menu; the actual
@@ -190,14 +201,14 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
               aria-label="More options"
               aria-haspopup="true"
               aria-expanded={menuOpen}
-              style={{ width:44, height:44, borderRadius:10, background:menuOpen?C.section:'none', border:'none', color:C.muted, fontSize:20, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-            >⋮</button>
+              style={{ width:44, height:44, borderRadius:10, background:menuOpen?C.section:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+            ><Icon name="dots-vertical" size={20} color={C.muted}/></button>
             {menuOpen && (
               <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.5)', zIndex:20, overflow:'hidden', minWidth:160 }}>
                 <button
                   onClick={() => { setMenuOpen(false); setConfirmingDelete(true); }}
                   style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'12px 14px', background:'none', border:'none', color:C.red, fontSize:14, fontWeight:600, cursor:'pointer', textAlign:'left', whiteSpace:'nowrap' }}
-                >🗑 Remove player</button>
+                ><Icon name="trash" size={15} color={C.red}/> Remove player</button>
               </div>
             )}
           </div>

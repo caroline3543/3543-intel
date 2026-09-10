@@ -36,6 +36,7 @@ const SORT_OPTIONS = [
 // someone opening this page for the first time, not for an officer
 // who already knows the app.
 const HELP_ITEMS = [
+  { title: '🔎 Search', body: "Searches name, nickname, alliance tag, country, and player ID — the player ID still works even if someone renames themselves, since it doesn't change." },
   { title: '📋 Field Registry', body: "Fill in or bulk-update furnace level, troop tiers, languages, and joiner heroes — for one player, or several at once." },
   { title: '☑️ Select', body: "Tap Select, then tap players to choose several. With players selected, stage multiple fields (like Furnace + all three troop tiers) and apply them all in one tap instead of editing each person one by one." },
   { title: '↕ Sort', body: "Reorder the list — alphabetical, by troop power, or missing-info-first to quickly see who still needs their profile filled in." },
