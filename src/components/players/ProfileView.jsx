@@ -111,6 +111,41 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
           </Section>
         )}
 
+        {/* 1.5. Rally Leader setup — inline summary so this is visible
+            without tapping into the separate profile sheet, per the
+            brief's requirement that hero/skill/widget info show
+            directly on the profile. The button below still opens the
+            full editor for changes. */}
+        {(player.leaderProfile?.teams || []).length > 0 && (
+          <Section title="Rally Leader Setup">
+            {player.leaderProfile.marchTime != null && (
+              <div style={{ fontSize:13, color:C.gold, fontWeight:700, marginBottom:10 }}>
+                🏃 March time: {Math.floor(player.leaderProfile.marchTime / 60)}:{String(player.leaderProfile.marchTime % 60).padStart(2,'0')}
+              </div>
+            )}
+            {player.leaderProfile.teams.map(team => {
+              const heroes = (team.leadHeroes || []).filter(Boolean);
+              if (!heroes.length) return null;
+              return (
+                <div key={team.id} style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>{team.type === 'offense' ? '⚔️ Offense' : '🛡️ Defense'}{team.ratio ? ` · ${team.ratio}` : ''}</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                    {heroes.map(h => {
+                      const skill = team.heroSkillLevels?.[h];
+                      const widgets = team.widgets?.[h];
+                      return (
+                        <span key={h} style={{ padding:'6px 12px', borderRadius:16, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:13 }}>
+                          {h}{skill != null ? ` • ★${skill}` : ''}{widgets != null ? ` • ${widgets}w` : ''}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </Section>
+        )}
+
         {/* 2. Troops — needed for assignment */}
         <Section title="Troops">
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>

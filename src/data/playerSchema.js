@@ -48,6 +48,7 @@ export function newLeaderProfile(overrides = {}) {
   return {
     role:      'none', // 'leader' | 'substitute' | 'both' | 'none'
     teams:     [],      // newLeaderTeam()[]
+    marchTime: null,    // seconds — same "last 2 digits = seconds" input convention as Live Rally Room. Belongs at the profile level, not per-team: it's a property of this player's city, not of a specific offense/defense loadout.
     updatedAt: new Date().toISOString(),
     ...overrides,
   };
@@ -68,6 +69,7 @@ export function newLeaderTeam(overrides = {}) {
     type:                 'offense', // 'offense' | 'defense'
     leadHeroes:           ['', '', ''],
     widgets:              {},        // { [heroName]: 0-10 }
+    heroSkillLevels:      {},        // { [heroName]: 1-5 } — star/skill level, same scale as joiner heroes' skillLevel field, separate from widget count
     ratio:                '',
     priorityJoinerHeroes: ['', '', '', ''],
     notes:                '',

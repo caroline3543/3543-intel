@@ -13,6 +13,29 @@ const ROLE_OPTIONS = [
   { id:'both',       label:'Both' },
 ];
 
+// Same input convention as Live Rally Room's march time fields: last 2
+// digits = seconds, the rest = minutes ('412' -> 4m 12s); a colon is
+// also accepted directly ('4:12'). Returns total seconds, or null for
+// empty/invalid input (seconds > 59).
+function parseMarchInput(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return null;
+  if (s.includes(':')) {
+    const [m, sec] = s.split(':').map(n => parseInt(n, 10) || 0);
+    return sec > 59 ? null : m * 60 + sec;
+  }
+  const digits = s.replace(/[^\d]/g, '');
+  if (!digits) return null;
+  const secs = parseInt(digits.slice(-2), 10) || 0;
+  const mins = parseInt(digits.slice(0, -2) || '0', 10) || 0;
+  return secs > 59 ? null : mins * 60 + secs;
+}
+function formatMarchSeconds(totalSecs) {
+  if (totalSecs == null) return '';
+  const m = Math.floor(totalSecs / 60), s = totalSecs % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 // ── TeamEditor ─────────────────────────────────────────────────
 // One offense or defense team: 3 lead heroes (each with a 0–10 widget
 // count), preferred ratio, 4 recommended priority joiner heroes, notes.
@@ -24,6 +47,9 @@ function TeamEditor({ team, onChange, onDelete }) {
   }
   function setWidgets(hero, n) {
     onChange({ ...team, widgets: { ...team.widgets, [hero]: n } });
+  }
+  function setSkillLevel(hero, n) {
+    onChange({ ...team, heroSkillLevels: { ...team.heroSkillLevels, [hero]: n } });
   }
   function setJoinerHero(i, hero) {
     const priorityJoinerHeroes = [...team.priorityJoinerHeroes];
@@ -56,12 +82,22 @@ function TeamEditor({ team, onChange, onDelete }) {
               {LEADER_HERO_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
             </select>
             {team.leadHeroes[i] && (
-              <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-                <span style={{ fontSize:11, color:C.muted }}>Widgets</span>
-                <input type="number" min={0} max={10} value={team.widgets?.[team.leadHeroes[i]] ?? 0}
-                  onChange={e => setWidgets(team.leadHeroes[i], Math.max(0, Math.min(10, Number(e.target.value)||0)))}
-                  style={{ width:44, height:40, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 8px', fontSize:13, color:C.gold, fontWeight:700, fontFamily:'inherit', textAlign:'center' }}
-                />
+              <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                  <span style={{ fontSize:11, color:C.muted }}>★</span>
+                  <input type="number" min={1} max={5} value={team.heroSkillLevels?.[team.leadHeroes[i]] ?? ''}
+                    onChange={e => setSkillLevel(team.leadHeroes[i], Math.max(1, Math.min(5, Number(e.target.value)||1)))}
+                    placeholder="—"
+                    style={{ width:36, height:40, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 6px', fontSize:13, color:C.icy, fontWeight:700, fontFamily:'inherit', textAlign:'center' }}
+                  />
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                  <span style={{ fontSize:11, color:C.muted }}>Widgets</span>
+                  <input type="number" min={0} max={10} value={team.widgets?.[team.leadHeroes[i]] ?? 0}
+                    onChange={e => setWidgets(team.leadHeroes[i], Math.max(0, Math.min(10, Number(e.target.value)||0)))}
+                    style={{ width:44, height:40, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 8px', fontSize:13, color:C.gold, fontWeight:700, fontFamily:'inherit', textAlign:'center' }}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -118,9 +154,14 @@ function TeamEditor({ team, onChange, onDelete }) {
 export function RallyLeaderProfileSheet({ player, open, onClose, onSave }) {
   const [profile, setProfile] = useState(() => player?.leaderProfile || newLeaderProfile());
   const [deleteTeamId, setDeleteTeamId] = useState(null);
+  const [marchInput, setMarchInput] = useState('');
 
   useEffect(() => {
-    if (open) setProfile(player?.leaderProfile || newLeaderProfile());
+    if (open) {
+      const p = player?.leaderProfile || newLeaderProfile();
+      setProfile(p);
+      setMarchInput(p.marchTime != null ? formatMarchSeconds(p.marchTime) : '');
+    }
   }, [open, player]);
 
   if (!open || !player) return null;
@@ -169,6 +210,31 @@ export function RallyLeaderProfileSheet({ player, open, onClose, onSave }) {
                 {r.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* March Time — a property of this player's city, not any one
+            team, so it lives at the profile level. Same input
+            convention as Live Rally Room (last 2 digits = seconds). */}
+        <div style={{ marginBottom:16 }}>
+          <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:8 }}>March time</label>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <input
+              value={marchInput}
+              onChange={e => {
+                setMarchInput(e.target.value);
+                const secs = parseMarchInput(e.target.value);
+                updProfile({ marchTime: secs });
+              }}
+              placeholder="e.g. 412 or 4:12"
+              style={{ width:140, height:40, background:C.section, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 12px', fontSize:14, color:C.white, fontFamily:'inherit' }}
+            />
+            {profile.marchTime != null && (
+              <span style={{ fontSize:13, color:C.gold, fontWeight:700 }}>= {formatMarchSeconds(profile.marchTime)}</span>
+            )}
+            {marchInput && profile.marchTime == null && (
+              <span style={{ fontSize:12, color:C.red }}>Invalid — seconds must be 00–59</span>
+            )}
           </div>
         </div>
 

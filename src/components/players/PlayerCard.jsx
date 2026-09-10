@@ -13,6 +13,11 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
   const metrics = calcMetrics(player, events||[]);
   const joiners = (player.joinerHeroes||[]).filter(jh=>jh.skillLevel>=5).map(jh=>jh.hero);
   const isRallyLead = player.roles?.includes('Rally Lead');
+  // Shown on the card as a quick-scan summary — offense preferred
+  // since that's the more commonly relevant context, falling back to
+  // whatever's saved first if there's no offense team.
+  const teams = player.leaderProfile?.teams || [];
+  const leaderTeam = teams.find(t => t.type === 'offense') || teams[0] || null;
 
   return (
     <div onClick={onClick} style={{ background:isSelected?C.gold+'18':C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none', opacity:player.blacklisted?0.6:1, border:`1px solid ${isSelected?C.gold:'transparent'}` }}>
@@ -39,7 +44,7 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
           {missingCount > 0 && (
             <button
               onClick={e => { e.stopPropagation(); onOpenFields?.(); }}
-              title="Open Field Registry"
+              title="Open Player Information"
               style={{ fontSize:11, color:C.gold, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', border:'none', flexShrink:0, cursor:'pointer', WebkitTapHighlightColor:'transparent' }}
             >⚠ {missingCount} missing</button>
           )}
@@ -57,6 +62,40 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
             </span>
           )}
         </div>
+
+        {/* Row 2.5 — role/capability labels (Rally Lead, Substitute Rally Lead,
+            Helios Infantry/Lancer/Marksman, and any custom alliance roles) */}
+        {(player.roles?.length > 0 || player.leaderProfile?.role === 'substitute' || player.leaderProfile?.role === 'both') && (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
+            {(player.leaderProfile?.role === 'substitute' || player.leaderProfile?.role === 'both') && !player.roles?.includes('Rally Lead') && (
+              <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:8, background:C.gold+'14', color:C.gold }}>Substitute Rally Lead</span>
+            )}
+            {player.roles?.map(r => (
+              <span key={r} style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:8, background:r==='Rally Lead'?C.gold+'18':C.section, color:r==='Rally Lead'?C.gold:C.icy }}>{r}</span>
+            ))}
+            {['infantry','lancer','marksman'].filter(k => player.troops?.[k]?.startsWith('Helios')).map(k => (
+              <span key={k} style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:8, background:C.section, color:k==='infantry'?C.inf:k==='lancer'?C.lan:C.mar }}>
+                Helios {k.charAt(0).toUpperCase()+k.slice(1)}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Row 2.75 — rally leader's own lead heroes, with skill level and
+            widget count, when saved (see RallyLeaderProfileSheet.jsx) */}
+        {(leaderTeam?.leadHeroes || []).filter(Boolean).length > 0 && (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
+            {leaderTeam.leadHeroes.filter(Boolean).map(h => {
+              const skill = leaderTeam.heroSkillLevels?.[h];
+              const widgets = leaderTeam.widgets?.[h];
+              return (
+                <span key={h} style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:C.gold+'14', color:C.gold }}>
+                  👑 {h}{skill != null ? ` • ★${skill}` : ''}{widgets != null ? ` • ${widgets} widget${widgets!==1?'s':''}` : ''}
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         {/* Row 3 — troops + joiner heroes (secondary info) */}
         <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>

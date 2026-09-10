@@ -30,7 +30,7 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
   const [summaryCopied, setSummaryCopied] = useState(false);
   const [checklistCopied, setChecklistCopied] = useState(false);
   const [confirmAutoFill, setConfirmAutoFill] = useState(false);
-  const [autoFillResult, setAutoFillResult]   = useState(null); // { leadersFilled, joinersFilled } or null
+  const [autoFillResult, setAutoFillResult]   = useState(null); // { leadersFilled, heroesSet } or null
 
   function updPlan(patch) { onUpdate({ ...plan, ...patch }); }
 
@@ -120,7 +120,7 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
       (s.joiners || []).forEach(j => { if (j.playerId) usedIds.add(j.playerId); });
     }));
 
-    let leadersFilled = 0, joinersFilled = 0;
+    let leadersFilled = 0, heroesSet = 0;
 
     const updatedSlots = slots.map(slot => {
       let next = { ...slot, joiners: slot.joiners.map(j => ({ ...j })) };
@@ -145,40 +145,30 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
 
       const leaderPlayer = next.leaderId ? players.find(p => p.id === next.leaderId) : null;
 
-      // Derive required joiner heroes from the meta table when none are
-      // set yet — same lookup FormationPicker uses, just applied here
-      // in bulk instead of one slot at a time.
+      // Derive required joiner HEROES from the meta table when none
+      // are set yet — same lookup FormationPicker uses, just applied
+      // here in bulk instead of one slot at a time. Deliberately stops
+      // here: it never picks WHO fills each hero, by design — the
+      // officer does that in JoinerSlotRow, which already shows
+      // exactly who's attending and eligible for each hero.
       const hasAnyHero = next.joiners.some(j => j.heroName);
       if (!hasAnyHero && leaderPlayer) {
         const suggestion = suggestJoinerHeroes(leaderPlayer, next.type, next.leaderRallyHeroes);
         if (suggestion?.suggestedHeroes?.length) {
           suggestion.suggestedHeroes.slice(0, 4).forEach((hero, i) => {
-            if (next.joiners[i] && !next.joiners[i].heroName) next.joiners[i] = { ...next.joiners[i], heroName: hero };
+            if (next.joiners[i] && !next.joiners[i].heroName) {
+              next.joiners[i] = { ...next.joiners[i], heroName: hero };
+              heroesSet++;
+            }
           });
         }
       }
-
-      const hasReqs = Object.values(next.troopReqs || {}).some(Boolean);
-      next.joiners = next.joiners.map(j => {
-        if (j.playerId || !j.heroName) return j;
-        const candidate = attendingPool.find(p =>
-          !usedIds.has(p.id) &&
-          p.id !== next.leaderId &&
-          (!next.allianceTag || p.allianceTag === next.allianceTag) &&
-          playerCanFillSlot(p, j.heroName) &&
-          (!hasReqs || meetsTroopReqs(p, next.troopReqs).ok)
-        );
-        if (!candidate) return j; // left blank — surfaces via the existing coverage-issue checklist flag below
-        usedIds.add(candidate.id);
-        joinersFilled++;
-        return { ...j, playerId: candidate.id, playerName: candidate.username || candidate.alias };
-      });
 
       return next;
     });
 
     updPlan({ rallySlots: updatedSlots });
-    setAutoFillResult({ leadersFilled, joinersFilled });
+    setAutoFillResult({ leadersFilled, heroesSet });
     setConfirmAutoFill(false);
     vibe(8);
   }
@@ -380,7 +370,7 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
         <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
           <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:4 }}>⚡ Auto-Fill by Power</div>
           <div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>
-            Fills empty rally leader slots with the strongest available attendees, then fills their priority joiners by troop tier and joiner-hero ownership — never by power. Existing manual picks are left untouched.
+            Fills empty rally leader slots with the strongest available attendees, then sets the required joiner heroes for each rally — never a specific person, that's always your call from the eligible list. Existing manual picks are left untouched.
           </div>
           <button onClick={() => confirmAutoFill ? autoFillPlan() : setConfirmAutoFill(true)}
             style={{ width:'100%', height:48, borderRadius:12, background:confirmAutoFill?C.gold:C.section, border:confirmAutoFill?'none':`1px solid ${C.border}`, color:confirmAutoFill?C.bg:C.icy, fontWeight:700, fontSize:14, cursor:'pointer' }}>
@@ -388,7 +378,7 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
           </button>
           {autoFillResult && (
             <div style={{ fontSize:12, color:C.muted, marginTop:8, textAlign:'center' }}>
-              Filled {autoFillResult.leadersFilled} leader{autoFillResult.leadersFilled!==1?'s':''} and {autoFillResult.joinersFilled} joiner{autoFillResult.joinersFilled!==1?'s':''}. Anything still blank has no eligible attendee — see the checklist below.
+              Filled {autoFillResult.leadersFilled} leader{autoFillResult.leadersFilled!==1?'s':''} and set {autoFillResult.heroesSet} required joiner hero{autoFillResult.heroesSet!==1?'es':''}. Open each rally to pick who provides each hero from the eligible attendees.
             </div>
           )}
         </div>

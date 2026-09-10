@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { C } from '../../../utils/constants.js';
 import { getAllFormations, FORMATION_GEN_CUTOFF } from '../../../data/joinerMeta.js';
-import { suggestPriorityJoiners } from '../../../data/metrics.js';
 import { newJoinerSlot } from '../../../data/playerSchema.js';
-import { resolveHero, playerCanFillSlot, meetsTroopReqs, CUSTOM_HERO_OPTIONS, LEADER_HERO_OPTIONS } from './battleConstants.js';
+import { resolveHero, playerCanFillSlot, CUSTOM_HERO_OPTIONS, LEADER_HERO_OPTIONS } from './battleConstants.js';
 
 // ── FormationPicker ────────────────────────────────────────────
 // Renders the guided/custom formation section inside a RallySlotCard.
@@ -15,17 +14,21 @@ import { resolveHero, playerCanFillSlot, meetsTroopReqs, CUSTOM_HERO_OPTIONS, LE
 // and sorted first, since those are the ones this specific leader can
 // actually execute — but nothing is hidden, the officer sees the full
 // picture and decides. Selecting a formation auto-fills the leader
-// heroes, ratio, AND the 4 priority joiner slots (via
-// suggestPriorityJoiners, weighted by who owns the required heroes
-// and is currently available) — the officer can still hand-edit
-// anything afterward.
+// Selecting a formation auto-fills the leader
+// heroes and ratio, and sets the 4 priority joiner slots' REQUIRED
+// HEROES — never a specific person for any of them. The officer picks
+// who fills each slot via JoinerSlotRow, which already shows exactly
+// who's attending and eligible for that hero.
 //
 // Props:
 //   slot           – rally slot object
 //   upd            – (patch) => void  — updates the parent slot
 //   color          – accent colour for this rally type
 //   players        – full roster array (for coverage checks + auto-suggest)
-//   events         – full events array (for auto-suggest's reliability scoring)
+//   events         – full events array (currently unused here since
+//                    hero suggestions no longer rank/pick specific
+//                    people — kept in the signature since the caller
+//                    already passes it and JoinerSlotRow still needs it)
 //   selectedGenerations – number[] from Settings, explicit not cumulative;
 //                        empty means "no filter, show every generation"
 //   assignedInOtherSlots – Set of playerIds already used elsewhere in
@@ -151,35 +154,23 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
         f.type === slot.selectedFormation.type)
     : null;
 
-  // Auto-suggest the 4 priority joiners for a formation's hero slots —
-  // resolves substitution notation ("Jessie*" -> Jessie/Jasser/Jeronimo),
-  // excludes anyone already used elsewhere in this plan, AND excludes
-  // anyone below the rally's minimum troop tier requirements. If given,
-  // formationAlts (a formation's own alt1/alt2 — a different thing
-  // from */** substitution notation) are appended as a LAST-RESORT
-  // fallback on every slot: only tried once the slot's own hero (and
-  // its built-in alternates) come up with nobody available.
-  function autoSuggestJoiners(heroSlotStrings, formationAlts = []) {
-    const altOptions = formationAlts.filter(Boolean).flatMap(raw => {
+  // Fills in the 4 priority joiner slots' REQUIRED HERO only — never a
+  // specific person. Per explicit design decision: the system
+  // recommends what's needed, the officer decides who provides it.
+  // Resolves substitution notation ("Jessie*" -> its display name) so
+  // the slot's heroName is always the clean form JoinerSlotRow expects.
+  // formationAlts (a formation's own alt1/alt2/alt3 — different from
+  // */** substitution notation) are intentionally NOT folded in here:
+  // they're a fallback for when nobody eligible has the primary hero,
+  // which is exactly the kind of judgment call JoinerSlotRow's
+  // "Change hero" / alternates picker already exists to make with a
+  // real person in front of the officer, not something to pre-resolve
+  // silently before anyone's had a chance to look.
+  function heroSlotsFromRaw(heroSlotStrings) {
+    return heroSlotStrings.filter(Boolean).map(raw => {
       const r = resolveHero(raw);
-      return r ? [r.display, ...r.alternatives] : [raw];
+      return newJoinerSlot({ heroName: r?.display || raw });
     });
-    const resolvedSlots = heroSlotStrings.filter(Boolean).map(raw => {
-      const r = resolveHero(raw);
-      const primary = r ? [r.display, ...r.alternatives] : [raw];
-      return { slotLabel: raw, heroOptions: [...primary, ...altOptions] };
-    });
-    const excludeIds = assignedInOtherSlots || new Set();
-    const eligiblePlayers = players
-      .filter(p => !excludeIds.has(p.id))
-      .filter(p => meetsTroopReqs(p, slot.troopReqs).ok);
-    const suggested = suggestPriorityJoiners(resolvedSlots, eligiblePlayers, events);
-    return suggested.map(s => newJoinerSlot({
-      playerId:   s.player?.id || null,
-      playerName: s.player ? (s.player.username || s.player.alias || '') : '',
-      heroName:   s.hero || '',
-      confirmed:  true,
-    }));
   }
 
   function selectFormation(f) {
@@ -193,13 +184,13 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
       leaderRallyHeroes: flattenLeaders(f.leaders),
       requestedHeroes:   [f.j1, f.j2, f.j3, f.j4].filter(Boolean).map(h => resolveHero(h)?.display).filter(Boolean),
       ratio:             f.ratio,
-      joiners:           autoSuggestJoiners([f.j1, f.j2, f.j3, f.j4], [f.alt1, f.alt2, f.alt3]),
+      joiners:           heroSlotsFromRaw([f.j1, f.j2, f.j3, f.j4]),
     });
     setShowAll(false);
   }
 
   function customAutoSuggest() {
-    upd({ joiners: autoSuggestJoiners(slot.requestedHeroes || []) });
+    upd({ joiners: heroSlotsFromRaw(slot.requestedHeroes || []) });
   }
 
   // Apply a Rally Leader's saved team setup (from their Rally Leader
@@ -219,7 +210,7 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
       leaderRallyHeroes: (team.leadHeroes || []).filter(Boolean),
       requestedHeroes:   (team.priorityJoinerHeroes || []).filter(Boolean),
       ratio:             team.ratio || slot.ratio,
-      joiners:           autoSuggestJoiners(team.priorityJoinerHeroes || []),
+      joiners:           heroSlotsFromRaw(team.priorityJoinerHeroes || []),
     });
   }
 
