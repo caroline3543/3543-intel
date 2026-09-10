@@ -149,6 +149,8 @@ export function newSnapshot(playerId, playerProfile, eventId) {
       willLeaveEarly:   false,
       willJoinDiscord:  false,
       presentWholeTime: false,
+      unsure:           false, // hasn't committed either way yet
+      intermittent:     false, // "pops in randomly" — attends some but not all of the event, not a firm yes/no
       substitute:       false,
     },
     // Post-event actuals — set after the event has happened. This is

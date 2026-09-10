@@ -68,11 +68,13 @@ export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, o
           showsRsvp && (
             <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
               <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:12 }}>📋 RSVP</div>
-              <ToggleRow label="On time"                value={s.rsvp?.onTime}           onChange={v=>updR({onTime:v})}/>
-              <ToggleRow label="Will be late"            value={s.rsvp?.willBeLate}       onChange={v=>updR({willBeLate:v})}       colorOn={C.gold} colorOff={C.muted}/>
-              <ToggleRow label="Will leave early"        value={s.rsvp?.willLeaveEarly}   onChange={v=>updR({willLeaveEarly:v})}   colorOn={C.mar}  colorOff={C.muted}/>
-              <ToggleRow label="Will join Discord"       value={s.rsvp?.willJoinDiscord}  onChange={v=>updR({willJoinDiscord:v})}  colorOn={C.icy}  colorOff={C.muted}/>
-              <ToggleRow label="Present the whole time"  value={s.rsvp?.presentWholeTime} onChange={v=>updR({presentWholeTime:v})}/>
+              <ToggleRow label="On time"                     value={s.rsvp?.onTime}           onChange={v=>updR({onTime:v})}/>
+              <ToggleRow label="Will be late"                value={s.rsvp?.willBeLate}       onChange={v=>updR({willBeLate:v})}       colorOn={C.gold} colorOff={C.muted}/>
+              <ToggleRow label="Will leave early"             value={s.rsvp?.willLeaveEarly}   onChange={v=>updR({willLeaveEarly:v})}   colorOn={C.mar}  colorOff={C.muted}/>
+              <ToggleRow label="Will join Discord voice chat" value={s.rsvp?.willJoinDiscord}  onChange={v=>updR({willJoinDiscord:v})}  colorOn={C.icy}  colorOff={C.muted}/>
+              <ToggleRow label="Present the whole time"       value={s.rsvp?.presentWholeTime} onChange={v=>updR({presentWholeTime:v})}/>
+              <ToggleRow label="Joins intermittently (pops in randomly)" value={s.rsvp?.intermittent} onChange={v=>updR({intermittent:v})} colorOn={C.gold} colorOff={C.muted}/>
+              <ToggleRow label="Unsure"                       value={s.rsvp?.unsure}           onChange={v=>updR({unsure:v})}           colorOn={C.muted} colorOff={C.muted}/>
             </div>
           )
         ) : (

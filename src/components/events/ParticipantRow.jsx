@@ -74,6 +74,8 @@ export function ParticipantRow({
                 {snap?.rsvp?.willLeaveEarly && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, fontWeight:600 }}>🏃 Early</span>}
                 {snap?.rsvp?.willJoinDiscord && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.icy+'18', color:C.icy, fontWeight:600 }}>🎙️</span>}
                 {snap?.rsvp?.presentWholeTime && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.green+'18', color:C.green, fontWeight:600 }}>✓ Full</span>}
+                {snap?.rsvp?.intermittent && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, fontWeight:600 }}>🔀 Pops in</span>}
+                {snap?.rsvp?.unsure && <span style={{ fontSize:11, padding:'1px 7px', borderRadius:8, background:C.muted+'18', color:C.muted, fontWeight:600 }}>? Unsure</span>}
               </>
             ) : (
               <>

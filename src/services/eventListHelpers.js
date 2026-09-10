@@ -107,11 +107,12 @@ export function noShowBadge(streak) {
   return streak <= 3 ? '💔'.repeat(streak) : `💔×${streak}`;
 }
 
-// Copyable, Discord-ready code block of the full roster — grouped by
-// rank the same way the on-screen list is, so what you copy always
-// matches what you see. Header includes time and Legion (when set) so
-// the code block is self-identifying once posted in Discord —
-// otherwise a Legion 1 and Legion 2 roster posted the same day are
+// Copyable, Discord-ready roster text — grouped by rank the same way
+// the on-screen list is, so what you copy always matches what you
+// see. Plain text, no code-fence wrapping — this gets pasted straight
+// into Discord as a normal message. Header includes time and Legion
+// (when set) so the text is self-identifying once posted — otherwise
+// a Legion 1 and Legion 2 roster posted the same day are
 // indistinguishable once separated from the app. Rally Leads get the
 // same 👑 marker the on-screen row uses.
 export function generateParticipantsText(activeEvent, participantsList, substitutesList) {
@@ -133,5 +134,5 @@ export function generateParticipantsText(activeEvent, participantsList, substitu
     lines.push('', `SUBSTITUTES (${substitutesList.length})`);
     substitutesList.forEach(p => lines.push(nameLine(p)));
   }
-  return '```\n' + lines.join('\n').trim() + '\n```';
+  return lines.join('\n').trim();
 }

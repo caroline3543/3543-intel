@@ -631,7 +631,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                 <div style={{ display:'flex', gap:8, marginBottom:14 }}>
                   <button onClick={copyParticipants}
                     style={{ flex:1, height:40, borderRadius:10, background:participantsCopied?C.green+'18':C.gold+'18', border:`1px solid ${participantsCopied?C.green:C.gold}44`, color:participantsCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                    {participantsCopied ? '✓ Copied' : '📋 Copy participants as code block'}
+                    {participantsCopied ? '✓ Copied' : '📋 Copy participants'}
                   </button>
                   <button onClick={() => { setVerifyMode(v => !v); setBulkMode(false); setBulkSel(new Set()); setConfirmedIds(new Set()); setVerifyPasteText(''); }}
                     style={{ height:40, padding:'0 14px', borderRadius:10, background:verifyMode?C.gold+'22':C.section, border:`1px solid ${verifyMode?C.gold:C.border}`, color:verifyMode?C.gold:C.muted, fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
