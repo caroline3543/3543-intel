@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { C, FC_BADGE_IMAGES } from '../../utils/constants.js';
+import { C, FC_BADGE_IMAGES, FC_OPTIONS } from '../../utils/constants.js';
 import { roleColor } from '../../utils/roles.js';
 import { fmtDate } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
@@ -7,6 +7,75 @@ import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 
 function initials(n) {
   return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
+}
+
+// Troop-type colors for THIS card specifically — red/lancer/green/
+// marksman/blue, per explicit request. NOTE: this is intentionally
+// scoped to the member card only, not the shared C.inf/C.lan/C.mar
+// tokens in constants.js — those are still used elsewhere (Battle
+// Plans, Profile view) that aren't part of this pass, so changing them
+// globally would create a mismatch there instead of here. Flagging
+// that this card and those other screens now use different colors for
+// the same troop types, in case that inconsistency needs resolving.
+const TROOP_COLORS = { infantry: C.red, lancer: C.green, marksman: C.blue };
+
+// Highest Helios stage a player has reached in ANY troop, ascending —
+// used only to detect "has Helios at all", not to rank by stage.
+function isFullyMatchedHelios(troops) {
+  const set = troops.filter(Boolean);
+  return set.length === 3 && set.every(t => t.startsWith('Helios')) && set.every(t => t === set[0]);
+}
+
+// Priority tier: 1 = all three troops Helios AND all the same stage
+// (no internal mismatch) — the strongest, most "ready" players. 2 =
+// has Helios somewhere but not fully matched (partially upgraded). 3 =
+// no Helios at all. Exported so RosterTab's Priority sort uses the
+// exact same definition as the badge shown here — one source of truth
+// instead of two definitions that could drift apart.
+export function getPriorityTier(player) {
+  const troops = [player.troops?.infantry, player.troops?.lancer, player.troops?.marksman];
+  const heliosCount = troops.filter(t => t && t.startsWith('Helios')).length;
+  if (heliosCount === 0) return 3;
+  if (isFullyMatchedHelios(troops)) return 1;
+  return 2;
+}
+
+// "Fully upgraded" here means the player's three troops don't
+// internally mismatch (same definition as the mismatch flag below) —
+// used as the tiebreak within a priority tier / furnace level, per the
+// "fully-upgraded ranked above partially-upgraded" requirement.
+function isFullyUpgraded(player) {
+  const set = [player.troops?.infantry, player.troops?.lancer, player.troops?.marksman].filter(Boolean);
+  if (set.length < 2) return true;
+  return set.every(t => t === set[0]);
+}
+
+// FC_OPTIONS is defined highest-first in constants.js, so a lower
+// index means a HIGHER furnace level — this rank is used directly as
+// a sort key (lower = better), not inverted.
+function furnaceRank(fc) {
+  const i = FC_OPTIONS.indexOf(fc);
+  return i === -1 ? FC_OPTIONS.length : i; // unset/unknown sorts last
+}
+
+// Full sort key for the Priority sort option in RosterTab — tier
+// first (1 before 2 before 3), then furnace level (higher first),
+// then fully-upgraded before partially-upgraded at the same level,
+// then name as the final tiebreak.
+export function prioritySortKey(player) {
+  return {
+    tier: getPriorityTier(player),
+    furnaceRank: furnaceRank(player.furnaceLevel),
+    upgradeGap: isFullyUpgraded(player) ? 0 : 1,
+  };
+}
+
+export function comparePriority(a, b) {
+  const ka = prioritySortKey(a), kb = prioritySortKey(b);
+  if (ka.tier !== kb.tier) return ka.tier - kb.tier;
+  if (ka.furnaceRank !== kb.furnaceRank) return ka.furnaceRank - kb.furnaceRank;
+  if (ka.upgradeGap !== kb.upgradeGap) return ka.upgradeGap - kb.upgradeGap;
+  return (a.username || a.alias || '').localeCompare(b.username || b.alias || '');
 }
 
 // Tabler Icons webfont (see index.html for the CDN <link>) — renders as
@@ -25,6 +94,8 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
   const isRallyLead = player.roles?.includes('Rally Lead');
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [joinersOpen, setJoinersOpen] = useState(false);
+  const priorityTier = getPriorityTier(player);
 
   return (
     <div onClick={onClick} style={{ background:isSelected?C.gold+'18':C.card, borderRadius:12, padding:'14px 16px', marginBottom:10, display:'flex', alignItems:'center', gap:12, cursor:'pointer', WebkitTapHighlightColor:'transparent', userSelect:'none', opacity:player.blacklisted?0.6:1, border:`1px solid ${isSelected?C.gold:C.border}`, boxShadow:'0 1px 3px rgba(0,0,0,0.35)' }}>
@@ -36,8 +107,28 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
       )}
 
       {/* Avatar */}
-      <div style={{ width:46, height:46, borderRadius:'50%', flexShrink:0, background:rc+'33', border:`2px solid ${rc}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:17, color:C.white }}>
-        {initials(dn)}
+      <div style={{ position:'relative', flexShrink:0 }}>
+        <div style={{ width:46, height:46, borderRadius:'50%', background:rc+'33', border:`2px solid ${rc}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:17, color:C.white }}>
+          {initials(dn)}
+        </div>
+        {/* Joiner-hero indicator — supplementary info, not a headline
+            element: a small neutral icon badge on the avatar corner
+            instead of a row of gold pills competing with FC/troop
+            data. Tap reveals which heroes without leaving the list. */}
+        {joiners.length > 0 && (
+          <div style={{ position:'absolute', bottom:-2, right:-2 }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setJoinersOpen(v => !v)} aria-label={`Joiner heroes: ${joiners.join(', ')}`}
+              style={{ width:18, height:18, borderRadius:'50%', background:C.muted, border:`2px solid ${C.card}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', padding:0 }}>
+              <Icon name="check" size={10} color={C.white}/>
+            </button>
+            {joinersOpen && (
+              <div style={{ position:'absolute', top:'100%', left:0, marginTop:4, background:C.section, border:`1px solid ${C.border}`, borderRadius:8, padding:'8px 10px', zIndex:20, whiteSpace:'nowrap', boxShadow:'0 8px 24px rgba(0,0,0,0.5)' }}>
+                <div style={{ fontSize:10, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Joiner Heroes</div>
+                {joiners.map(h => <div key={h} style={{ fontSize:12, color:C.white }}>{h}</div>)}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ flex:1, minWidth:0 }}>
@@ -52,6 +143,11 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
             ) : (
               <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, flexShrink:0 }}>{player.furnaceLevel}</span>
             )
+          )}
+          {priorityTier === 1 && (
+            <span title="Fully Helios-matched — top priority" style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.icy+'18', color:C.icy, flexShrink:0 }}>
+              <Icon name="star" size={11} color={C.icy}/> Priority
+            </span>
           )}
           {player.blacklisted && (
             <span title={player.blacklistReason || ''} style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, color:C.red, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.red+'18', flexShrink:0 }}>
@@ -119,7 +215,7 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
             conditions is true; a troop that's neither Helios-tier nor
             mismatched shows nothing, same as before. */}
         {(() => {
-          const troopEntries = [['shield','infantry',player.troops?.infantry,C.inf],['sword','lancer',player.troops?.lancer,C.lan],['target-arrow','marksman',player.troops?.marksman,C.mar]];
+          const troopEntries = [['shield','infantry',player.troops?.infantry,TROOP_COLORS.infantry],['sword','lancer',player.troops?.lancer,TROOP_COLORS.lancer],['target-arrow','marksman',player.troops?.marksman,TROOP_COLORS.marksman]];
           const setVals = troopEntries.filter(([,,t]) => t).map(([,,t]) => t);
           const freq = {};
           setVals.forEach(v => { freq[v] = (freq[v] || 0) + 1; });
@@ -156,20 +252,6 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
             </div>
           );
         })()}
-
-        {/* Row 4 — joiner heroes. Own row, always the same structure
-            when present (first 2 heroes as pills, "+N heroes" beyond
-            that); omitted entirely when there are none. */}
-        {joiners.length > 0 && (
-          <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-            {joiners.slice(0,2).map(h => (
-              <span key={h} style={{ fontSize:11, fontWeight:600, padding:'2px 7px', borderRadius:8, background:C.gold+'18', color:C.gold }}>
-                ✓ {h}
-              </span>
-            ))}
-            {joiners.length>2 && <span style={{ fontSize:11, color:C.muted }}>+{joiners.length-2} heroes</span>}
-          </div>
-        )}
 
       </div>
 

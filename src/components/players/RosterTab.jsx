@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { C } from '../../utils/constants.js';
-import { PlayerCard }       from './PlayerCard.jsx';
+import { PlayerCard, comparePriority } from './PlayerCard.jsx';
 import { ProfileView }      from './ProfileView.jsx';
 import { PlayerSheet }      from './PlayerSheet.jsx';
 import { RoleManagerSheet } from './RoleManagerSheet.jsx';
@@ -28,6 +28,7 @@ const DERIVED_TIER_FILTERS = [
 
 const SORT_OPTIONS = [
   { id:'name',       label:'Name (A–Z)' },
+  { id:'priority',   label:'⭐ Priority (strongest first)' },
   { id:'troopPower', label:'💪 Troop power (high → low)' },
   { id:'missing',    label:'⚠ Missing info first' },
 ];
@@ -39,7 +40,7 @@ const HELP_ITEMS = [
   { title: '🔎 Search', body: "Searches name, nickname, alliance tag, country, and player ID — the player ID still works even if someone renames themselves, since it doesn't change." },
   { title: '📋 Field Registry', body: "Fill in or bulk-update furnace level, troop tiers, languages, and joiner heroes — for one player, or several at once." },
   { title: '☑️ Select', body: "Tap Select, then tap players to choose several. With players selected, stage multiple fields (like Furnace + all three troop tiers) and apply them all in one tap instead of editing each person one by one." },
-  { title: '↕ Sort', body: "Reorder the list — alphabetical, by troop power, or missing-info-first to quickly see who still needs their profile filled in." },
+  { title: '↕ Sort', body: "Reorder the list — alphabetical, by Priority (fully Helios-matched players first, for rally/war planning), by troop power, or missing-info-first to quickly see who still needs their profile filled in." },
   { title: '🔎 Filters', body: "Filter by role, by alliance, or by fully-upgraded troop tiers (Full FC5, Full FC6, or Helios) to narrow the list down to who you're looking for." },
   { title: '⚔️ By Role', body: "Switch to see everyone grouped by their assigned role instead of one flat list." },
   { title: '👑 Rally Lead', body: "Tap the crown on a player's card to toggle whether they're a Rally Lead. This changes who's eligible to lead rallies when you build a Battle Plan." },
@@ -175,6 +176,8 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   });
   if (sortBy === 'missing') {
     filteredPlayers.sort((a,b) => missingCount(b) - missingCount(a));
+  } else if (sortBy === 'priority') {
+    filteredPlayers.sort(comparePriority);
   } else if (sortBy === 'troopPower') {
     filteredPlayers.sort((a,b) => (getCurrentTroopPower(b,events) ?? -1) - (getCurrentTroopPower(a,events) ?? -1));
   } else {

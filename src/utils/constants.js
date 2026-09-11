@@ -11,6 +11,7 @@ export const C = {
   mar:     '#B8859A',
   red:     '#FF453A',
   green:   '#30D158',
+  blue:    '#0A84FF',
   border:  '#2A4A64',
 };
 
