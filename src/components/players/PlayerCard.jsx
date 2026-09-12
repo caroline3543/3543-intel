@@ -136,6 +136,9 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
         {/* Row 1 — name + overall furnace badge together */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
           <div style={{ fontSize:16, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
+          {player.allianceRank && (
+            <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, flexShrink:0 }}>🎖️ {player.allianceRank}</span>
+          )}
           {player.furnaceLevel && (
             FC_BADGE_IMAGES[player.furnaceLevel] ? (
               <img src={FC_BADGE_IMAGES[player.furnaceLevel]} alt={player.furnaceLevel} title={player.furnaceLevel}
