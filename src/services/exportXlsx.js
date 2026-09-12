@@ -14,7 +14,7 @@
  */
 
 import * as XLSX from 'xlsx';
-import { JOINER_COVERAGE_EVENTS, SHOWS_RSVP_TYPES } from '../utils/constants.js';
+import { JOINER_COVERAGE_EVENTS } from '../utils/constants.js';
 import { buildRosterDataSheet, buildEventsDataSheet, buildPlansDataSheet, buildRolesDataSheet } from './xlsxDataSheets.js';
 
 // ── Styling helpers ────────────────────────────────────────────
@@ -304,7 +304,6 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
   // retired app-wide and this export had been left out of sync with it.
   const eventPlayers = players.filter(p => (event.participantIds || []).includes(p.id));
   const isUpcoming = event.status === 'upcoming';
-  const showsRsvp = SHOWS_RSVP_TYPES.includes(event.type);
 
   const linkedPlans = (plans || []).filter(p => p.eventId === event.id);
   function rallyLeaderHeroesFor(playerId) {
@@ -320,9 +319,14 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
   // down a priority list, so someone who's both "unsure" and "will be
   // late" lands under Unsure (the one that needs a follow-up most).
   // Ordered so anything needing attention surfaces at the TOP of the
-  // sheet — the big "everything's fine" bucket sits last.
-  const UPCOMING_CATEGORY_ORDER = ['Unsure', 'Not Yet Confirmed', 'Pops In Randomly', 'Coming Late', 'Leaving Early', 'Confirmed'];
-  const COMPLETED_CATEGORY_ORDER = ['No-Show', 'Excused Absence', 'Late (No Notice)', 'Not Recorded', 'Attended'];
+  // sheet — the big "everything's fine" bucket sits last. Present
+  // Whole Time and voice chat are folded in here as their own
+  // categories (compound-labeled when both apply) rather than separate
+  // tick columns — joiner heroes are the only tick-grid left in this
+  // sheet, everything else is conveyed by which subheading a row sits
+  // under.
+  const UPCOMING_CATEGORY_ORDER = ['Unsure', 'Not Yet Confirmed', 'Pops In Randomly', 'Coming Late', 'Leaving Early', 'Present Whole Time + Voice', 'Present Whole Time', 'Joining Voice Chat', 'Confirmed'];
+  const COMPLETED_CATEGORY_ORDER = ['No-Show', 'Excused Absence', 'Late (No Notice)', 'Not Recorded', 'Attended + Voice', 'Attended'];
   function rsvpCategoryFor(snap) {
     const r = snap?.rsvp || {};
     if (r.unsure) return 'Unsure';
@@ -330,13 +334,18 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
     if (r.intermittent) return 'Pops In Randomly';
     if (r.willBeLate) return 'Coming Late';
     if (r.willLeaveEarly) return 'Leaving Early';
+    if (r.presentWholeTime && r.willJoinDiscord) return 'Present Whole Time + Voice';
+    if (r.presentWholeTime) return 'Present Whole Time';
+    if (r.willJoinDiscord) return 'Joining Voice Chat';
     return 'Confirmed';
   }
   function attendanceCategoryFor(snap) {
     const a = snap?.attendance || {};
+    const v = snap?.voice || {};
     if (a.noShow && a.excused) return 'Excused Absence';
     if (a.noShow) return 'No-Show';
     if (a.joinedLateNoNotice) return 'Late (No Notice)';
+    if (a.attended === true && v.joined === true) return 'Attended + Voice';
     if (a.attended === true) return 'Attended';
     return 'Not Recorded';
   }
@@ -356,11 +365,11 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
   // same fact was redundant. Only genuinely ORTHOGONAL facts — voice
   // chat and whole-time presence, neither of which factors into the
   // category classification — still get their own column.
-  const baseHeaders = isUpcoming
-    ? (showsRsvp
-        ? ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Will Join Voice Chat', 'Present Whole Time', 'Notes']
-        : ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Notes'])
-    : ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Joined Voice', 'Notes'];
+  // All three phases share the same columns now — voice chat, whole
+  // time, and RSVP/attendance status all live in the category
+  // subheading instead of a column. Troop tiers and Rally Leader
+  // Heroes stay on every variant regardless of event type.
+  const baseHeaders = ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Notes'];
 
   // Joiner columns — added for SvS / Castle events
   const joinerHeroList = includeJoiners
@@ -405,35 +414,14 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
       const troopCells = [cell(p.troops?.infantry || '', style), cell(p.troops?.lancer || '', style), cell(p.troops?.marksman || '', style)];
       const leaderCell = cell(rallyLeaderHeroesFor(p.id), style);
 
-      const base = isUpcoming
-        ? (showsRsvp
-            ? [
-                cell(p.username || '', style),
-                cell(p.allianceTag || '', style),
-                cell(p.furnaceLevel || '', style),
-                ...troopCells,
-                leaderCell,
-                yesNo(snap?.rsvp?.willJoinDiscord),
-                yesNo(snap?.rsvp?.presentWholeTime),
-                cell(snap?.notes || '', style),
-              ]
-            : [
-                cell(p.username || '', style),
-                cell(p.allianceTag || '', style),
-                cell(p.furnaceLevel || '', style),
-                ...troopCells,
-                leaderCell,
-                cell(snap?.notes || '', style),
-              ])
-        : [
-            cell(p.username || '', style),
-            cell(p.allianceTag || '', style),
-            cell(p.furnaceLevel || '', style),
-            ...troopCells,
-            leaderCell,
-            yesNo(snap?.voice?.joined),
-            cell(snap?.notes || '', style),
-          ];
+      const base = [
+        cell(p.username || '', style),
+        cell(p.allianceTag || '', style),
+        cell(p.furnaceLevel || '', style),
+        ...troopCells,
+        leaderCell,
+        cell(snap?.notes || '', style),
+      ];
 
       if (includeJoiners) {
         const playerJoiners = new Set(
@@ -448,46 +436,19 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
     });
   });
 
-  // Summary row — filtered to CURRENT participantIds membership. Same
-  // fix as EventsTab.jsx's evSum(): removing someone only strips them
-  // from participantIds, their snapshot object isn't deleted, so
-  // counting raw snapshot values here let a removed person's stale
-  // "participating: true" keep inflating the numerator past the
-  // (correctly filtered) total — the literal "15/14 participating" bug.
+  // Summary row — total is eventPlayers.length directly since each
+  // category subheading above already shows its own (N) count; no
+  // separate per-status math needed here anymore.
   const total = eventPlayers.length;
-  const idSet = new Set(event.participantIds || []);
-  const activeSnaps = Object.values(snapMap).filter(s => idSet.has(s.playerId));
   rows.push([]);
-  if (isUpcoming) {
-    if (showsRsvp) {
-      const voice     = activeSnaps.filter(s => s.rsvp?.willJoinDiscord).length;
-      const wholeTime = activeSnaps.filter(s => s.rsvp?.presentWholeTime).length;
-      rows.push([
-        cell('SUMMARY', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
-        cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
-        cell(`${voice}/${total} joining voice`, SUBHEADER_STYLE),
-        cell(`${wholeTime}/${total} present whole time`, SUBHEADER_STYLE),
-      ]);
-    } else {
-      rows.push([
-        cell('SUMMARY', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
-        cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
-        cell(`${total} total`, SUBHEADER_STYLE),
-      ]);
-    }
-  } else {
-    const discord = activeSnaps.filter(s => s.voice?.joined === true).length;
-    rows.push([
-      cell('SUMMARY', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
-      cell(`${discord}/${total} joined voice`, SUBHEADER_STYLE),
-    ]);
-  }
+  rows.push([
+    cell('SUMMARY', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
+    cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
+    cell(`${total} total`, SUBHEADER_STYLE),
+  ]);
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  const baseWidths = isUpcoming
-    ? (showsRsvp ? [18, 10, 9, 9, 9, 9, 26, 16, 16, 24] : [18, 10, 9, 9, 9, 9, 26, 24])
-    : [18, 10, 9, 9, 9, 9, 26, 11, 24];
+  const baseWidths = [18, 10, 9, 9, 9, 9, 26, 24];
   const joinerWidths = joinerHeroList.map(() => 10);
   setColWidths(ws, [...baseWidths, ...joinerWidths]);
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
