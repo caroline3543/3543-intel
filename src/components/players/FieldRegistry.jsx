@@ -296,7 +296,7 @@ export default function FieldRegistry({ players, onUpdatePlayer, onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.gold, fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: 0 }}>← Back</button>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: C.white }}>📋 Field Registry</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: C.white }}>📋 Player Information</div>
             <div style={{ fontSize: 12, color: C.muted }}>Pick a field, then assign players to each value · {players.length} players</div>
           </div>
         </div>
