@@ -75,31 +75,37 @@ function TeamEditor({ team, onChange, onDelete }) {
       <div style={{ marginBottom:10 }}>
         <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:6 }}>Lead heroes (this leader's own 3)</label>
         {[0,1,2].map(i => (
-          <div key={i} style={{ display:'flex', gap:8, alignItems:'center', marginBottom:6 }}>
+          <div key={i} style={{ marginBottom:10 }}>
             <select value={team.leadHeroes[i] || ''} onChange={e => setLeadHero(i, e.target.value)}
-              style={{ flex:1, height:40, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 10px', fontSize:13, color:C.white, fontFamily:'inherit' }}>
+              style={{ width:'100%', height:40, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 10px', fontSize:13, color:C.white, fontFamily:'inherit', marginBottom:6, boxSizing:'border-box' }}>
               <option value="">— Hero {i+1} —</option>
               {LEADER_HERO_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
             </select>
-            {team.leadHeroes[i] && (
-              <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                  <span style={{ fontSize:11, color:C.muted }}>★</span>
-                  <input type="number" min={1} max={5} value={team.heroSkillLevels?.[team.leadHeroes[i]] ?? ''}
-                    onChange={e => setSkillLevel(team.leadHeroes[i], Math.max(1, Math.min(5, Number(e.target.value)||1)))}
-                    placeholder="—"
-                    style={{ width:36, height:40, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 6px', fontSize:13, color:C.icy, fontWeight:700, fontFamily:'inherit', textAlign:'center' }}
-                  />
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                  <span style={{ fontSize:11, color:C.muted }}>Widgets</span>
-                  <input type="number" min={0} max={10} value={team.widgets?.[team.leadHeroes[i]] ?? 0}
-                    onChange={e => setWidgets(team.leadHeroes[i], Math.max(0, Math.min(10, Number(e.target.value)||0)))}
-                    style={{ width:44, height:40, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 8px', fontSize:13, color:C.gold, fontWeight:700, fontFamily:'inherit', textAlign:'center' }}
-                  />
-                </div>
+            {/* Always rendered (not conditional on a hero being picked)
+                so this row's height never changes when a hero is
+                selected — that layout shift was pushing the NEXT hero's
+                dropdown out from under a fast tap-through-3-heroes
+                sequence, causing mis-taps. Disabled/dim until relevant. */}
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <span style={{ fontSize:11, color:C.muted }}>★</span>
+                <input type="number" min={1} max={5} value={team.leadHeroes[i] ? (team.heroSkillLevels?.[team.leadHeroes[i]] ?? '') : ''}
+                  onChange={e => team.leadHeroes[i] && setSkillLevel(team.leadHeroes[i], Math.max(1, Math.min(5, Number(e.target.value)||1)))}
+                  disabled={!team.leadHeroes[i]}
+                  placeholder="—"
+                  style={{ width:36, height:40, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 6px', fontSize:13, color:team.leadHeroes[i]?C.icy:C.muted, fontWeight:700, fontFamily:'inherit', textAlign:'center', opacity:team.leadHeroes[i]?1:0.4 }}
+                />
               </div>
-            )}
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <span style={{ fontSize:11, color:C.muted }}>Widgets</span>
+                <input type="number" min={0} max={10} value={team.leadHeroes[i] ? (team.widgets?.[team.leadHeroes[i]] ?? 0) : ''}
+                  onChange={e => team.leadHeroes[i] && setWidgets(team.leadHeroes[i], Math.max(0, Math.min(10, Number(e.target.value)||0)))}
+                  disabled={!team.leadHeroes[i]}
+                  placeholder="—"
+                  style={{ width:44, height:40, background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:'0 8px', fontSize:13, color:team.leadHeroes[i]?C.gold:C.muted, fontWeight:700, fontFamily:'inherit', textAlign:'center', opacity:team.leadHeroes[i]?1:0.4 }}
+                />
+              </div>
+            </div>
           </div>
         ))}
       </div>

@@ -315,6 +315,34 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
     return [...heroes].join(', ');
   }
 
+  // Categorizes each participant by how they RSVP'd (upcoming) or
+  // showed up (completed) — one category per person, first-match-wins
+  // down a priority list, so someone who's both "unsure" and "will be
+  // late" lands under Unsure (the one that needs a follow-up most).
+  // Ordered so anything needing attention surfaces at the TOP of the
+  // sheet — the big "everything's fine" bucket sits last.
+  const UPCOMING_CATEGORY_ORDER = ['Unsure', 'Not Yet Confirmed', 'Pops In Randomly', 'Coming Late', 'Leaving Early', 'Confirmed'];
+  const COMPLETED_CATEGORY_ORDER = ['No-Show', 'Excused Absence', 'Late (No Notice)', 'Not Recorded', 'Attended'];
+  function rsvpCategoryFor(snap) {
+    const r = snap?.rsvp || {};
+    if (r.unsure) return 'Unsure';
+    if (r.participating === false) return 'Not Yet Confirmed';
+    if (r.intermittent) return 'Pops In Randomly';
+    if (r.willBeLate) return 'Coming Late';
+    if (r.willLeaveEarly) return 'Leaving Early';
+    return 'Confirmed';
+  }
+  function attendanceCategoryFor(snap) {
+    const a = snap?.attendance || {};
+    if (a.noShow && a.excused) return 'Excused Absence';
+    if (a.noShow) return 'No-Show';
+    if (a.joinedLateNoNotice) return 'Late (No Notice)';
+    if (a.attended === true) return 'Attended';
+    return 'Not Recorded';
+  }
+  const categoryOrder = isUpcoming ? UPCOMING_CATEGORY_ORDER : COMPLETED_CATEGORY_ORDER;
+  const categoryFn    = isUpcoming ? rsvpCategoryFor : attendanceCategoryFor;
+
   // Base columns differ by phase — RSVP (a prediction) for upcoming
   // events, post-event actuals otherwise. Never both at once. RSVP
   // behavior predictions only apply to the two SvS/Castle types —
@@ -344,63 +372,85 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
     rows.push(subRow);
   }
 
-  eventPlayers.forEach((p, i) => {
-    const snap  = snapMap[p.id];
-    const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
-    const troopCells = [cell(p.troops?.infantry || '', style), cell(p.troops?.lancer || '', style), cell(p.troops?.marksman || '', style)];
-    const leaderCell = cell(rallyLeaderHeroesFor(p.id), style);
+  // Group into categories (in the priority order above), each with its
+  // own subheader row — mirrors the same grouping pattern already used
+  // for the alliance-grouped roster sheet elsewhere in this file.
+  const grouped = {};
+  eventPlayers.forEach(p => {
+    const cat = categoryFn(snapMap[p.id]);
+    (grouped[cat] = grouped[cat] || []).push(p);
+  });
+  const colCount = allHeaders.length;
 
-    const base = isUpcoming
-      ? (showsRsvp
-          ? [
-              cell(p.username || '', style),
-              cell(p.allianceTag || '', style),
-              cell(p.furnaceLevel || '', style),
-              ...troopCells,
-              leaderCell,
-              yesNo(snap?.rsvp?.participating),
-              yesNo(snap?.rsvp?.onTime),
-              yesNo(snap?.rsvp?.willBeLate),
-              yesNo(snap?.rsvp?.willLeaveEarly),
-              yesNo(snap?.rsvp?.willJoinDiscord),
-              yesNo(snap?.rsvp?.presentWholeTime),
-              yesNo(snap?.rsvp?.intermittent),
-              yesNo(snap?.rsvp?.unsure),
-              cell(snap?.notes || '', style),
-            ]
-          : [
-              cell(p.username || '', style),
-              cell(p.allianceTag || '', style),
-              cell(p.furnaceLevel || '', style),
-              ...troopCells,
-              leaderCell,
-              yesNo(snap?.rsvp?.participating),
-              cell(snap?.notes || '', style),
-            ])
-      : [
-          cell(p.username || '', style),
-          cell(p.allianceTag || '', style),
-          cell(p.furnaceLevel || '', style),
-          ...troopCells,
-          leaderCell,
-          yesNo(snap?.attendance?.attended),
-          yesNo(snap?.attendance?.noShow),
-          yesNo(snap?.attendance?.excused),
-          yesNo(snap?.attendance?.joinedLateNoNotice),
-          yesNo(snap?.voice?.joined),
-          cell(snap?.notes || '', style),
-        ];
+  let rowIndex = 0; // alternates across the WHOLE sheet, not reset per group
+  categoryOrder.forEach(cat => {
+    const group = grouped[cat];
+    if (!group || !group.length) return;
 
-    if (includeJoiners) {
-      const playerJoiners = new Set(
-        (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero)
-      );
-      joinerHeroList.forEach(hero => {
-        base.push(playerJoiners.has(hero) ? cell('✓', YES_STYLE) : cell('', style));
-      });
-    }
+    rows.push([
+      cell(`▸ ${cat} (${group.length})`, SUBHEADER_STYLE),
+      ...Array(colCount - 1).fill(null).map(() => cell('', SUBHEADER_STYLE)),
+    ]);
 
-    rows.push(base);
+    group.forEach(p => {
+      const snap  = snapMap[p.id];
+      const style = rowIndex % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
+      rowIndex++;
+      const troopCells = [cell(p.troops?.infantry || '', style), cell(p.troops?.lancer || '', style), cell(p.troops?.marksman || '', style)];
+      const leaderCell = cell(rallyLeaderHeroesFor(p.id), style);
+
+      const base = isUpcoming
+        ? (showsRsvp
+            ? [
+                cell(p.username || '', style),
+                cell(p.allianceTag || '', style),
+                cell(p.furnaceLevel || '', style),
+                ...troopCells,
+                leaderCell,
+                yesNo(snap?.rsvp?.participating),
+                yesNo(snap?.rsvp?.onTime),
+                yesNo(snap?.rsvp?.willBeLate),
+                yesNo(snap?.rsvp?.willLeaveEarly),
+                yesNo(snap?.rsvp?.willJoinDiscord),
+                yesNo(snap?.rsvp?.presentWholeTime),
+                yesNo(snap?.rsvp?.intermittent),
+                yesNo(snap?.rsvp?.unsure),
+                cell(snap?.notes || '', style),
+              ]
+            : [
+                cell(p.username || '', style),
+                cell(p.allianceTag || '', style),
+                cell(p.furnaceLevel || '', style),
+                ...troopCells,
+                leaderCell,
+                yesNo(snap?.rsvp?.participating),
+                cell(snap?.notes || '', style),
+              ])
+        : [
+            cell(p.username || '', style),
+            cell(p.allianceTag || '', style),
+            cell(p.furnaceLevel || '', style),
+            ...troopCells,
+            leaderCell,
+            yesNo(snap?.attendance?.attended),
+            yesNo(snap?.attendance?.noShow),
+            yesNo(snap?.attendance?.excused),
+            yesNo(snap?.attendance?.joinedLateNoNotice),
+            yesNo(snap?.voice?.joined),
+            cell(snap?.notes || '', style),
+          ];
+
+      if (includeJoiners) {
+        const playerJoiners = new Set(
+          (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero)
+        );
+        joinerHeroList.forEach(hero => {
+          base.push(playerJoiners.has(hero) ? cell('✓', YES_STYLE) : cell('', style));
+        });
+      }
+
+      rows.push(base);
+    });
   });
 
   // Summary row — filtered to CURRENT participantIds membership. Same
