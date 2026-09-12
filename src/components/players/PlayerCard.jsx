@@ -136,9 +136,6 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
         {/* Row 1 — name + overall furnace badge together */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
           <div style={{ fontSize:16, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
-          {player.allianceRank && (
-            <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:8, background:C.gold+'18', color:C.gold, flexShrink:0 }}>🎖️ {player.allianceRank}</span>
-          )}
           {player.furnaceLevel && (
             FC_BADGE_IMAGES[player.furnaceLevel] ? (
               <img src={FC_BADGE_IMAGES[player.furnaceLevel]} alt={player.furnaceLevel} title={player.furnaceLevel}
@@ -179,20 +176,10 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
           )}
         </div>
 
-        {/* Row 2.5 — role/capability labels (Rally Lead, Substitute Rally
-            Lead, and any custom alliance roles). Helios status moved to
-            a badge on the troop icon below instead of a text pill here —
-            showing it in two places at once was redundant. */}
-        {(player.roles?.length > 0 || player.leaderProfile?.role === 'substitute' || player.leaderProfile?.role === 'both') && (
-          <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
-            {(player.leaderProfile?.role === 'substitute' || player.leaderProfile?.role === 'both') && !player.roles?.includes('Rally Lead') && (
-              <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:8, background:C.gold+'14', color:C.gold }}>Substitute Rally Lead</span>
-            )}
-            {player.roles?.map(r => (
-              <span key={r} style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:8, background:r==='Rally Lead'?C.gold+'18':C.section, color:r==='Rally Lead'?C.gold:C.icy }}>{r}</span>
-            ))}
-          </div>
-        )}
+        {/* Role labels and rank were shown here before — removed per
+            request: both are one tap away in the profile now (Role in
+            SvS section, and the editable Alliance Rank section), so a
+            second copy on every list row was unnecessary clutter. */}
 
         {/* Rally leader hero/skill/widget detail intentionally removed
             from this card — it now lives only in ProfileView's

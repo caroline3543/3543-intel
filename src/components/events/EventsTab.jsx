@@ -63,6 +63,9 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [snapOpen, setSnapOpen]       = useState(false);
   const [bulkMode, setBulkMode]       = useState(false);
   const [bulkSel, setBulkSel]         = useState(new Set());
+  const [rsvpPickField, setRsvpPickField] = useState(null); // which RSVP field's picker is open, or null
+  const [rsvpPickQuery, setRsvpPickQuery] = useState('');
+  const [rsvpPickSel, setRsvpPickSel]     = useState(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [sortMode, setSortMode]       = useState('alpha'); // 'alpha' | 'troopPower' | 'lastAdded'
   const [addQuery, setAddQuery]       = useState('');
@@ -339,6 +342,8 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
       if (tag==='early')      s = { ...s, rsvp:{ ...s.rsvp, willLeaveEarly:true } };
       if (tag==='discord')    s = { ...s, rsvp:{ ...s.rsvp, willJoinDiscord:true } };
       if (tag==='wholetime')  s = { ...s, rsvp:{ ...s.rsvp, presentWholeTime:true } };
+      if (tag==='intermittentTag') s = { ...s, rsvp:{ ...s.rsvp, intermittent:true } };
+      if (tag==='unsureTag')  s = { ...s, rsvp:{ ...s.rsvp, unsure:true } };
       if (tag==='attended')   s = { ...s, attendance:{ ...s.attendance, attended:true, noShow:false, excused:false } };
       if (tag==='noshow')     s = { ...s, attendance:{ ...s.attendance, attended:false, noShow:true } };
       if (tag==='excused')    s = { ...s, attendance:{ ...s.attendance, attended:false, noShow:true, excused:true } };
@@ -348,6 +353,28 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     });
     onUpdateEvent({ ...activeEvent, snapshots:snaps });
     setBulkSel(new Set()); setBulkMode(false); vibe(8);
+  }
+
+  // Category-first RSVP assignment — the officer picks "Coming late"
+  // etc. FIRST, then types/taps names into it, rather than checking
+  // boxes across a long participant list before applying a tag. Scoped
+  // to this event's own participants only (RSVP doesn't make sense for
+  // someone who isn't even on the roster for this event yet).
+  function applyRsvpFieldToPlayers(field, playerIds) {
+    if (!activeEvent || !playerIds.length) return;
+    const snaps = [...(activeEvent.snapshots || [])];
+    playerIds.forEach(pid => {
+      const player = players.find(p => p.id === pid);
+      if (!player) return;
+      const idx = snaps.findIndex(s => s.playerId === pid);
+      const s = idx >= 0
+        ? { ...snaps[idx], rsvp: { ...snaps[idx].rsvp, [field]: true } }
+        : (() => { const ns = newSnapshot(pid, player, activeEvent.id); ns.rsvp.participating = true; ns.rsvp[field] = true; return ns; })();
+      if (idx >= 0) snaps[idx] = s; else snaps.push(s);
+    });
+    onUpdateEvent({ ...activeEvent, snapshots: snaps });
+    setRsvpPickField(null); setRsvpPickQuery(''); setRsvpPickSel(new Set());
+    vibe(8);
   }
 
   // Marking an event Done auto-marks everyone still unrecorded as
@@ -424,7 +451,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   }
 
   const bulkTags = isUpcoming
-    ? (showsRsvp ? [['🕐 Arriving late','rsvpLate',C.gold],['🏃 Leaving early','early',C.gold],['🎙️ Will join Discord','discord',C.icy],['✓ Present whole time','wholetime',C.green]] : [])
+    ? (showsRsvp ? [['🕐 Arriving late','rsvpLate',C.gold],['🏃 Leaving early','early',C.gold],['🎙️ Will join voice chat','discord',C.icy],['✓ Present whole time','wholetime',C.green],['🔀 Pops in randomly','intermittentTag',C.gold],['? Unsure','unsureTag',C.muted]] : [])
     : [['✓ Attended','attended',C.green],['✗ No-show','noshow',C.red],['📝 Excused absence','excused',C.mar],['🕐 Late (no notice)','late',C.gold],['🎙️ Voice','voice',C.icy]];
 
   return (
@@ -595,6 +622,79 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               )}
             </div>
           )}
+
+          {isUpcoming && showsRsvp && participantsList.length > 0 && (() => {
+            const RSVP_CATEGORIES = [
+              ['🕐 Coming Late', 'willBeLate', C.gold],
+              ['🏃 Leaving Early', 'willLeaveEarly', C.gold],
+              ['🎙️ Joining Voice Chat', 'willJoinDiscord', C.icy],
+              ['✓ Present Whole Time', 'presentWholeTime', C.green],
+              ['🔀 Pops In Randomly', 'intermittent', C.gold],
+              ['? Unsure', 'unsure', C.muted],
+            ];
+            const q = rsvpPickQuery.trim().toLowerCase();
+            const pickResults = q
+              ? participantsList.filter(p => (p.username||p.alias||'').toLowerCase().includes(q)).slice(0, 8)
+              : [];
+            return (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>Set RSVP by status</div>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:rsvpPickField?10:0 }}>
+                  {RSVP_CATEGORIES.map(([label, field, c]) => (
+                    <button key={field} onClick={() => { setRsvpPickField(rsvpPickField===field?null:field); setRsvpPickQuery(''); setRsvpPickSel(new Set()); }}
+                      style={{ height:44, padding:'0 14px', borderRadius:20, background:rsvpPickField===field?c+'22':C.section, border:`1px solid ${rsvpPickField===field?c:C.border}`, color:rsvpPickField===field?c:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {rsvpPickField && (() => {
+                  const [, , pickColor] = RSVP_CATEGORIES.find(([,f]) => f===rsvpPickField);
+                  return (
+                    <div style={{ background:C.section, borderRadius:12, padding:12 }}>
+                      <input
+                        value={rsvpPickQuery}
+                        onChange={e => setRsvpPickQuery(e.target.value)}
+                        placeholder="Type a name to add…"
+                        style={{ width:'100%', height:44, background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 14px', fontSize:15, color:C.white, boxSizing:'border-box', fontFamily:'inherit', marginBottom:8 }}
+                      />
+                      {pickResults.length > 0 && (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
+                          {pickResults.map(p => (
+                            <button key={p.id} onClick={() => { setRsvpPickSel(prev => new Set(prev).add(p.id)); setRsvpPickQuery(''); }}
+                              style={{ padding:'6px 12px', minHeight:36, borderRadius:14, background:C.card, border:`1px solid ${C.border}`, color:C.white, fontSize:13, cursor:'pointer' }}>
+                              + {p.username||p.alias}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {rsvpPickSel.size > 0 && (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:10 }}>
+                          {[...rsvpPickSel].map(pid => {
+                            const p = players.find(pl => pl.id===pid);
+                            return (
+                              <span key={pid} style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 6px 6px 12px', borderRadius:14, background:pickColor+'22', border:`1px solid ${pickColor}44`, color:pickColor, fontSize:13, fontWeight:600 }}>
+                                {p?.username||p?.alias||'?'}
+                                <button onClick={() => setRsvpPickSel(prev => { const n = new Set(prev); n.delete(pid); return n; })}
+                                  style={{ width:20, height:20, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', color:pickColor+'99', fontSize:12, cursor:'pointer', padding:0 }}>✕</button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={() => { setRsvpPickField(null); setRsvpPickQuery(''); setRsvpPickSel(new Set()); }}
+                          style={{ flex:1, height:44, borderRadius:10, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:14, cursor:'pointer' }}>Cancel</button>
+                        <button onClick={() => applyRsvpFieldToPlayers(rsvpPickField, [...rsvpPickSel])} disabled={rsvpPickSel.size===0}
+                          style={{ flex:2, height:44, borderRadius:10, background:rsvpPickSel.size?pickColor:C.card, border:'none', color:rsvpPickSel.size?C.bg:C.muted, fontWeight:700, fontSize:14, cursor:rsvpPickSel.size?'pointer':'default' }}>
+                          Apply to {rsvpPickSel.size || ''}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })()}
 
           {(bulkTags.length > 0 || !isUpcoming) && (
             <div style={{ display:'flex', gap:8, marginBottom:16, overflowX:'auto' }}>
