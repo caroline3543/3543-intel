@@ -292,7 +292,11 @@ function buildRosterSheet(players) {
 }
 
 // ── Sheet 2: Event Attendance ──────────────────────────────────
-function buildEventSheet(event, players, includeJoiners) {
+// plans is optional — only needed to populate Rally Leader Heroes
+// (looks for rally slots, in plans linked to this event via
+// plan.eventId, where this player is the leader). Pass [] or omit it
+// and that column just comes out blank instead of erroring.
+function buildEventSheet(event, players, includeJoiners, plans = []) {
   const snapMap = Object.fromEntries((event.snapshots || []).map(s => [s.playerId, s]));
   // Explicit roster, no fallback — an event with nobody added yet
   // exports as empty, not the entire player base. See EventsTab.jsx;
@@ -302,17 +306,27 @@ function buildEventSheet(event, players, includeJoiners) {
   const isUpcoming = event.status === 'upcoming';
   const showsRsvp = SHOWS_RSVP_TYPES.includes(event.type);
 
+  const linkedPlans = (plans || []).filter(p => p.eventId === event.id);
+  function rallyLeaderHeroesFor(playerId) {
+    const heroes = new Set();
+    linkedPlans.forEach(plan => (plan.rallySlots || []).forEach(slot => {
+      if (slot.leaderId === playerId) (slot.leaderRallyHeroes || []).forEach(h => heroes.add(h));
+    }));
+    return [...heroes].join(', ');
+  }
+
   // Base columns differ by phase — RSVP (a prediction) for upcoming
   // events, post-event actuals otherwise. Never both at once. RSVP
-  // behavior predictions (on time / late / early / Discord / whole
-  // time) only apply to the two SvS/Castle types — every other event
-  // type only ever records intention to participate during the
-  // registration period, matching SHOWS_RSVP_TYPES everywhere else.
+  // behavior predictions only apply to the two SvS/Castle types —
+  // every other event type only ever records intention to participate
+  // during the registration period, matching SHOWS_RSVP_TYPES
+  // everywhere else. Troop tiers and Rally Leader Heroes are new here
+  // (were missing) — the latter blank unless plans is passed in.
   const baseHeaders = isUpcoming
     ? (showsRsvp
-        ? ['Username', 'Alliance', 'Furnace', 'Participating', 'On Time', 'Will Be Late', 'Will Leave Early', 'Will Join Discord', 'Present Whole Time', 'Notes']
-        : ['Username', 'Alliance', 'Furnace', 'Participating', 'Notes'])
-    : ['Username', 'Alliance', 'Furnace', 'Attended', 'No-show', 'Late (No Notice)', 'Joined Voice', 'Notes'];
+        ? ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Participating', 'On Time', 'Will Be Late', 'Will Leave Early', 'Will Join Voice Chat', 'Present Whole Time', 'Pops In Randomly', 'Unsure', 'Notes']
+        : ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Participating', 'Notes'])
+    : ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Attended', 'No-show', 'Excused', 'Late (No Notice)', 'Joined Voice', 'Notes'];
 
   // Joiner columns — added for SvS / Castle events
   const joinerHeroList = includeJoiners
@@ -333,6 +347,8 @@ function buildEventSheet(event, players, includeJoiners) {
   eventPlayers.forEach((p, i) => {
     const snap  = snapMap[p.id];
     const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
+    const troopCells = [cell(p.troops?.infantry || '', style), cell(p.troops?.lancer || '', style), cell(p.troops?.marksman || '', style)];
+    const leaderCell = cell(rallyLeaderHeroesFor(p.id), style);
 
     const base = isUpcoming
       ? (showsRsvp
@@ -340,18 +356,24 @@ function buildEventSheet(event, players, includeJoiners) {
               cell(p.username || '', style),
               cell(p.allianceTag || '', style),
               cell(p.furnaceLevel || '', style),
+              ...troopCells,
+              leaderCell,
               yesNo(snap?.rsvp?.participating),
               yesNo(snap?.rsvp?.onTime),
               yesNo(snap?.rsvp?.willBeLate),
               yesNo(snap?.rsvp?.willLeaveEarly),
               yesNo(snap?.rsvp?.willJoinDiscord),
               yesNo(snap?.rsvp?.presentWholeTime),
+              yesNo(snap?.rsvp?.intermittent),
+              yesNo(snap?.rsvp?.unsure),
               cell(snap?.notes || '', style),
             ]
           : [
               cell(p.username || '', style),
               cell(p.allianceTag || '', style),
               cell(p.furnaceLevel || '', style),
+              ...troopCells,
+              leaderCell,
               yesNo(snap?.rsvp?.participating),
               cell(snap?.notes || '', style),
             ])
@@ -359,8 +381,11 @@ function buildEventSheet(event, players, includeJoiners) {
           cell(p.username || '', style),
           cell(p.allianceTag || '', style),
           cell(p.furnaceLevel || '', style),
+          ...troopCells,
+          leaderCell,
           yesNo(snap?.attendance?.attended),
           yesNo(snap?.attendance?.noShow),
+          yesNo(snap?.attendance?.excused),
           yesNo(snap?.attendance?.joinedLateNoNotice),
           yesNo(snap?.voice?.joined),
           cell(snap?.notes || '', style),
@@ -394,6 +419,10 @@ function buildEventSheet(event, players, includeJoiners) {
       cell('SUMMARY', SUBHEADER_STYLE),
       cell('', SUBHEADER_STYLE),
       cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
       cell(`${participating}/${total} participating`, SUBHEADER_STYLE),
     ]);
   } else {
@@ -404,8 +433,13 @@ function buildEventSheet(event, players, includeJoiners) {
       cell('SUMMARY', SUBHEADER_STYLE),
       cell('', SUBHEADER_STYLE),
       cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
       cell(`${attended}/${total} attended`, SUBHEADER_STYLE),
       cell(`${noShow} no-shows`, SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
       cell('', SUBHEADER_STYLE),
       cell(`${discord} joined voice`, SUBHEADER_STYLE),
     ]);
@@ -413,12 +447,28 @@ function buildEventSheet(event, players, includeJoiners) {
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const baseWidths = isUpcoming
-    ? (showsRsvp ? [18, 10, 9, 13, 9, 12, 14, 14, 16, 24] : [18, 10, 9, 13, 24])
-    : [18, 10, 9, 11, 9, 15, 11, 24];
+    ? (showsRsvp ? [18, 10, 9, 9, 9, 9, 26, 13, 9, 12, 14, 16, 16, 14, 9, 24] : [18, 10, 9, 9, 9, 9, 26, 13, 24])
+    : [18, 10, 9, 9, 9, 9, 26, 11, 9, 9, 15, 11, 24];
   const joinerWidths = joinerHeroList.map(() => 10);
   setColWidths(ws, [...baseWidths, ...joinerWidths]);
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
   return ws;
+}
+
+// Standalone per-event export — "export from this event's own page"
+// rather than only as part of the full multi-event workbook. Always
+// includes joiner heroes and Rally Leader Heroes regardless of event
+// type, since the officer asked for this on THIS event specifically —
+// unlike the full export's includeJoiners gate (JOINER_COVERAGE_EVENTS
+// only), which stays untouched for that other flow.
+export function exportEventParticipants(event, players, plans = []) {
+  const wb = XLSX.utils.book_new();
+  const eventWs = buildEventSheet(event, players || [], true, plans);
+  const sheetName = (event.name || event.type || 'Event').slice(0, 31).replace(/[[\]*/\\?:]/g, ' ');
+  XLSX.utils.book_append_sheet(wb, eventWs, sheetName || 'Event');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const fileName = `${(event.name || event.type || 'event').replace(/[^a-z0-9]+/gi, '_')}_${dateStr}.xlsx`;
+  XLSX.writeFile(wb, fileName);
 }
 
 // ── Cover sheet ────────────────────────────────────────────────
@@ -618,7 +668,7 @@ export function exportWorkbook(data, options = {}) {
   const usedEventSheetNames = new Set(['Overview', 'Roster', 'Roster Data', 'Events Data', 'Plans Data', 'Roles Data']);
   sortedEvents.forEach(event => {
     const includeJoiners = JOINER_COVERAGE_EVENTS.includes(event.type);
-    const eventWs = buildEventSheet(event, data.players || [], includeJoiners);
+    const eventWs = buildEventSheet(event, data.players || [], includeJoiners, data.plans || []);
     const sheetName = uniqueSheetName(event.name || event.type || 'Event', usedEventSheetNames);
     usedEventSheetNames.add(sheetName);
     XLSX.utils.book_append_sheet(wb, eventWs, sheetName);

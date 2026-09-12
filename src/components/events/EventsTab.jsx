@@ -9,6 +9,7 @@ import {
   eventMs, evSum, generateParticipantsText,
 } from '../../services/eventListHelpers.js';
 import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
+import { exportEventParticipants } from '../../services/exportXlsx.js';
 import { SnapshotEditor } from './SnapshotEditor.jsx';
 import { EventSheet } from './EventSheet.jsx';
 import { EventListCard } from './EventListCard.jsx';
@@ -31,7 +32,7 @@ import { SquadBalancerPanel } from './SquadBalancerPanel.jsx';
 // still exists in the data (Battle Plan's isAttending() reads it as the
 // hard eligibility filter for leader/joiner picks), it's just set
 // automatically the moment someone is added here, not chosen manually.
-export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent }) {
+export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, plans = [] }) {
   const [filterType, setFilterType]   = useState('All');
   const [toastMsg, setToastMsg]       = useState(null);
   function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); }
@@ -762,6 +763,10 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                   <button onClick={copyParticipants}
                     style={{ flex:1, height:40, borderRadius:10, background:participantsCopied?C.green+'18':C.gold+'18', border:`1px solid ${participantsCopied?C.green:C.gold}44`, color:participantsCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
                     {participantsCopied ? '✓ Copied' : '📋 Copy participants'}
+                  </button>
+                  <button onClick={() => exportEventParticipants(activeEvent, players, plans)}
+                    style={{ height:40, padding:'0 14px', borderRadius:10, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+                    📊 Export
                   </button>
                   <button onClick={() => { setVerifyMode(v => !v); setBulkMode(false); setBulkSel(new Set()); setConfirmedIds(new Set()); setVerifyPasteText(''); }}
                     style={{ height:40, padding:'0 14px', borderRadius:10, background:verifyMode?C.gold+'22':C.section, border:`1px solid ${verifyMode?C.gold:C.border}`, color:verifyMode?C.gold:C.muted, fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
