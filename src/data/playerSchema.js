@@ -144,7 +144,6 @@ export function newSnapshot(playerId, playerProfile, eventId) {
     // hard eligibility filter for Rally Leader/Priority Joiner picks.
     rsvp: {
       participating:    false,
-      onTime:           false,
       willBeLate:       false,
       willLeaveEarly:   false,
       willJoinDiscord:  false,

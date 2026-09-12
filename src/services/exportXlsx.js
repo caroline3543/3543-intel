@@ -344,17 +344,23 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
   const categoryFn    = isUpcoming ? rsvpCategoryFor : attendanceCategoryFor;
 
   // Base columns differ by phase — RSVP (a prediction) for upcoming
-  // events, post-event actuals otherwise. Never both at once. RSVP
-  // behavior predictions only apply to the two SvS/Castle types —
-  // every other event type only ever records intention to participate
-  // during the registration period, matching SHOWS_RSVP_TYPES
-  // everywhere else. Troop tiers and Rally Leader Heroes are new here
-  // (were missing) — the latter blank unless plans is passed in.
+  // events, post-event actuals otherwise. Never both at once. Troop
+  // tiers and Rally Leader Heroes were missing before (added a couple
+  // turns back) — the latter blank unless plans is passed in.
+  //
+  // Deliberately NOT included as columns: Participating, On Time (removed
+  // from the app entirely), Will Be Late, Will Leave Early, Pops In
+  // Randomly, Unsure, Attended, No-show, Excused, Late (No Notice) — all
+  // of these are now conveyed by the category subheading each row sits
+  // under (see categoryFn below), so a tick/cross column repeating the
+  // same fact was redundant. Only genuinely ORTHOGONAL facts — voice
+  // chat and whole-time presence, neither of which factors into the
+  // category classification — still get their own column.
   const baseHeaders = isUpcoming
     ? (showsRsvp
-        ? ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Participating', 'On Time', 'Will Be Late', 'Will Leave Early', 'Will Join Voice Chat', 'Present Whole Time', 'Pops In Randomly', 'Unsure', 'Notes']
-        : ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Participating', 'Notes'])
-    : ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Attended', 'No-show', 'Excused', 'Late (No Notice)', 'Joined Voice', 'Notes'];
+        ? ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Will Join Voice Chat', 'Present Whole Time', 'Notes']
+        : ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Notes'])
+    : ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Joined Voice', 'Notes'];
 
   // Joiner columns — added for SvS / Castle events
   const joinerHeroList = includeJoiners
@@ -407,14 +413,8 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
                 cell(p.furnaceLevel || '', style),
                 ...troopCells,
                 leaderCell,
-                yesNo(snap?.rsvp?.participating),
-                yesNo(snap?.rsvp?.onTime),
-                yesNo(snap?.rsvp?.willBeLate),
-                yesNo(snap?.rsvp?.willLeaveEarly),
                 yesNo(snap?.rsvp?.willJoinDiscord),
                 yesNo(snap?.rsvp?.presentWholeTime),
-                yesNo(snap?.rsvp?.intermittent),
-                yesNo(snap?.rsvp?.unsure),
                 cell(snap?.notes || '', style),
               ]
             : [
@@ -423,7 +423,6 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
                 cell(p.furnaceLevel || '', style),
                 ...troopCells,
                 leaderCell,
-                yesNo(snap?.rsvp?.participating),
                 cell(snap?.notes || '', style),
               ])
         : [
@@ -432,10 +431,6 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
             cell(p.furnaceLevel || '', style),
             ...troopCells,
             leaderCell,
-            yesNo(snap?.attendance?.attended),
-            yesNo(snap?.attendance?.noShow),
-            yesNo(snap?.attendance?.excused),
-            yesNo(snap?.attendance?.joinedLateNoNotice),
             yesNo(snap?.voice?.joined),
             cell(snap?.notes || '', style),
           ];
@@ -464,41 +459,35 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
   const activeSnaps = Object.values(snapMap).filter(s => idSet.has(s.playerId));
   rows.push([]);
   if (isUpcoming) {
-    const participating = activeSnaps.filter(s => s.rsvp?.participating).length;
-    rows.push([
-      cell('SUMMARY', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell(`${participating}/${total} participating`, SUBHEADER_STYLE),
-    ]);
+    if (showsRsvp) {
+      const voice     = activeSnaps.filter(s => s.rsvp?.willJoinDiscord).length;
+      const wholeTime = activeSnaps.filter(s => s.rsvp?.presentWholeTime).length;
+      rows.push([
+        cell('SUMMARY', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
+        cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
+        cell(`${voice}/${total} joining voice`, SUBHEADER_STYLE),
+        cell(`${wholeTime}/${total} present whole time`, SUBHEADER_STYLE),
+      ]);
+    } else {
+      rows.push([
+        cell('SUMMARY', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
+        cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
+        cell(`${total} total`, SUBHEADER_STYLE),
+      ]);
+    }
   } else {
-    const attended = activeSnaps.filter(s => s.attendance?.attended === true).length;
-    const noShow   = activeSnaps.filter(s => s.attendance?.noShow).length;
-    const discord  = activeSnaps.filter(s => s.voice?.joined === true).length;
+    const discord = activeSnaps.filter(s => s.voice?.joined === true).length;
     rows.push([
-      cell('SUMMARY', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell(`${attended}/${total} attended`, SUBHEADER_STYLE),
-      cell(`${noShow} no-shows`, SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell(`${discord} joined voice`, SUBHEADER_STYLE),
+      cell('SUMMARY', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
+      cell(`${discord}/${total} joined voice`, SUBHEADER_STYLE),
     ]);
   }
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const baseWidths = isUpcoming
-    ? (showsRsvp ? [18, 10, 9, 9, 9, 9, 26, 13, 9, 12, 14, 16, 16, 14, 9, 24] : [18, 10, 9, 9, 9, 9, 26, 13, 24])
-    : [18, 10, 9, 9, 9, 9, 26, 11, 9, 9, 15, 11, 24];
+    ? (showsRsvp ? [18, 10, 9, 9, 9, 9, 26, 16, 16, 24] : [18, 10, 9, 9, 9, 9, 26, 24])
+    : [18, 10, 9, 9, 9, 9, 26, 11, 24];
   const joinerWidths = joinerHeroList.map(() => 10);
   setColWidths(ws, [...baseWidths, ...joinerWidths]);
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
