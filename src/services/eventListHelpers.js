@@ -180,11 +180,20 @@ function attendanceStatusText(snap) {
   return 'Not recorded';
 }
 
+// Same priority order as the spreadsheet export (buildEventSheet in
+// exportXlsx.js) — kept in sync deliberately so "how they RSVP'd"
+// means the same grouping everywhere in the app, not two slightly
+// different sorts depending which export you used. Anything needing
+// a follow-up sorts to the top; "Confirmed" / "Attended" sit last.
+const UPCOMING_CATEGORY_ORDER = ['Unsure', 'Not confirmed', 'Pops in randomly', 'Coming late', 'Leaving early', 'Present whole time + voice', 'Present whole time', 'Joining voice chat', 'Confirmed'];
+const COMPLETED_CATEGORY_ORDER = ['No-show', 'Excused absence', 'Late (no notice)', 'Not recorded', 'Attended + voice', 'Attended'];
+
 // One line per player: flag emoji (👑 Rally Lead, ☀️ any Helios troop,
-// 🎖️ R4 or R5), furnace level, whether all three troops match each
-// other (Full/Partial), which troop type(s) are Helios if any, and
-// their current RSVP/attendance status.
-function attendanceLine(p, snap, isUpcoming) {
+// 🎖️ R4 or R5), furnace level, and whether all three troops match
+// each other (Full/Partial), plus which troop type(s) are Helios if
+// any. RSVP/attendance status is NOT repeated here — that's what the
+// category subheading above each group already says.
+function attendanceLine(p) {
   const flags = [];
   if (p.roles?.includes('Rally Lead')) flags.push('👑');
   const heliosTypes = heliosTypesFor(p);
@@ -195,19 +204,39 @@ function attendanceLine(p, snap, isUpcoming) {
   const fc = p.furnaceLevel || '?';
   const fullness = isFullyUpgraded(p) ? 'Full' : 'Partial';
   const heliosDetail = heliosTypes.length > 0 ? ` · Helios: ${heliosTypes.join('/')}` : '';
-  const status = isUpcoming ? rsvpStatusText(snap) : attendanceStatusText(snap);
 
-  return `  ${flagStr}${p.username || p.alias || '?'} — ${fc} (${fullness})${heliosDetail} · ${status}`;
+  return `  ${flagStr}${p.username || p.alias || '?'} — ${fc} (${fullness})${heliosDetail}`;
+}
+
+// Groups a list by RSVP/attendance category (in the priority order
+// above) and appends "▸ Category (N)" subheadings + each player's line
+// to `lines`. Shared by both the Participants and Substitutes sections
+// so the two never drift into different groupings.
+function pushCategoryGroups(lines, list, isUpcoming, snapFor) {
+  const categoryOrder = isUpcoming ? UPCOMING_CATEGORY_ORDER : COMPLETED_CATEGORY_ORDER;
+  const statusFn = isUpcoming ? rsvpStatusText : attendanceStatusText;
+  const grouped = {};
+  list.forEach(p => {
+    const cat = statusFn(snapFor(p.id));
+    (grouped[cat] = grouped[cat] || []).push(p);
+  });
+  categoryOrder.forEach(cat => {
+    const group = grouped[cat];
+    if (!group || !group.length) return;
+    lines.push(`▸ ${cat} (${group.length})`);
+    group.forEach(p => lines.push(attendanceLine(p)));
+  });
 }
 
 // Copyable, Discord-ready ATTENDANCE text — richer than
 // generateParticipantsText above (which is just names grouped by
 // rank): shows furnace level, whether the player's troops are fully
 // or only partially upgraded to match each other, which troop type(s)
-// are Helios-tier, and current RSVP/attendance status, with 👑/☀️/🎖️
-// flags for Rally Lead, any Helios troop, and R4+ respectively. Plain
-// text, no code-fence — same "pastes straight into Discord" rule as
-// every other copy feature in this app.
+// are Helios-tier, with 👑/☀️/🎖️ flags for Rally Lead, any Helios
+// troop, and R4+ respectively — grouped under RSVP/attendance category
+// subheadings rather than by rank. Plain text, no code-fence — same
+// "pastes straight into Discord" rule as every other copy feature in
+// this app.
 export function generateAttendanceText(activeEvent, participantsList, substitutesList) {
   if (!activeEvent) return '';
   const isUpcoming = activeEvent.status === 'upcoming';
@@ -218,18 +247,12 @@ export function generateAttendanceText(activeEvent, participantsList, substitute
   if (activeEvent.legion) headerParts.push(`Legion ${activeEvent.legion}`);
   const lines = [`📋 ${headerParts.join(' — ')} — Attendance`, ''];
 
-  const groups = groupByRank(participantsList);
   lines.push(`PARTICIPANTS (${participantsList.length})`);
-  [...ALLIANCE_RANKS, 'Unranked'].forEach(rank => {
-    const group = groups[rank];
-    if (!group.length) return;
-    lines.push(`${rank} (${group.length})`);
-    group.forEach(p => lines.push(attendanceLine(p, snapFor(p.id), isUpcoming)));
-  });
+  pushCategoryGroups(lines, participantsList, isUpcoming, snapFor);
 
   if (substitutesList.length > 0) {
     lines.push('', `SUBSTITUTES (${substitutesList.length})`);
-    substitutesList.forEach(p => lines.push(attendanceLine(p, snapFor(p.id), isUpcoming)));
+    pushCategoryGroups(lines, substitutesList, isUpcoming, snapFor);
   }
 
   return lines.join('\n').trim();
