@@ -487,6 +487,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         onEdit={() => { setProfileOpen(false); openEdit(viewingPlayer); }}
         events={events}
         onOpenLeaderProfile={() => setLeaderProfileOpen(true)}
+        onSave={updated => { onSavePlayer(updated); setViewingPlayer(updated); }}
       />
       <RallyLeaderProfileSheet
         player={viewingPlayer}

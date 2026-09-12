@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { C, TROOP_POWER_EVENTS } from '../../utils/constants.js';
+import { useState, useEffect } from 'react';
+import { C, TROOP_POWER_EVENTS, ALLIANCE_RANKS } from '../../utils/constants.js';
 import { roleColor, roleIcon } from '../../utils/roles.js';
 import { fmtDateShort } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
@@ -29,7 +29,11 @@ function Row({ label, value }) {
   );
 }
 
-export function ProfileView({ player, roles = [], open, onClose, onEdit, events, onOpenLeaderProfile }) {
+export function ProfileView({ player, roles = [], open, onClose, onEdit, events, onOpenLeaderProfile, onSave }) {
+  const [addingHero, setAddingHero] = useState(false);
+  const [heroName, setHeroName]     = useState('');
+  const [heroSkill, setHeroSkill]   = useState(5);
+
   useEffect(() => {
     if (!open) return;
     function handler(e) { if (e.key === 'Escape') onClose(); }
@@ -42,7 +46,7 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
   const dn      = player.username||player.alias||'Unknown';
   const rc      = roleColor(player.roles?.[0], roles);
   const metrics = calcMetrics(player, events||[]);
-  const joiners = (player.joinerHeroes||[]).filter(jh=>jh.skillLevel>=5);
+  const joiners = player.joinerHeroes || [];
   const snaps   = (events||[])
     .flatMap(ev=>(ev.snapshots||[]).filter(s=>s.playerId===player.id).map(s=>({...s,eventName:ev.name||ev.type,eventDate:ev.date})))
     .sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
@@ -54,6 +58,24 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
       .map(s => ({ date: ev.date, value: s.troopPower })))
     .sort((a,b) => new Date(a.date) - new Date(b.date))
     .map(p => ({ label: fmtDateShort(p.date), value: p.value }));
+
+  // Typing a name that already exists (case-insensitive) replaces that
+  // entry's skill level rather than creating a duplicate.
+  function addHero() {
+    const name = heroName.trim();
+    if (!name) return;
+    const existing = joiners.filter(jh => jh.hero.toLowerCase() !== name.toLowerCase());
+    onSave({ ...player, joinerHeroes: [...existing, { hero: name, skillLevel: heroSkill, verified: false, updatedAt: new Date().toISOString() }] });
+    setHeroName(''); setHeroSkill(5); setAddingHero(false);
+  }
+
+  function removeHero(hero) {
+    onSave({ ...player, joinerHeroes: joiners.filter(jh => jh.hero !== hero) });
+  }
+
+  function setAllianceRank(rank) {
+    onSave({ ...player, allianceRank: player.allianceRank === rank ? null : rank });
+  }
 
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'#000c', zIndex:300, display:'flex', alignItems:'flex-end' }}>
@@ -94,6 +116,22 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
         >
           👑 Rally Leader Profile — preset squads →
         </button>
+
+        {/* Alliance Rank — settable directly here instead of only
+            being visible as a read-only badge in the header. */}
+        <Section title="Alliance Rank">
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {ALLIANCE_RANKS.map(rank => {
+              const sel = player.allianceRank === rank;
+              return (
+                <button key={rank} onClick={() => setAllianceRank(rank)}
+                  style={{ minWidth:52, height:44, borderRadius:10, border:`1px solid ${sel?C.gold:C.border}`, background:sel?C.gold+'22':C.card, color:sel?C.gold:C.muted, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                  {rank}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
 
         {/* 1. Role in SvS — most important, shown first */}
         {player.roles?.length>0 && (
@@ -158,22 +196,54 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
           </div>
         </Section>
 
-        {/* 3. Joiner heroes — checked before every SvS */}
-        {joiners.length>0 ? (
-          <Section title="Joiner Heroes">
-            <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+        {/* 3. Joiner heroes — checked before every SvS. Now editable
+            right here instead of only through the separate Joiner
+            Registry screen. */}
+        <Section title="Joiner Heroes">
+          {joiners.length>0 && (
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:12 }}>
               {joiners.map(jh=>(
-                <span key={jh.hero} style={{ padding:'8px 16px', borderRadius:20, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:14 }}>
-                  ✓ {jh.hero}
+                <span key={jh.hero} style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 12px 8px 16px', borderRadius:20, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:14 }}>
+                  {jh.hero}{jh.skillLevel!=null?` · ★${jh.skillLevel}`:''}
+                  <button onClick={() => removeHero(jh.hero)} aria-label={`Remove ${jh.hero}`}
+                    style={{ width:20, height:20, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', color:C.gold+'99', fontSize:13, cursor:'pointer', padding:0 }}>✕</button>
                 </span>
               ))}
             </div>
-          </Section>
-        ) : (
-          <div style={{ background:C.section, borderRadius:12, padding:14, marginBottom:12 }}>
-            <div style={{ fontSize:13, color:C.muted }}>No joiner heroes set — add them in the 🦸 Joiner Registry</div>
-          </div>
-        )}
+          )}
+          {addingHero ? (
+            <div style={{ background:C.card, borderRadius:10, padding:12 }}>
+              <input
+                value={heroName}
+                onChange={e => setHeroName(e.target.value)}
+                onKeyDown={e => { if (e.key==='Enter') { e.preventDefault(); addHero(); } }}
+                placeholder="Hero name…"
+                autoFocus
+                style={{ width:'100%', height:44, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 14px', fontSize:15, color:C.white, boxSizing:'border-box', fontFamily:'inherit', marginBottom:10 }}
+              />
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                <span style={{ fontSize:12, color:C.muted }}>Skill</span>
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} onClick={() => setHeroSkill(n)}
+                    style={{ width:36, height:36, borderRadius:'50%', border:`1px solid ${heroSkill===n?C.gold:C.border}`, background:heroSkill===n?C.gold+'22':C.section, color:heroSkill===n?C.gold:C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display:'flex', gap:8 }}>
+                <button onClick={() => { setAddingHero(false); setHeroName(''); }}
+                  style={{ flex:1, height:44, borderRadius:10, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:14, cursor:'pointer' }}>Cancel</button>
+                <button onClick={addHero} disabled={!heroName.trim()}
+                  style={{ flex:2, height:44, borderRadius:10, background:heroName.trim()?C.gold:C.section, border:'none', color:heroName.trim()?C.bg:C.muted, fontWeight:700, fontSize:14, cursor:heroName.trim()?'pointer':'default' }}>Add Hero</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setAddingHero(true)}
+              style={{ width:'100%', height:44, borderRadius:10, background:'none', border:`1px dashed ${C.border}`, color:C.icy, fontWeight:600, fontSize:14, cursor:'pointer' }}>
+              + Add Joiner Hero
+            </button>
+          )}
+        </Section>
 
         {/* 5. Identity — reference info, lower priority */}
         <Section title="Identity">
