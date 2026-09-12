@@ -363,6 +363,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   // someone who isn't even on the roster for this event yet).
   function applyRsvpFieldToPlayers(field, playerIds) {
     if (!activeEvent || !playerIds.length) return;
+    const existingIds = new Set(activeEvent.participantIds || []);
     const snaps = [...(activeEvent.snapshots || [])];
     playerIds.forEach(pid => {
       const player = players.find(p => p.id === pid);
@@ -373,7 +374,11 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
         : (() => { const ns = newSnapshot(pid, player, activeEvent.id); ns.rsvp.participating = true; ns.rsvp[field] = true; return ns; })();
       if (idx >= 0) snaps[idx] = s; else snaps.push(s);
     });
-    onUpdateEvent({ ...activeEvent, snapshots: snaps });
+    // Selecting someone here joins them if they weren't already a
+    // participant — a snapshot alone doesn't make someone count as
+    // joined, participantIds is the actual membership list.
+    const participantIds = [...existingIds, ...playerIds.filter(id => !existingIds.has(id))];
+    onUpdateEvent({ ...activeEvent, participantIds, snapshots: snaps });
     setRsvpPickField(null); setRsvpPickQuery(''); setRsvpPickSel(new Set());
     vibe(8);
   }
@@ -624,7 +629,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             </div>
           )}
 
-          {isUpcoming && showsRsvp && participantsList.length > 0 && (() => {
+          {isUpcoming && showsRsvp && eventEligiblePlayers.length > 0 && (() => {
             const RSVP_CATEGORIES = [
               ['🕐 Coming Late', 'willBeLate', C.gold],
               ['🏃 Leaving Early', 'willLeaveEarly', C.gold],
@@ -633,13 +638,14 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               ['🔀 Pops In Randomly', 'intermittent', C.gold],
               ['? Unsure', 'unsure', C.muted],
             ];
+            const existingIds = new Set(activeEvent.participantIds || []);
             const q = rsvpPickQuery.trim().toLowerCase();
             const pickResults = q
-              ? participantsList.filter(p => (p.username||p.alias||'').toLowerCase().includes(q)).slice(0, 8)
+              ? eventEligiblePlayers.filter(p => (p.username||p.alias||'').toLowerCase().includes(q) && !rsvpPickSel.has(p.id)).slice(0, 8)
               : [];
             return (
               <div style={{ marginBottom:16 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>Set RSVP by status</div>
+                <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>Join & set RSVP by status</div>
                 <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:rsvpPickField?10:0 }}>
                   {RSVP_CATEGORIES.map(([label, field, c]) => (
                     <button key={field} onClick={() => { setRsvpPickField(rsvpPickField===field?null:field); setRsvpPickQuery(''); setRsvpPickSel(new Set()); }}
@@ -652,10 +658,13 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                   const [, , pickColor] = RSVP_CATEGORIES.find(([,f]) => f===rsvpPickField);
                   return (
                     <div style={{ background:C.section, borderRadius:12, padding:12 }}>
+                      <div style={{ fontSize:11, color:C.muted, marginBottom:8 }}>
+                        Search anyone in the alliance — picking someone not yet on this event's roster adds them as a participant too.
+                      </div>
                       <input
                         value={rsvpPickQuery}
                         onChange={e => setRsvpPickQuery(e.target.value)}
-                        placeholder="Type a name to add…"
+                        placeholder="Type a name…"
                         style={{ width:'100%', height:44, background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 14px', fontSize:15, color:C.white, boxSizing:'border-box', fontFamily:'inherit', marginBottom:8 }}
                       />
                       {pickResults.length > 0 && (
@@ -663,7 +672,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                           {pickResults.map(p => (
                             <button key={p.id} onClick={() => { setRsvpPickSel(prev => new Set(prev).add(p.id)); setRsvpPickQuery(''); }}
                               style={{ padding:'6px 12px', minHeight:36, borderRadius:14, background:C.card, border:`1px solid ${C.border}`, color:C.white, fontSize:13, cursor:'pointer' }}>
-                              + {p.username||p.alias}
+                              + {p.username||p.alias}{!existingIds.has(p.id) ? ' (new)' : ''}
                             </button>
                           ))}
                         </div>
@@ -674,7 +683,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                             const p = players.find(pl => pl.id===pid);
                             return (
                               <span key={pid} style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 6px 6px 12px', borderRadius:14, background:pickColor+'22', border:`1px solid ${pickColor}44`, color:pickColor, fontSize:13, fontWeight:600 }}>
-                                {p?.username||p?.alias||'?'}
+                                {p?.username||p?.alias||'?'}{!existingIds.has(pid) ? ' 🆕' : ''}
                                 <button onClick={() => setRsvpPickSel(prev => { const n = new Set(prev); n.delete(pid); return n; })}
                                   style={{ width:20, height:20, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', color:pickColor+'99', fontSize:12, cursor:'pointer', padding:0 }}>✕</button>
                               </span>
