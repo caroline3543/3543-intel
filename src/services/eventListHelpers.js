@@ -136,3 +136,101 @@ export function generateParticipantsText(activeEvent, participantsList, substitu
   }
   return lines.join('\n').trim();
 }
+
+// "Fully upgraded" — all three troops match each other (same
+// definition used for the mismatch flag on the member card and in the
+// event export's Rally Leader Heroes work). With fewer than 2 troops
+// set there's nothing to compare, so it's treated as not-partial by
+// default rather than flagging a gap that can't actually be confirmed.
+function isFullyUpgraded(p) {
+  const set = [p.troops?.infantry, p.troops?.lancer, p.troops?.marksman].filter(Boolean);
+  if (set.length < 2) return true;
+  return set.every(t => t === set[0]);
+}
+
+// Which troop types are at a Helios stage — a player can have more
+// than one, e.g. Helios on both Infantry and Lancer.
+function heliosTypesFor(p) {
+  const types = [];
+  if (p.troops?.infantry?.startsWith('Helios')) types.push('Inf');
+  if (p.troops?.lancer?.startsWith('Helios'))   types.push('Lan');
+  if (p.troops?.marksman?.startsWith('Helios')) types.push('Mar');
+  return types;
+}
+
+function rsvpStatusText(snap) {
+  const r = snap?.rsvp || {};
+  if (r.unsure) return 'Unsure';
+  if (r.participating === false) return 'Not confirmed';
+  if (r.intermittent) return 'Pops in randomly';
+  if (r.willBeLate) return 'Coming late';
+  if (r.willLeaveEarly) return 'Leaving early';
+  if (r.presentWholeTime && r.willJoinDiscord) return 'Present whole time + voice';
+  if (r.presentWholeTime) return 'Present whole time';
+  if (r.willJoinDiscord) return 'Joining voice chat';
+  return 'Confirmed';
+}
+
+function attendanceStatusText(snap) {
+  const a = snap?.attendance || {};
+  if (a.noShow && a.excused) return 'Excused absence';
+  if (a.noShow) return 'No-show';
+  if (a.joinedLateNoNotice) return 'Late (no notice)';
+  if (a.attended === true) return snap?.voice?.joined ? 'Attended + voice' : 'Attended';
+  return 'Not recorded';
+}
+
+// One line per player: flag emoji (👑 Rally Lead, ☀️ any Helios troop,
+// 🎖️ R4 or R5), furnace level, whether all three troops match each
+// other (Full/Partial), which troop type(s) are Helios if any, and
+// their current RSVP/attendance status.
+function attendanceLine(p, snap, isUpcoming) {
+  const flags = [];
+  if (p.roles?.includes('Rally Lead')) flags.push('👑');
+  const heliosTypes = heliosTypesFor(p);
+  if (heliosTypes.length > 0) flags.push('☀️');
+  if (p.allianceRank === 'R4' || p.allianceRank === 'R5') flags.push('🎖️');
+  const flagStr = flags.length ? flags.join('') + ' ' : '';
+
+  const fc = p.furnaceLevel || '?';
+  const fullness = isFullyUpgraded(p) ? 'Full' : 'Partial';
+  const heliosDetail = heliosTypes.length > 0 ? ` · Helios: ${heliosTypes.join('/')}` : '';
+  const status = isUpcoming ? rsvpStatusText(snap) : attendanceStatusText(snap);
+
+  return `  ${flagStr}${p.username || p.alias || '?'} — ${fc} (${fullness})${heliosDetail} · ${status}`;
+}
+
+// Copyable, Discord-ready ATTENDANCE text — richer than
+// generateParticipantsText above (which is just names grouped by
+// rank): shows furnace level, whether the player's troops are fully
+// or only partially upgraded to match each other, which troop type(s)
+// are Helios-tier, and current RSVP/attendance status, with 👑/☀️/🎖️
+// flags for Rally Lead, any Helios troop, and R4+ respectively. Plain
+// text, no code-fence — same "pastes straight into Discord" rule as
+// every other copy feature in this app.
+export function generateAttendanceText(activeEvent, participantsList, substitutesList) {
+  if (!activeEvent) return '';
+  const isUpcoming = activeEvent.status === 'upcoming';
+  const snapFor = pid => (activeEvent.snapshots || []).find(s => s.playerId === pid);
+
+  const headerParts = [activeEvent.name || activeEvent.type, fmtDateShort(activeEvent.date)];
+  if (activeEvent.time)   headerParts.push(`🕐 ${activeEvent.time}`);
+  if (activeEvent.legion) headerParts.push(`Legion ${activeEvent.legion}`);
+  const lines = [`📋 ${headerParts.join(' — ')} — Attendance`, ''];
+
+  const groups = groupByRank(participantsList);
+  lines.push(`PARTICIPANTS (${participantsList.length})`);
+  [...ALLIANCE_RANKS, 'Unranked'].forEach(rank => {
+    const group = groups[rank];
+    if (!group.length) return;
+    lines.push(`${rank} (${group.length})`);
+    group.forEach(p => lines.push(attendanceLine(p, snapFor(p.id), isUpcoming)));
+  });
+
+  if (substitutesList.length > 0) {
+    lines.push('', `SUBSTITUTES (${substitutesList.length})`);
+    substitutesList.forEach(p => lines.push(attendanceLine(p, snapFor(p.id), isUpcoming)));
+  }
+
+  return lines.join('\n').trim();
+}
