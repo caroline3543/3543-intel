@@ -6,7 +6,7 @@ import { newSnapshot } from '../../data/playerSchema.js';
 import { searchPlayers } from '../../services/playerAutosuggest.js';
 import {
   groupByRank, isArchived, findSiblingLegionEvent, legionColor,
-  eventMs, evSum, generateParticipantsText, generateAttendanceText,
+  eventMs, evSum, generateParticipantsText, generateAttendanceText, generateHeliosAttendanceText,
 } from '../../services/eventListHelpers.js';
 import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 import { exportEventParticipants } from '../../services/exportXlsx.js';
@@ -77,6 +77,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [copyPickerOpen, setCopyPickerOpen] = useState(false);
   const [participantsCopied, setParticipantsCopied] = useState(false);
   const [attendanceCopied, setAttendanceCopied]     = useState(false);
+  const [heliosCopied, setHeliosCopied]              = useState(false);
   const [eventsView, setEventsView] = useState('active'); // 'active' | 'archive'
 
   const activeEvent = events.find(e => e.id === activeEventId);
@@ -461,6 +462,10 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     navigator.clipboard.writeText(generateAttendanceText(activeEvent, participantsList, substitutesList)).then(() => { setAttendanceCopied(true); setTimeout(() => setAttendanceCopied(false), 2000); });
   }
 
+  function copyHeliosAttendance() {
+    navigator.clipboard.writeText(generateHeliosAttendanceText(activeEvent, participantsList, substitutesList)).then(() => { setHeliosCopied(true); setTimeout(() => setHeliosCopied(false), 2000); });
+  }
+
   const bulkTags = isUpcoming
     ? (showsRsvp ? [['🕐 Arriving late','rsvpLate',C.gold],['🏃 Leaving early','early',C.gold],['🎙️ Will join voice chat','discord',C.icy],['✓ Present whole time','wholetime',C.green],['🔀 Pops in randomly','intermittentTag',C.gold],['? Unsure','unsureTag',C.muted]] : [])
     : [['✓ Attended','attended',C.green],['✗ No-show','noshow',C.red],['📝 Excused absence','excused',C.mar],['🕐 Late (no notice)','late',C.gold],['🎙️ Voice','voice',C.icy]];
@@ -774,15 +779,27 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             return (
               <>
                 <div style={{ display:'flex', gap:8, marginBottom:8 }}>
-                  <button onClick={copyParticipants}
-                    style={{ flex:1, height:40, borderRadius:10, background:participantsCopied?C.green+'18':C.gold+'18', border:`1px solid ${participantsCopied?C.green:C.gold}44`, color:participantsCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                    {participantsCopied ? '✓ Copied' : '📋 Copy participants'}
-                  </button>
-                  <button onClick={copyAttendance}
-                    style={{ flex:1, height:40, borderRadius:10, background:attendanceCopied?C.green+'18':C.gold+'18', border:`1px solid ${attendanceCopied?C.green:C.gold}44`, color:attendanceCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                    {attendanceCopied ? '✓ Copied' : '📋 Copy attendance'}
-                  </button>
+                  {(!isUpcoming || !showsRsvp) && (
+                    <button onClick={copyParticipants}
+                      style={{ flex:1, height:40, borderRadius:10, background:participantsCopied?C.green+'18':C.gold+'18', border:`1px solid ${participantsCopied?C.green:C.gold}44`, color:participantsCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                      {participantsCopied ? '✓ Copied' : '📋 Copy participants'}
+                    </button>
+                  )}
+                  {(!isUpcoming || showsRsvp) && (
+                    <button onClick={copyAttendance}
+                      style={{ flex:1, height:40, borderRadius:10, background:attendanceCopied?C.green+'18':C.gold+'18', border:`1px solid ${attendanceCopied?C.green:C.gold}44`, color:attendanceCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                      {attendanceCopied ? '✓ Copied' : '📋 Copy attendance'}
+                    </button>
+                  )}
                 </div>
+                {showsRsvp && (
+                  <div style={{ marginBottom:14 }}>
+                    <button onClick={copyHeliosAttendance}
+                      style={{ width:'100%', height:40, borderRadius:10, background:heliosCopied?C.green+'18':C.section, border:`1px solid ${heliosCopied?C.green:C.border}`, color:heliosCopied?C.green:C.icy, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                      {heliosCopied ? '✓ Copied' : '☀️ Copy Helios attendees'}
+                    </button>
+                  </div>
+                )}
                 <div style={{ display:'flex', gap:8, marginBottom:14 }}>
                   <button onClick={() => exportEventParticipants(activeEvent, players, plans)}
                     style={{ flex:1, height:40, borderRadius:10, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>

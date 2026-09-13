@@ -257,3 +257,48 @@ export function generateAttendanceText(activeEvent, participantsList, substitute
 
   return lines.join('\n').trim();
 }
+
+// Copyable, Discord-ready list of every attending Helios player,
+// grouped by WHICH troop type is Helios-tier (Infantry/Lancer/
+// Marksman) — a player with Helios on more than one troop appears
+// under each type, since that's not a mutually-exclusive fact the way
+// RSVP status is. "Attending" means: on the participant/substitute
+// list for an upcoming event (being added is the participation signal
+// everywhere else in this app), or attendance.attended === true for a
+// completed one. Plain text, no code-fence.
+export function generateHeliosAttendanceText(activeEvent, participantsList, substitutesList) {
+  if (!activeEvent) return '';
+  const isUpcoming = activeEvent.status === 'upcoming';
+  const snapFor = pid => (activeEvent.snapshots || []).find(s => s.playerId === pid);
+
+  function isAttending(p) {
+    if (isUpcoming) return true; // already on this list = added/participating
+    return snapFor(p.id)?.attendance?.attended === true;
+  }
+
+  const heliosAttendees = [...participantsList, ...substitutesList]
+    .filter(isAttending)
+    .filter(p => heliosTypesFor(p).length > 0);
+
+  const headerParts = [activeEvent.name || activeEvent.type, fmtDateShort(activeEvent.date)];
+  if (activeEvent.time)   headerParts.push(`🕐 ${activeEvent.time}`);
+  if (activeEvent.legion) headerParts.push(`Legion ${activeEvent.legion}`);
+  const lines = [`☀️ ${headerParts.join(' — ')} — Helios Players (${heliosAttendees.length})`, ''];
+
+  if (heliosAttendees.length === 0) {
+    lines.push('No Helios players attending.');
+    return lines.join('\n').trim();
+  }
+
+  const TYPE_LABELS = [['Inf', '🛡️ Infantry'], ['Lan', '⚔️ Lancer'], ['Mar', '🎯 Marksman']];
+  TYPE_LABELS.forEach(([code, label]) => {
+    const group = heliosAttendees.filter(p => heliosTypesFor(p).includes(code));
+    if (!group.length) return;
+    lines.push(`${label} (${group.length})`);
+    group
+      .sort((a, b) => (a.username || a.alias || '').localeCompare(b.username || b.alias || ''))
+      .forEach(p => lines.push(`  ${p.username || p.alias || '?'}${p.furnaceLevel ? ` — ${p.furnaceLevel}` : ''}`));
+  });
+
+  return lines.join('\n').trim();
+}
