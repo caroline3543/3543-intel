@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { C } from '../../../utils/constants.js';
-import { meetsTroopReqs, playerCanFillSlot, resolveHero, CUSTOM_HERO_OPTIONS } from './battleConstants.js';
+import { meetsTroopReqs, playerCanFillSlot, resolveHero, CUSTOM_HERO_OPTIONS, timingTier as sharedTimingTier } from './battleConstants.js';
 import { calcMetrics, isMvpJoiner } from '../../../data/metrics.js';
 
 // ── JoinerSlotRow ──────────────────────────────────────────────
@@ -45,10 +45,12 @@ import { calcMetrics, isMvpJoiner } from '../../../data/metrics.js';
 //   linkedEvent     – the Event this plan is linked to — its
 //                     snapshots carry each attendee's RSVP timing
 //                     (willBeLate / willLeaveEarly / intermittent)
+//   planPhase       – 'start' | 'midway' (from the rally slot) — which
+//                     half of the timing tiers below ranks higher
 //   onUpdate        – (updatedSlot) => void
 //   allAssignedIds  – Set of playerIds already assigned elsewhere in this plan
 //   troopReqs       – { infantry, lancer, marksman } minimum FC strings
-export function JoinerSlotRow({ slot, index, players, events = [], linkedEvent = null, onUpdate, allAssignedIds, troopReqs = {} }) {
+export function JoinerSlotRow({ slot, index, players, events = [], linkedEvent = null, planPhase = 'start', onUpdate, allAssignedIds, troopReqs = {} }) {
   const [open, setOpen]             = useState(false);
   const [pickingHero, setPickingHero] = useState(false);
 
@@ -56,32 +58,11 @@ export function JoinerSlotRow({ slot, index, players, events = [], linkedEvent =
   const isUnavail  = slot.confirmed === false && slot.playerId;
   const hasReqs     = Object.values(troopReqs || {}).some(Boolean);
 
-  // Six distinct RSVP timing states, ranked worst-to-best as tiers
-  // 0 (best) through 5 (worst) — kept separate rather than lumped
-  // together since "arriving late" and "leaving early" mean opposite
-  // things for which rallies someone actually fits:
-  //   0 = confirmed full-window (presentWholeTime) or no flags set
-  //   1 = willLeaveEarly only — present for the early part of the event
-  //   2 = willBeLate only — present for the later part of the event
-  //   3 = both late AND leaving early — narrow window either way
-  //   4 = unsure — hasn't committed either way
-  //   5 = intermittent ("pops in randomly") — always last, overriding
-  //       MVP/reliability below it, see header note
-  // NOTE: this default ordering (leaving-early ranked above arriving-
-  // late) assumes a plan for the START of the event, where an early
-  // leaver is still around for most rallies but a late arrival isn't.
-  // That assumption inverts for a plan covering the MIDDLE of a
-  // 5-hour event — flagged as an open question, not yet built.
-  function timingTier(p) {
-    const rsvp = linkedEvent?.snapshots?.find(s => s.playerId === p.id)?.rsvp;
-    if (!rsvp) return 0;
-    if (rsvp.intermittent) return 5;
-    if (rsvp.unsure) return 4;
-    if (rsvp.willBeLate && rsvp.willLeaveEarly) return 3;
-    if (rsvp.willBeLate) return 2;
-    if (rsvp.willLeaveEarly) return 1;
-    return 0;
-  }
+  // Ranking logic itself now lives in battleConstants.js's timingTier
+  // (shared with PlanDetail.jsx's autoFillPlan, which ranks rally
+  // LEADER candidates by the same tiers) — this wrapper just supplies
+  // this row's linkedEvent/planPhase closure.
+  function timingTier(p) { return sharedTimingTier(p, linkedEvent, planPhase); }
 
   function timingLabel(tier) {
     switch (tier) {

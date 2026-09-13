@@ -49,7 +49,7 @@ export function RallySlotCard({
   onGoToMembers, selectedGenerations = [],
   assignedInOtherSlots, linkedEvent = null,
 }) {
-  const [open, setOpen]               = useState(index === 0);
+  const [open, setOpen]               = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [changingLeader, setChangingLeader] = useState(false);
 
@@ -232,6 +232,26 @@ export function RallySlotCard({
             </div>
           )}
 
+          {/* 2.6 Plan phase — start vs. midway through the 5-hour
+              event. Governs the officer's own thinking about WHEN this
+              rally fires, and re-ranks priority-joiner candidates in
+              JoinerSlotRow accordingly (an early-leaver is fine early
+              in the event, risky if this rally is later). */}
+          <div style={{ marginBottom:14 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:8 }}>Planning for</label>
+            <div style={{ display:'flex', gap:8 }}>
+              {[['start','⏱ Start of event'],['midway','🔄 Midway through']].map(([val, label]) => {
+                const sel = (slot.planPhase || 'start') === val;
+                return (
+                  <button key={val} onClick={() => upd({ planPhase: val })}
+                    style={{ flex:1, height:40, borderRadius:12, border:`1px solid ${sel?color:C.border}`, background:sel?color+'22':C.section, color:sel?color:C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                    {sel?'✓ ':''}{label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* 3. Rally leader + 4. Formation + Troop Ratio — all three
               need real attendance data (leader picker, formation
               coverage/auto-suggest all read the eligible pool), so all
@@ -386,6 +406,7 @@ export function RallySlotCard({
                     players={joinerEligiblePlayers}
                     events={events}
                     linkedEvent={linkedEvent}
+                    planPhase={slot.planPhase || 'start'}
                     onUpdate={patch => updJoiner(i, patch)}
                     allAssignedIds={allAssignedIds}
                     troopReqs={slot.troopReqs}

@@ -174,6 +174,59 @@ export function isAttending(playerId, event) {
 }
 
 /**
+ * Timing tier for a player's RSVP on a given linked Event — used to
+ * rank BOTH rally leader candidates (PlanDetail.jsx's autoFillPlan)
+ * and priority-joiner candidates (JoinerSlotRow.jsx) by how safely
+ * present they are, lower = more preferred:
+ *   0 = confirmed full-window (presentWholeTime) or no flags set
+ *   1/2 = late-only vs early-only — which is 1 vs 2 depends on
+ *         planPhase (see below); whichever means "still around for
+ *         THIS rally" ranks as 1
+ *   3 = both late AND leaving early — narrow window either way
+ *   4 = unsure — hasn't committed either way
+ *   5 = intermittent ("pops in randomly") — always last, deliberately
+ *       overriding MVP/reliability wherever those are also used to rank
+ * planPhase ('start' | 'midway', from the rally slot's own planPhase
+ * field — see newRallySlot in playerSchema.js) decides which of
+ * late/early is the safer bet: at 'start' an early-leaver still
+ * covers most of a start-phase rally (arriving-late is the real
+ * risk); at 'midway' a late-arriver has probably already shown up by
+ * now (leaving-early is the real risk — they may already be gone).
+ */
+export function timingTier(player, event, planPhase = 'start') {
+  const rsvp = event?.snapshots?.find(s => s.playerId === player.id)?.rsvp;
+  if (!rsvp) return 0;
+  if (rsvp.intermittent) return 5;
+  if (rsvp.unsure) return 4;
+  if (rsvp.willBeLate && rsvp.willLeaveEarly) return 3;
+  const lateOnly  = rsvp.willBeLate && !rsvp.willLeaveEarly;
+  const earlyOnly = rsvp.willLeaveEarly && !rsvp.willBeLate;
+  if (planPhase === 'midway') {
+    if (lateOnly)  return 1;
+    if (earlyOnly) return 2;
+  } else {
+    if (earlyOnly) return 1;
+    if (lateOnly)  return 2;
+  }
+  return 0;
+}
+
+/**
+ * Best (highest) troop tier a player has across their three troop
+ * types, as an FC_ORDER index — used by autoFillPlan (PlanDetail.jsx)
+ * to pair the strongest available troop-tier joiners with the
+ * strongest rally leaders. Distinct from getCurrentTroopPower
+ * (metrics.js), which is a numeric Foundry/Canyon Clash power
+ * snapshot, not an FC-tier classification — Caroline asked
+ * specifically for "troop tiers" here, not power.
+ */
+export function bestTroopTierIndex(player) {
+  const tiers = ['infantry','lancer','marksman'].map(k => player.troops?.[k]).filter(Boolean);
+  if (!tiers.length) return -1;
+  return Math.max(...tiers.map(t => FC_ORDER.indexOf(t)));
+}
+
+/**
  * Checks whether a player meets a rally slot's minimum troop tier
  * requirements. Shared by JoinerSlotRow (manual picker — greys out
  * ineligible members) and FormationPicker's auto-suggest (which used

@@ -78,6 +78,26 @@ export function newLeaderTeam(overrides = {}) {
   };
 }
 
+/**
+ * One row in the Labyrinth Rankings tracker (Intel tab) — "create
+ * fresh" per Caroline's request, no prior Labyrinth data model
+ * existed. Deliberately NOT tied to a roster playerId: Labyrinth is a
+ * state-wide leaderboard, so an entry may name someone outside
+ * Caroline's own alliance/roster entirely. Grouped and displayed by
+ * allianceTag, sorted by score, top 15 shown per alliance.
+ */
+export function newLabyrinthEntry(overrides = {}) {
+  return {
+    id:          uid(),
+    allianceTag: '',
+    playerName:  '',    // free text — name or FID, not a roster lookup
+    score:       null,  // Labyrinth ranking score — sort key
+    notes:       '',
+    updatedAt:   new Date().toISOString(),
+    ...overrides,
+  };
+}
+
 export function newEvent(overrides = {}) {
   return {
     id:             uid(),
@@ -195,6 +215,7 @@ export function newRallySlot(overrides = {}) {
     type:         'Main Rally',
     allianceTag:  null,     // restricts leader + joiner eligibility to this alliance only, if set
     target:       null,     // 'turret' | 'castle' | null — SvS/Castle Battle events only (see JOINER_COVERAGE_EVENTS in constants.js); which structure this rally is aimed at
+    planPhase:    'start',  // 'start' | 'midway' — which part of the 5-hour event this rally is expected to happen in. Flips how JoinerSlotRow ranks willBeLate vs willLeaveEarly: at 'start' an early-leaver still covers most of the rally, at 'midway' a late-arriver is probably already there by now.
     leaderId:     null,
     leaderName:   '',
     rallyDuration: 3,

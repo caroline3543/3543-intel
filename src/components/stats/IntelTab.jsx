@@ -1,16 +1,158 @@
 import { useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { calcMetrics } from '../../data/metrics.js';
+import { newLabyrinthEntry } from '../../data/playerSchema.js';
 import { ReliabilityBadge } from '../common/Primitives.jsx';
 import JoinerRegistry from '../JoinerRegistry.jsx';
 import NoticeLibrary from '../notices/NoticeLibrary.jsx';
 import AsciiArtLibrary from '../ascii/AsciiArtLibrary.jsx';
 
-export function IntelTab({ players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice, asciiArts = [], onSaveArt, onDeleteArt, onResetArtToDefaults }) {
+// ── LabyrinthRankings ──────────────────────────────────────────
+// Built fresh — no prior Labyrinth tracking existed anywhere in the
+// app. Entries are free-standing (newLabyrinthEntry, playerSchema.js),
+// NOT tied to a roster playerId, since Labyrinth is a state-wide
+// leaderboard and entries may name people outside Caroline's own
+// alliance/roster. Grouped by allianceTag, sorted by score, top 15
+// shown per alliance (more can be stored; only the top 15 surface).
+//
+// Kept inline in this file rather than split into its own component
+// file — IntelTab.jsx's existing sub-panels (JoinerRegistry,
+// NoticeLibrary, AsciiArtLibrary) each live in a DIFFERENT folder
+// with no consistent "intel subcomponent" location to infer, so
+// guessing a new path felt riskier than one extra ~120-line function
+// here. Split it out (e.g. components/intel/LabyrinthRankings.jsx) if
+// this file crosses the 300-line component limit.
+function LabyrinthRankings({ entries, existingTags, onSave, onDelete, onClose }) {
+  const [formOpen, setFormOpen]               = useState(false);
+  const [editing, setEditing]                 = useState(null); // entry being added/edited
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  const byAlliance = new Map();
+  entries.forEach(e => {
+    const tag = e.allianceTag || '(no alliance set)';
+    if (!byAlliance.has(tag)) byAlliance.set(tag, []);
+    byAlliance.get(tag).push(e);
+  });
+  const allianceGroups = [...byAlliance.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+  function startAdd() { setEditing(newLabyrinthEntry()); setFormOpen(true); }
+  function startEdit(entry) { setEditing({ ...entry }); setConfirmDeleteId(null); setFormOpen(true); }
+  function saveEditing() {
+    if (!editing?.playerName?.trim()) return;
+    onSave({ ...editing, updatedAt: new Date().toISOString() });
+    setFormOpen(false);
+    setEditing(null);
+  }
+
+  const isExisting = editing && entries.some(e => e.id === editing.id);
+
+  return (
+    <>
+      <div style={{ padding:'16px 20px', borderBottom:`1px solid ${C.border}`, display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+        <div style={{ fontSize:17, fontWeight:700, color:C.white }}>🏆 Labyrinth Rankings</div>
+        <button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, fontSize:26, cursor:'pointer', lineHeight:1 }}>✕</button>
+      </div>
+
+      <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }}>
+        <div style={{ fontSize:12, color:C.muted, marginBottom:16 }}>
+          Top 15 per alliance, ranked by score. Entries don't need to be on your roster — Labyrinth spans the whole state.
+        </div>
+
+        <button onClick={startAdd} style={{ width:'100%', height:44, borderRadius:12, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:700, fontSize:13, cursor:'pointer', marginBottom:16 }}>
+          ＋ Add player
+        </button>
+
+        {allianceGroups.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'32px 0', color:C.muted, fontSize:13 }}>No entries yet — add your first Labyrinth player above.</div>
+        ) : (
+          allianceGroups.map(([tag, list]) => {
+            const sorted = [...list].sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity));
+            const top15  = sorted.slice(0, 15);
+            const extra  = sorted.length - top15.length;
+            return (
+              <div key={tag} style={{ marginBottom:20 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:C.icy, marginBottom:8 }}>
+                  {tag === '(no alliance set)' ? tag : `[${tag}]`} · {sorted.length}{extra > 0 ? ' (top 15 shown)' : ''}
+                </div>
+                {top15.map((e, i) => (
+                  <div key={e.id} onClick={() => startEdit(e)}
+                    style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:`1px solid ${C.border}22`, cursor:'pointer' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:i<3?C.gold:C.muted, width:20, textAlign:'center' }}>
+                      {i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:14, fontWeight:700, color:C.white }}>{e.playerName}</div>
+                      {e.notes && <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>{e.notes}</div>}
+                    </div>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.gold }}>{e.score ?? '—'}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {formOpen && editing && (
+        <div onClick={() => { setFormOpen(false); setEditing(null); }} style={{ position:'fixed', inset:0, background:'#000c', zIndex:700, display:'flex', alignItems:'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:480, margin:'0 auto', maxHeight:'85vh', overflowY:'auto', padding:'16px 20px 32px' }}>
+            <div style={{ width:40, height:4, borderRadius:2, background:C.border, margin:'0 auto 16px' }} />
+            <div style={{ fontSize:16, fontWeight:700, color:C.white, marginBottom:16 }}>{isExisting ? 'Edit entry' : 'Add player'}</div>
+
+            <label style={{ fontSize:11, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Alliance</label>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:4 }}>
+              {existingTags.map(tag => (
+                <button key={tag} onClick={() => setEditing({ ...editing, allianceTag: tag })}
+                  style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${editing.allianceTag===tag?C.gold:C.border}`, background:editing.allianceTag===tag?C.gold+'22':C.section, color:editing.allianceTag===tag?C.gold:C.icy, fontWeight:600, fontSize:12, cursor:'pointer' }}>
+                  [{tag}]
+                </button>
+              ))}
+            </div>
+            <input value={editing.allianceTag || ''} onChange={e => setEditing({ ...editing, allianceTag: e.target.value })} placeholder="Or type an alliance tag"
+              style={{ width:'100%', height:40, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 12px', fontSize:13, color:C.white, boxSizing:'border-box', marginBottom:12 }} />
+
+            <label style={{ fontSize:11, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Player name</label>
+            <input value={editing.playerName || ''} onChange={e => setEditing({ ...editing, playerName: e.target.value })} placeholder="Name or FID"
+              style={{ width:'100%', height:40, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 12px', fontSize:13, color:C.white, boxSizing:'border-box', marginBottom:12 }} />
+
+            <label style={{ fontSize:11, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Labyrinth score</label>
+            <input type="number" value={editing.score ?? ''} onChange={e => setEditing({ ...editing, score: e.target.value === '' ? null : Number(e.target.value) })} placeholder="e.g. 128500"
+              style={{ width:'100%', height:40, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 12px', fontSize:13, color:C.white, boxSizing:'border-box', marginBottom:12 }} />
+
+            <label style={{ fontSize:11, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:4 }}>Notes</label>
+            <textarea value={editing.notes || ''} onChange={e => setEditing({ ...editing, notes: e.target.value })} placeholder="Optional — anything worth remembering"
+              style={{ width:'100%', minHeight:56, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:13, color:C.white, resize:'none', boxSizing:'border-box', fontFamily:'inherit', marginBottom:16 }} />
+
+            <div style={{ display:'flex', gap:8 }}>
+              {isExisting && (
+                <button onClick={() => {
+                    if (confirmDeleteId === editing.id) { onDelete(editing.id); setFormOpen(false); setEditing(null); setConfirmDeleteId(null); }
+                    else setConfirmDeleteId(editing.id);
+                  }}
+                  style={{ height:48, padding:'0 16px', borderRadius:12, background:'none', border:`1px solid ${C.red}44`, color:C.red, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  {confirmDeleteId === editing.id ? 'Tap again to delete' : 'Delete'}
+                </button>
+              )}
+              <button onClick={saveEditing} disabled={!editing.playerName?.trim()}
+                style={{ flex:1, height:48, borderRadius:12, background:editing.playerName?.trim()?C.gold:C.section, border:editing.playerName?.trim()?'none':`1px solid ${C.border}`, color:editing.playerName?.trim()?C.bg:C.muted, fontWeight:700, fontSize:14, cursor:editing.playerName?.trim()?'pointer':'default' }}>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function IntelTab({ players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice, asciiArts = [], onSaveArt, onDeleteArt, onResetArtToDefaults, labyrinthEntries = [], onSaveLabyrinthEntry, onDeleteLabyrinthEntry }) {
   const [registryOpen, setRegistryOpen] = useState(false);
   const [noticesOpen, setNoticesOpen]   = useState(false);
   const [artOpen, setArtOpen]           = useState(false);
+  const [labyrinthOpen, setLabyrinthOpen] = useState(false);
   const [englishDiscordOpen, setEnglishDiscordOpen] = useState(false);
+
+  const existingAllianceTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
 
   const withM = players
     .map(p=>({player:p,metrics:calcMetrics(p,events)}))
@@ -75,6 +217,20 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
           onDeleteArt={onDeleteArt}
           onResetToDefaults={onResetArtToDefaults}
           onClose={()=>setArtOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  if (labyrinthOpen) {
+    return (
+      <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg, display:'flex', flexDirection:'column', overflow:'hidden', maxWidth:480, margin:'0 auto' }}>
+        <LabyrinthRankings
+          entries={labyrinthEntries}
+          existingTags={existingAllianceTags}
+          onSave={onSaveLabyrinthEntry}
+          onDelete={onDeleteLabyrinthEntry}
+          onClose={()=>setLabyrinthOpen(false)}
         />
       </div>
     );
@@ -148,6 +304,16 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
         <div>
           <div style={{ fontSize:15, fontWeight:700, color:C.gold }}>ASCII Art Library</div>
           <div style={{ fontSize:13, color:C.muted, marginTop:2 }}>Save and copy banners, dividers, and decorations</div>
+        </div>
+        <span style={{ marginLeft:'auto', fontSize:20, color:C.gold }}>›</span>
+      </button>
+
+      {/* Labyrinth Rankings — prominent card */}
+      <button onClick={()=>setLabyrinthOpen(true)} style={{ width:'100%', borderRadius:12, background:C.card, border:`1px solid ${C.gold}44`, padding:'16px', marginBottom:16, cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', gap:14 }}>
+        <span style={{ fontSize:32 }}>🏆</span>
+        <div>
+          <div style={{ fontSize:15, fontWeight:700, color:C.gold }}>Labyrinth Rankings</div>
+          <div style={{ fontSize:13, color:C.muted, marginTop:2 }}>Top 15 per alliance · tap to add or edit</div>
         </div>
         <span style={{ marginLeft:'auto', fontSize:20, color:C.gold }}>›</span>
       </button>
