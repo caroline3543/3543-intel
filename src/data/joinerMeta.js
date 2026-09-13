@@ -64,7 +64,7 @@ export const JOINER_HEROES = [
       { type:'Offense', ratio:'50/20/30 or 30/20/50',  leaders:['Jeronimo & Renee & Gwen'],    j1:'Jessie*', j2:'Seeyoon', j3:'Mia',     j4:'Norah',      alt1:'Patrick',  alt2:'Wu Ming', comments:'Jeronimo is Jessie + Seyoon already so stacking happens. Wu Ming to counter his skills damages' },
       { type:'Offense', ratio:'48/4/48 or 40/10/50',   leaders:['Jeronimo/Hector & Mia & Wayne/Gwen'],j1:'Norah',j2:'Norah',j3:'Norah',j4:'Norah/Patrick',alt1:'or 25%', comments:'Alternative joiners choice: Jessie, Seeyoon, 2xPatrick. Wu Ming to counter his skills damages' },
       { type:'Offense', ratio:'60/40/0 or 40/60/0',    leaders:['Jeronimo & Renee & Greg'],    j1:'Mia',     j2:'Patrick', j3:'Jessie**',j4:'Seeyoon',    alt1:'Wu Ming',  alt2:'Philly', comments:'Jeronimo is Jessie + Seyoon already so stacking happens. Wu Ming to counter his skills damages' },
-      { type:'NEW META Defense', ratio:'45/5/50 or 40/0/60', leaders:['Logan & Philly & Wayne'],     j1:'Norah',   j2:'Norah',   j3:'Norah',   j4:'Norah/Patrick',alt1:'or 25%', comments:'', isMeta:true },
+      { type:'NEW META Defense', ratio:'48/4/48 or 45/5/50', leaders:['Logan & Philly & Wayne'],     j1:'Norah',   j2:'Norah',   j3:'Norah',   j4:'Norah/Patrick',alt1:'or 25%', comments:'', isMeta:true },
       { type:'NEW Defense',      ratio:'45/15/40',      leaders:['Hector & Norah & Wayne'],     j1:'Mia',     j2:'Patrick', j3:'Philly',  j4:'Lynn',       alt1:'or 25%', isMeta:true },
     ],
   },

@@ -271,9 +271,10 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
     navigator.clipboard.writeText(text).then(() => { setSummaryCopied(true); setTimeout(() => setSummaryCopied(false), 2000); });
   }
 
-  // ── Leadership Checklist as a Discord-ready code block — fenced in
-  // triple-backticks so it pastes into Discord already monospaced,
-  // rather than losing the ☐/☑ alignment as plain chat text.
+  // ── Leadership Checklist as plain text — pastes directly into the
+  // game (no code fence). Matches the plain-text convention used by
+  // generateSummary() above; the earlier fenced version broke pasting
+  // into the game, which is this text's actual destination.
   function generateChecklistText() {
     const lines = [`📋 ${plan.name || 'Battle Plan'} — Leadership Checklist`, ''];
     if (autoFlags.length > 0) {
@@ -285,7 +286,7 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
       lines.push('CHECKLIST');
       checklist.forEach(item => lines.push(`${(plan.checklist || {})[item.id] ? '☑' : '☐'} ${item.name}`));
     }
-    return '```\n' + lines.join('\n').trim() + '\n```';
+    return lines.join('\n').trim();
   }
   function copyChecklist() {
     navigator.clipboard.writeText(generateChecklistText()).then(() => { setChecklistCopied(true); setTimeout(() => setChecklistCopied(false), 2000); });
@@ -536,7 +537,7 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
         {(autoFlags.length > 0 || checklist.length > 0) && (
           <button onClick={copyChecklist}
             style={{ width:'100%', height:44, borderRadius:10, marginTop:10, background:checklistCopied?C.green+'18':C.gold+'18', border:`1px solid ${checklistCopied?C.green:C.gold}44`, color:checklistCopied?C.green:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-            {checklistCopied ? '✓ Copied' : '📋 Copy as code block'}
+            {checklistCopied ? '✓ Copied' : '📋 Copy checklist'}
           </button>
         )}
       </div>

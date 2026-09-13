@@ -375,6 +375,7 @@ export function RallySlotCard({
                     index={i}
                     players={joinerEligiblePlayers}
                     events={events}
+                    linkedEvent={linkedEvent}
                     onUpdate={patch => updJoiner(i, patch)}
                     allAssignedIds={allAssignedIds}
                     troopReqs={slot.troopReqs}

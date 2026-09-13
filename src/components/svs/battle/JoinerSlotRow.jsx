@@ -14,25 +14,41 @@ import { calcMetrics, isMvpJoiner } from '../../../data/metrics.js';
 // Rally Leader is excluded upstream in RallySlotCard, which never
 // includes them in the `players` array passed down here at all).
 //
-// NOTE — "attending" is intentionally NOT a filter here. General
-// player-level availability was removed from the data model this
-// project year; attendance now only exists per-Event via RSVP/actual
-// snapshots, and Battle Plans aren't linked to a specific Event. Until
-// that link exists, there's no principled "is this person attending
-// this rally" signal to filter on. `reliabilityScore` (real historical
-// attendance rate, from metrics.js) is used to RANK eligible members
-// instead, as the closest available real signal — not to exclude
-// anyone.
+// NOTE — the `players` array arrives already attendance-filtered:
+// RallySlotCard gates it on `linkedEvent` via `isAttending()` before
+// this component ever sees it, so nothing here re-checks whether
+// someone is coming to the event at all. (An earlier version of this
+// comment said Battle Plans weren't linked to a specific Event —
+// that's no longer true, `plan.eventId`/`linkedEvent` exist now;
+// corrected here.)
+//
+// Ranking beyond raw eligibility, most-preferred first:
+//   1. Timing tier, from this player's RSVP on `linkedEvent` —
+//      full-window/no flags, then partial-window (willBeLate OR
+//      willLeaveEarly), then `intermittent` ("pops in randomly")
+//      LAST — deliberately checked before MVP/reliability below it,
+//      so an unpredictable joiner never outranks a dependable one for
+//      a specific priority slot, no matter how good their event-wide
+//      numbers are. Nobody is ever removed from the list for this,
+//      only sorted down and labelled — same non-exclusionary approach
+//      reliabilityScore already used.
+//   2. MVP Joiner status (ever joined Discord voice — see metrics.js)
+//   3. `reliabilityScore` (real historical attendance rate)
+//   4. Name
 //
 // Props:
 //   slot            – joiner slot object { heroName, playerId, ... }
 //   index           – 0-based position
-//   players         – roster array, already leader-excluded upstream
-//   events          – full events array (for reliability ranking)
+//   players         – roster array, already leader- and attendance-
+//                     filtered upstream
+//   events          – full events array (for reliability/MVP ranking)
+//   linkedEvent     – the Event this plan is linked to — its
+//                     snapshots carry each attendee's RSVP timing
+//                     (willBeLate / willLeaveEarly / intermittent)
 //   onUpdate        – (updatedSlot) => void
 //   allAssignedIds  – Set of playerIds already assigned elsewhere in this plan
 //   troopReqs       – { infantry, lancer, marksman } minimum FC strings
-export function JoinerSlotRow({ slot, index, players, events = [], onUpdate, allAssignedIds, troopReqs = {} }) {
+export function JoinerSlotRow({ slot, index, players, events = [], linkedEvent = null, onUpdate, allAssignedIds, troopReqs = {} }) {
   const [open, setOpen]             = useState(false);
   const [pickingHero, setPickingHero] = useState(false);
 
@@ -40,15 +56,29 @@ export function JoinerSlotRow({ slot, index, players, events = [], onUpdate, all
   const isUnavail  = slot.confirmed === false && slot.playerId;
   const hasReqs     = Object.values(troopReqs || {}).some(Boolean);
 
+  // 0 = full-window or no timing flags set, 1 = present for only part
+  // of the event (willBeLate or willLeaveEarly), 2 = intermittent
+  // ("pops in randomly") — always deprioritized last, see header note.
+  function timingTier(p) {
+    const rsvp = linkedEvent?.snapshots?.find(s => s.playerId === p.id)?.rsvp;
+    if (!rsvp) return 0;
+    if (rsvp.intermittent) return 2;
+    if (rsvp.willBeLate || rsvp.willLeaveEarly) return 1;
+    return 0;
+  }
+
   // Eligible members for a given required hero — hard-filtered, then
-  // ranked by: MVP Joiner status first (ever joined Discord voice —
-  // see metrics.js), then historical reliability, then name.
+  // ranked by: timing tier first (see timingTier above), then MVP
+  // Joiner status (ever joined Discord voice — see metrics.js), then
+  // historical reliability, then name.
   function eligibleFor(hero) {
     return players
       .filter(p => !allAssignedIds.has(p.id) || p.id === slot.playerId)
       .filter(p => playerCanFillSlot(p, hero))
       .filter(p => !hasReqs || meetsTroopReqs(p, troopReqs).ok)
       .sort((a, b) => {
+        const tA = timingTier(a), tB = timingTier(b);
+        if (tA !== tB) return tA - tB;
         const mvpA = isMvpJoiner(a, events), mvpB = isMvpJoiner(b, events);
         if (mvpA !== mvpB) return mvpA ? -1 : 1;
         const ra = calcMetrics(a, events)?.reliabilityScore || 0;
@@ -185,10 +215,13 @@ export function JoinerSlotRow({ slot, index, players, events = [], onUpdate, all
                   {eligible.map(p => {
                     const sel = slot.playerId === p.id;
                     const mvp = isMvpJoiner(p, events);
+                    const tier = timingTier(p);
                     return (
                       <button key={p.id} onClick={() => assignMember(p)}
-                        style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${sel?C.gold:mvp?C.green+'88':C.border}`, background:sel?C.gold+'22':C.section, color:sel?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                        style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${sel?C.gold:mvp?C.green+'88':C.border}`, background:sel?C.gold+'22':C.section, color:sel?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', opacity: tier===2 ? 0.65 : 1 }}>
                         {sel ? '✓ ' : ''}{mvp && <span style={{ color:C.green }}>🎙️MVP </span>}{p.username || p.alias}{p.furnaceLevel ? ` · ${p.furnaceLevel}` : ''}
+                        {tier === 2 && <span style={{ color:C.muted, marginLeft:5, fontWeight:400 }}>🎲 intermittent</span>}
+                        {tier === 1 && <span style={{ color:C.gold, marginLeft:5, fontWeight:400 }}>⏰ partial window</span>}
                       </button>
                     );
                   })}
