@@ -155,6 +155,19 @@ function mergeRoles(existing, incoming) {
   return [...rm.values()];
 }
 
+// Labyrinth Rankings: newer updatedAt wins per entry, keyed by id —
+// same pattern as mergeRoles, same tombstone-tracking caveat (a
+// deleted entry can be resurrected by importing an older file that
+// still has it).
+function mergeLabyrinthEntries(existing, incoming) {
+  const lm = new Map((existing || []).map(e => [e.id, e]));
+  (incoming || []).forEach(e => {
+    const ex = lm.get(e.id);
+    lm.set(e.id, (!ex || ts(e, 'updatedAt') >= ts(ex, 'updatedAt')) ? e : ex);
+  });
+  return [...lm.values()];
+}
+
 export function mergeImportedData(current, incoming) {
   const pm = new Map(current.players.map(p => [p.id, p]));
   (incoming.players || []).forEach(p => pm.set(p.id, pm.has(p.id) ? mergePlayer(pm.get(p.id), p) : p));
@@ -166,6 +179,7 @@ export function mergeImportedData(current, incoming) {
   (incoming.svsPlans || []).forEach(p => sm.set(p.id, sm.has(p.id) ? mergePlan(sm.get(p.id), p) : p));
 
   const mergedRoles = mergeRoles(current.customRoles || [], incoming.customRoles || []);
+  const mergedLabyrinth = mergeLabyrinthEntries(current.labyrinthEntries || [], incoming.labyrinthEntries || []);
 
   return {
     ...current,
@@ -174,6 +188,7 @@ export function mergeImportedData(current, incoming) {
     events:      [...em.values()],
     svsPlans:    [...sm.values()],
     customRoles: mergedRoles,
+    labyrinthEntries: mergedLabyrinth,
     lastUpdated: new Date().toISOString(),
   };
 }
@@ -184,6 +199,7 @@ function migrateIfNeeded(data) {
   if (!m.prepScores) m.prepScores = [];
   if (!m.svsPlans)   m.svsPlans   = [];
   if (!m.customRoles) m.customRoles = [];
+  if (!m.labyrinthEntries) m.labyrinthEntries = [];
   if (!m.settings)   m.settings   = { allianceName:'', allianceTag:'', stateId:'' };
 
   m.players = (m.players || []).map(p => ({
