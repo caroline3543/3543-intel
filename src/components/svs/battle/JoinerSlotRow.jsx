@@ -56,15 +56,42 @@ export function JoinerSlotRow({ slot, index, players, events = [], linkedEvent =
   const isUnavail  = slot.confirmed === false && slot.playerId;
   const hasReqs     = Object.values(troopReqs || {}).some(Boolean);
 
-  // 0 = full-window or no timing flags set, 1 = present for only part
-  // of the event (willBeLate or willLeaveEarly), 2 = intermittent
-  // ("pops in randomly") — always deprioritized last, see header note.
+  // Six distinct RSVP timing states, ranked worst-to-best as tiers
+  // 0 (best) through 5 (worst) — kept separate rather than lumped
+  // together since "arriving late" and "leaving early" mean opposite
+  // things for which rallies someone actually fits:
+  //   0 = confirmed full-window (presentWholeTime) or no flags set
+  //   1 = willLeaveEarly only — present for the early part of the event
+  //   2 = willBeLate only — present for the later part of the event
+  //   3 = both late AND leaving early — narrow window either way
+  //   4 = unsure — hasn't committed either way
+  //   5 = intermittent ("pops in randomly") — always last, overriding
+  //       MVP/reliability below it, see header note
+  // NOTE: this default ordering (leaving-early ranked above arriving-
+  // late) assumes a plan for the START of the event, where an early
+  // leaver is still around for most rallies but a late arrival isn't.
+  // That assumption inverts for a plan covering the MIDDLE of a
+  // 5-hour event — flagged as an open question, not yet built.
   function timingTier(p) {
     const rsvp = linkedEvent?.snapshots?.find(s => s.playerId === p.id)?.rsvp;
     if (!rsvp) return 0;
-    if (rsvp.intermittent) return 2;
-    if (rsvp.willBeLate || rsvp.willLeaveEarly) return 1;
+    if (rsvp.intermittent) return 5;
+    if (rsvp.unsure) return 4;
+    if (rsvp.willBeLate && rsvp.willLeaveEarly) return 3;
+    if (rsvp.willBeLate) return 2;
+    if (rsvp.willLeaveEarly) return 1;
     return 0;
+  }
+
+  function timingLabel(tier) {
+    switch (tier) {
+      case 5: return { text:'🎲 intermittent',          color:C.muted };
+      case 4: return { text:'❓ unsure',                 color:C.muted };
+      case 3: return { text:'⏰ late + leaves early',    color:C.gold  };
+      case 2: return { text:'⏰ arriving late',          color:C.gold  };
+      case 1: return { text:'🚪 leaving early',          color:C.gold  };
+      default: return null;
+    }
   }
 
   // Eligible members for a given required hero — hard-filtered, then
@@ -216,12 +243,12 @@ export function JoinerSlotRow({ slot, index, players, events = [], linkedEvent =
                     const sel = slot.playerId === p.id;
                     const mvp = isMvpJoiner(p, events);
                     const tier = timingTier(p);
+                    const tag  = timingLabel(tier);
                     return (
                       <button key={p.id} onClick={() => assignMember(p)}
-                        style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${sel?C.gold:mvp?C.green+'88':C.border}`, background:sel?C.gold+'22':C.section, color:sel?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', opacity: tier===2 ? 0.65 : 1 }}>
+                        style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${sel?C.gold:mvp?C.green+'88':C.border}`, background:sel?C.gold+'22':C.section, color:sel?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', opacity: tier===5 ? 0.65 : 1 }}>
                         {sel ? '✓ ' : ''}{mvp && <span style={{ color:C.green }}>🎙️MVP </span>}{p.username || p.alias}{p.furnaceLevel ? ` · ${p.furnaceLevel}` : ''}
-                        {tier === 2 && <span style={{ color:C.muted, marginLeft:5, fontWeight:400 }}>🎲 intermittent</span>}
-                        {tier === 1 && <span style={{ color:C.gold, marginLeft:5, fontWeight:400 }}>⏰ partial window</span>}
+                        {tag && <span style={{ color:tag.color, marginLeft:5, fontWeight:400 }}>{tag.text}</span>}
                       </button>
                     );
                   })}

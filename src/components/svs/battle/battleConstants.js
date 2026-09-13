@@ -178,12 +178,24 @@ export function isAttending(playerId, event) {
  * requirements. Shared by JoinerSlotRow (manual picker — greys out
  * ineligible members) and FormationPicker's auto-suggest (which used
  * to ignore troop tier entirely and only check hero ownership).
+ *
+ * minFC is either a plain FC level ('FC1'–'FC8', compared ordinally
+ * via FC_ORDER as before) or the sentinel 'Helios', meaning "any
+ * Helios stage qualifies" — replaces requiring one specific Helios
+ * FC5–FC8 sub-tier as the cutoff (see RallySlotCard.jsx's
+ * TIER_REQ_OPTIONS, the only place that can set this field now).
  */
 export function meetsTroopReqs(player, troopReqs) {
   const reqs = troopReqs || {};
   for (const [key, minFC] of Object.entries(reqs)) {
     if (!minFC) continue;
     const playerTier = player.troops?.[key];
+    if (minFC === 'Helios') {
+      if (!playerTier || !playerTier.startsWith('Helios')) {
+        return { ok: false, reason: `Needs any Helios tier ${key}` };
+      }
+      continue;
+    }
     if (!playerTier) return { ok: false, reason: `Needs ${minFC}+ ${key}` };
     if (FC_ORDER.indexOf(playerTier) < FC_ORDER.indexOf(minFC)) {
       return { ok: false, reason: `${key} ${playerTier} < ${minFC} required` };

@@ -60,6 +60,16 @@ export function RallySlotCard({
 
   const existingTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
 
+  // Minimum troop tier requirement options — plain FC level only
+  // (FC1–FC8), plus ONE 'Helios' bucket meaning "any Helios stage
+  // qualifies," replacing the old four separate Helios FC5–FC8
+  // sub-tier options. Officers no longer have to know/pick which
+  // specific Helios stage to require; meetsTroopReqs (battleConstants.js)
+  // treats 'Helios' as "player.troops[key] starts with Helios," not an
+  // exact FC_ORDER match.
+  const TIER_REQ_OPTIONS = ['Helios','FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1'];
+  function tierReqLabel(fc) { return fc === 'Helios' ? 'Any Helios' : `${fc}+`; }
+
   // Everyone attending the linked event, further narrowed to this
   // slot's alliance if one is set — the pool a Rally Leader can be
   // picked from. Empty (not "everyone") when no event is linked, so
@@ -326,12 +336,12 @@ export function RallySlotCard({
             <div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>Members below these tiers shouldn't join this rally.</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', marginBottom:10 }}>
               <span style={{ fontSize:11, color:C.muted, marginRight:2 }}>Set all three:</span>
-              {['Helios FC8','Helios FC7','Helios FC6','Helios FC5','FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1'].map(fc => {
+              {TIER_REQ_OPTIONS.map(fc => {
                 const allMatch = ['infantry','lancer','marksman'].every(k => (slot.troopReqs||{})[k] === fc);
                 return (
                   <button key={fc} onClick={() => upd({ troopReqs:{ infantry:fc, lancer:fc, marksman:fc } })}
                     style={{ padding:'4px 10px', borderRadius:12, border:`1px solid ${allMatch?C.gold:C.border}`, background:allMatch?C.gold+'22':C.section, color:allMatch?C.gold:C.muted, fontWeight:600, fontSize:11, cursor:'pointer' }}>
-                    {allMatch?'✓ ':''}{fc}
+                    {allMatch?'✓ ':''}{tierReqLabel(fc)}
                   </button>
                 );
               })}
@@ -345,12 +355,12 @@ export function RallySlotCard({
                 <div key={key}>
                   <div style={{ fontSize:11, color:tc, fontWeight:700, marginBottom:4 }}>{label}</div>
                   <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                    {['Helios FC8','Helios FC7','Helios FC6','Helios FC5','FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1'].map(fc => {
+                    {TIER_REQ_OPTIONS.map(fc => {
                       const sel = (slot.troopReqs || {})[key] === fc;
                       return (
                         <button key={fc} onClick={() => upd({ troopReqs:{ ...(slot.troopReqs||{}), [key]:sel?null:fc } })}
                           style={{ ...tierChipStyle(sel, tc), height:32, borderRadius:8 }}>
-                          {sel?'✓ ':''}{fc}+
+                          {sel?'✓ ':''}{tierReqLabel(fc)}
                         </button>
                       );
                     })}
