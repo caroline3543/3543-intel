@@ -90,7 +90,8 @@ export function newLabyrinthEntry(overrides = {}) {
   return {
     id:          uid(),
     allianceTag: '',
-    playerName:  '',    // free text — name or FID, not a roster lookup
+    playerId:    null,  // optional link to a roster member, set when the name matches one via autofill — stays null for players outside Caroline's own roster (Labyrinth is state-wide)
+    playerName:  '',    // free text — name or FID; canonical source of truth even when playerId is set, since a linked player's name can change later
     score:       null,  // Labyrinth ranking score — sort key
     notes:       '',
     updatedAt:   new Date().toISOString(),
