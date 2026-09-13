@@ -1,12 +1,39 @@
+import { useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { matchNamesToPlayers, findCloseMatches, parseNames } from '../../utils/nameList.js';
 import { noShowStreak, noShowBadge } from '../../services/eventListHelpers.js';
+import { getCurrentTroopPower } from '../../data/metrics.js';
+import { newSnapshot } from '../../data/playerSchema.js';
 
-function VerifyRow({ player, activeEvent, events, confirmed, onToggle, lc }) {
+// Tap-through mode is for events where the in-game combatants screen
+// can't be copied as text (it's a scrollable native list, not
+// selectable) — you read it and tap names off one at a time instead.
+// Showing each player's last-known troop power alongside their name
+// lets you cross-check that number against what's on screen at the
+// same time, and tapping it lets you correct it on the spot if it's
+// drifted since it was last recorded, rather than needing a separate
+// trip to their profile.
+function VerifyRow({ player, activeEvent, events, confirmed, onToggle, lc, onUpdatePower }) {
   const dn = player.username||player.alias||'Unknown';
   const streak = noShowStreak(player.id, activeEvent.type, activeEvent.id, events);
   const heart = noShowBadge(streak);
+  const currentPower = getCurrentTroopPower(player, events);
+  const [editingPower, setEditingPower] = useState(false);
+  const [powerInput, setPowerInput]     = useState('');
+
+  function startEdit(e) {
+    e.stopPropagation();
+    setPowerInput(currentPower != null ? String(currentPower) : '');
+    setEditingPower(true);
+  }
+  function commitEdit(e) {
+    e.stopPropagation();
+    const n = Number(powerInput);
+    if (powerInput.trim() && !isNaN(n) && n >= 0) onUpdatePower(player.id, n);
+    setEditingPower(false);
+  }
+
   return (
     <div onClick={() => { onToggle(player.id, confirmed); vibe(6); }}
       style={{ background:confirmed?C.green+'14':C.card, borderRadius:12, padding:'18px 20px', marginBottom:12, minHeight:64, display:'flex', alignItems:'center', gap:16, cursor:'pointer', border:`1.5px solid ${confirmed?C.green+'66':(lc?lc+'44':C.border+'44')}`, WebkitTapHighlightColor:'transparent' }}>
@@ -17,6 +44,23 @@ function VerifyRow({ player, activeEvent, events, confirmed, onToggle, lc }) {
         <div style={{ fontSize:18, fontWeight:700, color:confirmed?C.green:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
         {heart && <span title={`${streak} consecutive ${activeEvent.type} no-shows`} style={{ fontSize:13, flexShrink:0 }}>{heart}</span>}
       </div>
+      {editingPower ? (
+        <div onClick={e => e.stopPropagation()} style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+          <input
+            autoFocus
+            inputMode="numeric"
+            value={powerInput}
+            onChange={e => setPowerInput(e.target.value)}
+            onKeyDown={e => { if (e.key==='Enter') commitEdit(e); if (e.key==='Escape') { e.stopPropagation(); setEditingPower(false); } }}
+            style={{ width:84, height:36, background:C.section, border:`1px solid ${C.gold}`, borderRadius:8, padding:'0 8px', fontSize:14, color:C.white, fontFamily:'inherit', boxSizing:'border-box' }}
+          />
+          <button onClick={commitEdit} style={{ width:36, height:36, borderRadius:8, background:C.gold, border:'none', color:C.bg, fontWeight:700, fontSize:14, cursor:'pointer' }}>✓</button>
+        </div>
+      ) : (
+        <button onClick={startEdit} title="Tap to update troop power" style={{ flexShrink:0, minHeight:36, padding:'6px 10px', borderRadius:8, background:'none', border:`1px solid ${C.border}`, color:currentPower!=null?C.gold:C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+          💪 {currentPower != null ? currentPower.toLocaleString() : '—'}
+        </button>
+      )}
     </div>
   );
 }
@@ -27,12 +71,14 @@ function VerifyRow({ player, activeEvent, events, confirmed, onToggle, lc }) {
 //   verifyInputMode, setVerifyInputMode     – 'tap' | 'paste'
 //   verifyPasteText, setVerifyPasteText     – paste sub-mode state
 //   lc                                      – this event's Legion color
+//   onUpdateEvent                           – (updatedEvent) => void — needed for the
+//                                              tap-to-correct troop power while verifying
 export function VerifyRosterPanel({
   participantsList, activeEvent, events,
   confirmedIds, setConfirmedIds,
   verifyInputMode, setVerifyInputMode,
   verifyPasteText, setVerifyPasteText,
-  lc,
+  lc, onUpdateEvent,
 }) {
   function toggleConfirmed(playerId, confirmed) {
     setConfirmedIds(prev => {
@@ -40,6 +86,22 @@ export function VerifyRosterPanel({
       confirmed ? n.delete(playerId) : n.add(playerId);
       return n;
     });
+  }
+
+  // Writes to THIS event's own snapshot for the player, same as the
+  // inline troop-power field already used elsewhere for Foundry/Canyon
+  // Clash — not a general "update their profile" edit, just this
+  // event's on-the-day number.
+  function updatePower(playerId, value) {
+    if (!onUpdateEvent) return;
+    const player = participantsList.find(p => p.id === playerId);
+    if (!player) return;
+    const snaps = [...(activeEvent.snapshots || [])];
+    const idx = snaps.findIndex(s => s.playerId === playerId);
+    if (idx >= 0) snaps[idx] = { ...snaps[idx], troopPower: value };
+    else { const ns = newSnapshot(playerId, player, activeEvent.id); ns.troopPower = value; snaps.push(ns); }
+    onUpdateEvent({ ...activeEvent, snapshots: snaps });
+    vibe(8);
   }
 
   return (
@@ -135,13 +197,13 @@ export function VerifyRosterPanel({
             </div>
             {unconfirmed.length === 0
               ? <div style={{ fontSize:13, color:C.green, marginBottom:16 }}>✓ Everyone confirmed.</div>
-              : unconfirmed.map(p => <VerifyRow key={p.id} player={p} activeEvent={activeEvent} events={events} confirmed={false} onToggle={toggleConfirmed} lc={lc} />)}
+              : unconfirmed.map(p => <VerifyRow key={p.id} player={p} activeEvent={activeEvent} events={events} confirmed={false} onToggle={toggleConfirmed} lc={lc} onUpdatePower={updatePower} />)}
             {confirmedPlayers.length > 0 && (
               <>
                 <div style={{ fontSize:11, fontWeight:700, color:C.green, textTransform:'uppercase', letterSpacing:'0.07em', marginTop:16, marginBottom:8 }}>
                   ✓ Confirmed · {confirmedPlayers.length}
                 </div>
-                {confirmedPlayers.map(p => <VerifyRow key={p.id} player={p} activeEvent={activeEvent} events={events} confirmed={true} onToggle={toggleConfirmed} lc={lc} />)}
+                {confirmedPlayers.map(p => <VerifyRow key={p.id} player={p} activeEvent={activeEvent} events={events} confirmed={true} onToggle={toggleConfirmed} lc={lc} onUpdatePower={updatePower} />)}
               </>
             )}
           </>

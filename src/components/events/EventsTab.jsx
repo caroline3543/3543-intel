@@ -820,6 +820,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                     verifyInputMode={verifyInputMode} setVerifyInputMode={setVerifyInputMode}
                     verifyPasteText={verifyPasteText} setVerifyPasteText={setVerifyPasteText}
                     lc={lc}
+                    onUpdateEvent={onUpdateEvent}
                   />
                 ) : (
                   <>
