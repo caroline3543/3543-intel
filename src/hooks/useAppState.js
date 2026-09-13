@@ -228,6 +228,38 @@ export function useAppState() {
     showToast('Library reset to defaults');
   }, [showToast]);
 
+  // ── Labyrinth Rankings ─────────────────────────────────────
+  // Same shape as Notice Library / ASCII Art ops above — local-only,
+  // no cloud push (cloudSyncService.js has no labyrinth-entry
+  // equivalent, and entries often aren't roster players anyway). Part
+  // of the whole `data` object like everything else here, so the
+  // existing auto-save effect and a "replace"-mode import already
+  // cover it for free; a "merge"-mode import depends on
+  // mergeImportedData (exportImportService.js) explicitly knowing
+  // about this key — not confirmed, since that file wasn't available
+  // to check.
+  const saveLabyrinthEntry = useCallback((entry) => {
+    setData(prev => {
+      const isEdit = (prev.labyrinthEntries || []).some(e => e.id === entry.id);
+      return {
+        ...prev,
+        labyrinthEntries: isEdit
+          ? prev.labyrinthEntries.map(e => e.id === entry.id ? entry : e)
+          : [...(prev.labyrinthEntries || []), entry],
+        lastUpdated: new Date().toISOString(),
+      };
+    });
+  }, []);
+
+  const deleteLabyrinthEntry = useCallback((id) => {
+    setData(prev => ({
+      ...prev,
+      labyrinthEntries: (prev.labyrinthEntries || []).filter(e => e.id !== id),
+      lastUpdated: new Date().toISOString(),
+    }));
+    showToast('Entry deleted');
+  }, [showToast]);
+
   // ── Settings ──────────────────────────────────────────────
   const saveSettings = useCallback((settings) => {
     setData(prev => ({ ...prev, settings, lastUpdated: new Date().toISOString() }));
@@ -291,6 +323,7 @@ export function useAppState() {
   const prepScores  = data.prepScores  || [];
   const notices     = data.notices     || [];
   const asciiArts   = data.asciiArts   || [];
+  const labyrinthEntries = data.labyrinthEntries || [];
   const settings    = data.settings    || {};
   const customRoles = data.customRoles || [];
   const roles       = withBuiltinRole(customRoles);
@@ -336,6 +369,11 @@ export function useAppState() {
     saveAsciiArt,
     deleteAsciiArt,
     resetAsciiArtsToDefaults,
+
+    // Labyrinth Rankings
+    labyrinthEntries,
+    saveLabyrinthEntry,
+    deleteLabyrinthEntry,
 
     // Prep scores
     updatePrepScores,
