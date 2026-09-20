@@ -13,12 +13,39 @@ export function parseBatchInput(raw) {
 }
 
 /**
- * Resolve a list of { text, linkedId } rows against existing players.
+ * Parse "FID, username" CSV text into structured rows: [{ fid, text }].
+ * A header row is dropped automatically — if the first line's first
+ * cell isn't purely numeric, it's treated as a column label ("ID,
+ * username") rather than real data. Comma-separated; blank lines
+ * skipped. Feeds into resolveBatchRows below exactly like the typed-
+ * name flow does, just with fid pre-supplied instead of guessed.
+ */
+export function parseCsvRows(raw) {
+  const lines = (raw || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+
+  const rows = lines.map(line => {
+    const [fidRaw, ...rest] = line.split(',');
+    return { fid: (fidRaw || '').trim(), text: rest.join(',').trim() };
+  });
+
+  if (rows.length && rows[0].fid && !/^\d+$/.test(rows[0].fid)) rows.shift();
+
+  return rows.filter(r => r.fid || r.text);
+}
+
+/**
+ * Resolve a list of { text, linkedId, fid? } rows against existing players.
+ * `fid` is optional — set by CSV import rows; typed-name rows never
+ * carry it and fall back to the original numeric-text guess below,
+ * unchanged from before this field existed.
  *
  * Returns { exact[], fuzzy[], fresh[] }
- *   exact  — matched by linkedId, FID, or exact name  → will update
- *   fuzzy  — similar name but not exact                → needs officer review
- *   fresh  — no match found                            → will create
+ *   exact  — matched by linkedId, FID, or exact name/nickname → will update
+ *   fuzzy  — similar name but not exact                       → needs officer review
+ *   fresh  — no match found                                   → will create
+ * Every entry also carries `fid` through (undefined for rows that
+ * never had one) so buildAndSave can set it on newly-created players.
  */
 export function resolveBatchRows(rows, existingPlayers) {
   const exact = [];
@@ -26,33 +53,40 @@ export function resolveBatchRows(rows, existingPlayers) {
   const fresh = [];
 
   rows.forEach(row => {
-    const { text, linkedId } = row;
+    const { text, linkedId, fid } = row;
     const norm = normalizeName(text);
-    if (!norm) return;
+    if (!norm && !fid) return;
+    const displayName = text || `FID ${fid}`;
 
-    // 1. Pre-linked by autosuggest selection
+    // 1. Pre-linked by autosuggest selection (or CSV FID match, see below)
     if (linkedId) {
       const player = existingPlayers.find(p => p.id === linkedId);
-      if (player) { exact.push({ name: text, existingPlayer: player }); return; }
+      if (player) { exact.push({ name: displayName, existingPlayer: player, fid }); return; }
     }
 
-    // 2. Numeric — try FID
-    if (/^\d+$/.test(norm)) {
-      const byFid = existingPlayers.find(p => p.fid && String(p.fid).trim() === norm);
-      if (byFid) { exact.push({ name: text, existingPlayer: byFid }); return; }
+    // 2. FID — an explicit fid field (CSV import) takes priority; a
+    // purely numeric typed name is still tried as a possible FID,
+    // same guess this always made before CSV import existed.
+    const fidToTry = fid || (/^\d+$/.test(norm) ? norm : null);
+    if (fidToTry) {
+      const byFid = existingPlayers.find(p => p.fid && String(p.fid).trim() === String(fidToTry).trim());
+      if (byFid) { exact.push({ name: displayName, existingPlayer: byFid, fid }); return; }
     }
 
-    // 3. Exact normalized name
-    const byName = findExistingPlayer(existingPlayers, { name: text });
-    if (byName) { exact.push({ name: text, existingPlayer: byName }); return; }
+    if (norm) {
+      // 3. Exact normalized name or nickname (checks both username and alias)
+      const byName = findExistingPlayer(existingPlayers, { name: text });
+      if (byName) { exact.push({ name: displayName, existingPlayer: byName, fid }); return; }
 
-    // 4. Fuzzy
-    const dupes = findPossibleDuplicates(existingPlayers, text);
-    if (dupes.length > 0) {
-      fuzzy.push({ name: text, existingPlayer: dupes[0].player, score: dupes[0].score });
-    } else {
-      fresh.push({ name: text });
+      // 4. Fuzzy
+      const dupes = findPossibleDuplicates(existingPlayers, text);
+      if (dupes.length > 0) {
+        fuzzy.push({ name: displayName, existingPlayer: dupes[0].player, score: dupes[0].score, fid });
+        return;
+      }
     }
+
+    fresh.push({ name: displayName, fid });
   });
 
   return { exact, fuzzy, fresh };

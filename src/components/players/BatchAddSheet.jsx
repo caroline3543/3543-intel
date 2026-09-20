@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { C, TIER_OPTIONS, LANGUAGES, tierChipStyle } from '../../utils/constants.js';
 import { JOINER_HEROES } from '../../data/joinerMeta.js';
 import { vibe } from '../../utils/vibe.js';
 import { newPlayer } from '../../data/playerSchema.js';
-import { resolveBatchRows, mergePlayerObjects } from '../../services/batchAddService.js';
+import { resolveBatchRows, mergePlayerObjects, parseCsvRows } from '../../services/batchAddService.js';
+import { matchPlayerByFID } from '../../services/playerMatching.js';
 import { searchPlayers } from '../../services/playerAutosuggest.js';
 import { Inp, Sel, SheetHandle } from '../common/Primitives.jsx';
 import { AlliancePicker } from '../common/AlliancePicker.jsx';
@@ -47,6 +48,35 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
     setInputText(''); setSuggestions([]);
   }
   function removeLine(idx) { setRawLines(prev=>prev.filter((_,i)=>i!==idx)); }
+
+  const csvInputRef = useRef(null);
+
+  // CSV upload — "FID, username" per line (header row optional).
+  // Feeds the SAME rawLines pipeline typed names use, just with FID
+  // pre-matched instead of typed/guessed: a row whose fid matches an
+  // existing player is pre-linked exactly like tapping a suggestion;
+  // everything else (no FID match) falls through unchanged to
+  // resolveBatchRows' existing username/nickname/fuzzy logic.
+  function handleCsvFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      const rows = parseCsvRows(evt.target.result);
+      const newLines = rows.map(row => {
+        const matched = row.fid ? matchPlayerByFID(members, row.fid) : null;
+        return {
+          text: row.text || matched?.username || matched?.alias || (row.fid ? `FID ${row.fid}` : ''),
+          linkedId: matched ? matched.id : null,
+          fid: row.fid || null,
+        };
+      }).filter(l => l.text);
+      setRawLines(prev => [...prev, ...newLines]);
+      vibe(8);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
 
   function getActive() {
     if (!resolved) return [];
@@ -94,8 +124,8 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
   function buildAndSave() {
     const toCreate=[],toUpdate=[];
     (resolved?.exact||[]).forEach(r=>{const patch={...buildStats(r.name)};if(tagAll)patch.allianceTag=tagAll;toUpdate.push(mergePlayerObjects(r.existingPlayer,patch));});
-    (resolved?.fuzzy||[]).forEach(r=>{const d=fuzzyDec[r.name];if(d==='skip')return;const patch={...buildStats(r.name)};if(tagAll)patch.allianceTag=tagAll;d==='update'?toUpdate.push(mergePlayerObjects(r.existingPlayer,patch)):toCreate.push(newPlayer({username:r.name,allianceTag:tagAll,...patch}));});
-    (resolved?.fresh||[]).forEach(r=>toCreate.push(newPlayer({username:r.name,allianceTag:tagAll,...buildStats(r.name)})));
+    (resolved?.fuzzy||[]).forEach(r=>{const d=fuzzyDec[r.name];if(d==='skip')return;const patch={...buildStats(r.name)};if(tagAll)patch.allianceTag=tagAll;d==='update'?toUpdate.push(mergePlayerObjects(r.existingPlayer,patch)):toCreate.push(newPlayer({username:r.name,allianceTag:tagAll,...(r.fid?{fid:r.fid}:{}),...patch}));});
+    (resolved?.fresh||[]).forEach(r=>toCreate.push(newPlayer({username:r.name,allianceTag:tagAll,...(r.fid?{fid:r.fid}:{}),...buildStats(r.name)})));
     if(toUpdate.length)onUpdateExisting(toUpdate);
     if(toCreate.length)onAddNew(toCreate);
     vibe([10,50,10]);resetAll();onClose();
@@ -130,7 +160,7 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
         {phase===0&&(
           <div>
             <div style={{ fontSize:22, fontWeight:700, color:C.white, marginBottom:6 }}>Who's joining?</div>
-            <div style={{ fontSize:13, color:C.icy, marginBottom:16 }}>Type names one at a time. Tap suggestions to link existing players.</div>
+            <div style={{ fontSize:13, color:C.icy, marginBottom:16 }}>Type names one at a time, or upload a CSV. Tap suggestions to link existing players.</div>
             {rawLines.length>0&&(
               <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:12 }}>
                 {rawLines.map((line,i)=>(
@@ -146,6 +176,10 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
                 <input value={inputText} onChange={e=>{setInputText(e.target.value);updateSuggestions(e.target.value);}} onKeyDown={e=>{if(e.key==='Enter'||e.key===','){e.preventDefault();addLine(inputText);}}} placeholder="Type a name, press Enter to add…" style={{ flex:1, background:C.section, border:`1px solid ${C.border}`, borderRadius:10, padding:'12px 14px', fontSize:16, color:C.white, fontFamily:'inherit' }}/>
                 <button onClick={()=>addLine(inputText)} disabled={!inputText.trim()} style={{ height:48, padding:'0 16px', borderRadius:10, background:inputText.trim()?C.gold:C.border, color:C.bg, fontWeight:700, fontSize:14, border:'none', cursor:inputText.trim()?'pointer':'default' }}>Add</button>
               </div>
+              <input type="file" accept=".csv" ref={csvInputRef} onChange={handleCsvFile} style={{ display:'none' }} />
+              <button onClick={()=>csvInputRef.current?.click()} style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', color:C.gold, fontSize:13, fontWeight:600, cursor:'pointer', padding:'8px 0 0' }}>
+                📄 Upload CSV (ID, username)
+              </button>
               {suggestions.length>0&&(
                 <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:600, boxShadow:'0 8px 24px #000a' }}>
                   <div style={{ fontSize:11, color:C.muted, padding:'8px 14px 4px', textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700 }}>Existing — tap to link</div>
