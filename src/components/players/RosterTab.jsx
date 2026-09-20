@@ -540,6 +540,7 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         <div style={{ position:'fixed', inset:0, zIndex:600 }}>
           <BulkNameAdd
             onAddPlayers={onAddPlayers}
+            onUpdatePlayers={onUpdatePlayers}
             onClose={() => setBulkAddOpen(false)}
             showToast={showToast}
             onGoToFieldRegistry={() => { setBulkAddOpen(false); setFieldRegistryOpen(true); }}
