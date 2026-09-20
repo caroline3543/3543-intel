@@ -42,6 +42,16 @@ function classifyNames(raw, existingPlayers) {
 // After adding, this screen offers a direct one-tap handoff into Field
 // Registry rather than closing silently — that's almost always the
 // very next thing you want to do with names you just bulk-added.
+// Normalize a name for use as a fidIndex key — trims and collapses
+// whitespace before lowercasing, so a CSV name stored here still
+// matches after it round-trips through the raw textarea and back out
+// via parseNames (utils/nameList.js — not available to confirm its
+// exact behavior, so this only assumes it trims/normalizes
+// whitespace, never that it changes the name's actual content).
+function fidKey(name) {
+  return (name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, showToast, onGoToFieldRegistry, existingPlayers = [] }) {
   const [raw, setRaw] = useState('');
   const [addedCount, setAddedCount] = useState(null); // null = still entering names
@@ -66,7 +76,7 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
   // confirmed by an exact name match, ID just never got recorded.
   const pendingFidBackfills = skipped
     .map(name => {
-      const fid = fidIndex[name.toLowerCase()];
+      const fid = fidIndex[fidKey(name)];
       if (!fid) return null;
       const existing = existingPlayers.find(p => (p.username || p.alias || '').trim().toLowerCase() === name.toLowerCase());
       return (existing && !existing.fid) ? { ...existing, fid } : null;
@@ -86,7 +96,7 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
   // write that ID onto the existing record, rather than just dropping
   // the row and losing the ID entirely.
   function linkCloseMatchToExisting(name, existingPlayer) {
-    const fid = fidIndex[name.toLowerCase()];
+    const fid = fidIndex[fidKey(name)];
     removeNameFromRaw(name);
     if (fid && onUpdatePlayers) onUpdatePlayers([{ ...existingPlayer, fid }]);
     vibe(8);
@@ -114,7 +124,7 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
         const existing = row.fid ? existingPlayers.find(p => p.fid && String(p.fid).trim() === String(row.fid).trim()) : null;
         if (existing) { matched.push({ name: row.text, fid: row.fid, existingPlayer: existing }); return; }
         toAppend.push(row.text);
-        if (row.fid) newIndex[row.text.toLowerCase()] = row.fid;
+        if (row.fid) newIndex[fidKey(row.text)] = row.fid;
       });
       setFidIndex(prev => ({ ...prev, ...newIndex }));
       setFidSkipped(prev => [...prev, ...matched]);
@@ -137,7 +147,7 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
     }
     const players = names.map(name => newPlayer({
       username: name,
-      ...(fidIndex[name.toLowerCase()] ? { fid: fidIndex[name.toLowerCase()] } : {}),
+      ...(fidIndex[fidKey(name)] ? { fid: fidIndex[fidKey(name)] } : {}),
     }));
     onAddPlayers(players);
     const skippedNote = skipped.length ? ` · skipped ${skipped.length} duplicate${skipped.length !== 1 ? 's' : ''}` : '';
@@ -221,7 +231,7 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
             {closeMatches.map(({ name, matches }) => (
               <div key={name} style={{ fontSize: 12, color: C.icy, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span>"{name}" looks like <strong style={{ color: C.white }}>{matches[0].player.username || matches[0].player.alias}</strong> — same person?</span>
-                {fidIndex[name.toLowerCase()] && (
+                {fidIndex[fidKey(name)] && (
                   <button onClick={() => linkCloseMatchToExisting(name, matches[0].player)} style={{ fontSize: 11, color: C.green, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>🔗 Yes — link their ID</button>
                 )}
                 <button onClick={() => removeNameFromRaw(name)} style={{ fontSize: 11, color: C.gold, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Remove from list</button>
