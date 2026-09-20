@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES, ALLIANCE_RANKS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { fmtDateShort } from '../../utils/dates.js';
-import { newSnapshot } from '../../data/playerSchema.js';
+import { newSnapshot, newPlayer } from '../../data/playerSchema.js';
 import { searchPlayers } from '../../services/playerAutosuggest.js';
 import {
   groupByRank, isArchived, findSiblingLegionEvent, legionColor,
@@ -32,7 +32,7 @@ import { SquadBalancerPanel } from './SquadBalancerPanel.jsx';
 // still exists in the data (Battle Plan's isAttending() reads it as the
 // hard eligibility filter for leader/joiner picks), it's just set
 // automatically the moment someone is added here, not chosen manually.
-export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, plans = [] }) {
+export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, onAddPlayers, plans = [] }) {
   const [filterType, setFilterType]   = useState('All');
   const [toastMsg, setToastMsg]       = useState(null);
   function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); }
@@ -74,6 +74,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [addAsSubstitute, setAddAsSubstitute] = useState(false);
   const [addMode, setAddMode]         = useState('type'); // 'type' | 'paste'
   const [pasteAddText, setPasteAddText] = useState('');
+  const [pastePowerText, setPastePowerText] = useState('');
   const [copyPickerOpen, setCopyPickerOpen] = useState(false);
   const [participantsCopied, setParticipantsCopied] = useState(false);
   const [attendanceCopied, setAttendanceCopied]     = useState(false);
@@ -215,6 +216,55 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     });
     onUpdateEvent({ ...activeEvent, participantIds, snapshots: snaps });
     setPasteAddText('');
+    vibe(8);
+  }
+
+  // Foundry/Canyon Clash attendance import — "Name, Troop Power" per
+  // line (see AddParticipantPanel's power-paste mode, only shown for
+  // TROOP_POWER_EVENTS types). Records attendance exactly like
+  // addParticipantsBatch above (this is pre-event, upcoming — being
+  // added here IS the participation signal), and also writes troop
+  // power onto each snapshot in the same pass.
+  //
+  // Rows whose name has no roster match are resolved in the panel
+  // itself (confirmed as a new player, or linked to an existing one
+  // via a fuzzy suggestion) before ever reaching here — a `newName`
+  // row means "officer confirmed this is a new player." newPlayer()
+  // assigns its id synchronously, so that id can be used for both the
+  // roster-add and the event-add below without waiting on a
+  // re-render, same trick used elsewhere for same-turn dependent writes.
+  function addAttendanceWithPower(rows) {
+    if (!activeEvent || rows.length === 0) return;
+    const playersToCreate = [];
+    const resolvedRows = rows.map(row => {
+      if (row.player) return { player: row.player, power: row.power };
+      const created = newPlayer({ username: row.newName });
+      playersToCreate.push(created);
+      return { player: created, power: row.power };
+    });
+
+    if (playersToCreate.length && onAddPlayers) onAddPlayers(playersToCreate);
+
+    const participantIds = [...new Set([...(activeEvent.participantIds || []), ...resolvedRows.map(r => r.player.id)])];
+    const snaps = [...(activeEvent.snapshots || [])];
+    resolvedRows.forEach(({ player, power }) => {
+      const idx = snaps.findIndex(s => s.playerId === player.id);
+      if (idx >= 0) {
+        snaps[idx] = {
+          ...snaps[idx],
+          rsvp: { ...snaps[idx].rsvp, participating: true, substitute: addAsSubstitute },
+          troopPower: power != null ? power : snaps[idx].troopPower,
+        };
+      } else {
+        const snap = newSnapshot(player.id, player, activeEvent.id);
+        snap.rsvp.participating = true;
+        snap.rsvp.substitute = addAsSubstitute;
+        snap.troopPower = power;
+        snaps.push(snap);
+      }
+    });
+    onUpdateEvent({ ...activeEvent, participantIds, snapshots: snaps });
+    setPastePowerText('');
     vibe(8);
   }
 
@@ -623,6 +673,8 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
             addMode={addMode} setAddMode={setAddMode}
             addQuery={addQuery} addResults={addResults} onSearchAdd={searchAdd} onCommitTopMatch={commitTopMatch} onAddParticipant={addParticipant}
             pasteAddText={pasteAddText} setPasteAddText={setPasteAddText} onAddParticipantsBatch={addParticipantsBatch}
+            tracksTroopPower={tracksTroopPower}
+            pastePowerText={pastePowerText} setPastePowerText={setPastePowerText} onAddAttendanceWithPower={addAttendanceWithPower}
             players={eventEligiblePlayers} activeEvent={activeEvent} events={events}
             onOpenLegionSwap={(player, sibling) => setLegionModal({ mode:'swap', player, sibling })}
             copyPickerOpen={copyPickerOpen} setCopyPickerOpen={setCopyPickerOpen} onCopyRosterFrom={copyRosterFrom}

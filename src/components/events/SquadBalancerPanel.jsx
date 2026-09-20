@@ -24,8 +24,20 @@ export function SquadBalancerPanel({ activeEvent, players, events, onUpdateEvent
   const [selectedLeaderIds, setSelectedLeaderIds] = useState([]);
   const [confirmRebalance, setConfirmRebalance]   = useState(false);
   const [movingPlayerId, setMovingPlayerId]       = useState(null); // player currently showing the "move to..." picker
+  const [squadCopied, setSquadCopied]             = useState(false);
 
-  const eventPlayers = players.filter(p => (activeEvent.participantIds || []).includes(p.id));
+  // Substitutes are still on the event's participantIds (they're a
+  // display/eligibility category, not a separate roster — see
+  // EventsTab.jsx), but they never belong in an auto-split team: a
+  // sub is explicitly not part of the required lineup. Excluded here
+  // at the source rather than filtered per-call, so every consumer
+  // below — leader picker, balanceSquads, "no recorded power" count —
+  // automatically only ever sees real attendees.
+  function isSubstitute(player) {
+    return (activeEvent.snapshots || []).some(s => s.playerId === player.id && s.rsvp?.substitute);
+  }
+  const eventPlayers = players.filter(p => (activeEvent.participantIds || []).includes(p.id) && !isSubstitute(p));
+  const substituteList = players.filter(p => (activeEvent.participantIds || []).includes(p.id) && isSubstitute(p));
 
   function getPower(player) {
     const snap = (activeEvent.snapshots || []).find(s => s.playerId === player.id);
@@ -87,6 +99,40 @@ export function SquadBalancerPanel({ activeEvent, players, events, onUpdateEvent
     return p ? (p.username || p.alias || '?') : '?';
   }
 
+  // Copy text — fenced code block per Caroline's request (this one's
+  // meant for Discord/game chat, unlike the plain-text convention used
+  // elsewhere in Battle Plan copy surfaces), each team's members
+  // sorted by troop power descending regardless of the order they
+  // were added/moved in the live editable list above. Substitutes are
+  // never in `squads` at all (excluded at the source, see
+  // eventPlayers above) so there's nothing to filter out here.
+  function generateSquadCopyText() {
+    const lines = [];
+    squads.forEach(squad => {
+      lines.push(squad.name);
+      const ids = [squad.leaderId, ...squad.memberIds].filter(Boolean);
+      const ranked = ids
+        .map(pid => {
+          const player = players.find(pl => pl.id === pid);
+          return { pid, power: player ? getPower(player) : null };
+        })
+        .sort((a, b) => (b.power ?? -1) - (a.power ?? -1));
+      ranked.forEach(({ pid, power }) => {
+        const isLeader = pid === squad.leaderId;
+        lines.push(`${isLeader ? '👑 ' : ''}${playerName(pid)}${power != null ? ` — ${power.toLocaleString()}` : ''}`);
+      });
+      lines.push('');
+    });
+    return '```\n' + lines.join('\n').trim() + '\n```';
+  }
+
+  function copySquadList() {
+    navigator.clipboard.writeText(generateSquadCopyText()).then(() => {
+      setSquadCopied(true);
+      setTimeout(() => setSquadCopied(false), 2000);
+    });
+  }
+
   if (!hasSquads) {
     return (
       <div style={{ background:C.card, borderRadius:14, padding:16, marginBottom:16 }}>
@@ -131,6 +177,12 @@ export function SquadBalancerPanel({ activeEvent, players, events, onUpdateEvent
         {noPowerCount > 0 && (
           <div style={{ fontSize:11, color:C.gold, marginBottom:12 }}>
             ⚠ {noPowerCount} attendee{noPowerCount!==1?'s have':' has'} no recorded troop power — they'll be spread evenly by headcount instead of by strength.
+          </div>
+        )}
+
+        {substituteList.length > 0 && (
+          <div style={{ fontSize:11, color:C.muted, marginBottom:12, padding:'8px 10px', background:C.section, borderRadius:8 }}>
+            <span style={{ fontWeight:700 }}>{substituteList.length} substitute{substituteList.length!==1?'s':''}</span> not included in the split: {substituteList.map(p => p.username||p.alias||'?').join(', ')}
           </div>
         )}
 
@@ -208,9 +260,14 @@ export function SquadBalancerPanel({ activeEvent, players, events, onUpdateEvent
         );
       })}
 
-      <button onClick={clearSquads} style={{ width:'100%', height:40, borderRadius:10, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', marginTop:4 }}>
-        Clear teams
-      </button>
+      <div style={{ display:'flex', gap:8, marginTop:4 }}>
+        <button onClick={copySquadList} style={{ flex:1, height:40, borderRadius:10, background:squadCopied?C.green+'22':C.section, border:`1px solid ${squadCopied?C.green:C.border}`, color:squadCopied?C.green:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+          {squadCopied ? '✓ Copied' : '📋 Copy team lists'}
+        </button>
+        <button onClick={clearSquads} style={{ flex:1, height:40, borderRadius:10, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+          Clear teams
+        </button>
+      </div>
     </div>
   );
 }
