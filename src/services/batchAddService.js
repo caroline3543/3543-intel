@@ -12,21 +12,61 @@ export function parseBatchInput(raw) {
     .filter(Boolean);
 }
 
+// Strip a wrapping pair of double quotes (CSV exporters — Numbers
+// included — sometimes quote every field, or just fields it decides
+// are ambiguous), un-escaping doubled internal quotes ("" -> ").
+function stripQuotes(s) {
+  const t = (s || '').trim();
+  if (t.length >= 2 && t.startsWith('"') && t.endsWith('"')) {
+    return t.slice(1, -1).replace(/""/g, '"');
+  }
+  return t;
+}
+
+// Minimal quoted-field-aware CSV line splitter — a field wrapped in
+// double quotes may itself contain a comma without breaking the split.
+// No support for a quoted field spanning multiple lines, which a
+// simple two-column ID/username export won't produce.
+function splitCsvLine(line) {
+  const cells = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      cells.push(cur); cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  cells.push(cur);
+  return cells;
+}
+
 /**
  * Parse "FID, username" CSV text into structured rows: [{ fid, text }].
  * A header row is dropped automatically — if the first line's first
- * cell isn't purely numeric, it's treated as a column label ("ID,
- * username") rather than real data. Comma-separated; blank lines
- * skipped. Feeds into resolveBatchRows below exactly like the typed-
- * name flow does, just with fid pre-supplied instead of guessed.
+ * cell isn't purely numeric (after stripping quotes), it's treated as
+ * a column label ("ID, username") rather than real data. Strips a
+ * leading BOM (some exporters, Numbers included, add one) and quote
+ * wrapping on every cell. Only the first two columns are read — any
+ * further columns (stray empty ones from a spreadsheet export, for
+ * instance) are ignored rather than getting glued onto the username.
  */
 export function parseCsvRows(raw) {
-  const lines = (raw || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const text = (raw || '').replace(/^\uFEFF/, '');
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (!lines.length) return [];
 
   const rows = lines.map(line => {
-    const [fidRaw, ...rest] = line.split(',');
-    return { fid: (fidRaw || '').trim(), text: rest.join(',').trim() };
+    const cells = splitCsvLine(line);
+    return {
+      fid:  stripQuotes(cells[0] || ''),
+      text: stripQuotes(cells[1] || ''),
+    };
   });
 
   if (rows.length && rows[0].fid && !/^\d+$/.test(rows[0].fid)) rows.shift();
