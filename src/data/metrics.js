@@ -51,6 +51,14 @@ export function calcMetrics(player, events) {
       // explicitly records attendance either way — they showed up, or
       // were explicitly marked no-show — it counts like anyone else's.
       if (s.rsvp?.substitute && s.attendance?.attended === null && !s.attendance?.noShow) return false;
+      // An excused absence is a sanctioned absence, not a discipline
+      // flag (see playerSchema.js's newSnapshot comment on `excused`)
+      // — excluded from the qualifying set entirely, same treatment
+      // as the substitute case just above, so it can't drag
+      // attendancePct/reliabilityScore down OR break a
+      // consecutiveMisses streak. The event simply doesn't count
+      // either way, for either metric.
+      if (s.attendance?.noShow && s.attendance?.excused) return false;
       return true;
     })
   );
@@ -83,7 +91,7 @@ export function calcMetrics(player, events) {
     totalEvents:       snaps.length,
     attended:          attended.length,
     noShows:           noShows.length,
-    late:              snaps.filter(s => s.attendance.late).length,
+    late:              snaps.filter(s => s.attendance.joinedLateNoNotice).length,
     voiceCount:        voiceOn.length,
     attendancePct:     ap,
     voicePct:          vp,

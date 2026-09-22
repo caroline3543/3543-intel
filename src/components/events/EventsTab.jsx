@@ -7,6 +7,7 @@ import { searchPlayers } from '../../services/playerAutosuggest.js';
 import {
   groupByRank, isArchived, findSiblingLegionEvent, legionColor,
   eventMs, evSum, generateParticipantsText, generateAttendanceText, generateHeliosAttendanceText,
+  noShowStreak, noShowBadge,
 } from '../../services/eventListHelpers.js';
 import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 import { exportEventParticipants } from '../../services/exportXlsx.js';
@@ -876,6 +877,17 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                   />
                 ) : (
                   <>
+                    {(() => {
+                      const flaggedCount = participantsList.filter(p => noShowBadge(noShowStreak(p.id, activeEvent.type, activeEvent.id, events))).length;
+                      const noPowerCount = tracksTroopPower ? participantsList.filter(p => getSnap(activeEvent, p.id)?.troopPower == null).length : 0;
+                      return (
+                        <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:12, color:C.muted, marginBottom:10 }}>
+                          <span><strong style={{ color:C.white }}>{participantsList.length}</strong> attending</span>
+                          {flaggedCount > 0 && <span style={{ color:C.red }}>⚠ {flaggedCount} flagged</span>}
+                          {tracksTroopPower && noPowerCount > 0 && <span style={{ color:C.gold }}>💪 {noPowerCount} no power recorded</span>}
+                        </div>
+                      );
+                    })()}
                     <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
                       Participants · {participantsList.length}
                     </div>

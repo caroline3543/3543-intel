@@ -302,6 +302,12 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
     .filter(x=>x.metrics)
     .sort((a,b)=>b.metrics.reliabilityScore-a.metrics.reliabilityScore);
 
+  // Mirrors withM, ascending instead of descending — excused absences
+  // are already excluded from reliabilityScore itself (calcMetrics,
+  // metrics.js), so someone with a run of sanctioned absences won't
+  // land here for that alone.
+  const leastReliable = [...withM].sort((a,b)=>a.metrics.reliabilityScore-b.metrics.reliabilityScore);
+
   const atRisk = players
     .map(p=>({player:p,metrics:calcMetrics(p,events)}))
     .filter(x=>x.metrics&&x.metrics.consecutiveMisses>=3)
@@ -471,6 +477,22 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
               <div style={{ fontSize:13, fontWeight:700, color:i<3?C.gold:C.muted, width:22, textAlign:'center' }}>
                 {i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}
               </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:C.white }}>{player.username||player.alias||'?'}</div>
+                <div style={{ fontSize:11, color:C.muted }}>{metrics.attended}/{metrics.totalEvents} events · {metrics.attendancePct}% attendance</div>
+              </div>
+              <ReliabilityBadge score={metrics.reliabilityScore}/>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Least reliable — mirrors Most Reliable above, ascending */}
+      {leastReliable.length>0&&(
+        <div style={{ background:C.card, borderRadius:12, padding:16, marginBottom:16 }}>
+          <div style={{ fontSize:15, fontWeight:700, color:C.white, marginBottom:12 }}>📉 Least Reliable</div>
+          {leastReliable.slice(0,8).map(({player,metrics})=>(
+            <div key={player.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:`1px solid ${C.border}22` }}>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:14, fontWeight:700, color:C.white }}>{player.username||player.alias||'?'}</div>
                 <div style={{ fontSize:11, color:C.muted }}>{metrics.attended}/{metrics.totalEvents} events · {metrics.attendancePct}% attendance</div>

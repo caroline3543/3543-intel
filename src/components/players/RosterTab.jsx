@@ -24,6 +24,7 @@ const DERIVED_TIER_FILTERS = [
   { id:'helios-infantry', label:'🛡️ Helios Infantry', match:p => !!p.troops?.infantry?.startsWith('Helios') },
   { id:'full-fc5', label:'💯 Full FC5', match:p => p.troops?.infantry==='FC5' && p.troops?.lancer==='FC5' && p.troops?.marksman==='FC5' },
   { id:'full-fc6', label:'💯 Full FC6', match:p => ['FC6','Helios FC6'].includes(p.troops?.infantry) && ['FC6','Helios FC6'].includes(p.troops?.lancer) && ['FC6','Helios FC6'].includes(p.troops?.marksman) },
+  { id:'no-fid', label:'❓ No ID', match:p => !p.fid },
 ];
 
 const SORT_OPTIONS = [
