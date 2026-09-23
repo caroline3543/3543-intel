@@ -29,25 +29,32 @@ function parseDetailLines(raw) {
 function resolveDetailRows(lines, pool, decisions) {
   return lines.map(row => {
     const byFid = row.fid ? pool.find(p => p.fid && String(p.fid).trim() === row.fid) : null;
-    if (byFid) return { status: 'matched', ...row, player: byFid };
+    if (byFid) return { status: 'matched', ...row, player: byFid, renamed: isRename(byFid, row.name) };
 
     const exact = pool.find(p =>
       (p.username || '').toLowerCase() === row.name.toLowerCase() ||
       (p.alias || '').toLowerCase() === row.name.toLowerCase()
     );
-    if (exact) return { status: 'matched', ...row, player: exact };
+    if (exact) return { status: 'matched', ...row, player: exact, renamed: isRename(exact, row.name) };
 
     const decision = decisions[row.name];
     if (decision === 'new') return { status: 'new', ...row };
     if (decision) {
       const linked = pool.find(p => p.id === decision);
-      if (linked) return { status: 'matched', ...row, player: linked };
+      if (linked) return { status: 'matched', ...row, player: linked, renamed: isRename(linked, row.name) };
     }
 
     const fuzzy = findCloseMatches(row.name, pool);
     if (fuzzy.length > 0) return { status: 'fuzzy', ...row, suggestion: fuzzy[0].player };
     return { status: 'new', ...row };
   });
+}
+
+// A genuine rename — not just a capitalization difference — worth
+// logging to pastUsernames rather than silently overwritten.
+function isRename(existingPlayer, incomingName) {
+  const current = (existingPlayer.username || '').trim();
+  return !!current && current.toLowerCase() !== incomingName.trim().toLowerCase();
 }
 
 // ── BulkNameAdd ──────────────────────────────────────────────────
@@ -76,8 +83,23 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
     const toCreate = [];
     resolvedDetail.forEach(r => {
       if (r.status === 'matched') {
+        const namePatch = r.renamed
+          ? {
+              username: r.name,
+              // Append the OLD username to history before it's gone
+              // — skip if it's already the most recent entry, so
+              // re-running the same list twice doesn't pile up
+              // duplicate consecutive entries.
+              pastUsernames: (() => {
+                const hist = r.player.pastUsernames || [];
+                const outgoing = r.player.username;
+                return (outgoing && hist[hist.length - 1] !== outgoing) ? [...hist, outgoing] : hist;
+              })(),
+            }
+          : {};
         toUpdate.push({
           ...r.player,
+          ...namePatch,
           ...(r.allianceTag ? { allianceTag: r.allianceTag } : {}),
           ...(r.fc ? { furnaceLevel: r.fc } : {}),
           ...(r.fid ? { fid: r.fid } : {}),
@@ -157,7 +179,7 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
               if (r.status === 'matched') {
                 return (
                   <span key={i} style={{ padding: '6px 12px', borderRadius: 14, background: C.green+'18', border: `1px solid ${C.green}44`, color: C.green, fontSize: 12 }}>
-                    ✓ {r.name} → {r.player.username || r.player.alias}{r.allianceTag ? ` · [${r.allianceTag}]` : ''}{r.fc ? ` · ${r.fc}` : ''}{r.fid ? ` · ID ${r.fid}` : ''}
+                    ✓ {r.renamed ? `${r.player.username} → ${r.name} (renamed)` : `${r.name} → ${r.player.username || r.player.alias}`}{r.allianceTag ? ` · [${r.allianceTag}]` : ''}{r.fc ? ` · ${r.fc}` : ''}{r.fid ? ` · ID ${r.fid}` : ''}
                   </span>
                 );
               }
