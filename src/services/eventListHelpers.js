@@ -276,46 +276,72 @@ export function generateAttendanceText(activeEvent, participantsList, substitute
   return lines.join('\n').trim();
 }
 
-// Copyable, Discord-ready list of every attending Helios player,
-// grouped by WHICH troop type is Helios-tier (Infantry/Lancer/
-// Marksman) — a player with Helios on more than one troop appears
-// under each type, since that's not a mutually-exclusive fact the way
-// RSVP status is. "Attending" means: on the participant/substitute
-// list for an upcoming event (being added is the participation signal
-// everywhere else in this app), or attendance.attended === true for a
-// completed one. Plain text, no code-fence.
+// Tier order for ranking — same ascending order as FC_ORDER in
+// battleConstants.js (kept local so this service has no dependency on
+// the battle components folder). Unset troop = -1.
+const TIER_ORDER = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','Helios FC5','Helios FC6','Helios FC7','Helios FC8'];
+const tierIdx = t => TIER_ORDER.indexOf(t);
+
+// Strongest-joiner-first ranking key: total strength across ALL three
+// troops first (each tier's index + 1, unset = 0), then their single
+// best tier, then number of Helios troops. So Helios on all three
+// beats Helios on one troop with weak others, and two players with the
+// same total are split by who has the higher peak.
+function joinerStrength(p) {
+  const tiers = ['infantry','lancer','marksman'].map(k => tierIdx(p.troops?.[k]));
+  return {
+    sum:  tiers.reduce((a, t) => a + (t + 1), 0),
+    best: Math.max(...tiers),
+    helios: tiers.filter(t => t >= 8).length,
+  };
+}
+
+// Copyable, Discord-ready ranked list of every attending Helios
+// player, strongest joiner first. Each line says WHICH troop type(s)
+// are Helios (and at what stage), then their other troops. "Attending"
+// means: on the participant/substitute list for an upcoming event
+// (being added is the participation signal everywhere else in this
+// app), or attendance.attended === true for a completed one.
+// Substitutes are included and tagged. Plain text, no code-fence.
 export function generateHeliosAttendanceText(activeEvent, participantsList, substitutesList) {
   if (!activeEvent) return '';
   const isUpcoming = activeEvent.status === 'upcoming';
   const snapFor = pid => (activeEvent.snapshots || []).find(s => s.playerId === pid);
+  const subIds = new Set(substitutesList.map(p => p.id));
 
   function isAttending(p) {
     if (isUpcoming) return true; // already on this list = added/participating
     return snapFor(p.id)?.attendance?.attended === true;
   }
 
+  const name = p => p.username || p.alias || '?';
   const heliosAttendees = [...participantsList, ...substitutesList]
     .filter(isAttending)
-    .filter(p => heliosTypesFor(p).length > 0);
+    .filter(p => heliosTypesFor(p).length > 0)
+    .sort((a, b) => {
+      const ka = joinerStrength(a), kb = joinerStrength(b);
+      return kb.sum - ka.sum || kb.best - ka.best || kb.helios - ka.helios || name(a).localeCompare(name(b));
+    });
 
   const headerParts = [activeEvent.name || activeEvent.type, fmtDateShort(activeEvent.date)];
   if (activeEvent.time)   headerParts.push(`🕐 ${activeEvent.time}`);
   if (activeEvent.legion) headerParts.push(`Legion ${activeEvent.legion}`);
-  const lines = [`☀️ ${headerParts.join(' — ')} — Helios Players (${heliosAttendees.length})`, ''];
+  const lines = [`☀️ ${headerParts.join(' — ')} — Helios Players (${heliosAttendees.length}) — strongest first`, ''];
 
   if (heliosAttendees.length === 0) {
     lines.push('No Helios players attending.');
     return lines.join('\n').trim();
   }
 
-  const TYPE_LABELS = [['Inf', '🛡️ Infantry'], ['Lan', '⚔️ Lancer'], ['Mar', '🎯 Marksman']];
-  TYPE_LABELS.forEach(([code, label]) => {
-    const group = heliosAttendees.filter(p => heliosTypesFor(p).includes(code));
-    if (!group.length) return;
-    lines.push(`${label} (${group.length})`);
-    group
-      .sort((a, b) => (a.username || a.alias || '').localeCompare(b.username || b.alias || ''))
-      .forEach(p => lines.push(`  ${p.username || p.alias || '?'}${p.furnaceLevel ? ` — ${p.furnaceLevel}` : ''}`));
+  const TYPES = [['infantry', 'Inf'], ['lancer', 'Lan'], ['marksman', 'Mar']];
+  heliosAttendees.forEach((p, i) => {
+    const helios = TYPES.filter(([k]) => String(p.troops?.[k] || '').startsWith('Helios'))
+      .map(([k, label]) => `${label} ${p.troops[k]}`);
+    const others = TYPES.filter(([k]) => p.troops?.[k] && !String(p.troops[k]).startsWith('Helios'))
+      .map(([k, label]) => `${label} ${p.troops[k]}`);
+    const fc = p.furnaceLevel ? ` (${p.furnaceLevel})` : '';
+    const sub = subIds.has(p.id) ? ' [sub]' : '';
+    lines.push(`${i + 1}. ${name(p)}${fc}${sub} — ☀️ ${helios.join(', ')}${others.length ? ` · ${others.join(', ')}` : ''}`);
   });
 
   return lines.join('\n').trim();

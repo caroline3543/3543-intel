@@ -560,7 +560,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   }
 
   function copyHeliosAttendance() {
-    navigator.clipboard.writeText(generateHeliosAttendanceText(activeEvent, participantsList, substitutesList) + heliosBlock()).then(() => { setHeliosCopied(true); setTimeout(() => setHeliosCopied(false), 2000); });
+    navigator.clipboard.writeText(generateHeliosAttendanceText(activeEvent, participantsList, substitutesList)).then(() => { setHeliosCopied(true); setTimeout(() => setHeliosCopied(false), 2000); });
   }
 
   const bulkTags = isUpcoming
