@@ -221,9 +221,10 @@ function attendanceLine(p) {
 
   const fc = p.furnaceLevel || '?';
   const fullness = isFullyUpgraded(p) ? 'Full' : 'Partial';
-  const heliosDetail = heliosTypes.length > 0 ? ` · Helios: ${heliosTypes.join('/')}` : '';
-
-  return `  ${flagStr}${p.username || p.alias || '?'} — ${fc} (${fullness})${heliosDetail}`;
+  // Troop types deliberately not named here — the ☀️ flag says "has
+  // Helios"; ordering within each group (see pushCategoryGroups)
+  // carries the strength ranking.
+  return `  ${flagStr}${p.username || p.alias || '?'} — ${fc} (${fullness})`;
 }
 
 // Groups a list by RSVP/attendance category (in the priority order
@@ -242,7 +243,15 @@ function pushCategoryGroups(lines, list, isUpcoming, snapFor) {
     const group = grouped[cat];
     if (!group || !group.length) return;
     lines.push(`▸ ${cat} (${group.length})`);
-    group.forEach(p => lines.push(attendanceLine(p)));
+    // Strongest troops first within each subgroup (arriving early,
+    // leaving early, etc.) — same ranking as the Helios copy.
+    [...group]
+      .sort((a, b) => {
+        const ka = joinerStrength(a), kb = joinerStrength(b);
+        return kb.sum - ka.sum || kb.best - ka.best || kb.helios - ka.helios
+          || (a.username || a.alias || '').localeCompare(b.username || b.alias || '');
+      })
+      .forEach(p => lines.push(attendanceLine(p)));
   });
 }
 
