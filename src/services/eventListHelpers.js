@@ -219,12 +219,9 @@ function attendanceLine(p) {
   if (p.allianceRank === 'R4' || p.allianceRank === 'R5') flags.push('🎖️');
   const flagStr = flags.length ? flags.join('') + ' ' : '';
 
-  const fc = p.furnaceLevel || '?';
-  const fullness = isFullyUpgraded(p) ? 'Full' : 'Partial';
-  // Troop types deliberately not named here — the ☀️ flag says "has
-  // Helios"; ordering within each group (see pushCategoryGroups)
-  // carries the strength ranking.
-  return `  ${flagStr}${p.username || p.alias || '?'} — ${fc} (${fullness})`;
+  // Name + flags only — no furnace level, troop types or Full/Partial.
+  // Strength ranking is carried by the ORDER (see pushCategoryGroups).
+  return `  ${flagStr}${p.username || p.alias || '?'}`;
 }
 
 // Groups a list by RSVP/attendance category (in the priority order
