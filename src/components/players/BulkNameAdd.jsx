@@ -101,14 +101,14 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
           ...r.player,
           ...namePatch,
           ...(r.allianceTag ? { allianceTag: r.allianceTag } : {}),
-          ...(r.fc ? { furnaceLevel: r.fc } : {}),
+          ...(r.fc ? { furnaceLevel: r.fc, tiersUpdatedAt: new Date().toISOString() } : {}),
           ...(r.fid ? { fid: r.fid } : {}),
         });
       } else if (r.status === 'new') {
         toCreate.push(newPlayer({
           username: r.name,
           ...(r.allianceTag ? { allianceTag: r.allianceTag } : {}),
-          ...(r.fc ? { furnaceLevel: r.fc } : {}),
+          ...(r.fc ? { furnaceLevel: r.fc, tiersUpdatedAt: new Date().toISOString() } : {}),
           ...(r.fid ? { fid: r.fid } : {}),
         }));
       }

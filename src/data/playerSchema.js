@@ -29,6 +29,7 @@ export function newPlayer(overrides = {}) {
     blacklistReason:    '',
     notes:              '',
     profileLastUpdated: null,
+    tiersUpdatedAt:     null, // ISO — when furnaceLevel/troops were last deliberately set (SnapshotEditor, BulkNameAdd). Falls back to profileLastUpdated for display when null.
     createdAt:          Date.now(),
     eventHistory:       [],
     leaderProfile:      newLeaderProfile(),

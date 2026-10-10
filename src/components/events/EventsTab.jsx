@@ -11,6 +11,7 @@ import {
 } from '../../services/eventListHelpers.js';
 import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 import { exportEventParticipants } from '../../services/exportXlsx.js';
+import { generateEarlyHeliosText } from '../../services/heliosSummary.js';
 import { SnapshotEditor } from './SnapshotEditor.jsx';
 import { EventSheet } from './EventSheet.jsx';
 import { EventListCard } from './EventListCard.jsx';
@@ -33,7 +34,7 @@ import { SquadBalancerPanel } from './SquadBalancerPanel.jsx';
 // still exists in the data (Battle Plan's isAttending() reads it as the
 // hard eligibility filter for leader/joiner picks), it's just set
 // automatically the moment someone is added here, not chosen manually.
-export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, onAddPlayers, plans = [] }) {
+export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, onAddPlayers, onUpdatePlayers, plans = [] }) {
   const [filterType, setFilterType]   = useState('All');
   const [toastMsg, setToastMsg]       = useState(null);
   function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); }
@@ -149,13 +150,27 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     setSnapOpen(true);
   }
 
-  function saveSnap(upd) {
+  // `tiers` (optional) = furnace/troop edits made in the same sheet.
+  // Furnace/troops belong to the PLAYER (Battle Plan reads them there),
+  // so they're written to the player — and ALSO copied into this
+  // snapshot's profileSnapshot so the event keeps a record. One
+  // onUpdateEvent call only: two calls from the same stale `events`
+  // would overwrite each other.
+  function saveSnap(upd, tiers) {
     const { eventId, playerId } = snapEditing;
     const ev = events.find(e => e.id===eventId);
     if (!ev) return;
+    let next = upd;
+    if (tiers) {
+      const player = players.find(p => p.id === playerId);
+      if (player && onUpdatePlayers) {
+        onUpdatePlayers([{ ...player, furnaceLevel: tiers.furnaceLevel, troops:{ ...(player.troops||{}), ...tiers.troops }, tiersUpdatedAt: new Date().toISOString() }]);
+      }
+      next = { ...upd, profileSnapshot:{ ...(upd.profileSnapshot||{}), furnaceLevel: tiers.furnaceLevel, troops:{ ...(upd.profileSnapshot?.troops||{}), ...tiers.troops } } };
+    }
     const snaps = [...(ev.snapshots||[])];
     const idx = snaps.findIndex(s => s.playerId===playerId);
-    if (idx>=0) snaps[idx]=upd; else snaps.push(upd);
+    if (idx>=0) snaps[idx]=next; else snaps.push(next);
     onUpdateEvent({ ...ev, snapshots:snaps });
   }
 
@@ -505,16 +520,23 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const participantsList = sortGroup(allEventPlayers.filter(p => !getSnap(activeEvent, p.id)?.rsvp?.substitute));
   const substitutesList  = sortGroup(allEventPlayers.filter(p => getSnap(activeEvent, p.id)?.rsvp?.substitute));
 
+  // SvS events only: appended to every text copy so the early-Helios
+  // headcount travels with the list. Norah joiners are listed first.
+  function heliosBlock() {
+    if (!showsRsvp) return '';
+    return '\n\n' + generateEarlyHeliosText(participantsList, p => getSnap(activeEvent, p.id));
+  }
+
   function copyParticipants() {
-    navigator.clipboard.writeText(generateParticipantsText(activeEvent, participantsList, substitutesList)).then(() => { setParticipantsCopied(true); setTimeout(() => setParticipantsCopied(false), 2000); });
+    navigator.clipboard.writeText(generateParticipantsText(activeEvent, participantsList, substitutesList) + heliosBlock()).then(() => { setParticipantsCopied(true); setTimeout(() => setParticipantsCopied(false), 2000); });
   }
 
   function copyAttendance() {
-    navigator.clipboard.writeText(generateAttendanceText(activeEvent, participantsList, substitutesList)).then(() => { setAttendanceCopied(true); setTimeout(() => setAttendanceCopied(false), 2000); });
+    navigator.clipboard.writeText(generateAttendanceText(activeEvent, participantsList, substitutesList) + heliosBlock()).then(() => { setAttendanceCopied(true); setTimeout(() => setAttendanceCopied(false), 2000); });
   }
 
   function copyHeliosAttendance() {
-    navigator.clipboard.writeText(generateHeliosAttendanceText(activeEvent, participantsList, substitutesList)).then(() => { setHeliosCopied(true); setTimeout(() => setHeliosCopied(false), 2000); });
+    navigator.clipboard.writeText(generateHeliosAttendanceText(activeEvent, participantsList, substitutesList) + heliosBlock()).then(() => { setHeliosCopied(true); setTimeout(() => setHeliosCopied(false), 2000); });
   }
 
   const bulkTags = isUpcoming
@@ -1032,7 +1054,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
         </>
       )}
       <EventSheet event={editingEvent} open={eventSheetOpen} onClose={() => setEventSheetOpen(false)} onSave={ev => { if (editingEvent) onUpdateEvent(ev); else onCreateEvent(ev); }} players={players}/>
-      <SnapshotEditor snapshot={snapEditing?.snapshot} playerName={snapEditing?.playerName} eventType={activeEvent?.type} eventStatus={activeEvent?.status} open={snapOpen} onClose={() => setSnapOpen(false)} onSave={saveSnap}/>
+      <SnapshotEditor snapshot={snapEditing?.snapshot} playerName={snapEditing?.playerName} eventType={activeEvent?.type} eventStatus={activeEvent?.status} open={snapOpen} onClose={() => setSnapOpen(false)} onSave={saveSnap} player={players.find(p => p.id === snapEditing?.playerId)} canEditTiers={!!onUpdatePlayers}/>
       {deleteConfirmId && (
         <DeleteConfirmModal
           message="Delete this event? This cannot be undone."

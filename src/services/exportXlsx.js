@@ -14,7 +14,8 @@
  */
 
 import * as XLSX from 'xlsx';
-import { JOINER_COVERAGE_EVENTS } from '../utils/constants.js';
+import { JOINER_COVERAGE_EVENTS, SHOWS_RSVP_TYPES } from '../utils/constants.js';
+import { buildEarlyHeliosSummary } from './heliosSummary.js';
 import { buildRosterDataSheet, buildEventsDataSheet, buildPlansDataSheet, buildRolesDataSheet } from './xlsxDataSheets.js';
 
 // ── Styling helpers ────────────────────────────────────────────
@@ -446,6 +447,40 @@ function buildEventSheet(event, players, includeJoiners, plans = []) {
     cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
     cell(`${total} total`, SUBHEADER_STYLE),
   ]);
+
+  // SvS-type events only (same gate as the RSVP UI): how many players
+  // arriving early are Helios (at least one troop), and who. Norah
+  // joiners first. Substitutes are left out, same as the text copies.
+  if (SHOWS_RSVP_TYPES.includes(event.type)) {
+    const participants = eventPlayers.filter(p => !snapMap[p.id]?.rsvp?.substitute);
+    const { earlyTotal, norah, others, count } = buildEarlyHeliosSummary(participants, p => snapMap[p.id]);
+    const blank = n => Array(n).fill(null).map(() => cell('', SUBHEADER_STYLE));
+    rows.push([]);
+    rows.push([
+      cell('☀️ EARLY HELIOS', SUBHEADER_STYLE), ...blank(6),
+      cell(`${count} of ${earlyTotal} arriving early`, SUBHEADER_STYLE),
+    ]);
+    const pushGroup = (label, list, isNorah) => {
+      if (!list.length) return;
+      rows.push([cell(`▸ ${label} (${list.length})`, SUBHEADER_STYLE), ...blank(allHeaders.length - 1)]);
+      list.forEach(p => {
+        const style = rowIndex % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
+        rowIndex++;
+        rows.push([
+          cell(p.username || p.alias || '', style),
+          cell(p.allianceTag || '', style),
+          cell(p.furnaceLevel || '', style),
+          cell(p.troops?.infantry || '', style),
+          cell(p.troops?.lancer || '', style),
+          cell(p.troops?.marksman || '', style),
+          cell('', style),
+          cell(isNorah ? 'Norah joiner' : '', isNorah ? YES_STYLE : style),
+        ]);
+      });
+    };
+    pushGroup('Norah joiners', norah, true);
+    pushGroup('Other Helios', others, false);
+  }
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const baseWidths = [18, 10, 9, 9, 9, 9, 26, 24];

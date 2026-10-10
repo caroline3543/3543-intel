@@ -2,6 +2,27 @@ import { useState, useEffect } from 'react';
 import { C, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import { ToggleRow, SheetHandle } from '../common/Primitives.jsx';
+import { ageLabel, ageDays, tiersUpdatedInfo } from '../../services/heliosSummary.js';
+
+const TIER_OPTIONS = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','Helios FC5','Helios FC6','Helios FC7','Helios FC8'];
+const TROOP_KEYS = [['infantry','🛡️ Infantry'],['lancer','🐎 Lancer'],['marksman','🏹 Marksman']];
+
+// Native select — 48px tall, always includes the current value even if
+// it isn't one of the standard tiers (e.g. older free-text furnace levels).
+function TierSelect({ label, value, onChange }) {
+  const opts = value && !TIER_OPTIONS.includes(value) ? [value, ...TIER_OPTIONS] : TIER_OPTIONS;
+  return (
+    <div style={{ marginBottom:10 }}>
+      <div style={{ fontSize:12, color:C.muted, fontWeight:600, marginBottom:4 }}>{label}</div>
+      <select value={value || ''} onChange={e => onChange(e.target.value || null)}
+        style={{ width:'100%', minHeight:48, background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:'0 12px', fontSize:16, color:C.white, boxSizing:'border-box', fontFamily:'inherit' }}>
+        <option value="">— not set —</option>
+        {opts.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
 
 // ── SnapshotEditor ─────────────────────────────────────────────
 // Per-player event record. Shows ONE of two mutually-exclusive
@@ -29,8 +50,12 @@ import { ToggleRow, SheetHandle } from '../common/Primitives.jsx';
 //   eventType    – event.type — gates whether troop power/RSVP show
 //   eventStatus  – 'upcoming' | 'active' | 'completed'
 //   open, onClose, onSave
-export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, open, onClose, onSave }) {
+export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, open, onClose, onSave, player, canEditTiers }) {
   const [s, setS] = useState(() => snapshot || {});
+  // Furnace + troop tiers live on the PLAYER record (Battle Plan reads
+  // them from there), so editing here saves to the player, not just
+  // this event's snapshot. Local draft until Save.
+  const [tiers, setTiers] = useState({ furnaceLevel:null, troops:{} });
   const isUpcoming = eventStatus === 'upcoming';
   const showsRsvp = SHOWS_RSVP_TYPES.includes(eventType);
   const tracksTroopPower = TROOP_POWER_EVENTS.includes(eventType);
@@ -38,6 +63,18 @@ export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, o
   useEffect(() => {
     if (open && snapshot) setS({ ...snapshot });
   }, [open, snapshot?.snapshotId]);
+
+  useEffect(() => {
+    if (open && player) setTiers({ furnaceLevel: player.furnaceLevel || null, troops: { ...(player.troops || {}) } });
+  }, [open, player?.id]);
+
+  const editsTiers = showsRsvp && !!player && !!canEditTiers;
+  const tiersChanged = editsTiers && (
+    (tiers.furnaceLevel || null) !== (player.furnaceLevel || null) ||
+    TROOP_KEYS.some(([k]) => (tiers.troops?.[k] || null) !== (player.troops?.[k] || null))
+  );
+  const upd = tiersUpdatedInfo(player);
+  const updDays = ageDays(upd.iso);
 
   useEffect(() => {
     if (!open) return;
@@ -94,6 +131,26 @@ export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, o
           </>
         )}
 
+        {editsTiers && (
+          <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:12, gap:8, flexWrap:'wrap' }}>
+              <div style={{ fontSize:14, fontWeight:700, color:C.white }}>🏰 Furnace &amp; Troops</div>
+              <div style={{ fontSize:12, color: updDays == null ? C.muted : updDays > 14 ? C.gold : C.muted }}>
+                {upd.iso
+                  ? `${upd.approximate ? 'Profile edited' : 'Updated'} ${ageLabel(upd.iso)}`
+                  : 'Never recorded'}
+              </div>
+            </div>
+            <TierSelect label="Furnace level" value={tiers.furnaceLevel} onChange={v => setTiers(t => ({ ...t, furnaceLevel:v }))}/>
+            {TROOP_KEYS.map(([k, label]) => (
+              <TierSelect key={k} label={label} value={tiers.troops?.[k] || null} onChange={v => setTiers(t => ({ ...t, troops:{ ...t.troops, [k]:v } }))}/>
+            ))}
+            <div style={{ fontSize:11, color:C.muted }}>
+              Saved to {playerName}'s profile — Battle Plan reads the same values.{upd.approximate ? ' Age shown is when the profile was last edited at all; saving here starts an exact one.' : ''}
+            </div>
+          </div>
+        )}
+
         {tracksTroopPower && (
           <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
             <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:8 }}>💪 Troop Power</div>
@@ -114,7 +171,7 @@ export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, o
         </div>
         <div style={{ display:'flex', gap:10 }}>
           <button onClick={onClose} style={{ flex:1, height:54, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:16, cursor:'pointer' }}>Cancel</button>
-          <button onClick={() => { onSave(s); onClose(); vibe(8); }} style={{ flex:2, height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>Save Record</button>
+          <button onClick={() => { onSave(s, tiersChanged ? { furnaceLevel: tiers.furnaceLevel, troops: tiers.troops } : null); onClose(); vibe(8); }} style={{ flex:2, height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>Save Record</button>
         </div>
       </div>
     </div>
