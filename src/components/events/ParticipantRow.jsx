@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { C } from '../../utils/constants.js';
-import { initials, noShowStreak, noShowBadge } from '../../services/eventListHelpers.js';
+import { C, ALLIANCE_RANKS, TROOP_POWER_EVENTS } from '../../utils/constants.js';
+import { initials, recentMisses } from '../../services/eventListHelpers.js';
 
 // Props:
 //   player, activeEvent, events, snap
@@ -9,19 +9,29 @@ import { initials, noShowStreak, noShowBadge } from '../../services/eventListHel
 //   onResolveLegionConflict – (player, sibling) => void
 //   lc                      – this event's Legion color (see legionColor)
 //   tracksTroopPower, showsRsvp, isUpcoming
-//   onSetTroopPower, onToggleSubstitute, onRemove
+//   onSetTroopPower, onSetRank, onRemove
+//
+// Rank: no chip beside the name (rank is conveyed by the group heading
+// in EventsTab). Tap the avatar to re-rank — writes straight to the
+// roster record. The ⇄ substitute button is gone; moving someone to
+// substitutes now lives in the missed-events panel of the record sheet,
+// reached by tapping the ⚠ flag.
 export function ParticipantRow({
   player, activeEvent, events, snap,
   bulkMode, isSel, onToggleBulkSel, onOpenSnap,
   sibling, onResolveLegionConflict,
   lc, tracksTroopPower, showsRsvp, isUpcoming,
-  onSetTroopPower, onToggleSubstitute, onRemove,
+  onSetTroopPower, onSetRank, onRemove,
 }) {
   const dn = player.username||player.alias||'Unknown';
   const isLead = player.roles?.includes('Rally Lead');
   const legionConflict = !!sibling && (sibling.participantIds||[]).includes(player.id);
-  const streak = noShowStreak(player.id, activeEvent.type, activeEvent.id, events);
-  const heart = noShowBadge(streak);
+  // Foundry / Canyon Clash only. 1-2 misses in the last 5 = heads-up;
+  // 3+ = consider blacklisting. Excused absences never count.
+  const misses = TROOP_POWER_EVENTS.includes(activeEvent.type)
+    ? recentMisses(player.id, activeEvent.type, activeEvent.id, events).missed.length
+    : 0;
+  const [rankOpen, setRankOpen] = useState(false);
   // Removing someone used to be a single mis-tap away with no way back
   // — this is a small inline two-step confirm instead (tap once to
   // arm, tap again within ~2.5s to actually remove), matching the "no
@@ -36,15 +46,22 @@ export function ParticipantRow({
   }
 
   return (
-    <div onClick={() => { if (bulkMode) onToggleBulkSel(player.id); else onOpenSnap(activeEvent, player); }} style={{ background:isSel?C.gold+'18':C.card, borderRadius:10, padding:'10px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${legionConflict?C.red+'88':isSel?C.gold:isLead?C.gold+'55':(lc?lc+'44':C.border+'44')}`, WebkitTapHighlightColor:'transparent' }}>
+    <div style={{ marginBottom:8 }}>
+    <div onClick={() => { if (bulkMode) onToggleBulkSel(player.id); else onOpenSnap(activeEvent, player); }} style={{ background:isSel?C.gold+'18':C.card, borderRadius:10, padding:'10px 14px', display:'flex', alignItems:'center', gap:10, cursor:'pointer', border:`1px solid ${legionConflict?C.red+'88':isSel?C.gold:isLead?C.gold+'55':(lc?lc+'44':C.border+'44')}`, WebkitTapHighlightColor:'transparent' }}>
       {bulkMode && <div style={{ width:22, height:22, borderRadius:'50%', border:`2px solid ${isSel?C.gold:C.border}`, background:isSel?C.gold:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{isSel && <span style={{ fontSize:12, color:C.bg, fontWeight:700 }}>✓</span>}</div>}
-      <div style={{ width:36, height:36, borderRadius:'50%', background:(isLead?C.gold:C.muted)+'33', border:`1.5px solid ${isLead?C.gold:C.muted}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:14, color:C.white, flexShrink:0 }}>{initials(dn)}</div>
+      <button onClick={e => { e.stopPropagation(); if (!bulkMode) setRankOpen(o => !o); }} title="Tap to change rank"
+        style={{ width:44, height:44, flexShrink:0, background:'none', border:'none', padding:0, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+        <span style={{ width:36, height:36, borderRadius:'50%', background:(isLead?C.gold:C.muted)+'33', border:`1.5px solid ${isLead?C.gold:C.muted}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:14, color:C.white }}>{initials(dn)}</span>
+      </button>
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:6, overflow:'hidden' }}>
           {isLead && <span style={{ fontSize:12, flexShrink:0 }}>👑</span>}
           <div style={{ fontSize:15, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{dn}</div>
-          {heart && <span title={`${streak} consecutive ${activeEvent.type} no-shows`} style={{ fontSize:12, flexShrink:0 }}>{heart}</span>}
-          {player.allianceRank && <span style={{ fontSize:11, color:C.gold, fontWeight:700, flexShrink:0, padding:'0 6px', borderRadius:6, background:C.gold+'18' }}>{player.allianceRank}</span>}
+          {misses > 0 && (
+            <span style={{ fontSize:11, fontWeight:700, flexShrink:0, padding:'0 6px', borderRadius:6, background:(misses>=3?C.red:C.gold)+'18', color:misses>=3?C.red:C.gold }}>
+              {misses>=3 ? `⚠ ${misses} missed · consider blacklisting` : `⚠ missed ${misses}`}
+            </span>
+          )}
           {player.furnaceLevel && <span style={{ fontSize:11, color:C.icy, fontWeight:600, flexShrink:0 }}>{player.furnaceLevel}</span>}
           {legionConflict && (
             <button onClick={e => { e.stopPropagation(); onResolveLegionConflict(player, sibling); }}
@@ -94,8 +111,6 @@ export function ParticipantRow({
       </div>
       {!bulkMode && (
         <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-          <button onClick={e => { e.stopPropagation(); onToggleSubstitute(player.id); }} title="Move to the other section"
-            style={{ width:44, height:44, borderRadius:10, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>⇄</button>
           <button onClick={handleRemoveTap}
             style={{ height:44, minWidth:confirmingRemove?76:44, padding:confirmingRemove?'0 12px':0, borderRadius:10, background:confirmingRemove?C.red:'none', border:`1px solid ${confirmingRemove?C.red:C.red+'33'}`, color:confirmingRemove?C.white:C.red+'88', fontSize:confirmingRemove?12:15, fontWeight:confirmingRemove?700:400, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', whiteSpace:'nowrap', transition:'all 150ms ease' }}>
             {confirmingRemove ? 'Remove?' : '✕'}
@@ -103,6 +118,20 @@ export function ParticipantRow({
           <span style={{ fontSize:18, color:C.muted }}>›</span>
         </div>
       )}
+    </div>
+    {rankOpen && !bulkMode && (
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap', padding:'8px 4px 0' }}>
+        {[...ALLIANCE_RANKS, null].map(r => {
+          const on = (player.allianceRank || null) === r;
+          return (
+            <button key={r || 'none'} onClick={() => { onSetRank(player.id, r); setRankOpen(false); }}
+              style={{ minWidth:52, height:44, borderRadius:10, padding:'0 12px', fontSize:14, fontWeight:700, cursor:'pointer', background:on?C.gold+'22':C.section, border:`1px solid ${on?C.gold:C.border}`, color:on?C.gold:C.icy }}>
+              {r || 'None'}
+            </button>
+          );
+        })}
+      </div>
+    )}
     </div>
   );
 }

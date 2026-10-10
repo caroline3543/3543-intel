@@ -50,12 +50,13 @@ function TierSelect({ label, value, onChange }) {
 //   eventType    – event.type — gates whether troop power/RSVP show
 //   eventStatus  – 'upcoming' | 'active' | 'completed'
 //   open, onClose, onSave
-export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, open, onClose, onSave, player, canEditTiers }) {
+export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, open, onClose, onSave, player, canEditTiers, missed = [] }) {
   const [s, setS] = useState(() => snapshot || {});
   // Furnace + troop tiers live on the PLAYER record (Battle Plan reads
   // them from there), so editing here saves to the player, not just
   // this event's snapshot. Local draft until Save.
   const [tiers, setTiers] = useState({ furnaceLevel:null, troops:{} });
+  const [blacklistNow, setBlacklistNow] = useState(false);
   const isUpcoming = eventStatus === 'upcoming';
   const showsRsvp = SHOWS_RSVP_TYPES.includes(eventType);
   const tracksTroopPower = TROOP_POWER_EVENTS.includes(eventType);
@@ -65,6 +66,7 @@ export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, o
   }, [open, snapshot?.snapshotId]);
 
   useEffect(() => {
+    if (open && player) setBlacklistNow(!!player.blacklisted);
     if (open && player) setTiers({ furnaceLevel: player.furnaceLevel || null, troops: { ...(player.troops || {}) } });
   }, [open, player?.id]);
 
@@ -131,6 +133,22 @@ export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, o
           </>
         )}
 
+        {missed.length > 0 && (
+          <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16, border:`1px solid ${(missed.length>=3?C.red:C.gold)}44` }}>
+            <div style={{ fontSize:14, fontWeight:700, color:missed.length>=3?C.red:C.gold, marginBottom:8 }}>
+              ⚠ Missed {missed.length} recent {eventType} event{missed.length!==1?'s':''}
+            </div>
+            {missed.map(ev => (
+              <div key={ev.id} style={{ fontSize:13, color:C.icy, padding:'4px 0' }}>• {ev.name || ev.type} — {ev.date}</div>
+            ))}
+            <div style={{ fontSize:11, color:C.muted, margin:'6px 0 10px' }}>Excused absences aren't counted.</div>
+            <ToggleRow label="Substitute for this event" value={!!s.rsvp?.substitute} onChange={v=>updR({substitute:v})} colorOn={C.mar} colorOff={C.muted}/>
+            {missed.length >= 3 && player && canEditTiers && (
+              <ToggleRow label={`Blacklist ${playerName} (applies on Save)`} value={blacklistNow} onChange={setBlacklistNow} colorOn={C.red} colorOff={C.muted}/>
+            )}
+          </div>
+        )}
+
         {editsTiers && (
           <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:12, gap:8, flexWrap:'wrap' }}>
@@ -171,7 +189,7 @@ export function SnapshotEditor({ snapshot, playerName, eventType, eventStatus, o
         </div>
         <div style={{ display:'flex', gap:10 }}>
           <button onClick={onClose} style={{ flex:1, height:54, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:16, cursor:'pointer' }}>Cancel</button>
-          <button onClick={() => { onSave(s, tiersChanged ? { furnaceLevel: tiers.furnaceLevel, troops: tiers.troops } : null); onClose(); vibe(8); }} style={{ flex:2, height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>Save Record</button>
+          <button onClick={() => { onSave(s, (() => { const patch = {}; if (tiersChanged) { patch.furnaceLevel = tiers.furnaceLevel; patch.troops = tiers.troops; patch.tiersChanged = true; } if (player && blacklistNow !== !!player.blacklisted) patch.blacklisted = blacklistNow; return Object.keys(patch).length ? patch : null; })()); onClose(); vibe(8); }} style={{ flex:2, height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>Save Record</button>
         </div>
       </div>
     </div>

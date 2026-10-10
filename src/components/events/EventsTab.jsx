@@ -7,7 +7,7 @@ import { searchPlayers } from '../../services/playerAutosuggest.js';
 import {
   groupByRank, isArchived, findSiblingLegionEvent, legionColor,
   eventMs, evSum, generateParticipantsText, generateAttendanceText, generateHeliosAttendanceText,
-  noShowStreak, noShowBadge,
+  recentMisses,
 } from '../../services/eventListHelpers.js';
 import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 import { exportEventParticipants } from '../../services/exportXlsx.js';
@@ -142,6 +142,13 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   // always draws from this same full active set.
   const activeSwipeList = sorted.filter(ev => !isArchived(ev, todayStr));
 
+  // Unexcused misses in the last 5 events of this type — Foundry /
+  // Canyon Clash only (same gate as the row flag).
+  function missedFor(pid) {
+    if (!pid || !activeEvent || !TROOP_POWER_EVENTS.includes(activeEvent.type)) return [];
+    return recentMisses(pid, activeEvent.type, activeEvent.id, events).missed;
+  }
+
   function getSnap(ev, pid) { return (ev.snapshots||[]).find(s => s.playerId===pid); }
 
   function openSnap(ev, player) {
@@ -150,28 +157,45 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     setSnapOpen(true);
   }
 
-  // `tiers` (optional) = furnace/troop edits made in the same sheet.
-  // Furnace/troops belong to the PLAYER (Battle Plan reads them there),
-  // so they're written to the player — and ALSO copied into this
-  // snapshot's profileSnapshot so the event keeps a record. One
-  // onUpdateEvent call only: two calls from the same stale `events`
-  // would overwrite each other.
-  function saveSnap(upd, tiers) {
+  // `patch` (optional) = roster-level edits made from the same sheet:
+  // furnaceLevel/troops (flagged by patch.tiersChanged) and/or
+  // blacklisted. These belong to the PLAYER, so they're written to the
+  // roster in ONE updatePlayers call; furnace/troops are also copied
+  // into this snapshot's profileSnapshot as a record. One onUpdateEvent
+  // call only: two calls from the same stale `events` would overwrite
+  // each other.
+  function saveSnap(upd, patch) {
     const { eventId, playerId } = snapEditing;
     const ev = events.find(e => e.id===eventId);
     if (!ev) return;
     let next = upd;
-    if (tiers) {
+    if (patch) {
       const player = players.find(p => p.id === playerId);
       if (player && onUpdatePlayers) {
-        onUpdatePlayers([{ ...player, furnaceLevel: tiers.furnaceLevel, troops:{ ...(player.troops||{}), ...tiers.troops }, tiersUpdatedAt: new Date().toISOString() }]);
+        const updated = { ...player };
+        if (patch.tiersChanged) {
+          updated.furnaceLevel = patch.furnaceLevel;
+          updated.troops = { ...(player.troops||{}), ...patch.troops };
+          updated.tiersUpdatedAt = new Date().toISOString();
+        }
+        if ('blacklisted' in patch) updated.blacklisted = patch.blacklisted;
+        onUpdatePlayers([updated]);
       }
-      next = { ...upd, profileSnapshot:{ ...(upd.profileSnapshot||{}), furnaceLevel: tiers.furnaceLevel, troops:{ ...(upd.profileSnapshot?.troops||{}), ...tiers.troops } } };
+      if (patch.tiersChanged) {
+        next = { ...upd, profileSnapshot:{ ...(upd.profileSnapshot||{}), furnaceLevel: patch.furnaceLevel, troops:{ ...(upd.profileSnapshot?.troops||{}), ...patch.troops } } };
+      }
     }
     const snaps = [...(ev.snapshots||[])];
     const idx = snaps.findIndex(s => s.playerId===playerId);
     if (idx>=0) snaps[idx]=next; else snaps.push(next);
     onUpdateEvent({ ...ev, snapshots:snaps });
+  }
+
+  // Re-rank from the event list — straight to the roster record, so the
+  // Roster tab and every other event see it immediately.
+  function setRank(playerId, rank) {
+    const player = players.find(p => p.id === playerId);
+    if (player && onUpdatePlayers) onUpdatePlayers([{ ...player, allianceRank: rank }]);
   }
 
   // ── Add participant by name — type + Enter commits the top match ──
@@ -846,7 +870,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                   onOpenSnap={openSnap}
                   sibling={sibling} onResolveLegionConflict={(p, sib) => setLegionModal({ mode:'resolve', player:p, sibling:sib })}
                   lc={lc} tracksTroopPower={tracksTroopPower} showsRsvp={showsRsvp} isUpcoming={isUpcoming}
-                  onSetTroopPower={setTroopPower} onToggleSubstitute={toggleSubstitute} onRemove={removeParticipant}
+                  onSetTroopPower={setTroopPower} onSetRank={setRank} onRemove={removeParticipant}
                 />
               );
             }
@@ -900,7 +924,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
                 ) : (
                   <>
                     {(() => {
-                      const flaggedCount = participantsList.filter(p => noShowBadge(noShowStreak(p.id, activeEvent.type, activeEvent.id, events))).length;
+                      const flaggedCount = participantsList.filter(p => missedFor(p.id).length > 0).length;
                       const noPowerCount = tracksTroopPower ? participantsList.filter(p => getSnap(activeEvent, p.id)?.troopPower == null).length : 0;
                       return (
                         <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:12, color:C.muted, marginBottom:10 }}>
@@ -1054,7 +1078,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
         </>
       )}
       <EventSheet event={editingEvent} open={eventSheetOpen} onClose={() => setEventSheetOpen(false)} onSave={ev => { if (editingEvent) onUpdateEvent(ev); else onCreateEvent(ev); }} players={players}/>
-      <SnapshotEditor snapshot={snapEditing?.snapshot} playerName={snapEditing?.playerName} eventType={activeEvent?.type} eventStatus={activeEvent?.status} open={snapOpen} onClose={() => setSnapOpen(false)} onSave={saveSnap} player={players.find(p => p.id === snapEditing?.playerId)} canEditTiers={!!onUpdatePlayers}/>
+      <SnapshotEditor snapshot={snapEditing?.snapshot} playerName={snapEditing?.playerName} eventType={activeEvent?.type} eventStatus={activeEvent?.status} open={snapOpen} onClose={() => setSnapOpen(false)} onSave={saveSnap} player={players.find(p => p.id === snapEditing?.playerId)} canEditTiers={!!onUpdatePlayers} missed={missedFor(snapEditing?.playerId)}/>
       {deleteConfirmId && (
         <DeleteConfirmModal
           message="Delete this event? This cannot be undone."

@@ -99,6 +99,24 @@ export function noShowStreak(playerId, eventType, excludeEventId, events) {
   return streak;
 }
 
+// Missed events (unexcused no-shows) for one player at one event TYPE
+// within that type's most recent `window` past events the player was
+// actually part of. Unlike noShowStreak this doesn't need to be
+// consecutive — "flag anything they've missed in recent history".
+// Returns { missed: [ev…] newest first, considered: n }.
+export function recentMisses(playerId, eventType, excludeEventId, events, window = 5) {
+  const past = events
+    .filter(e => e.type === eventType && e.id !== excludeEventId && e.status !== 'upcoming')
+    .filter(e => (e.snapshots||[]).some(s => s.playerId === playerId))
+    .sort((a,b) => `${b.date}T${b.time||'00:00'}`.localeCompare(`${a.date}T${a.time||'00:00'}`))
+    .slice(0, window);
+  const missed = past.filter(e => {
+    const a = (e.snapshots||[]).find(s => s.playerId === playerId)?.attendance;
+    return a?.noShow && !a?.excused;
+  });
+  return { missed, considered: past.length };
+}
+
 // Capped display — a wall of hearts past 3 stops being informative
 // and starts breaking the row layout. This cap wasn't specified;
 // easy to change.
