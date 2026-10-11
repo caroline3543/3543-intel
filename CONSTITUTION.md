@@ -99,6 +99,7 @@ BattleTab and LiveRallyRoom both hit ~1000 lines before being split. Don't let i
 | Key | Owner | Contents |
 |-----|-------|----------|
 | `svs_live_rally_room_v2` | `LiveRallyRoom.jsx` | Timers, calculator, march registry |
+| `svs_castle_command_v1` | `useCastleCommand.js` | Isolated battles, events, roster, drafts, presets, audit |
 | `svs_onboarded` | `LandingPage.jsx` | Onboarding complete flag |
 | (global app data) | `exportImportService.js` | Players, plans, events, scores, settings |
 

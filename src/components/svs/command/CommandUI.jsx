@@ -1,0 +1,6 @@
+import {C} from '../../../utils/constants.js';
+export const row = {display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'};
+export const panel = {padding:12,background:C.section,borderRadius:12,marginBottom:12};
+export function Button({children,onClick,disabled=false,danger=false}) {return <button disabled={disabled} onClick={onClick} style={{minHeight:44,padding:'8px 12px',fontSize:14,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:danger?C.red:C.white,cursor:'pointer',opacity:disabled?.5:1}}>{children}</button>;}
+export function Field({label,value,onChange,type='text',children}) {const style={width:'100%',boxSizing:'border-box',minHeight:44,fontSize:16,background:C.bg,color:C.white,border:`1px solid ${C.border}`,borderRadius:8,padding:8};return <label style={{display:'block',fontSize:14,color:C.icy,marginBottom:10,minWidth:0}}>{label}{children?<select style={style} value={value} onChange={e=>onChange(e.target.value)}>{children}</select>:<input type={type} style={style} value={value??''} onChange={e=>onChange(e.target.value)}/>}</label>;}
+export function Warning({children}) {return <div role="status" style={{color:C.gold,fontSize:14,padding:'8px 0',overflowWrap:'anywhere'}}>{children}</div>;}
