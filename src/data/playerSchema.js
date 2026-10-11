@@ -8,6 +8,7 @@ export function newPlayer(overrides = {}) {
     alias:              '',
     pastUsernames:      [], // history of previous usernames, oldest first — see BulkNameAdd.jsx, which appends here on a detected FID-matched rename rather than silently overwriting
     allianceTag:        '',
+    allianceHistory:    [], // [{ from, to, at }] — written by BulkNameAdd when a bulk update/verify moves someone between alliances (or to none); newest last
     country:            '',
     timezone:           '',
     languages:          [],

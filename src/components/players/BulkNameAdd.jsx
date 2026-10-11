@@ -57,6 +57,19 @@ function isRename(existingPlayer, incomingName) {
   return !!current && current.toLowerCase() !== incomingName.trim().toLowerCase();
 }
 
+// What changed for one matched row, vs. the player on file. Drives both
+// the preview chips (so you see old → new before saving) and the
+// summary counts after.
+function diffRow(r) {
+  const p = r.player;
+  const d = {};
+  if (r.renamed) d.name = [p.username, r.name];
+  if (r.allianceTag && (p.allianceTag || '') !== r.allianceTag) d.alliance = [p.allianceTag || 'none', r.allianceTag];
+  if (r.fc && (p.furnaceLevel || '') !== r.fc) d.fc = [p.furnaceLevel || '—', r.fc];
+  if (r.fid && String(p.fid || '').trim() !== r.fid) d.fid = [p.fid || '—', r.fid];
+  return d;
+}
+
 // ── BulkNameAdd ──────────────────────────────────────────────────
 // One paste format, one purpose: match-and-update existing players
 // (alliance, FC level, ID all overwrite what's on file when provided
@@ -68,21 +81,50 @@ function isRename(existingPlayer, incomingName) {
 export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, showToast, onGoToFieldRegistry, existingPlayers = [] }) {
   const [detailText, setDetailText] = useState('');
   const [detailDecisions, setDetailDecisions] = useState({});
-  const [result, setResult] = useState(null); // { updated, created } once submitted, else null
+  const [result, setResult] = useState(null); // summary counts once submitted, else null
+  // Verify-roster mode: anyone NOT on the pasted list is moved to "no
+  // alliance". scope 'all' = whole roster; 'listed' = only players whose
+  // current alliance appears in the list (for pasting one alliance's
+  // list without touching the others).
+  const [verifyMode, setVerifyMode] = useState(false);
+  const [scope, setScope] = useState('all');
+  const [armed, setArmed] = useState(false);
 
   const resolvedDetail = resolveDetailRows(parseDetailLines(detailText), existingPlayers, detailDecisions);
   const readyCount = resolvedDetail.filter(r => r.status === 'matched' || r.status === 'new').length;
   const pendingCount = resolvedDetail.filter(r => r.status === 'fuzzy').length;
 
+  // Players who'd be cleared: have an alliance, aren't matched by any
+  // row on the list. Fuzzy rows must be resolved first (submit is
+  // blocked until then), so nobody is cleared by an unresolved guess.
+  const matchedIds = new Set(resolvedDetail.filter(r => r.status === 'matched').map(r => r.player.id));
+  const listedTags = new Set(resolvedDetail.map(r => r.allianceTag).filter(Boolean));
+  const toClear = !verifyMode ? [] : existingPlayers.filter(p =>
+    p.allianceTag && !matchedIds.has(p.id) && (scope === 'all' || listedTags.has(p.allianceTag))
+  );
+  const matchedCount = matchedIds.size;
+  // A pasted list that matches very little of the roster usually means
+  // a wrong paste (or wrong format), not 40 people leaving — say so.
+  const looksWrong = verifyMode && existingPlayers.length >= 10 && toClear.length > 0 && toClear.length > matchedCount;
+
   function decide(name, value) {
     setDetailDecisions(prev => ({ ...prev, [name]: value }));
+    setArmed(false);
   }
 
   function handleSubmit() {
+    // Verify mode with people to clear needs a second, deliberate tap.
+    if (toClear.length > 0 && !armed) { setArmed(true); return; }
+    const now = new Date().toISOString();
     const toUpdate = [];
     const toCreate = [];
+    const stats = { renamed: 0, moved: 0, fc: 0, cleared: 0 };
     resolvedDetail.forEach(r => {
       if (r.status === 'matched') {
+        const d = diffRow(r);
+        if (d.name) stats.renamed++;
+        if (d.alliance) stats.moved++;
+        if (d.fc) stats.fc++;
         const namePatch = r.renamed
           ? {
               username: r.name,
@@ -97,21 +139,29 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
               })(),
             }
           : {};
+        const alliancePatch = d.alliance
+          ? { allianceTag: r.allianceTag, allianceHistory: [...(r.player.allianceHistory || []), { from: r.player.allianceTag || '', to: r.allianceTag, at: now }] }
+          : {};
         toUpdate.push({
           ...r.player,
           ...namePatch,
-          ...(r.allianceTag ? { allianceTag: r.allianceTag } : {}),
-          ...(r.fc ? { furnaceLevel: r.fc, tiersUpdatedAt: new Date().toISOString() } : {}),
+          ...alliancePatch,
+          ...(r.fc ? { furnaceLevel: r.fc, tiersUpdatedAt: now } : {}),
           ...(r.fid ? { fid: r.fid } : {}),
         });
       } else if (r.status === 'new') {
         toCreate.push(newPlayer({
           username: r.name,
           ...(r.allianceTag ? { allianceTag: r.allianceTag } : {}),
-          ...(r.fc ? { furnaceLevel: r.fc, tiersUpdatedAt: new Date().toISOString() } : {}),
+          ...(r.fc ? { furnaceLevel: r.fc, tiersUpdatedAt: now } : {}),
           ...(r.fid ? { fid: r.fid } : {}),
         }));
       }
+    });
+    // Players left off the list → no alliance (history keeps where they were)
+    toClear.forEach(p => {
+      stats.cleared++;
+      toUpdate.push({ ...p, allianceTag: '', allianceHistory: [...(p.allianceHistory || []), { from: p.allianceTag, to: '', at: now }] });
     });
     if (toUpdate.length && onUpdatePlayers) onUpdatePlayers(toUpdate);
     if (toCreate.length) onAddPlayers(toCreate);
@@ -119,7 +169,8 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
     vibe(10);
     setDetailText('');
     setDetailDecisions({});
-    setResult({ updated: toUpdate.length, created: toCreate.length });
+    setArmed(false);
+    setResult({ updated: toUpdate.length - stats.cleared, created: toCreate.length, ...stats });
   }
 
   if (result !== null) {
@@ -130,6 +181,11 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
           <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
             Updated {result.updated}, added {result.created}
           </div>
+          {(result.renamed + result.moved + result.fc + result.cleared) > 0 && (
+            <div style={{ fontSize: 13, color: C.icy, marginBottom: 12, maxWidth: 320 }}>
+              {[result.renamed && `${result.renamed} renamed`, result.moved && `${result.moved} changed alliance`, result.fc && `${result.fc} furnace updated`, result.cleared && `${result.cleared} set to no alliance`].filter(Boolean).join(' · ')}
+            </div>
+          )}
           <div style={{ fontSize: 14, color: C.muted, marginBottom: 32, maxWidth: 320 }}>
             Languages, joiner heroes, and roles still aren't set. Field Registry is the fastest way to fill those in for everyone.
           </div>
@@ -156,7 +212,7 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.gold, fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: 0 }}>← Back</button>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 700 }}>➕ Bulk Add</div>
+            <div style={{ fontSize: 17, fontWeight: 700 }}>➕ Bulk Add / Verify Roster</div>
             <div style={{ fontSize: 12, color: C.muted }}>Matches and updates existing players, adds the rest</div>
           </div>
         </div>
@@ -165,11 +221,23 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <textarea
           value={detailText}
-          onChange={e => setDetailText(e.target.value)}
+          onChange={e => { setDetailText(e.target.value); setArmed(false); }}
           placeholder={'[Alliance] Username, FC Level, User ID — one per line, e.g.\n[R3K] Alice, FC7, 632707622\n[R3K] Bob, Helios, 636115844\nCharlie'}
           rows={10}
           style={{ width: '100%', background: C.section, border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 14px', fontSize: 15, color: C.white, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }}
         />
+        <button onClick={() => { setVerifyMode(v => !v); setArmed(false); }}
+          style={{ minHeight: 48, borderRadius: 10, padding: '8px 14px', textAlign: 'left', cursor: 'pointer', background: verifyMode ? C.gold + '18' : C.section, border: `1px solid ${verifyMode ? C.gold : C.border}`, color: verifyMode ? C.gold : C.icy, fontSize: 14, fontWeight: 700 }}>
+          {verifyMode ? '✓ ' : ''}Verify roster — anyone not on this list → no alliance
+        </button>
+        {verifyMode && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[['all', 'Whole roster'], ['listed', 'Only alliances in this list']].map(([k, label]) => (
+              <button key={k} onClick={() => { setScope(k); setArmed(false); }}
+                style={{ flex: 1, minHeight: 44, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: scope === k ? C.gold + '22' : C.section, border: `1px solid ${scope === k ? C.gold : C.border}`, color: scope === k ? C.gold : C.icy }}>{label}</button>
+            ))}
+          </div>
+        )}
         <div style={{ fontSize: 13, color: C.muted }}>
           Only the username is required — leave alliance, FC, or ID blank if you don't know it yet, and it just won't be touched for that person.
         </div>
@@ -177,9 +245,16 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {resolvedDetail.map((r, i) => {
               if (r.status === 'matched') {
+                const d = diffRow(r);
+                const parts = [
+                  d.name && `${d.name[0]} → ${d.name[1]} (renamed)`,
+                  d.alliance && `[${d.alliance[0]}] → [${d.alliance[1]}]`,
+                  d.fc && `${d.fc[0]} → ${d.fc[1]}`,
+                  d.fid && `ID ${d.fid[1]}`,
+                ].filter(Boolean);
                 return (
                   <span key={i} style={{ padding: '6px 12px', borderRadius: 14, background: C.green+'18', border: `1px solid ${C.green}44`, color: C.green, fontSize: 12 }}>
-                    ✓ {r.renamed ? `${r.player.username} → ${r.name} (renamed)` : `${r.name} → ${r.player.username || r.player.alias}`}{r.allianceTag ? ` · [${r.allianceTag}]` : ''}{r.fc ? ` · ${r.fc}` : ''}{r.fid ? ` · ID ${r.fid}` : ''}
+                    ✓ {r.player.username || r.player.alias}{parts.length ? ` · ${parts.join(' · ')}` : ' · no changes'}
                   </span>
                 );
               }
@@ -202,6 +277,24 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
             })}
           </div>
         )}
+        {verifyMode && toClear.length > 0 && (
+          <div style={{ padding: '10px 12px', borderRadius: 10, background: C.section, border: `1px solid ${armed ? C.red : C.gold}66` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: armed ? C.red : C.gold, marginBottom: 6 }}>
+              {toClear.length} not on the list → no alliance
+            </div>
+            <div style={{ fontSize: 12, color: C.icy, lineHeight: 1.6 }}>
+              {toClear.map(p => `${p.username || p.alias}${p.allianceTag ? ` [${p.allianceTag}]` : ''}`).join(', ')}
+            </div>
+            {looksWrong && (
+              <div style={{ fontSize: 12, color: C.gold, marginTop: 8 }}>
+                ⚠ That's more people than matched ({matchedCount}). Check this is the right list and format before saving.
+              </div>
+            )}
+          </div>
+        )}
+        {verifyMode && toClear.length === 0 && resolvedDetail.length > 0 && (
+          <div style={{ fontSize: 12, color: C.muted }}>Everyone with an alliance is on this list — nobody will be cleared.</div>
+        )}
         {pendingCount > 0 && (
           <div style={{ fontSize: 12, color: C.red+'cc' }}>⚠ {pendingCount} name{pendingCount!==1?'s':''} need a decision above before submitting.</div>
         )}
@@ -211,9 +304,9 @@ export default function BulkNameAdd({ onAddPlayers, onUpdatePlayers, onClose, sh
         <button
           onClick={handleSubmit}
           disabled={readyCount === 0 || pendingCount > 0}
-          style={{ width: '100%', height: 48, borderRadius: 12, background: (readyCount>0 && pendingCount===0) ? C.gold : C.section, border: 'none', color: (readyCount>0 && pendingCount===0) ? C.bg : C.muted, fontWeight: 800, fontSize: 15, cursor: (readyCount>0 && pendingCount===0) ? 'pointer' : 'default' }}
+          style={{ width: '100%', height: 48, borderRadius: 12, background: (readyCount>0 && pendingCount===0) ? (armed ? C.red : C.gold) : C.section, border: 'none', color: (readyCount>0 && pendingCount===0) ? (armed ? C.white : C.bg) : C.muted, fontWeight: 800, fontSize: 15, cursor: (readyCount>0 && pendingCount===0) ? 'pointer' : 'default' }}
         >
-          {readyCount > 0 ? `Save ${readyCount} Player${readyCount !== 1 ? 's' : ''}` : 'Save'}
+          {readyCount === 0 ? 'Save' : armed ? `Confirm — clear ${toClear.length} alliance${toClear.length !== 1 ? 's' : ''} & save` : toClear.length > 0 ? `Review & save (${toClear.length} to clear)` : `Save ${readyCount} Player${readyCount !== 1 ? 's' : ''}`}
         </button>
       </div>
     </div>
