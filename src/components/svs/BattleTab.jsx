@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { CastleCommand } from './command/CastleCommand.jsx';
-import { Button } from './command/CommandUI.jsx';
 import { LiveRallyRoom } from './LiveRallyRoom.jsx';
 import { PlanList }   from './battle/PlanList.jsx';
 import { PlanDetail } from './battle/PlanDetail.jsx';
@@ -39,8 +37,6 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
 
   function handleGoLive(plan) { setLiveRoomPlan(plan); setView('liveRoom'); }
 
-  if (view === 'castleCommand') return <CastleCommand onBack={() => setView('plans')} players={players}/>;
-
   if (view === 'liveRoom') {
     return <LiveRallyRoom onBack={() => setView('plans')} players={players} planData={liveRoomPlan}/>;
   }
@@ -65,7 +61,6 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
 
   return (
     <>
-    <div style={{padding:16}}><Button onClick={() => setView('castleCommand')}>🏰 Castle Command Centre</Button></div>
     <PlanList
       plans={plans}
       onSelectPlan={setActivePlanId}

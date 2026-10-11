@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CommandAssignments } from './CommandAssignments.jsx';
 import { C, EVENT_ICONS, JOINER_COVERAGE_EVENTS } from '../../../utils/constants.js';
 import { vibe } from '../../../utils/vibe.js';
 import { newRallySlot } from '../../../data/playerSchema.js';
@@ -432,6 +433,8 @@ export function PlanDetail({ plan, plans = [], players, events = [], onUpdate, o
           </div>
         )}
       </div>
+
+      <CommandAssignments plan={plan} players={players} onUpdate={onUpdate}/>
 
       {/* Create Rally Slots — "how many rally leaders, and for what?"
           Creates the slots and immediately auto-fills them (leaders,
