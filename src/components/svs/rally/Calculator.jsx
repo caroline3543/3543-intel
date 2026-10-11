@@ -6,6 +6,7 @@ import {
   COUNTDOWN_PRESETS, COUNTDOWN_MIN, COUNTDOWN_MAX, COUNTDOWN_STEP, COUNTDOWN_DEFAULT,
   uid, nowEpochSecs, computeLeaderTimes, fmtSend, fmtMarch, secsToHHMMSS,
 } from './rallyRoomHelpers.js';
+import { parseImpactInput } from '../../../services/rallyTimingParser.js';
 import { ImpactInput } from './SmartInputs.jsx';
 import { LeaderRow } from './LeaderRow.jsx';
 import { DeleteConfirmModal } from '../../common/DeleteConfirmModal.jsx';
@@ -50,15 +51,15 @@ export function Calculator({ calc, onChange, registry, onStartTimers }) {
   }
 
   function setRallyDuration(d) {
-    onChange({ ...calc, rallyDuration: d, leaders: calc.leaders.map(l => ({ ...l, rallyDuration: d })) });
+    onChange({ ...calc, rallyDuration: d, leaders: calc.leaders.map(l => ({ ...l, rallyDuration: l.rallyDuration ?? d })) });
   }
 
   // ── Leader list ops (shared by both modes) ─────────────────
   function addFromRegistry(entry) {
     if (calc.leaders.some(l => l.registryId === entry.id)) return;
     onChange({ ...calc, leaders:[...calc.leaders, {
-      id:uid(), registryId:entry.id, name:entry.name, type:entry.type||'Main Rally',
-      marchSecs:entry.marchSecs, rallyDuration:calc.rallyDuration||3, offset:0, notes:'',
+      id:uid(), registryId:entry.id, playerId:entry.playerId, name:entry.name, type:entry.type||'Main Rally',
+      marchSecs:entry.marchSecs, rallyDuration:calc.rallyDuration||3, offset:0, offsetConvention:'later', notes:'',
     }] });
     vibe(8);
   }
@@ -80,7 +81,7 @@ export function Calculator({ calc, onChange, registry, onStartTimers }) {
       .replace('{open}',    openRallyAtUtc != null ? fmtSend(openRallyAtUtc) : '--:--')
       .replace('{joiners}', joinersText)
       .replace('{ratio}',   leader.ratio || '');
-    navigator.clipboard.writeText(text).then(() => { setCopied(leader.id); setTimeout(() => setCopied(null), 2000); });
+    navigator.clipboard.writeText(text).then(() => { setCopied(leader.id); setTimeout(() => setCopied(null), 2000); }).catch(()=>setCopied('Copy unavailable'));
     vibe(8);
   }
 
@@ -109,7 +110,10 @@ export function Calculator({ calc, onChange, registry, onStartTimers }) {
       const rallyDurMins = l.rallyDuration || calc.rallyDuration || 3;
       return {
         id: uid(),
-        leaderId: l.registryId || null,
+        leaderId: l.playerId || l.registryId || null,
+        calculatorLeaderId:l.id,
+        slotId:l.slotId,
+        status:'Planned',
         leaderName: l.name || l.type,
         rallyType: l.type || 'Main Rally',
         timingMode: calc.timingMode,
@@ -131,7 +135,7 @@ export function Calculator({ calc, onChange, registry, onStartTimers }) {
     return t.openRallyAtUtc != null;
   }).length;
 
-  const gridCols = '1fr 56px 84px 96px';
+  const gridCols = 'minmax(0,1fr) 46px 70px 44px';
 
   return (
     <div>
@@ -153,7 +157,8 @@ export function Calculator({ calc, onChange, registry, onStartTimers }) {
         <div style={{ marginBottom:16 }}>
           <label style={{ display:'block', fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>Target impact time (UTC)</label>
           <div style={{ fontSize:12, color:C.muted, marginBottom:8 }}>Set the UTC time when all rallies should impact the target.</div>
-          <ImpactInput value={calc.impactTimeRaw} onChange={setImpact} large/>
+          <label style={{display:'block',fontSize:14,color:C.icy,marginBottom:10}}>UTC date<input aria-label="Rally UTC date" type="date" value={calc.utcDate||new Date().toISOString().slice(0,10)} onChange={e=>{const utcDate=e.target.value;onChange({...calc,utcDate,impactEpochSecs:parseImpactInput(calc.impactTimeRaw,Date.parse(utcDate+'T00:00:00Z')/1000)?.epochSecs??null});}} style={{width:'100%',boxSizing:'border-box',minHeight:44,background:C.section,color:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:10,fontSize:16,marginTop:6}}/></label>
+          <ImpactInput value={calc.impactTimeRaw} onChange={setImpact} large refEpochSecs={Date.parse((calc.utcDate||new Date().toISOString().slice(0,10))+'T00:00:00Z')/1000}/>
         </div>
       ) : (
         <div style={{ marginBottom:16 }}>
@@ -233,7 +238,7 @@ export function Calculator({ calc, onChange, registry, onStartTimers }) {
               onUpdate={patch => updRow(leader.id, patch)}
             />
           ))}
-          <button onClick={() => { onChange({ ...calc, leaders:[...calc.leaders, { id:uid(), name:'', type:'Main Rally', marchSecs:null, rallyDuration:calc.rallyDuration||3, offset:0, notes:'' }] }); setEditingRow(calc.leaders.length); }}
+          <button onClick={() => { onChange({ ...calc, leaders:[...calc.leaders, { id:uid(), name:'', type:'Main Rally', marchSecs:null, rallyDuration:calc.rallyDuration||3, offset:0, offsetConvention:'later', notes:'' }] }); setEditingRow(calc.leaders.length); }}
             style={{ width:'100%', height:44, background:'none', border:'none', borderTop:`1px solid ${C.border}22`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
             ＋ Add leader
           </button>
@@ -241,7 +246,7 @@ export function Calculator({ calc, onChange, registry, onStartTimers }) {
       )}
 
       {calc.leaders.length === 0 && registry.filter(r => r.marchSecs).length === 0 && (
-        <div style={{ textAlign:'center', padding:'20px 0', color:C.muted, fontSize:13, marginBottom:16 }}>Add leaders in 💾 March Times, then tap their chips here.</div>
+        <div style={{ textAlign:'center', padding:'20px 0', color:C.icy, fontSize:14, marginBottom:16 }}>Add leaders in 💾 March Times, then tap their chips here.</div>
       )}
 
       {/* 6. Start Timers */}

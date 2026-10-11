@@ -23,7 +23,7 @@ export function ArchivedSection({ archived, onClear }) {
     <div style={{ marginTop:16 }}>
       <button onClick={() => setOpen(!open)}
         style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', background:'none', border:'none', padding:'8px 0', cursor:'pointer' }}>
-        <span style={{ fontSize:13, fontWeight:700, color:C.muted }}>✓ Completed ({archived.length})</span>
+        <span style={{ fontSize:13, fontWeight:700, color:C.muted }}>Battle history ({archived.length})</span>
         <span style={{ color:C.muted, fontSize:13 }}>{open ? '▲' : '▼'}</span>
       </button>
 
@@ -42,7 +42,7 @@ export function ArchivedSection({ archived, onClear }) {
                   <div style={{ width:8, height:8, borderRadius:'50%', background:tcolor, flexShrink:0 }}/>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:700, color:C.muted }}>{t.leaderName || t.rallyType}</div>
-                    <div style={{ fontSize:11, color:C.muted }}>✓ Impact {impactDisplay} UTC{aTime ? ` · ${aTime}` : ''}</div>
+                    <div style={{ fontSize:11, color:C.muted }}>{t.status||'Outcome unconfirmed'} · Scheduled {impactDisplay} UTC{aTime ? ` · ${aTime}` : ''}</div>
                   </div>
                   <span style={{ color:C.muted, fontSize:12 }}>{isExp ? '▲' : '▼'}</span>
                 </div>
@@ -75,7 +75,7 @@ export function ArchivedSection({ archived, onClear }) {
             );
           })}
           <button onClick={onClear} style={{ width:'100%', height:36, borderRadius:8, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontSize:12, cursor:'pointer', marginTop:4 }}>
-            Clear completed
+            Clear history
           </button>
         </div>
       )}
@@ -118,7 +118,7 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
 
   function upd(k, v) { setT(prev => ({ ...prev, [k]:v })); }
 
-  const parsed          = parseImpactInput(t.impactTime);
+  const parsed = parseImpactInput(t.impactTime,Date.parse(t.utcDate+'T00:00:00Z')/1000);
   const impactEpochSecs = parsed?.epochSecs ?? null;
   const rallyDurMins    = t.rallyDuration || null;
   const openRallyAtUtc  = (impactEpochSecs != null && t.marchSecs != null && rallyDurMins)
@@ -127,6 +127,7 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
   const marchesAtUtc    = openRallyAtUtc != null ? openRallyAtUtc + rallyDurMins * 60 : null;
 
   function handleSave() {
+    if(impactEpochSecs==null)return;
     const built = {
       ...(t._original || {}), // preserve joiners/ratio/leaderId/createdAtUtc when editing
       id: t.id,
@@ -174,7 +175,7 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
               const col = RALLY_COLORS[type];
               return (
                 <button key={type} onClick={() => upd('type', type)}
-                  style={{ padding:'8px 14px', borderRadius:20, minHeight:36, border:`1px solid ${sel?col:C.border}`, background:sel?col+'22':C.section, color:sel?col:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                  style={{ padding:'8px 14px', borderRadius:20, minHeight:44, border:`1px solid ${sel?col:C.border}`, background:sel?col+'22':C.section, color:sel?col:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>
                   {type}
                 </button>
               );
@@ -184,7 +185,8 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
 
         <div style={{ marginBottom:14 }}>
           <label style={{ display:'block', fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Target impact time (UTC)</label>
-          <ImpactInput value={t.impactTime} onChange={(disp) => upd('impactTime', disp || '')} large/>
+          <label style={{display:'block',fontSize:14,color:C.icy,marginBottom:10}}>UTC date<input type="date" value={t.utcDate} onChange={e=>upd('utcDate',e.target.value)} style={{width:'100%',boxSizing:'border-box',minHeight:44,background:C.section,color:C.white,border:`1px solid ${C.border}`,borderRadius:10,padding:10,fontSize:16}}/></label>
+          <ImpactInput refEpochSecs={Date.parse(t.utcDate+'T00:00:00Z')/1000} value={t.impactTime} onChange={(disp) => upd('impactTime', disp || '')} large/>
         </div>
 
         <div style={{ marginBottom:14 }}>
@@ -196,10 +198,10 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
           <label style={{ display:'block', fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Rally duration</label>
           <div style={{ display:'flex', gap:8 }}>
             <button onClick={() => upd('rallyDuration', null)}
-              style={{ flex:1, height:40, borderRadius:10, border:`1px solid ${!t.rallyDuration?C.gold:C.border}`, background:!t.rallyDuration?C.gold+'22':C.section, color:!t.rallyDuration?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>None</button>
+              style={{ flex:1, minHeight:44, borderRadius:10, border:`1px solid ${!t.rallyDuration?C.gold:C.border}`, background:!t.rallyDuration?C.gold+'22':C.section, color:!t.rallyDuration?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>None</button>
             {RALLY_DURATIONS.map(d => (
               <button key={d} onClick={() => upd('rallyDuration', d)}
-                style={{ flex:1, height:40, borderRadius:10, border:`1px solid ${t.rallyDuration===d?C.gold:C.border}`, background:t.rallyDuration===d?C.gold+'22':C.section, color:t.rallyDuration===d?C.gold:C.muted, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                style={{ flex:1, minHeight:44, borderRadius:10, border:`1px solid ${t.rallyDuration===d?C.gold:C.border}`, background:t.rallyDuration===d?C.gold+'22':C.section, color:t.rallyDuration===d?C.gold:C.muted, fontWeight:700, fontSize:14, cursor:'pointer' }}>
                 {d}min
               </button>
             ))}
@@ -233,7 +235,7 @@ export function TimerSheet({ timer, open, onClose, onSave, prefillImpact }) {
 
         <div style={{ display:'flex', gap:10 }}>
           <button onClick={onClose} style={{ flex:1, height:52, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:16, cursor:'pointer' }}>Cancel</button>
-          <button onClick={handleSave}
+          <button onClick={handleSave} disabled={impactEpochSecs==null}
             style={{ flex:2, height:52, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:16, border:'none', cursor:'pointer' }}>Save timer</button>
         </div>
       </div>
@@ -249,7 +251,7 @@ function draftFromTimer(timer, prefillImpact) {
   if (!timer) {
     return {
       id: uid(), name:'', type:'Main Rally',
-      impactTime: prefillImpact || '', marchSecs:null, rallyDuration:3, notes:'',
+      utcDate:new Date().toISOString().slice(0,10), impactTime: prefillImpact || '', marchSecs:null, rallyDuration:3, notes:'',
       _original: null,
     };
   }
@@ -257,6 +259,7 @@ function draftFromTimer(timer, prefillImpact) {
     id: timer.id,
     name: timer.leaderName || '',
     type: timer.rallyType || 'Main Rally',
+    utcDate:new Date((timer.impactAtUtc??nowEpochSecs())*1000).toISOString().slice(0,10),
     impactTime: timer.impactAtUtc != null ? fmtSend(timer.impactAtUtc) : '',
     marchSecs: timer.marchSecs ?? null,
     rallyDuration: timer.rallyDurationSecs ? Math.round(timer.rallyDurationSecs / 60) : null,

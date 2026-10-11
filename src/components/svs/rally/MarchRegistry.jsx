@@ -14,11 +14,11 @@ export function MarchRegistry({ registry, onChange, players = [] }) {
   const [editingEntry, setEditingEntry] = useState(null);
   const [editOpen, setEditOpen]         = useState(false);
 
-  const rallyLeads = (players || []).filter(p => p.roles?.includes('Rally Lead'));
+  const rallyLeads = (players || []).filter(p => !p.blacklisted);
 
   function addFromRoster(player) {
     if (registry.some(r => r.name === player.username)) return;
-    onChange([...registry, { id:uid(), name:player.username, marchSecs:player.marchSecs||null, type:'Main Rally' }]);
+    onChange([...registry, { id:uid(), playerId:player.id, name:player.username, marchSecs:player.leaderProfile?.marchTime??player.marchSecs??null, type:'Main Rally' }]);
     vibe(8);
   }
   function saveEntry(entry)  { onChange(registry.some(r => r.id === entry.id) ? registry.map(r => r.id === entry.id ? entry : r) : [...registry, entry]); }
@@ -27,7 +27,7 @@ export function MarchRegistry({ registry, onChange, players = [] }) {
   return (
     <div>
       <div style={{ fontSize:16, fontWeight:700, color:C.white, marginBottom:4 }}>March Times</div>
-      <div style={{ fontSize:13, color:C.muted, marginBottom:16 }}>Saved leaders appear as chips in the calculator.</div>
+      <div style={{ fontSize:13, color:C.muted, marginBottom:16 }}>Saved members and march times are reused in Timing. Verify march times before battle.</div>
 
       {/* Quick-add from roster */}
       {rallyLeads.length > 0 && (
@@ -38,7 +38,7 @@ export function MarchRegistry({ registry, onChange, players = [] }) {
               const inReg = registry.some(r => r.name === p.username);
               return (
                 <button key={p.id} onClick={() => addFromRoster(p)} disabled={inReg}
-                  style={{ padding:'8px 14px', borderRadius:20, minHeight:38, border:`1px solid ${inReg?C.border:C.gold}`, background:inReg?C.section:C.gold+'18', color:inReg?C.muted:C.gold, fontWeight:600, fontSize:13, cursor:inReg?'default':'pointer' }}>
+                  style={{ padding:'8px 14px', borderRadius:20, minHeight:44, border:`1px solid ${inReg?C.border:C.gold}`, background:inReg?C.section:C.gold+'18', color:inReg?C.muted:C.gold, fontWeight:600, fontSize:13, cursor:inReg?'default':'pointer' }}>
                   {inReg ? '✓ ' : ''}{p.username}
                 </button>
               );
@@ -108,10 +108,13 @@ function LeaderEditForm({ entry, onSave, onDelete, onCancel }) {
         <label style={{ display:'block', fontSize:12, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>March time</label>
         <MarchInput value={l.marchSecs} onChange={v => setL(p => ({ ...p, marchSecs:v }))}/>
       </div>
+      <label style={{display:'block',fontSize:14,color:C.icy,marginBottom:12}}>Availability<select value={l.availability||'Available'} onChange={e=>setL(p=>({...p,availability:e.target.value}))} style={{width:'100%',minHeight:44,background:C.section,border:`1px solid ${C.border}`,borderRadius:10,color:C.white,padding:10,fontSize:16}}>{['Available','Standby','Unavailable'].map(x=><option key={x}>{x}</option>)}</select></label>
+      <label style={{display:'block',fontSize:14,color:C.icy,marginBottom:12}}>Capacity · optional<input type="number" min="0" value={l.capacity||''} onChange={e=>setL(p=>({...p,capacity:e.target.value}))} style={{width:'100%',boxSizing:'border-box',minHeight:44,background:C.section,border:`1px solid ${C.border}`,borderRadius:10,color:C.white,padding:10,fontSize:16}}/></label>
+      <label style={{display:'block',fontSize:14,color:C.icy,marginBottom:12}}>Notes<input value={l.notes||''} onChange={e=>setL(p=>({...p,notes:e.target.value}))} style={{width:'100%',boxSizing:'border-box',minHeight:44,background:C.section,border:`1px solid ${C.border}`,borderRadius:10,color:C.white,padding:10,fontSize:16}}/></label>
       <div style={{ display:'flex', gap:10, marginBottom:entry ? 12 : 0 }}>
         <button onClick={onCancel} style={{ flex:1, height:52, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:16, cursor:'pointer' }}>Cancel</button>
-        <button onClick={() => onSave(l)} disabled={!l.name || !l.marchSecs}
-          style={{ flex:2, height:52, borderRadius:12, background:l.name&&l.marchSecs?C.gold:C.border, color:C.bg, fontWeight:700, fontSize:16, border:'none', cursor:l.name&&l.marchSecs?'pointer':'default' }}>Save</button>
+        <button onClick={() => onSave({...l,verifiedAt:new Date().toISOString()})} disabled={!l.name}
+          style={{ flex:2, height:52, borderRadius:12, background:l.name?C.gold:C.border, color:C.bg, fontWeight:700, fontSize:16, border:'none', cursor:l.name?'pointer':'default' }}>Save</button>
       </div>
       {entry && !confirmDel && (
         <button onClick={() => setConfirmDel(true)}

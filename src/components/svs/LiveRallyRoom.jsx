@@ -1,9 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
+import { useLiveBattleRoom } from '../../hooks/useLiveBattleRoom.js';
+import { useBattleClock } from '../../hooks/useBattleClock.js';
+import { timerActionAt, CLOSED } from '../../services/battleOperationsService.js';
+import { SwitchingPanel } from './rally/SwitchingPanel.jsx';
+import { CommandSummary } from './rally/CommandSummary.jsx';
+import { LegacyBattleImport } from './rally/LegacyBattleImport.jsx';
+import { BattleBackup } from './rally/BattleBackup.jsx';
+import { TimerActions } from './rally/TimerActions.jsx';
 import { C } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
 import {
-  uid, nowEpochSecs, loadState, saveState,
-  DEFAULT_MSG, COUNTDOWN_DEFAULT,
+  uid,
 } from './rally/rallyRoomHelpers.js';
 import { UTCClock }        from './rally/UTCClock.jsx';
 import { TimerCard }       from './rally/TimerCard.jsx';
@@ -12,17 +19,11 @@ import { Calculator }      from './rally/Calculator.jsx';
 import { MarchRegistry }   from './rally/MarchRegistry.jsx';
 import { ArchivedSection, TimerSheet } from './rally/ArchivedSection.jsx';
 
-const DEFAULT_STATE = {
-  timers:[], archived:[], marchRegistry:[],
-  calculator:{
-    timingMode:'impact', impactTimeRaw:'', impactEpochSecs:null,
-    countdownSecs:COUNTDOWN_DEFAULT, rallyDuration:3, leaders:[], messageTemplate:DEFAULT_MSG,
-  },
-};
-
 // ── LiveRallyRoom ──────────────────────────────────────────────
 export function LiveRallyRoom({ onBack, players = [], planData = null }) {
-  const [state, setState]                   = useState(() => loadState(DEFAULT_STATE, DEFAULT_MSG) || DEFAULT_STATE);
+  const room = useLiveBattleRoom(planData,players);
+  const {state,setState,timers,saveTimer}=room;
+  const {now,warning}=useBattleClock();
   const [view, setView]                     = useState('registry');
   const [editingTimer, setEditingTimer]     = useState(null);
   const [sheetOpen, setSheetOpen]           = useState(false);
@@ -31,44 +32,6 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
   const [toastMsg, setToastMsg]             = useState(null);
   const [clearConfirm, setClearConfirm]     = useState(false);
   const [allRalliesCopied, setAllRalliesCopied] = useState(false);
-  const planLoadedRef = useRef(false);
-
-  // Pre-populate calculator from Battle Plan (once only)
-  useEffect(() => {
-    if (!planData || planLoadedRef.current) return;
-    planLoadedRef.current = true;
-    const slots = (planData.rallySlots || []).filter(s => s.leaderName);
-    if (!slots.length) return;
-    const leaders = slots.map(s => ({
-      id:uid(), name:s.leaderName, type:s.type||'Main Rally',
-      marchSecs:null, rallyDuration:s.rallyDuration||3,
-      offset:0, notes:s.notes||'', joiners:s.joiners||[], ratio:s.ratio||'',
-    }));
-    setState(prev => ({ ...prev, calculator:{ ...prev.calculator, leaders, rallyDuration:slots[0]?.rallyDuration||3 } }));
-    setView('registry');
-    showToast(`${slots.length} rally slots loaded from "${planData.name || 'Battle Plan'}" — enter march times to begin`);
-  }, [planData]);
-
-  // Persist on every state change
-  useEffect(() => { saveState(state); }, [state]);
-
-  // Auto-archive 30s after impact — checked every 10s.
-  useEffect(() => {
-    const id = setInterval(() => {
-      const now = nowEpochSecs();
-      setState(prev => {
-        const toArchive = prev.timers.filter(t => t.impactAtUtc != null && (t.impactAtUtc - now) < -30);
-        if (toArchive.length === 0) return prev;
-        return {
-          ...prev,
-          timers:   prev.timers.filter(t => !toArchive.find(a => a.id === t.id)),
-          archived: [...prev.archived, ...toArchive.map(t => ({ ...t, archivedAt:new Date().toISOString() }))],
-        };
-      });
-    }, 10000);
-    return () => clearInterval(id);
-  }, []);
-
   function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); }
 
   // Every rally currently in the calculator, one Discord-ready block —
@@ -94,13 +57,10 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
     navigator.clipboard.writeText(generateAllRalliesText()).then(() => {
       setAllRalliesCopied(true);
       setTimeout(() => setAllRalliesCopied(false), 2000);
-    });
+    }).catch(()=>showToast('Copy unavailable'));
   }
 
-  function saveTimer(t) {
-    setState(prev => ({ ...prev, timers: prev.timers.some(x => x.id === t.id) ? prev.timers.map(x => x.id === t.id ? t : x) : [...prev.timers, t] }));
-  }
-  function deleteTimer(id) { setState(prev => ({ ...prev, timers: prev.timers.filter(t => t.id !== id) })); }
+  function deleteTimer(id) { const timer=timers.find(t=>t.id===id); if(timer)saveTimer({...timer,status:'Cancelled'}); }
 
   function updateJoiner(timerId, joinerIdx, patch) {
     setState(prev => ({
@@ -114,26 +74,11 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
     }));
   }
 
-  function handleStartTimers(newTimers) {
-    setState(prev => {
-      const slots = 5 - prev.timers.length;
-      if (slots <= 0) { showToast('Live Room is full — delete a timer first'); return prev; }
-      const toAdd = newTimers.slice(0, slots);
-      if (toAdd.length < newTimers.length) showToast(`${toAdd.length} of ${newTimers.length} timers created — room full`);
-      else showToast(`${toAdd.length} timer${toAdd.length !== 1 ? 's' : ''} started ✓`);
-      const built = toAdd.map(t => {
-        const cl = state.calculator.leaders.find(l => l.name === t.leaderName);
-        return cl ? { ...t, joiners:cl.joiners||[], ratio:cl.ratio||'' } : t;
-      });
-      return { ...prev, timers:[...prev.timers, ...built] };
-    });
-    setView('timers');
-    vibe([10,40,10]);
-  }
+  function handleStartTimers(newTimers) { room.addTimers(newTimers); setView('timers'); vibe([10,40,10]); }
 
   return (
     <>
-      {leaderTimer && <LeaderMode timer={leaderTimer} allTimers={state.timers} onClose={() => setLeaderTimer(null)}/>}
+      {leaderTimer && <LeaderMode timer={{...(timers.find(t=>t.id===leaderTimer.id)||leaderTimer),paused:state.paused}} allTimers={timers} onClose={() => setLeaderTimer(null)}/>}
 
       {toastMsg && (
         <div style={{ position:'fixed', top:20, left:'50%', transform:'translateX(-50%)', background:C.card+'ee', backdropFilter:'blur(12px)', border:`1px solid ${C.gold}44`, borderRadius:20, padding:'10px 20px', fontSize:14, fontWeight:600, color:C.gold, zIndex:800, whiteSpace:'nowrap', pointerEvents:'none' }}>
@@ -150,10 +95,12 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
         </div>
 
         <UTCClock/>
+        {room.error && <div role="alert" style={{color:C.red,fontSize:14,marginBottom:12}}>{room.error}</div>}
+        {state.planName && <div style={{color:C.icy,fontSize:14,marginBottom:12}}>{state.planName}</div>}
 
         {/* Tab nav */}
         <div style={{ display:'flex', gap:6, marginBottom:20 }}>
-          {[['registry','💾 March Times'],['calc','🧮 Calculator'],['timers','⏱ Live Timers']].map(([id, label]) => (
+          {[['registry','💾 Leaders'],['calc','🧮 Timing'],['timers','⏱ Live']].map(([id, label]) => (
             <button key={id} onClick={() => setView(id)}
               style={{ flex:1, height:44, borderRadius:20, whiteSpace:'nowrap', background:view===id?C.gold+'22':C.section, border:`1px solid ${view===id?C.gold:C.border}`, color:view===id?C.gold:C.muted, fontWeight:700, fontSize:13, cursor:'pointer' }}>
               {label}
@@ -164,8 +111,9 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
         {/* ── Live Timers tab ── */}
         {view === 'timers' && (
           <div>
+            <CommandSummary timers={timers} now={now} paused={state.paused} onPause={paused=>room.mutate('Sequence pause changed',prev=>({...prev,paused}))} battleStatus={state.battleStatus} onStatus={battleStatus=>room.mutate('Castle status changed',prev=>({...prev,battleStatus}))} warning={warning} templates={state.templates} onTemplates={templates=>room.mutate('Callouts updated',prev=>({...prev,templates}))} audit={state.audit} registry={state.marchRegistry}/>
             <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-              {state.timers.length < 5 && (
+              {true && (
                 <button onClick={() => { setEditingTimer(null); setSheetOpen(true); }}
                   style={{ flex:1, height:48, borderRadius:12, background:C.section, border:`1px dashed ${C.border}`, color:C.muted, fontWeight:600, fontSize:14, cursor:'pointer' }}>
                   ＋ New timer manually
@@ -174,7 +122,7 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
               {state.timers.length > 0 && !clearConfirm && (
                 <button onClick={() => setClearConfirm(true)}
                   style={{ height:48, padding:'0 16px', borderRadius:12, background:C.red+'18', border:`1px solid ${C.red}44`, color:C.red, fontWeight:600, fontSize:13, cursor:'pointer' }}>
-                  Clear all
+                  Cancel planned
                 </button>
               )}
               {clearConfirm && (
@@ -183,9 +131,9 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
                     style={{ flex:1, height:48, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
                     Cancel
                   </button>
-                  <button onClick={() => { setState(prev => ({ ...prev, timers:[] })); setClearConfirm(false); vibe([20,20,20]); }}
+                  <button onClick={() => { room.mutate('Planned actions cancelled',prev=>({...prev,timers:prev.timers.map(t=>!t.status||['Planned','Ready'].includes(t.status)?{...t,status:'Cancelled'}:t)})); setClearConfirm(false); vibe([20,20,20]); }}
                     style={{ flex:2, height:48, borderRadius:12, background:C.red, color:'#fff', fontWeight:700, fontSize:14, border:'none', cursor:'pointer' }}>
-                    Clear all timers
+                    Cancel planned actions
                   </button>
                 </div>
               )}
@@ -209,20 +157,14 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
               </div>
             )}
 
-            {state.timers.map(t => (
-              <TimerCard key={t.id} timer={t}
-                onEdit={t => { setEditingTimer(t); setSheetOpen(true); }}
-                onDelete={deleteTimer}
-                onLeaderMode={setLeaderTimer}
-                onUpdateJoiner={updateJoiner}
-              />
-            ))}
-
-            {state.timers.length >= 5 && (
-              <div style={{ textAlign:'center', fontSize:13, color:C.muted, padding:'8px 0' }}>
-                Maximum 5 timers. Delete one to add another.
+            {[...timers].sort((a,b)=>Number(CLOSED.includes(a.status))-Number(CLOSED.includes(b.status))||timerActionAt(a)-timerActionAt(b)).map(t => (
+              <div key={t.id} data-timer-id={t.id} style={{background:C.card,borderRadius:14,marginBottom:12,overflow:'hidden'}}>
+                <TimerCard timer={t} now={now} paused={state.paused}
+                  onEdit={timer => { setEditingTimer(timer); setSheetOpen(true); }}
+                  onDelete={deleteTimer} onLeaderMode={setLeaderTimer} onUpdateJoiner={updateJoiner}/>
+                <TimerActions timer={t} timers={timers} onSave={saveTimer} onDuplicate={timer=>room.addTimers([timer])} onArchive={room.archive} now={now} templates={state.templates}/>
               </div>
-            )}
+            ))}
 
             {state.archived?.length > 0 && (
               <ArchivedSection archived={state.archived} onClear={() => setState(prev => ({ ...prev, archived:[] }))}/>
@@ -248,15 +190,22 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
               registry={state.marchRegistry}
               onStartTimers={handleStartTimers}
             />
+            <SwitchingPanel timers={timers} leaders={state.marchRegistry} draft={state.switchingDraft} onChange={switchingDraft=>setState(prev=>({...prev,switchingDraft}))} onAdd={seq=>{room.addTimers(seq);setView('timers');}} now={now} planDate={planData?.date}/>
+            <div style={{marginTop:16,display:'flex',gap:8,flexWrap:'wrap'}}><button onClick={room.preset} style={{minHeight:44,padding:'8px 14px',borderRadius:10,background:C.section,border:`1px solid ${C.border}`,color:C.icy,fontSize:14}}>Save timing preset</button>
+            <select aria-label="Load timing preset" value="" onChange={e=>room.loadPreset(e.target.value)} style={{minHeight:44,maxWidth:'100%',borderRadius:10,background:C.section,border:`1px solid ${C.border}`,color:C.icy,fontSize:16}}><option value="">Load preset</option>{state.presets?.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           </>
         )}
 
         {view === 'registry' && (
+          <>
           <MarchRegistry
             registry={state.marchRegistry}
-            onChange={marchRegistry => setState(prev => ({ ...prev, marchRegistry }))}
+            onChange={marchRegistry => room.mutate('Leader registry updated',prev => ({ ...prev, marchRegistry,calculator:{...prev.calculator,leaders:prev.calculator.leaders.map(l=>{const saved=marchRegistry.find(r=>r.id===l.registryId || l.playerId && r.playerId===l.playerId || r.name===l.name);return saved?{...l,marchSecs:saved.marchSecs}:l;})} }))}
             players={players}
           />
+          <BattleBackup state={state} onRestore={room.restore}/>
+          <LegacyBattleImport onAdd={room.addTimers}/>
+          </>
         )}
       </div>
 

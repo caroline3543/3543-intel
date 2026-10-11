@@ -60,6 +60,7 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
   }
 
   return (
+    <>
     <PlanList
       plans={plans}
       onSelectPlan={setActivePlanId}
@@ -70,5 +71,6 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
       existingTags={existingTags}
       showToast={showToast}
     />
+    </>
   );
 }
