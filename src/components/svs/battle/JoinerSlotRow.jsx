@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { eligibleTypes } from '../../../services/battlePoolService.js';
 import { C } from '../../../utils/constants.js';
 import { meetsTroopReqs, playerCanFillSlot, resolveHero, CUSTOM_HERO_OPTIONS, timingTier as sharedTimingTier } from './battleConstants.js';
 import { calcMetrics, isMvpJoiner } from '../../../data/metrics.js';
@@ -50,7 +51,7 @@ import { calcMetrics, isMvpJoiner } from '../../../data/metrics.js';
 //   onUpdate        – (updatedSlot) => void
 //   allAssignedIds  – Set of playerIds already assigned elsewhere in this plan
 //   troopReqs       – { infantry, lancer, marksman } minimum FC strings
-export function JoinerSlotRow({ slot, index, players, events = [], linkedEvent = null, planPhase = 'start', onUpdate, allAssignedIds, troopReqs = {} }) {
+export function JoinerSlotRow({ slot, index, players, events = [], linkedEvent = null, planPhase = 'start', onUpdate, allAssignedIds, troopReqs = {}, rallySlot }) {
   const [open, setOpen]             = useState(false);
   const [pickingHero, setPickingHero] = useState(false);
 
@@ -83,7 +84,7 @@ export function JoinerSlotRow({ slot, index, players, events = [], linkedEvent =
     return players
       .filter(p => !allAssignedIds.has(p.id) || p.id === slot.playerId)
       .filter(p => playerCanFillSlot(p, hero))
-      .filter(p => !hasReqs || meetsTroopReqs(p, troopReqs).ok)
+      .filter(p => rallySlot ? eligibleTypes(p,rallySlot).length>0 : !hasReqs || meetsTroopReqs(p, troopReqs).ok)
       .sort((a, b) => {
         const tA = timingTier(a), tB = timingTier(b);
         if (tA !== tB) return tA - tB;

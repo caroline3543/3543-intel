@@ -1,3 +1,5 @@
+import { useBattlePool } from '../../hooks/useBattlePool.js';
+import { mergePoolPlayers } from '../../services/battlePoolService.js';
 import { useState } from 'react';
 import { LiveRallyRoom } from './LiveRallyRoom.jsx';
 import { PlanList }   from './battle/PlanList.jsx';
@@ -12,6 +14,10 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
   const [liveRoomPlan, setLiveRoomPlan] = useState(null);
 
   const activePlan   = plans.find(p => p.id === activePlanId);
+  const currentPlan = view==='liveRoom'?(plans.find(p=>p.id===liveRoomPlan?.id)||liveRoomPlan):activePlan;
+  const poolController=useBattlePool(currentPlan?.eventId);
+  const battlePlayers=mergePoolPlayers(players,poolController.pool);
+  const poolEvent=events.find(e=>e.id===currentPlan?.eventId);
   const existingTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
 
   function createPlan(plan)    { onSave([...plans, plan]); setActivePlanId(plan.id); showToast('Plan created ✓'); }
@@ -38,7 +44,7 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
   function handleGoLive(plan) { setLiveRoomPlan(plan); setView('liveRoom'); }
 
   if (view === 'liveRoom') {
-    return <LiveRallyRoom onBack={() => setView('plans')} players={players} planData={liveRoomPlan}/>;
+    return <LiveRallyRoom onBack={() => setView('plans')} players={battlePlayers} planData={currentPlan} poolController={poolController} poolEvent={poolEvent}/>;
   }
 
   if (activePlan) {
@@ -46,7 +52,8 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
       <PlanDetail
         plan={activePlan}
         plans={plans}
-        players={players}
+        players={battlePlayers}
+        poolController={poolController}
         events={events}
         onUpdate={updatePlan}
         onBack={() => setActivePlanId(null)}

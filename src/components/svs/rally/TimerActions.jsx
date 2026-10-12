@@ -5,7 +5,7 @@ import {CLOSED,battleCallout} from '../../../services/battleOperationsService.js
 import {fmtSend,uid} from './rallyRoomHelpers.js';
 const btn={minHeight:44,padding:'8px 12px',background:C.section,border:`1px solid ${C.border}`,borderRadius:10,color:C.icy,fontSize:14};
 const inp={width:'100%',boxSizing:'border-box',minHeight:44,padding:10,background:C.section,border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:16};
-export function TimerActions({timer:t,timers,onSave,onDuplicate,onArchive,now,templates}) {
+export function TimerActions({timer:t,timers,onSave,onDuplicate,onArchive,now,templates,onRelease}) {
  const [error,setError]=useState(''),[date,setDate]=useState(()=>new Date((t.actualImpactAtUtc??t.impactAtUtc??now)*1000).toISOString().slice(0,10)),[time,setTime]=useState('');
  const [parent,setParent]=useState(t.dependency?.parentId||''),[offset,setOffset]=useState(String(t.dependency?.offsetSecs??0));
  async function copy(){const text=battleCallout(t,fmtSend,templates);try{await navigator.clipboard.writeText(text);setError('Copied');}catch{setError(text);}}
@@ -15,6 +15,7 @@ export function TimerActions({timer:t,timers,onSave,onDuplicate,onArchive,now,te
  {!CLOSED.includes(t.status)&&<button style={btn} disabled={!!t.captureHold||!!t.review} onClick={()=>onSave(t.openRallyAtUtc!=null&&['Planned','Ready'].includes(t.status)?{...t,status:'Opened',actualOpenAtUtc:now}:{...t,status:'Confirmed',actualImpactAtUtc:now})}>{t.openRallyAtUtc!=null&&['Planned','Ready'].includes(t.status)?t.rallyType==='Garrison Entry'?'Confirm departed':'Confirm opened':'Confirm arrival'}</button>}
  <button style={btn} onClick={copy}>Copy callout</button></div>
  {(t.review||t.captureHold)&&<div style={{color:C.gold,marginTop:10}}>Hold · {t.review?'Timing requires review':'Await confirmed capture'}</div>}
+ {onRelease&&<button style={{...btn,marginTop:8}} onClick={onRelease}>Troops returned · release commitment</button>}
  <details><summary style={{minHeight:44,paddingTop:12,color:C.icy}}>Outcome, actual time & links</summary>
  <label style={{display:'block',marginBottom:10}}>Status<select style={inp} value={t.status||'Planned'} onChange={e=>onSave({...t,status:e.target.value,...(e.target.value==='Confirmed'?{actualImpactAtUtc:now}:e.target.value==='Opened'?{actualOpenAtUtc:now}:{})})}>{['Planned','Ready','Opened','Reported','Confirmed','Completed','Failed','Cancelled'].map(x=><option key={x}>{x}</option>)}</select></label>
  <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:12}}>{!t.enemy && !['Garrison Entry','Reinforcement'].includes(t.rallyType) && <button style={btn} onClick={()=>onSave({...t,status:'Confirmed',outcome:'captured',actualImpactAtUtc:now})}>Capture confirmed</button>}<button style={{...btn,color:C.red}} onClick={()=>onSave({...t,status:'Failed',outcome:'failed'})}>Failed</button><button style={btn} onClick={()=>onDuplicate({...t,id:uid(),status:'Planned',outcome:null,actualImpactAtUtc:null,actualOpenAtUtc:null,review:false})}>Duplicate</button></div>

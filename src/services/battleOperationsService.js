@@ -50,7 +50,7 @@ export function leadersFromPlan(plan, registry, players) {
     const member=players.find(p=>p.id===s.leaderId);
     const saved=registry.find(r=>s.leaderId && r.playerId===s.leaderId || r.name===s.leaderName);
     return {id:s.id,slotId:s.id,playerId:s.leaderId,registryId:saved?.id||s.leaderId,name:s.leaderName,type:s.type||'Main Rally',target:s.target,
-      marchSecs:saved?.marchSecs??member?.leaderProfile?.marchTime??null,rallyDuration:s.rallyDuration||3,offset:0,offsetConvention:'later',notes:s.notes||'',joiners:s.joiners||[],ratio:s.ratio||'',leadHeroes:s.leaderRallyHeroes||[]};
+      marchSecs:saved?.marchSecs??member?.leaderProfile?.marchTime??null,rallyDuration:s.rallyDuration||3,offset:0,offsetConvention:'later',notes:s.notes||'',joiners:s.joiners||[],ratio:s.ratio||'',troopFillers:s.troopFillers||[],waveId:s.waveId||'main',leadHeroes:s.leaderRallyHeroes||[]};
   });
 }
 export function importCommandBattle(battle, profiles) {
