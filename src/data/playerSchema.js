@@ -25,6 +25,9 @@ export function newPlayer(overrides = {}) {
     joinerHeroes:       [],   // [{ hero, skillLevel, verified, updatedAt }]
     roles:              [],
     allianceRank:       null, // 'R5'|'R4'|'R3'|'R2'|'R1'|null — mutually exclusive, unlike roles (which are multi-select)
+    availableTroops:     null, // optional counts at each recorded troop tier; battle overrides remain isolated
+    marchCapacity:       null,
+    leadershipRank:      null, // explicit commander rank; smaller is stronger
     teamAssignment:     null,
     blacklisted:        false, // excludes from Battle Plan leader/joiner selection — roster entry and history are kept, not hidden
     blacklistReason:    '',
@@ -204,6 +207,7 @@ export function newSvsPlan(overrides = {}) {
     status:          'draft',
     notes:           '',
     postBattleNotes: '',
+    allocationMode: 'balanced',
     commandAssignments: {}, // member IDs: commander, deputy, garrison, backup, reinforcement
     eventId:         null,   // links this plan to a tracked Event — required before joiner/leader eligibility can be shown (see battleConstants.js's isAttending)
     checklist:       {},     // { [checklistItemId]: boolean } — per-plan checked state against the alliance-wide Leadership Checklist (see utils/checklist.js)
@@ -223,6 +227,8 @@ export function newRallySlot(overrides = {}) {
     planPhase:    'start',  // 'start' | 'midway' — which part of the 5-hour event this rally is expected to happen in. Flips how JoinerSlotRow ranks willBeLate vs willLeaveEarly: at 'start' an early-leaver still covers most of the rally, at 'midway' a late-arriver is probably already there by now.
     leaderId:     null,
     leaderName:   '',
+    waveId:'main', targetJoiners:10, tierPolicy:'minimum', troopFillers:[],
+    allocationLocked:false, leaderLocked:false, rallyCapacity:null, leaderContribution:null,
     rallyDuration: 3,
     ratio:        '60/40/0',
     troopReqs:    { infantry:null, lancer:null, marksman:null },
@@ -260,6 +266,7 @@ export function newJoinerSlot(overrides = {}) {
     id:        uid(),
     playerId:  null,
     playerName:'',
+    locked:false, heroLocked:false,
     heroName:  '',     // specific hero they must bring
     confirmed: false,  // marked unavailable mid-battle
     replacedBy:null,   // { playerId, playerName, heroName } if swapped
@@ -335,4 +342,9 @@ export function newPrepEntry(overrides = {}) {
     history:      [],
     ...overrides,
   };
+}
+
+// Local, event-scoped operational reports; not a duplicate global roster.
+export function newBattlePool() {
+  return {overrides:{},temporary:[],commitments:{},structures:{},audit:[]};
 }

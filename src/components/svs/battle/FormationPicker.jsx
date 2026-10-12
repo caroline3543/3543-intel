@@ -180,10 +180,10 @@ export function FormationPicker({ slot, upd, color, players, events = [], select
     if (isSelected) { upd({ selectedFormation: null }); setShowAll(true); return; }
 
     upd({
-      selectedFormation: { gen:f.gen, leaders:f.leaders, type:f.type },
+      selectedFormation: { gen:f.gen, leaders:f.leaders, type:f.type, ratio:f.ratio },
       leaderRallyHeroes: flattenLeaders(f.leaders),
       requestedHeroes:   [f.j1, f.j2, f.j3, f.j4].filter(Boolean).map(h => resolveHero(h)?.display).filter(Boolean),
-      ratio:             f.ratio,
+      ratio:             f.ratio.split(/\s+or\s+/)[0],
       joiners:           heroSlotsFromRaw([f.j1, f.j2, f.j3, f.j4]),
     });
     setShowAll(false);

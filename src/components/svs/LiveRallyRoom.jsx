@@ -1,3 +1,6 @@
+import { BattlePoolPanel } from './battle/BattlePoolPanel.jsx';
+import { HoldingBoard } from './battle/HoldingBoard.jsx';
+import { isReady,isCommitted,assignmentIds,poolSummary } from '../../services/battlePoolService.js';
 import { useState } from 'react';
 import { useLiveBattleRoom } from '../../hooks/useLiveBattleRoom.js';
 import { useBattleClock } from '../../hooks/useBattleClock.js';
@@ -20,7 +23,7 @@ import { MarchRegistry }   from './rally/MarchRegistry.jsx';
 import { ArchivedSection, TimerSheet } from './rally/ArchivedSection.jsx';
 
 // ── LiveRallyRoom ──────────────────────────────────────────────
-export function LiveRallyRoom({ onBack, players = [], planData = null }) {
+export function LiveRallyRoom({ onBack, players = [], planData = null, poolController, poolEvent }) {
   const room = useLiveBattleRoom(planData,players);
   const {state,setState,timers,saveTimer}=room;
   const {now,warning}=useBattleClock();
@@ -95,6 +98,8 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
         </div>
 
         <UTCClock/>
+        {poolController&&<BattlePoolPanel controller={poolController} players={players} event={poolEvent} slots={planData?.rallySlots||[]}/>}
+        <HoldingBoard controller={poolController} players={players} assignments={planData?.commandAssignments}/>
         {room.error && <div role="alert" style={{color:C.red,fontSize:14,marginBottom:12}}>{room.error}</div>}
         {state.planName && <div style={{color:C.icy,fontSize:14,marginBottom:12}}>{state.planName}</div>}
 
@@ -111,6 +116,7 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
         {/* ── Live Timers tab ── */}
         {view === 'timers' && (
           <div>
+            {poolSummary(players,poolEvent,planData?.rallySlots||[],poolController?.pool,planData).warnings.map((w,i)=><div key={i} style={{color:C.gold,fontSize:14,marginBottom:8}}>{w}</div>)}
             <CommandSummary timers={timers} now={now} paused={state.paused} onPause={paused=>room.mutate('Sequence pause changed',prev=>({...prev,paused}))} battleStatus={state.battleStatus} onStatus={battleStatus=>room.mutate('Castle status changed',prev=>({...prev,battleStatus}))} warning={warning} templates={state.templates} onTemplates={templates=>room.mutate('Callouts updated',prev=>({...prev,templates}))} audit={state.audit} registry={state.marchRegistry}/>
             <div style={{ display:'flex', gap:8, marginBottom:16 }}>
               {true && (
@@ -162,7 +168,7 @@ export function LiveRallyRoom({ onBack, players = [], planData = null }) {
                 <TimerCard timer={t} now={now} paused={state.paused}
                   onEdit={timer => { setEditingTimer(timer); setSheetOpen(true); }}
                   onDelete={deleteTimer} onLeaderMode={setLeaderTimer} onUpdateJoiner={updateJoiner}/>
-                <TimerActions timer={t} timers={timers} onSave={saveTimer} onDuplicate={timer=>room.addTimers([timer])} onArchive={room.archive} now={now} templates={state.templates}/>
+                <TimerActions timer={t} timers={timers} onSave={timer=>{saveTimer(timer);if(timer.status==='Opened'&&poolController)poolController.commit(timer.id,[timer.leaderId,...(timer.joiners||[]).map(j=>j.playerId),...(timer.troopFillers||[]).map(f=>f.playerId)].filter(Boolean),true,timer.leaderName,timer.slotId);}} onDuplicate={timer=>room.addTimers([timer])} onArchive={room.archive} now={now} templates={state.templates} onRelease={poolController?()=>poolController.commit(t.id,[],false,t.leaderName):null}/>
               </div>
             ))}
 
