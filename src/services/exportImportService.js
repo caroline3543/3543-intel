@@ -187,6 +187,7 @@ export function mergeImportedData(current, incoming) {
     players:     [...pm.values()],
     events:      [...em.values()],
     svsPlans:    [...sm.values()],
+    foundryPlans: mergeRoles(current.foundryPlans || [], incoming.foundryPlans || []),
     customRoles: mergedRoles,
     labyrinthEntries: mergedLabyrinth,
     lastUpdated: new Date().toISOString(),
@@ -195,6 +196,7 @@ export function mergeImportedData(current, incoming) {
 
 function migrateIfNeeded(data) {
   const m = { ...data };
+  if (!m.foundryPlans) m.foundryPlans = [];
   if (!m.events)     m.events     = [];
   if (!m.prepScores) m.prepScores = [];
   if (!m.svsPlans)   m.svsPlans   = [];

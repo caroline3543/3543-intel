@@ -1,3 +1,4 @@
+import { FoundryPlanner } from './components/foundry/FoundryPlanner.jsx';
 import { useState, useRef } from 'react';
 import { useAppState } from './hooks/useAppState.js';
 import { importFromFile, exportToFile } from './services/exportImportService.js';
@@ -21,6 +22,7 @@ const TABS = [
   { icon:'📊', label:'Intel'   },   // 1
   { icon:'📅', label:'Events'  },   // 2
   { icon:'⚔️', label:'Battle'  },   // 3
+  { icon:'🏭', label:'Foundry' },
 ];
 
 const hdrBtn = { height:36, padding:'0 10px', borderRadius:20, background:'#152236', border:'1px solid #2A4A64', color:'#A8C4D8', fontSize:13, fontWeight:600, cursor:'pointer' };
@@ -82,6 +84,8 @@ export default function App() {
       {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} showToast={showToast} /></TabErrorBoundary>}
       {tab===3 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} checklist={customChecklist} onSaveChecklist={saveChecklistItems} labyrinthEntries={labyrinthEntries} /></TabErrorBoundary>}
 
+      {tab===4 && <TabErrorBoundary><FoundryPlanner plans={state.foundryPlans} onSave={state.saveFoundryPlans} players={players} settings={settings} showToast={showToast} /></TabErrorBoundary>}
+
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
       {dataPanel    && (
         <DataPanel
@@ -99,7 +103,7 @@ export default function App() {
       {settingsPanel && <SettingsPanel settings={settings} onSave={s=>{saveSettings(s);setSettingsPanel(false);vibe(8);}} onClose={()=>setSettingsPanel(false)} />}
       {toast && <Toast msg={toast.msg} type={toast.type} />}
 
-      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(4,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>
+      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(5,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>
         {TABS.map((t,i) => (
           <button key={i} onClick={()=>{setTab(i);vibe(8);}} style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color:tab===i?'#F5A623':'#5A7A94', gap:2, fontSize:9, fontWeight:600, transition:'color 150ms ease', WebkitTapHighlightColor:'transparent' }}>
             <span style={{ fontSize:19 }}>{t.icon}</span>{t.label}
