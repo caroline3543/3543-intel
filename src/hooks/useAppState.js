@@ -134,6 +134,10 @@ export function useAppState() {
     showToast('Event deleted');
   }, [showToast]);
 
+  const saveFoundryPlans = useCallback(plans => {
+    setData(prev => ({ ...prev, foundryPlans:plans, lastUpdated:new Date().toISOString() }));
+  }, []);
+
   // ── SvS plan operations ───────────────────────────────────
   // Note: saveSvsPlans replaces the whole array (existing behavior), so on
   // every call we push every plan in it — fine at this data volume (a
@@ -341,6 +345,9 @@ export function useAppState() {
     notices,
     asciiArts,
     settings,
+
+    foundryPlans: data.foundryPlans || [],
+    saveFoundryPlans,
 
     // Toast
     toast,
