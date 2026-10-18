@@ -3,16 +3,20 @@ import { C } from '../../utils/constants.js';
 import { uid } from '../../utils/dates.js';
 import { newFoundryPlan } from '../../data/playerSchema.js';
 import { BUILDINGS, PHASES, TEAM_COLORS } from '../../data/foundry.js';
-import { battleSheet, memberLabel, validateFoundry } from '../../services/foundryService.js';
+import { battleSheet, memberLabel, validateFoundry, foundryEventRoster, withFoundryEvent } from '../../services/foundryService.js';
 import { foundryImage, downloadFoundry } from '../../services/foundryExport.js';
 import { FoundryMap } from './FoundryMap.jsx';
 const field={minHeight:44,width:'100%',boxSizing:'border-box',padding:10,borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.white,font:'inherit'};
 const button={...field,width:'auto',cursor:'pointer'};
-export function FoundryPlanner({plans,players,onSave,settings,showToast}) {
- const [selected,setSelected]=useState(plans[0]?.id || '');
+export function FoundryPlanner({plans,players,onSave,settings,showToast,events=[],initialPlanId, onOpenEvent}) {
+ const [selected,setSelected]=useState(initialPlanId || plans[0]?.id || '');
  const [phase,setPhase]=useState(0),[teamId,setTeamId]=useState(''),[query,setQuery]=useState(''),[busy,setBusy]=useState(false),[remove,setRemove]=useState(false),[text,setText]=useState('');
  const mapRef=useRef();
- const plan=plans.find(p=>p.id===selected)||plans[0];
+ const savedPlan=plans.find(p=>p.id===selected)||plans[0];
+ const plan=savedPlan ? withFoundryEvent(savedPlan,events) : null;
+ const event=events.find(e=>e.id===plan?.eventId && e.type==='Foundry');
+ const roster=event ? foundryEventRoster(event,players) : [];
+ const candidates=plan?.eventId ? roster : players;
  const team=plan?.teams.find(t=>t.id===teamId)||plan?.teams[0];
  function save(next){onSave(plans.some(p=>p.id===next.id)?plans.map(p=>p.id===next.id?{...next,updatedAt:new Date().toISOString()}:p):[...plans,next]);}
  function patch(fields){save({...plan,...fields});}
@@ -21,15 +25,19 @@ export function FoundryPlanner({plans,players,onSave,settings,showToast}) {
  async function exportImage(share=false){setBusy(true);try{const blob=await foundryImage(mapRef.current.querySelector('svg').outerHTML,plan,players,PHASES[phase]);const file=new File([blob],'foundry-plan.png',{type:'image/png'});if(share && navigator.canShare?.({files:[file]}))await navigator.share({files:[file],title:plan.title});else downloadFoundry(blob,'foundry-plan.png');}catch(e){if(e.name!=='AbortError')showToast(e.message,'error');}finally{setBusy(false);}}
  if(!plan)return <div style={{padding:16}}><h2>Foundry planner</h2><p>Build colour coded teams, assign targets, and export a battle plan.</p><button style={button} onClick={()=>addPlan()}>Create plan</button></div>;
  const used=new Set(plan.teams.flatMap(t=>t.members.map(m=>m.playerId)));
- const results=players.filter(p=>!used.has(p.id)&&!p.blacklisted&&`${p.username} ${p.fid}`.toLowerCase().includes(query.toLowerCase()));
+ const results=candidates.filter(p=>!used.has(p.id)&&!p.blacklisted&&`${p.username} ${p.fid}`.toLowerCase().includes(query.toLowerCase()));
  return <section style={{padding:16,display:'grid',gap:14}}>
   <h2 style={{margin:0}}>Foundry planner</h2>
   <label>Saved plans<select style={field} value={plan.id} onChange={e=>{setSelected(e.target.value);setTeamId('');setRemove(false);}}>{plans.map(p=><option key={p.id} value={p.id}>{p.title} · L{p.legion}</option>)}</select></label>
   <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={button} onClick={()=>addPlan()}>New plan</button><button style={button} onClick={()=>addPlan(true)}>Duplicate</button><button style={button} onClick={()=>setRemove(!remove)}>Delete plan</button></div>
   {remove&&<div><p>Delete this plan?</p><button style={{...button,color:C.red}} onClick={()=>{onSave(plans.filter(p=>p.id!==plan.id));setSelected('');setRemove(false);}}>Delete permanently</button><button style={button} onClick={()=>setRemove(false)}>Cancel</button></div>}
+  <label>Foundry event<select style={field} value={plan.eventId || ''} onChange={e=>patch({eventId:e.target.value || null})}><option value="">Standalone plan</option>{plan.eventId&&!event&&<option value={plan.eventId}>Event unavailable</option>}{events.filter(e=>e.type==='Foundry').map(e=><option key={e.id} value={e.id}>{e.name || 'Foundry'} · L{e.legion || '?'} · {e.date}</option>)}</select></label>
+  {event&&<div style={{background:C.section,padding:12,borderRadius:12}}><strong>Legion {event.legion || 'not set'} · {roster.filter(p=>!p.foundrySubstitute).length} participants · {roster.filter(p=>p.foundrySubstitute).length} substitutes</strong><button style={{...button,display:'block',marginTop:8}} onClick={()=>onOpenEvent(event.id)}>Manage event participants</button><details><summary style={{minHeight:44,paddingTop:12}}>View legion roster</summary>{roster.map(p=><div key={p.id} style={{padding:'8px 0'}}>{p.username} · {p.furnaceLevel || '—'}{p.foundrySubstitute?' · Substitute':''}{used.has(p.id)?' · Assigned':' · Unassigned'}</div>)}{!roster.length&&<p>Add participants in Events to start assigning teams.</p>}</details></div>}
+  {plan.eventId&&!event&&<p style={{color:C.gold}}>Linked event unavailable. Choose another Foundry event to see its participants.</p>}
+  {event&&plan.teams.some(t=>t.members.some(m=>m.playerId&&!roster.some(p=>p.id===m.playerId)))&&<p style={{color:C.gold}}>Some assigned members are no longer in this event. Review your teams.</p>}
   <label>Plan name<input style={field} value={plan.title} onChange={e=>patch({title:e.target.value})}/></label>
-  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><label>Legion<select style={field} value={plan.legion} onChange={e=>patch({legion:e.target.value})}><option>1</option><option>2</option></select></label><label>UTC time<input aria-label="Battle time UTC" type="time" style={field} value={plan.time} onChange={e=>patch({time:e.target.value})}/></label></div>
-  <label>UTC date<input type="date" style={field} value={plan.date} onChange={e=>patch({date:e.target.value})}/></label>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}><label>Legion<select disabled={!!event} style={field} value={plan.legion} onChange={e=>patch({legion:e.target.value})}><option value="">Set legion in Events</option><option>1</option><option>2</option></select></label><label>UTC time<input aria-label="Battle time UTC" type="time" disabled={!!event} style={field} value={plan.time} onChange={e=>patch({time:e.target.value})}/></label></div>
+  <label>UTC date<input type="date" disabled={!!event} style={field} value={plan.date} onChange={e=>patch({date:e.target.value})}/></label>
   <label>Commander instructions<textarea style={field} value={plan.notes} onChange={e=>patch({notes:e.target.value})}/></label>
   <div style={{display:'flex',gap:4}}>{PHASES.map((p,i)=><button key={p} style={{...button,flex:1,padding:6,borderColor:phase===i?C.gold:C.border}} aria-pressed={phase===i} onClick={()=>setPhase(i)}>{i+1}. {p}</button>)}</div>
   <div ref={mapRef}><FoundryMap plan={plan} phase={phase} onBuilding={id=>{const targets=team.targets.map((a,i)=>i===phase?(a.includes(id)?a.filter(x=>x!==id):[...a,id]):a);patchTeam({targets});}}/></div>
@@ -48,7 +56,7 @@ export function FoundryPlanner({plans,players,onSave,settings,showToast}) {
     <button style={button} onClick={()=>patchTeam({members:team.members.filter((_,j)=>j!==i)})}>Remove member</button>
    </div>)}
    <label>Find member<input type="search" style={field} value={query} placeholder="Name or player ID" onChange={e=>setQuery(e.target.value)}/></label>
-   <select aria-label="Add existing member" style={field} value="" onChange={e=>{if(e.target.value)patchTeam({members:[...team.members,{id:uid(),playerId:e.target.value,role:team.members.length?'joiner':'leader',note:''}]});}}><option value="">Add member ({results.length} available)</option>{results.map(p=><option key={p.id} value={p.id}>{p.username} · {p.furnaceLevel || ''}</option>)}</select>
+   <select aria-label="Add existing member" style={field} value="" onChange={e=>{if(e.target.value)patchTeam({members:[...team.members,{id:uid(),playerId:e.target.value,role:roster.find(p=>p.id===e.target.value)?.foundrySubstitute?'substitute':team.members.length?'joiner':'leader',note:''}]});}}><option value="">Add member ({results.length} available)</option>{results.map(p=><option key={p.id} value={p.id}>{p.username} · {p.furnaceLevel || ''}{p.foundrySubstitute ? ' · Substitute' : ''}</option>)}</select>
    <button style={button} onClick={()=>patchTeam({members:[...team.members,{id:uid(),name:'',role:'joiner',note:''}]})}>Add guest</button>
   </div>
   {plan.teams.length<9&&<button style={button} onClick={()=>{const id=uid();patch({teams:[...plan.teams,{id,name:plan.teams.length===4?'Loot patrol':`Team ${plan.teams.length+1}`,loot:plan.teams.length===4,colorIndex:plan.teams.length%8,targets:[[],[],[]],instructions:['','',''],members:[]}]});setTeamId(id);}}>Add team / loot patrol</button>}

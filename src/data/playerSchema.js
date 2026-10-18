@@ -351,7 +351,7 @@ export function newBattlePool() {
 
 // Foundry records live in the global backup alongside events and members.
 export function newFoundryPlan(overrides = {}) {
-  return { id:uid(), title:'Foundry Battle Plan', legion:'1', date:'', time:'', notes:'',
+  return { id:uid(), title:'Foundry Battle Plan', eventId:null, legion:'1', date:'', time:'', notes:'',
     teams:Array.from({length:4},(_,i)=>({id:uid(),name:['Blue','Green','Orange','Pink'][i],colorIndex:i,
       targets:[[],[],[]],instructions:['','',''],members:[]})),
     updatedAt:new Date().toISOString(), ...overrides };

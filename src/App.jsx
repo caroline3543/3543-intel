@@ -1,3 +1,4 @@
+import { newFoundryPlan } from './data/playerSchema.js';
 import { FoundryPlanner } from './components/foundry/FoundryPlanner.jsx';
 import { useState, useRef } from 'react';
 import { useAppState } from './hooks/useAppState.js';
@@ -42,6 +43,14 @@ export default function App() {
     labyrinthEntries, saveLabyrinthEntry, deleteLabyrinthEntry,
   } = state;
 
+  const [foundryPlanId, setFoundryPlanId] = useState('');
+  const [eventToOpen, setEventToOpen] = useState(null);
+  function openFoundry(event) {
+    let plan=state.foundryPlans.find(p=>p.eventId===event.id);
+    if(!plan) { plan=newFoundryPlan({eventId:event.id,title:event.name || 'Foundry Battle Plan',legion:String(event.legion || ''),date:event.date,time:event.time}); state.saveFoundryPlans([...state.foundryPlans,plan]); }
+    setFoundryPlanId(plan.id);setTab(4);
+  }
+
   const [tab, setTab]               = useState(0);
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem('svs_onboarded'));
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -81,10 +90,10 @@ export default function App() {
 
       {tab===0 && <TabErrorBoundary><RosterTab players={players} events={events} roles={roles} onSaveCustomRoles={saveCustomRoles} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(1)} /></TabErrorBoundary>}
       {tab===1 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} settings={settings} notices={notices} onSaveNotice={saveNotice} onDeleteNotice={deleteNotice} asciiArts={asciiArts} onSaveArt={saveAsciiArt} onDeleteArt={deleteAsciiArt} onResetArtToDefaults={resetAsciiArtsToDefaults} labyrinthEntries={labyrinthEntries} onSaveLabyrinthEntry={saveLabyrinthEntry} onDeleteLabyrinthEntry={deleteLabyrinthEntry} /></TabErrorBoundary>}
-      {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} showToast={showToast} /></TabErrorBoundary>}
+      {tab===2 && <TabErrorBoundary><EventsTab initialEventId={eventToOpen} onOpenFoundry={openFoundry} events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} showToast={showToast} /></TabErrorBoundary>}
       {tab===3 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} checklist={customChecklist} onSaveChecklist={saveChecklistItems} labyrinthEntries={labyrinthEntries} /></TabErrorBoundary>}
 
-      {tab===4 && <TabErrorBoundary><FoundryPlanner plans={state.foundryPlans} onSave={state.saveFoundryPlans} players={players} settings={settings} showToast={showToast} /></TabErrorBoundary>}
+      {tab===4 && <TabErrorBoundary><FoundryPlanner initialPlanId={foundryPlanId} events={events} onOpenEvent={id=>{setEventToOpen(id);setTab(2);}} plans={state.foundryPlans} onSave={state.saveFoundryPlans} players={players} settings={settings} showToast={showToast} /></TabErrorBoundary>}
 
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
       {dataPanel    && (

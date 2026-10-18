@@ -19,3 +19,14 @@ export function validateFoundry(plan) {
   if(!plan.date || !plan.time) warnings.push('Set the battle date and UTC time before sharing.');
   return [...new Set(warnings)];
 }
+
+// Event membership is explicit: an empty legion never falls back to the alliance.
+export function foundryEventRoster(event, players) {
+  const ids=new Set(event?.participantIds || []);
+  return players.filter(p=>ids.has(p.id)).map(p=>({...p,
+    foundrySubstitute:!!event.snapshots?.find(s=>s.playerId===p.id)?.rsvp?.substitute}));
+}
+export function withFoundryEvent(plan, events) {
+  const event=events.find(e=>e.id===plan.eventId && e.type==='Foundry');
+  return event ? {...plan,legion:String(event.legion || ''),date:event.date || '',time:event.time || ''} : plan;
+}

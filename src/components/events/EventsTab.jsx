@@ -34,7 +34,7 @@ import { SquadBalancerPanel } from './SquadBalancerPanel.jsx';
 // still exists in the data (Battle Plan's isAttending() reads it as the
 // hard eligibility filter for leader/joiner picks), it's just set
 // automatically the moment someone is added here, not chosen manually.
-export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, onAddPlayers, onUpdatePlayers, plans = [] }) {
+export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, onAddPlayers, onUpdatePlayers, plans = [], initialEventId = null, onOpenFoundry }) {
   const [filterType, setFilterType]   = useState('All');
   const [toastMsg, setToastMsg]       = useState(null);
   function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); }
@@ -61,7 +61,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const [filterTag, setFilterTag]     = useState('');
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventSheetOpen, setEventSheetOpen] = useState(false);
-  const [activeEventId, setActiveEventId]   = useState(null);
+  const [activeEventId, setActiveEventId]   = useState(initialEventId);
   const [snapEditing, setSnapEditing] = useState(null);
   const [snapOpen, setSnapOpen]       = useState(false);
   const [bulkMode, setBulkMode]       = useState(false);
@@ -705,6 +705,8 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               );
             })()}
           </div>
+
+          {activeEvent.type==='Foundry' && onOpenFoundry && <button onClick={()=>onOpenFoundry(activeEvent)} style={{width:'100%',minHeight:48,marginBottom:16,borderRadius:12,background:C.gold,color:C.bg,border:'none',fontWeight:700,cursor:'pointer'}}>Open Foundry plan · {activeEvent.legion ? `Legion ${activeEvent.legion}` : 'Set legion in event'}</button>}
 
           {tracksTroopPower && (activeEvent.participantIds || []).length > 0 && (
             <SquadBalancerPanel

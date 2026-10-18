@@ -22,3 +22,13 @@ test('backup merge retains both plans and newer edits',()=>{
  const merged=mergeImportedData({players:[],events:[],svsPlans:[],foundryPlans:[a]}, {players:[],events:[],svsPlans:[],foundryPlans:[{...a,title:'Old',updatedAt:'2026-10-17'},{id:'b'}]});
  assert.equal(merged.foundryPlans.length,2);assert.equal(merged.foundryPlans[0].title,'New');
 });
+
+test('linked Foundry roster isolates legions and retains substitute status', async()=>{
+ const {foundryEventRoster,withFoundryEvent}=await import('../src/services/foundryService.js');
+ const event={id:'l2',type:'Foundry',legion:2,date:'2026-11-01',time:'18:00',participantIds:['a','b'],snapshots:[{playerId:'b',rsvp:{substitute:true}}]};
+ const roster=foundryEventRoster(event,[{id:'a'},{id:'b'},{id:'otherLegion'}]);
+ assert.deepEqual(roster.map(p=>p.id),['a','b']);assert.equal(roster[1].foundrySubstitute,true);
+ assert.deepEqual(foundryEventRoster({...event,participantIds:[]},[{id:'a'}]),[]);
+ const linked=withFoundryEvent(newFoundryPlan({eventId:'l2'}),[event]);
+ assert.equal(linked.legion,'2');assert.equal(linked.date,'2026-11-01');assert.equal(linked.time,'18:00');
+});
