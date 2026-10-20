@@ -4,6 +4,7 @@ export function newPlayer(overrides = {}) {
   return {
     id:                 uid(),
     fid:                '',
+    avatarUrl:          null,
     power:              null,
     kills:              null,
     providerStats:      null, // Complete fetched member data plus retrieval/source information.

@@ -1,3 +1,4 @@
+import { PlayerAvatar } from '../players/PlayerAvatar.jsx';
 import { profileChanges, providerFurnaceLevel } from '../../services/providerProfileService.js';
 import { useState } from 'react';
 import { fetchMightpulseAlliance } from '../../services/mightpulseService.js';
@@ -44,10 +45,10 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
         <button style={{ ...button, width:'100%', marginBottom:12 }} disabled={!rows.length} onClick={importRows}>Update {rows.length-newRows.length} profiles & add {newRows.length} · State {stateId}</button>
         {!rows.length && <p>No players returned. Check the alliance tag and state.</p>}
         {rows.map(row => <article key={row.fid} style={{ padding:'12px 0', borderBottom:`1px solid ${C.border}` }}>
-          <strong>{row.username || row.fid}</strong> <span style={{ color:existing.has(row.fid)?C.muted:C.green }}>{existing.has(row.fid)?'Update profile':'New'}</span>
+          <div style={{display:'inline-flex',alignItems:'center',gap:8,verticalAlign:'middle',marginRight:8}}><PlayerAvatar player={{username:row.username,avatarUrl:row.avatarUrl}} size={32}/><strong>{row.username || row.fid}</strong></div> <span style={{ color:existing.has(row.fid)?C.muted:C.green }}>{existing.has(row.fid)?'Update profile':'New'}</span>
           <div style={{ color:C.icy, fontSize:12, marginTop:5 }}>FID {row.fid} · [{row.allianceTag}] · State {stateId}</div>
           <div style={{ fontSize:13, marginTop:5 }}>Power {fmt(row.power)} · Kills {fmt(row.kills)} · Furnace {providerFurnaceLevel(row.furnaceLabel) || providerFurnaceLevel(row.furnaceLevel) || row.furnaceLevel || '—'}</div>
-          {existing.has(row.fid) && <div style={{fontSize:12,color:C.gold,marginTop:6}}>{profileChanges(players.find(p=>String(p.fid).trim()===row.fid),row).map(c=>`${c.field}: ${c.before ?? 'unset'} → ${c.after}`).join(' · ') || 'Refresh fetched details'}</div>}
+          {existing.has(row.fid) && <div style={{fontSize:12,color:C.gold,marginTop:6}}>{profileChanges(players.find(p=>String(p.fid).trim()===row.fid),row).map(c=>c.field === 'avatarUrl' ? 'Profile picture updated' : `${c.field}: ${c.before ?? 'unset'} → ${c.after}`).join(' · ') || 'Refresh fetched details'}</div>}
         </article>)}
       </>}
     </section>

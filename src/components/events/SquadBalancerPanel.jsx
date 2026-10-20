@@ -1,3 +1,4 @@
+import { PlayerAvatar } from '../players/PlayerAvatar.jsx';
 import { useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
@@ -5,7 +6,6 @@ import { getCurrentTroopPower } from '../../data/metrics.js';
 import { newSquad } from '../../data/playerSchema.js';
 import { balanceSquads, squadTotalPower } from '../../services/squadBalancerService.js';
 
-function initials(n) { return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?'; }
 
 // ── SquadBalancerPanel ─────────────────────────────────────────
 // Foundry / Canyon Clash only (see TROOP_POWER_EVENTS) — these events
@@ -235,9 +235,7 @@ export function SquadBalancerPanel({ activeEvent, players, events, onUpdateEvent
                 <div key={pid} style={{ position:'relative' }}>
                   <div onClick={() => setMovingPlayerId(movingPlayerId === pid ? null : pid)}
                     style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', cursor:'pointer' }}>
-                    <div style={{ width:26, height:26, borderRadius:'50%', background:(isLeader?C.gold:C.muted)+'33', border:`1.5px solid ${isLeader?C.gold:C.muted}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:11, color:C.white, flexShrink:0 }}>
-                      {initials(playerName(pid))}
-                    </div>
+                    <PlayerAvatar player={player || {username:playerName(pid)}} size={26} color={isLeader?C.gold:C.muted} bordered />
                     {isLeader && <span style={{ fontSize:11 }}>👑</span>}
                     <span style={{ fontSize:13, color:C.white, flex:1 }}>{playerName(pid)}</span>
                     <span style={{ fontSize:12, color:power!=null?C.icy:C.muted }}>{power!=null ? power.toLocaleString() : 'no power'}</span>

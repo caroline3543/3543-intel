@@ -1,3 +1,4 @@
+import { PlayerAvatar } from './PlayerAvatar.jsx';
 import { useState, useEffect, useRef } from 'react';
 import { C, TIER_OPTIONS, LANGUAGES, tierChipStyle } from '../../utils/constants.js';
 import { JOINER_HEROES } from '../../data/joinerMeta.js';
@@ -10,9 +11,7 @@ import { Inp, Sel, SheetHandle } from '../common/Primitives.jsx';
 import { AlliancePicker } from '../common/AlliancePicker.jsx';
 import { BatchMemberCard } from './BatchMemberCard.jsx';
 
-function initials(n) {
-  return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
-}
+
 
 const TROOP_TYPES = [['🛡️',C.inf,'infantry'],['⚔️',C.lan,'lancer'],['🏹',C.mar,'marksman']];
 const emptyTroops = () => ({infantry:null,lancer:null,marksman:null});
@@ -185,7 +184,7 @@ export function BatchAddSheet({ open, onClose, members, onAddNew, onUpdateExisti
                   <div style={{ fontSize:11, color:C.muted, padding:'8px 14px 4px', textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700 }}>Existing — tap to link</div>
                   {suggestions.map(p=>(
                     <button key={p.id} onClick={()=>{addLine(p.username||p.alias||'',p.id);vibe(8);}} style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'10px 14px', background:'none', border:'none', borderTop:`1px solid ${C.border}22`, cursor:'pointer', textAlign:'left' }}>
-                      <div style={{ width:30, height:30, borderRadius:'50%', background:C.muted+'33', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:12, color:C.white, flexShrink:0 }}>{initials(p.username||p.alias||'?')}</div>
+                      <PlayerAvatar player={p} size={30} />
                       <div style={{ flex:1 }}><div style={{ fontSize:14, fontWeight:700, color:C.white }}>{p.username||p.alias||'?'}</div><div style={{ fontSize:11, color:C.muted }}>{p.allianceTag?`[${p.allianceTag}]`:''}</div></div>
                       <span style={{ fontSize:12, color:C.gold, fontWeight:600 }}>Link ›</span>
                     </button>

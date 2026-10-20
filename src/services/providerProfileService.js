@@ -1,3 +1,4 @@
+import { normalizeAvatarUrl } from './playerAvatarService.js';
 // Whiteout Stats' own levelLabel(): /static/app.js (20261020kvkcol).
 // Completed Fire Crystal tier = floor((raw furnace level - 30) / 5).
 export function providerFurnaceLevel(value) {
@@ -17,6 +18,8 @@ export function providerNumber(value) {
 }
 export function providerProfilePatch(row) {
   const patch = {};
+  const avatar = normalizeAvatarUrl(row.avatarUrl);
+  if (avatar) patch.avatarUrl = avatar;
   if (row.username?.trim()) patch.username = row.username.trim();
   if (row.allianceTag?.trim()) patch.allianceTag = row.allianceTag.trim();
   if (/^R[1-5]$/.test(row.allianceRank || '')) patch.allianceRank = row.allianceRank;

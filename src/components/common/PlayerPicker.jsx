@@ -1,10 +1,9 @@
+import { PlayerAvatar } from '../players/PlayerAvatar.jsx';
 import { useState, useEffect, useRef } from 'react';
 import { C, ROLE_COLORS } from '../../utils/constants.js';
 import { searchPlayers } from '../../services/playerAutosuggest.js';
 
-function initials(n) {
-  return (n || '?').split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '?';
-}
+
 
 /**
  * Reusable PlayerPicker component.
@@ -68,9 +67,7 @@ function SelectedChip({ player, onClear }) {
   const rc = ROLE_COLORS[player.roles?.[0]] || C.muted;
   return (
     <div style={{ display:'flex', alignItems:'center', gap:10, background:C.section, border:`1px solid ${C.gold}66`, borderRadius:10, padding:'10px 14px' }}>
-      <div style={{ width:32, height:32, borderRadius:'50%', background:rc+'33', border:`1.5px solid ${rc}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:13, color:C.white, flexShrink:0 }}>
-        {initials(player.username || player.alias || '?')}
-      </div>
+      <PlayerAvatar player={player} size={32} color={rc} bordered />
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ fontSize:14, fontWeight:700, color:C.white, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
           {player.username || player.alias || '?'}
@@ -123,9 +120,7 @@ function PlayerRow({ player, onSelect }) {
       onClick={() => onSelect(player)}
       style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'12px 14px', background:'none', border:'none', borderBottom:`1px solid ${C.border}22`, cursor:'pointer', textAlign:'left' }}
     >
-      <div style={{ width:32, height:32, borderRadius:'50%', background:rc+'33', border:`1.5px solid ${rc}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:13, color:C.white, flexShrink:0 }}>
-        {initials(player.username || player.alias || '?')}
-      </div>
+      <PlayerAvatar player={player} size={32} color={rc} bordered />
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ fontSize:14, fontWeight:700, color:C.white }}>
           {player.username || player.alias || '?'}

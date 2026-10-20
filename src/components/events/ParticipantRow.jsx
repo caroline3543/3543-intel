@@ -1,6 +1,7 @@
+import { PlayerAvatar } from '../players/PlayerAvatar.jsx';
 import { useState } from 'react';
 import { C, ALLIANCE_RANKS, TROOP_POWER_EVENTS } from '../../utils/constants.js';
-import { initials, recentMisses } from '../../services/eventListHelpers.js';
+import { recentMisses } from '../../services/eventListHelpers.js';
 
 // Props:
 //   player, activeEvent, events, snap
@@ -51,7 +52,7 @@ export function ParticipantRow({
       {bulkMode && <div style={{ width:22, height:22, borderRadius:'50%', border:`2px solid ${isSel?C.gold:C.border}`, background:isSel?C.gold:'none', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{isSel && <span style={{ fontSize:12, color:C.bg, fontWeight:700 }}>✓</span>}</div>}
       <button onClick={e => { e.stopPropagation(); if (!bulkMode) setRankOpen(o => !o); }} title="Tap to change rank"
         style={{ width:44, height:44, flexShrink:0, background:'none', border:'none', padding:0, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-        <span style={{ width:36, height:36, borderRadius:'50%', background:(isLead?C.gold:C.muted)+'33', border:`1.5px solid ${isLead?C.gold:C.muted}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:14, color:C.white }}>{initials(dn)}</span>
+        <PlayerAvatar player={player} size={36} color={isLead?C.gold:C.muted} bordered />
       </button>
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:6, overflow:'hidden' }}>
