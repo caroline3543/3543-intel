@@ -38,7 +38,7 @@ export function stateStorageKey(base, stateId = activeStateId()) {
 }
 export function selectWorkspace(value) {
   const id = normalizeStateId(value);
-  const registry = getWorkspaces();
+  const registry = initializeWorkspaces(localStorage);
   const next = { ...registry, activeStateId: id, states: [...new Set([...registry.states, id])] };
   localStorage.setItem(REGISTRY_KEY, JSON.stringify(next));
   // A complete reload clears every open player, filter, timer and pending preview.
@@ -51,4 +51,21 @@ export function assertImportState(imported, stateId) {
   }
   const stats = (imported?.players || []).find(p => p.providerStats?.stateId && String(p.providerStats.stateId) !== String(stateId));
   if (stats) throw new Error('This file contains player stats from a different state.');
+}
+
+// Remove the selector entry, retaining state-specific records for recovery.
+// Read the latest registry to avoid resurrecting states removed in another tab.
+export function removeWorkspace(storage, value) {
+  const id = normalizeStateId(value);
+  const registry = initializeWorkspaces(storage);
+  if (!registry.states.includes(id)) throw new Error(`State ${id} is no longer in your list. Reload the page.`);
+  const states = registry.states.filter(state => state !== id);
+  if (!states.length) throw new Error('Add your correct state before deleting the last state.');
+  const next = {...registry, states, activeStateId:registry.activeStateId === id ? states[0] : registry.activeStateId};
+  storage.setItem(REGISTRY_KEY, JSON.stringify(next));
+  return next;
+}
+export function deleteSelectedWorkspace() {
+  removeWorkspace(localStorage, activeStateId());
+  window.location.reload();
 }
