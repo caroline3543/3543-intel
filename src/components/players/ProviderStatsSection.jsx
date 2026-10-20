@@ -19,3 +19,5 @@ export function ProviderStatsSection({player}) {
     {stats?.raw && <details><summary style={{minHeight:44,display:'list-item',paddingTop:12,color:C.gold,cursor:'pointer'}}>All fetched player data</summary><div style={{fontSize:13,color:C.icy}}><Value value={stats.raw}/></div></details>}
   </section>;
 }
+
+export { Value as ProviderDataValue };

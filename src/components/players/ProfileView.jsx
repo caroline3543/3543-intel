@@ -1,3 +1,4 @@
+import { PlayerEquipmentSection } from './PlayerEquipmentSection.jsx';
 import { PlayerHistorySection } from './PlayerHistorySection.jsx';
 import { PlayerRankingsSection } from './PlayerRankingsSection.jsx';
 import { PlayerAvatar } from './PlayerAvatar.jsx';
@@ -105,6 +106,7 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
           </div>
         </div>
 
+        <PlayerEquipmentSection player={player} onSave={onSave} />
         <ProviderStatsSection player={player} />
         <PlayerRankingsSection player={player} />
         <PlayerHistorySection player={player} />
