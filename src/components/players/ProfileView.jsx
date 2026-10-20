@@ -1,3 +1,4 @@
+import { PlayerHistorySection } from './PlayerHistorySection.jsx';
 import { PlayerRankingsSection } from './PlayerRankingsSection.jsx';
 import { PlayerAvatar } from './PlayerAvatar.jsx';
 import { ProviderStatsSection } from './ProviderStatsSection.jsx';
@@ -106,6 +107,7 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
 
         <ProviderStatsSection player={player} />
         <PlayerRankingsSection player={player} />
+        <PlayerHistorySection player={player} />
 
         {/* Rally Leader Profile — preset offense/defense squads. Not
             gated behind the "Rally Lead" role tag, since a player's

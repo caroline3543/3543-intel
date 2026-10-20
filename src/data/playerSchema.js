@@ -4,6 +4,7 @@ export function newPlayer(overrides = {}) {
   return {
     id:                 uid(),
     fid:                '',
+    observationHistory: [], // Latest 200 dated source observations; see newPlayerObservation.
     providerRankings:   {}, // Board snapshots keyed by category; scoped to the workspace state.
     avatarUrl:          null,
     power:              null,
@@ -352,4 +353,9 @@ export function newPrepEntry(overrides = {}) {
 // Local, event-scoped operational reports; not a duplicate global roster.
 export function newBattlePool() {
   return {overrides:{},temporary:[],commitments:{},structures:{},audit:[]};
+}
+
+// Dated provider observations, separate from event attendance and manual profile edits.
+export function newPlayerObservation(overrides = {}) {
+  return {id:'',stateId:'',stream:'profile',observedAt:null,source:'Whiteout Stats',values:{},fields:[],changes:[],baseline:false,...overrides};
 }

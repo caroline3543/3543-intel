@@ -1,3 +1,4 @@
+import { PlayerChangesPanel } from './history/PlayerChangesPanel.jsx';
 import { StateRankingsPanel } from './rankings/StateRankingsPanel.jsx';
 import { useState } from 'react';
 import { C } from '../../utils/constants.js';
@@ -290,6 +291,7 @@ function LabyrinthRankings({ entries, existingTags, players, onSave, onDelete, o
 }
 
 export function IntelTab({ onUpdatePlayers, onViewPlayer, players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice, asciiArts = [], onSaveArt, onDeleteArt, onResetArtToDefaults, labyrinthEntries = [], onSaveLabyrinthEntry, onDeleteLabyrinthEntry }) {
+  const [changesOpen,setChangesOpen] = useState(false);
   const [rankingsOpen,setRankingsOpen] = useState(false);
   const [registryOpen, setRegistryOpen] = useState(false);
   const [noticesOpen, setNoticesOpen]   = useState(false);
@@ -330,6 +332,8 @@ export function IntelTab({ onUpdatePlayers, onViewPlayer, players, events, onUpd
   const rallyLeads   = players.filter(p=>p.roles?.includes('Rally Lead')).length;
   const withJoiners  = players.filter(p=>(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5)).length;
   const englishDiscordPlayers = players.filter(p=>p.languages?.includes('English') && p.availability?.discord==='yes');
+
+  if (changesOpen) return <PlayerChangesPanel stateId={settings.stateId} players={players} onViewPlayer={onViewPlayer} onClose={()=>setChangesOpen(false)}/>;
 
   if (rankingsOpen) return <StateRankingsPanel stateId={settings.stateId} players={players} onUpdatePlayers={onUpdatePlayers} onViewPlayer={onViewPlayer} showToast={showToast} onClose={()=>setRankingsOpen(false)}/>;
 
@@ -392,6 +396,7 @@ export function IntelTab({ onUpdatePlayers, onViewPlayer, players, events, onUpd
 
   return (
     <div style={{ padding:'16px 20px' }}>
+      <button onClick={()=>setChangesOpen(true)} style={{width:'100%',minHeight:64,padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.gold}`,color:C.gold,fontWeight:700,fontSize:15,textAlign:'left',marginBottom:12}}>What changed? →<div style={{fontSize:12,fontWeight:400,color:C.icy,marginTop:5}}>Power · Kills · Furnace · Rankings · Names & alliances</div></button>
       <button onClick={()=>setRankingsOpen(true)} style={{width:'100%',minHeight:64,padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.gold}`,color:C.gold,fontWeight:700,fontSize:15,textAlign:'left',marginBottom:16}}>🏆 State {settings.stateId} rankings →<div style={{fontSize:12,fontWeight:400,color:C.icy,marginTop:5}}>Power · Kills · Transfer score · Labyrinth · Gear & more</div></button>
 
       {/* Summary line — replaces the 6-card grid */}
