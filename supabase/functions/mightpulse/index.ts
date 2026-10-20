@@ -47,6 +47,10 @@ Deno.serve(async req => {
   if (userError || !user) return respond({ error: "Invalid user session" }, 401, origin);
   if (!officerIds.includes(user.id)) return respond({ error: "Officer access required" }, 403, origin);
 
+  if (!/^kss_[\x21-\x7E]+$/.test(apiKey)) {
+    return respond({ error: "MIGHTPULSE_API_KEY contains an invalid value. Replace it in Supabase Edge Function secrets with the complete generated kss_ key." }, 503, origin);
+  }
+
   let input: Record<string, unknown>;
   try { input = await req.json(); }
   catch { return respond({ error: "Invalid JSON" }, 400, origin); }
