@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AdminAccessPanel } from './admin/AdminAccessPanel.jsx';
 import { C, HEROES_BY_GEN } from '../utils/constants.js';
 import { Field, Inp, SheetHandle } from './common/Primitives.jsx';
 import { FORMATION_GEN_CUTOFF } from '../data/joinerMeta.js';
@@ -77,6 +78,8 @@ export function SettingsPanel({ settings, onSave, onClose }) {
             <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>Nothing selected yet — battle planning will show suggestions from every generation until you pick which ones apply to you.</div>
           )}
         </Field>
+
+        <AdminAccessPanel />
 
         <button onClick={() => onSave(s)} style={{ width:'100%', height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>
           Save Settings
