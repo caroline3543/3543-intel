@@ -12,7 +12,15 @@ export async function mightpulseRequest(action, params = {}) {
     body: { action, ...params },
     headers: { Authorization: `Bearer ${session.access_token}` },
   });
-  if (error) throw new Error(error.message || 'MightPulse request failed');
+  if (error) {
+    let detail = null;
+    if (error.context instanceof Response) {
+      try { detail = await error.context.clone().json(); } catch { /* Non-JSON gateway response. */ }
+    }
+    const status = detail?.provider_status ? ` (provider HTTP ${detail.provider_status})` : '';
+    const providerDetail = typeof detail?.provider_error === 'string' ? `: ${detail.provider_error}` : '';
+    throw new Error(detail?.error ? detail.error + status + providerDetail : error.message || 'MightPulse request failed');
+  }
   return data;
 }
 
