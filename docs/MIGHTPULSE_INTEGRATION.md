@@ -1,11 +1,10 @@
 # MightPulse integration: secured foundation
 
-Status: **Not deployed and not connected to live data**. This branch adds an Edge
-Function and read-only frontend service; no existing player records are changed.
+Status: **Edge Function deployed with JWT verification enabled**. Admin settings provide password/email sign-in, a usage test, and a read-only State 3573 / LUN roster preview. The positive provider test remains pending a successful officer sign-in. No existing player records are changed.
 
 ## Preconditions
 1. Store `MIGHTPULSE_API_KEY` in Supabase Edge Function secrets (user reports done).
-2. Configure `MIGHTPULSE_ALLOWED_ORIGINS` with exact production site origin(s)
+2. The function allows the exact production and integration-preview origins in `APP_ORIGINS`. Optionally configure `MIGHTPULSE_ALLOWED_ORIGINS` with additional exact site origin(s)
    e.g. `https://your-site.example`; no wildcard.
 3. Configure `MIGHTPULSE_ALLOWED_USER_IDS` with comma-separated Supabase Auth
    user UUIDs permitted to use the provider. The current app does not yet have
@@ -35,10 +34,10 @@ provider timestamps and manual review before applying changes. Do not overwrite:
 Never infer live player activity from MightPulse `online` or `last_active_at`.
 
 ## Next steps
-- Add officer sign-in and Supabase RLS audit.
-- Deploy function, perform authenticated usage test.
+- Completed: officer sign-in and RLS restriction of cloud records to the approved account (explicitly authorized).
+- Completed: function deployment, unauthorized request rejection, and CORS checks. Authenticated usage test is pending.
 - Fetch State 3573 / LUN and show a non-destructive preview.
 - Add approval-based merge by FID and separate history tables.
 - Cache results server-side and throttle calls to remain below provider quotas.
 
-The function is intentionally gated until officers are configured.
+The function requires a validated Supabase Auth session and membership in the server-side user ID allowlist. The provider key stays in Edge Function secrets.
