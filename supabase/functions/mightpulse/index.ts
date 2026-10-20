@@ -12,7 +12,7 @@ function respond(body: unknown, status = 200, origin = ""): Response {
     "Vary": "Origin",
   };
   if (origin && permitted.includes(origin)) headers["Access-Control-Allow-Origin"] = origin;
-  headers["Access-Control-Allow-Headers"] = "authorization, apikey, content-type";
+  headers["Access-Control-Allow-Headers"] = "authorization, apikey, content-type, x-client-info";
   headers["Access-Control-Allow-Methods"] = "POST, OPTIONS";
   return new Response(status === 204 ? null : JSON.stringify(body), { status, headers });
 }
