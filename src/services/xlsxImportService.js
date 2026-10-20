@@ -44,6 +44,7 @@ export async function importFromXlsxFile(file) {
 
     const players = sheet('Roster Data').map(row => ({
       providerStats: parseJsonCell(row.providerStats, null),
+      power: row.power ?? null, kills: row.kills ?? null,
       id: row.id, fid: row.fid || '', username: row.username || '', alias: row.alias || '',
       allianceTag: row.allianceTag || '', country: row.country || '', timezone: row.timezone || '',
       languages: parseJsonCell(row.languages, []),

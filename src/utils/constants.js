@@ -52,10 +52,10 @@ export const TIER_OPTIONS = [
 ];
 
 // Furnace level options — separate from TIER_OPTIONS above. Furnace is
-// FC1-FC8 only; T10/T11/Helios/T12 are troop camp tiers, not furnace
+// FC1-FC10 only; T10/T11/Helios/T12 are troop camp tiers, not furnace
 // levels (see the "T11/Helios is not a furnace" fix in PlayerSheet.jsx).
 // Highest-first, matching TIER_OPTIONS' display convention above.
-export const FC_OPTIONS = ['FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1'];
+export const FC_OPTIONS = ['FC10','FC9','FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1'];
 
 // Furnace-level badge icons — full FC1–FC8 set now that artwork exists
 // for all eight. Served from /public/furnace-badges/.

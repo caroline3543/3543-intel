@@ -1,6 +1,5 @@
 import { StateSwitcher } from './components/workspaces/StateSwitcher.jsx';
 import { AllianceImportPanel } from './components/workspaces/AllianceImportPanel.jsx';
-import { newAlliancePlayers } from './services/allianceImportService.js';
 import { useState, useRef } from 'react';
 import { useAppState } from './hooks/useAppState.js';
 import { importFromFile, exportToFile } from './services/exportImportService.js';
@@ -34,7 +33,7 @@ export default function App() {
     data, players, events, svsPlans, settings, toast, showToast,
     savePlayer, addPlayers, updatePlayers, deletePlayer,
     createEvent, updateEvent, deleteEvent,
-    saveSvsPlans, deleteSvsPlan, saveSettings, applyImport,
+    saveSvsPlans, deleteSvsPlan, saveSettings, applyImport, importAllianceProfiles,
     syncFromCloud, syncStatus, lastSyncedAt, isCloudConfigured,
     roles, saveCustomRoles,
     customChecklist, saveChecklistItems,
@@ -87,7 +86,7 @@ export default function App() {
       {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} showToast={showToast} /></TabErrorBoundary>}
       {tab===3 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} checklist={customChecklist} onSaveChecklist={saveChecklistItems} labyrinthEntries={labyrinthEntries} /></TabErrorBoundary>}
 
-      {alliancePanel && <AllianceImportPanel stateId={settings.stateId} players={players} onClose={() => setAlliancePanel(false)} onImport={rows => addPlayers(newAlliancePlayers(players, rows, settings.stateId))} />}
+      {alliancePanel && <AllianceImportPanel stateId={settings.stateId} players={players} onClose={() => setAlliancePanel(false)} onImport={importAllianceProfiles} />}
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
       {dataPanel    && (
         <DataPanel

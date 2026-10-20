@@ -23,7 +23,7 @@ The app must be fast, reliable, and obvious to use with one hand.
 - **Max width 480px** centred on desktop — never break the mobile layout for desktop
 
 ### Data
-- **Furnace level is always a string** `"FC1"`–`"FC5"` — never a number, never re-prefix with "FC"
+- **Furnace level is always a string**: `"F1"`–`"F34"` for provider base/sublevels or `"FC1"`–`"FC10"` for completed Fire Crystal tiers — never a number. Whiteout Stats uses `floor((raw level - 30) / 5)` after level 30; keep original raw codes in providerStats.
 - **All times are UTC** — no timezone conversion anywhere, display raw UTC
 - **Only Skill 5 joiner heroes count** for coverage checks and joiner picker
 - **`joinerMeta.js` is the source of truth** for joiner hero recommendations — never hardcode formations elsewhere

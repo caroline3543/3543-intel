@@ -1,3 +1,4 @@
+import { profileChanges, providerFurnaceLevel } from '../../services/providerProfileService.js';
 import { useState } from 'react';
 import { fetchMightpulseAlliance } from '../../services/mightpulseService.js';
 import { allianceRows } from '../../services/allianceImportService.js';
@@ -20,7 +21,7 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
     finally { setBusy(false); }
   }
   function importRows() {
-    try { onImport(newRows); onClose(); }
+    try { onImport(rows); onClose(); }
     catch (e) { setError(e.message); }
   }
   return <div style={{ position:'fixed', inset:0, background:C.bg+'ee', zIndex:350, overflowY:'auto' }}>
@@ -38,14 +39,15 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
       </form>
       {error && <p role="alert" style={{ color:C.red }}>{error}</p>}
       {rows && <>
-        <p style={{ color:C.gold }}>{rows.length} players · {newRows.length} new · {rows.length-newRows.length} existing kept unchanged</p>
-        <p style={{ color:C.icy, fontSize:13 }}>Existing records are never overwritten or removed. New players include a separate provider stats snapshot. Numeric furnace codes are kept in that snapshot for review.</p>
-        <button style={{ ...button, width:'100%', marginBottom:12 }} disabled={!newRows.length} onClick={importRows}>Import {newRows.length} new players into State {stateId}</button>
+        <p style={{ color:C.gold }}>{rows.length} players · {newRows.length} new · {rows.length-newRows.length} profiles to update</p>
+        <p style={{ color:C.icy, fontSize:13 }}>Updates matching FIDs with the supplied name, alliance, rank, power, kills and furnace level. Missing values keep their current values. Notes, troops, heroes and event history are preserved. All fetched fields are saved in each profile.</p>
+        <button style={{ ...button, width:'100%', marginBottom:12 }} disabled={!rows.length} onClick={importRows}>Update {rows.length-newRows.length} profiles & add {newRows.length} · State {stateId}</button>
         {!rows.length && <p>No players returned. Check the alliance tag and state.</p>}
         {rows.map(row => <article key={row.fid} style={{ padding:'12px 0', borderBottom:`1px solid ${C.border}` }}>
-          <strong>{row.username || row.fid}</strong> <span style={{ color:existing.has(row.fid)?C.muted:C.green }}>{existing.has(row.fid)?'Kept unchanged':'New'}</span>
+          <strong>{row.username || row.fid}</strong> <span style={{ color:existing.has(row.fid)?C.muted:C.green }}>{existing.has(row.fid)?'Update profile':'New'}</span>
           <div style={{ color:C.icy, fontSize:12, marginTop:5 }}>FID {row.fid} · [{row.allianceTag}] · State {stateId}</div>
-          <div style={{ fontSize:13, marginTop:5 }}>Power {fmt(row.power)} · Kills {fmt(row.kills)} · Furnace {row.furnaceLevel ?? '—'}</div>
+          <div style={{ fontSize:13, marginTop:5 }}>Power {fmt(row.power)} · Kills {fmt(row.kills)} · Furnace {providerFurnaceLevel(row.furnaceLabel) || providerFurnaceLevel(row.furnaceLevel) || row.furnaceLevel || '—'}</div>
+          {existing.has(row.fid) && <div style={{fontSize:12,color:C.gold,marginTop:6}}>{profileChanges(players.find(p=>String(p.fid).trim()===row.fid),row).map(c=>`${c.field}: ${c.before ?? 'unset'} → ${c.after}`).join(' · ') || 'Refresh fetched details'}</div>}
         </article>)}
       </>}
     </section>

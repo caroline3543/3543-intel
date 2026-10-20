@@ -1,4 +1,5 @@
 import { newPlayer } from '../data/playerSchema.js';
+import { providerNumber, providerProfilePatch } from './providerProfileService.js';
 export function allianceRows(response, stateId, tag) {
   const data = response?.data;
   if (!Array.isArray(data?.members)) throw new Error('The provider did not return an alliance roster.');
@@ -6,11 +7,14 @@ export function allianceRows(response, stateId, tag) {
   const seen = new Set();
   return data.members.map(member => {
     if (member.kid && String(member.kid) !== String(stateId)) throw new Error('The roster contains a player from another state. Nothing was imported.');
+    const rank = member.alliance_rank_label ?? (member.alliance_rank != null ? `R${member.alliance_rank}` : null);
     return {
-      fid: String(member.chief_id ?? member.fid ?? ''), username: member.nick_name || '',
+      fid: String(member.chief_id ?? member.fid ?? member.governor_id ?? ''), username: member.nick_name || '',
       stateId: String(stateId), allianceTag: tag.trim(),
-      power: member.power ?? null, kills: member.kills ?? null,
-      furnaceLevel: member.furnace_level ?? null, allianceRank: member.alliance_rank_label ?? null,
+      power: providerNumber(member.power), kills: providerNumber(member.kills),
+      furnaceLevel: member.furnace_level ?? member.stove_lv ?? member.town_center_level ?? null,
+      furnaceLabel: member.furnace_level_label ?? member.tg_label ?? null,
+      allianceRank: rank, raw: structuredClone(member),
       retrievedAt: response.retrieved_at || new Date().toISOString(),
     };
   }).filter(row => {
@@ -18,19 +22,44 @@ export function allianceRows(response, stateId, tag) {
     seen.add(row.fid); return true;
   });
 }
-export function newAlliancePlayers(existing, rows, stateId) {
-  const fids = new Set(existing.filter(p => p.fid).map(p => String(p.fid).trim()));
-  const added = [];
+export function mergeAllianceProfiles(existing, rows, stateId) {
+  const players = [...existing], byFid = new Map();
+  existing.forEach((p,index) => {
+    const fid = String(p.fid || '').trim();
+    if (fid) byFid.set(fid, [...(byFid.get(fid) || []), index]);
+  });
+  const added = [], updated = [], seen = new Set();
   for (const row of rows) {
     if (row.stateId !== String(stateId)) throw new Error('Switch to the correct state before importing.');
-    if (fids.has(row.fid)) continue;
-    fids.add(row.fid);
-    added.push(newPlayer({
-      fid: row.fid, username: row.username, allianceTag: row.allianceTag,
-      allianceRank: /^R[1-5]$/.test(row.allianceRank || '') ? row.allianceRank : null,
-      furnaceLevel: /^FC[1-5]$/.test(String(row.furnaceLevel)) ? row.furnaceLevel : null,
-      providerStats: { ...row, source: 'Whiteout Stats' },
-    }));
+    if (!/^\d+$/.test(row.fid) || seen.has(row.fid)) continue;
+    seen.add(row.fid);
+    const matches = byFid.get(row.fid) || [];
+    if (matches.length > 1) throw new Error(`FID ${row.fid} matches multiple profiles. Resolve the duplicates before importing.`);
+    const index = matches[0];
+    const previous = index == null ? null : players[index];
+    const patch = providerProfilePatch(row);
+    const at = new Date().toISOString();
+    const snapshot = {...(previous?.providerStats || {})};
+    for (const [key,value] of Object.entries(row)) if (value != null && value !== '') snapshot[key] = value;
+    snapshot.raw = {...previous?.providerStats?.raw, ...row.raw};
+    snapshot.source = 'Whiteout Stats';
+    const player = {
+      ...(previous || newPlayer({fid:row.fid})), ...patch,
+      providerStats:snapshot, profileLastUpdated:at,
+      ...(patch.furnaceLevel && patch.furnaceLevel !== previous?.furnaceLevel ? {tiersUpdatedAt:at} : {}),
+    };
+    if (previous?.username && patch.username && previous.username !== patch.username) {
+      const history = previous.pastUsernames || [];
+      player.pastUsernames = history.at(-1) === previous.username ? history : [...history, previous.username];
+    }
+    if (previous && patch.allianceTag && previous.allianceTag !== patch.allianceTag) {
+      player.allianceHistory = [...(previous.allianceHistory || []), {from:previous.allianceTag || '',to:patch.allianceTag,at}];
+    }
+    if (previous) { players[index] = player; updated.push(player); }
+    else { players.push(player); added.push(player); }
   }
-  return added;
+  return {players, added, updated};
+}
+export function newAlliancePlayers(existing, rows, stateId) {
+  return mergeAllianceProfiles(existing,rows,stateId).added;
 }

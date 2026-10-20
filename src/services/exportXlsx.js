@@ -623,7 +623,7 @@ export function exportRosterCsv(data, options = {}) {
       const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
 
       rows.push([
-        data.settings?.stateId || '', p.fid || '', p.providerStats?.power ?? '', p.providerStats?.kills ?? '',
+        data.settings?.stateId || '', p.fid || '', p.power ?? p.providerStats?.power ?? '', p.kills ?? p.providerStats?.kills ?? '',
         nameCell,
         p.furnaceLevel || '',
         p.allianceTag || '',
@@ -719,7 +719,7 @@ export function exportWorkbook(data, options = {}) {
   if (includeRoster && scopedPlayers.some(p => p.providerStats)) {
     const stats = scopedPlayers.filter(p => p.providerStats).map(p => ({
       State: data.settings?.stateId || '', FID:p.fid, Name:p.username, Alliance:p.allianceTag,
-      Power:p.providerStats.power, Kills:p.providerStats.kills,
+      Power:p.power ?? p.providerStats.power, Kills:p.kills ?? p.providerStats.kills,
       'Furnace (raw)':p.providerStats.furnaceLevel, 'Retrieved (UTC)':p.providerStats.retrievedAt,
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stats), 'Provider Stats');
