@@ -51,6 +51,8 @@ export function assertImportState(imported, stateId) {
   }
   const stats = (imported?.players || []).find(p => p.providerStats?.stateId && String(p.providerStats.stateId) !== String(stateId));
   if (stats) throw new Error('This file contains player stats from a different state.');
+  const rankings = (imported?.players || []).some(p => Object.values(p.providerRankings || {}).some(r => r.stateId && String(r.stateId) !== String(stateId)));
+  if (rankings) throw new Error('This file contains rankings from a different state.');
 }
 
 // Remove the selector entry, retaining state-specific records for recovery.

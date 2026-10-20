@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { C } from '../../utils/constants.js';
 import { PlayerCard, comparePriority } from './PlayerCard.jsx';
 import { ProfileView }      from './ProfileView.jsx';
@@ -48,7 +48,7 @@ const HELP_ITEMS = [
   { title: '⚙ Roles', body: "Create, rename, or recolor the roles your alliance uses (besides the built-in Rally Lead role)." },
 ];
 
-export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePlayer, onAddPlayers, onUpdatePlayers, onDeletePlayer, onGoToIntel, showToast }) {
+export function RosterTab({ initialPlayerId, onInitialPlayerOpened, players, events, roles, onSaveCustomRoles, onSavePlayer, onAddPlayers, onUpdatePlayers, onDeletePlayer, onGoToIntel, showToast }) {
   const [rosterView, setRosterView]       = useState('list');
   const [search, setSearch]               = useState('');
   const [filterRole, setFilterRole]       = useState('All');
@@ -69,6 +69,13 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
   const [activeField, setActiveField]   = useState(null); // which field's value picker is open
   const [stagedFields, setStagedFields] = useState({});   // { [fieldId]: value } — built up before one combined Apply
   const [helpOpen, setHelpOpen]         = useState(false);
+
+  useEffect(()=>{
+    if (!initialPlayerId) return;
+    const player=players.find(p=>p.id===initialPlayerId);
+    if(player){setViewingPlayer(player);setProfileOpen(true);}
+    onInitialPlayerOpened?.();
+  },[initialPlayerId,players,onInitialPlayerOpened]);
 
   // How many of the "should be set" fields are actually missing —
   // higher = more incomplete. NOTE: having zero roles is no longer
