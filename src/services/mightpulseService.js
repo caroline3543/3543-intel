@@ -1,14 +1,14 @@
 import { supabase } from './supabaseClient.js';
 
 /**
- * Authenticated server-side proxy. Never store the MightPulse secret in Vite variables.
+ * Authenticated server-side proxy. Never store the Whiteout Stats secret in Vite variables.
  * Requires signed-in Supabase user allowlisted by the Edge Function.
  */
 export async function mightpulseRequest(action, params = {}) {
   if (!supabase) throw new Error('Supabase is not configured');
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !session?.access_token) throw new Error('Officer sign-in is required');
-  const { data, error } = await supabase.functions.invoke('mightpulse', {
+  const { data, error } = await supabase.functions.invoke('whiteoutstats', {
     body: { action, ...params },
     headers: { Authorization: `Bearer ${session.access_token}` },
   });
@@ -19,7 +19,7 @@ export async function mightpulseRequest(action, params = {}) {
     }
     const status = detail?.provider_status ? ` (provider HTTP ${detail.provider_status})` : '';
     const providerDetail = typeof detail?.provider_error === 'string' ? `: ${detail.provider_error}` : '';
-    throw new Error(detail?.error ? detail.error + status + providerDetail : error.message || 'MightPulse request failed');
+    throw new Error(detail?.error ? detail.error + status + providerDetail : error.message || 'Whiteout Stats request failed');
   }
   return data;
 }
@@ -45,7 +45,7 @@ export function previewMightpulseRoster(existingPlayers, response) {
   const localByFid = new Map(existingPlayers.filter(p => p.fid)
     .map(p => [String(p.fid), p]));
   return remote.map(member => {
-    const fid = String(member.governor_id ?? member.fid ?? '');
+    const fid = String(member.chief_id ?? member.fid ?? '');
     const existing = localByFid.get(fid);
     return {
       fid,
@@ -57,7 +57,7 @@ export function previewMightpulseRoster(existingPlayers, response) {
       allianceRank: member.alliance_rank_label ?? null,
       power: member.power ?? null,
       kills: member.kills ?? null,
-      townCenterLevel: member.town_center_level ?? null,
+      furnaceLevel: member.furnace_level ?? null,
     };
   }).filter(row => /^\d+$/.test(row.fid));
 }
