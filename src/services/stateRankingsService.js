@@ -1,3 +1,4 @@
+import { recordPlayerObservation } from './playerObservationService.js';
 import {RANKING_BOARDS} from '../../supabase/functions/whiteoutstats/rankings.js';
 import {normalizeStateId} from './stateWorkspaceService.js';
 import {providerFurnaceLevel} from './providerProfileService.js';
@@ -53,10 +54,11 @@ export function rankingProfileUpdates(players,result,state) {
     const p=matchedRankingPlayer(players,row.fid);
     if(!p || row.score==null || row.score==='' || seen.has(p.id))continue;
     seen.add(p.id);
-    updates.push({...p,providerRankings:{...p.providerRankings,[result.board]:{
+    const updated={...p,providerRankings:{...p.providerRankings,[result.board]:{
       stateId:result.stateId,rank:row.rank,score:row.score,scoreLabel:row.scoreLabel,
       retrievedAt:result.retrievedAt,cachedAt:result.cachedAt,source:'Whiteout Stats',
-    }}});
+    }}};
+    updates.push(recordPlayerObservation(p,updated,{stateId:result.stateId,stream:`ranking:${result.board}`,observedAt:result.retrievedAt,values:{score:row.score,rank:row.rank}}));
   }
   return updates;
 }

@@ -1,3 +1,4 @@
+import { mergeObservationHistory } from './playerObservationService.js';
 import { activeStateId, stateStorageKey } from './stateWorkspaceService.js';
 const CURRENT_VERSION = '3.1.0';
 const STORAGE_KEY = () => stateStorageKey('svs_rally_data');
@@ -101,6 +102,7 @@ function mergePlayer(existing, incoming) {
     if (!ex || jh.skillLevel >= ex.skillLevel) jm.set(jh.hero, jh);
   });
   base.joinerHeroes = [...jm.values()];
+  base.observationHistory = mergeObservationHistory(existing.observationHistory || [],incoming.observationHistory || []);
 
   const hm = new Map((existing.eventHistory || []).map(s => [s.snapshotId, s]));
   (incoming.eventHistory || []).forEach(s => { if (!hm.has(s.snapshotId)) hm.set(s.snapshotId, s); });
