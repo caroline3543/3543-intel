@@ -1,11 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const API_ROOT = "https://api.mightpulse.com/v1";
+const APP_ORIGINS = [
+  "https://3543-intel.vercel.app",
+  "https://3543-intel-git-feature-mightpulse-ede932-sunfire-castle-planner.vercel.app",
+];
+function allowedOrigins(): string[] {
+  return [...new Set([...APP_ORIGINS, ...(Deno.env.get("MIGHTPULSE_ALLOWED_ORIGINS") || "")
+    .split(",").map(x => x.trim()).filter(Boolean)])];
+}
 const ALLOWED_ACTIONS = new Set(["usage", "alliance", "kingdom", "player"]);
 
 function respond(body: unknown, status = 200, origin = ""): Response {
-  const permitted = (Deno.env.get("MIGHTPULSE_ALLOWED_ORIGINS") || "")
-    .split(",").map(x => x.trim()).filter(Boolean);
+  const permitted = allowedOrigins();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Cache-Control": "no-store",
@@ -19,9 +26,8 @@ function respond(body: unknown, status = 200, origin = ""): Response {
 
 Deno.serve(async req => {
   const origin = req.headers.get("origin") || "";
-  const allowedOrigins = (Deno.env.get("MIGHTPULSE_ALLOWED_ORIGINS") || "")
-    .split(",").map(x => x.trim()).filter(Boolean);
-  if (origin && !allowedOrigins.includes(origin)) return respond({ error: "Origin not allowed" }, 403);
+  const permittedOrigins = allowedOrigins();
+  if (origin && !permittedOrigins.includes(origin)) return respond({ error: "Origin not allowed" }, 403);
   if (req.method === "OPTIONS") return respond({}, 204, origin);
   if (req.method !== "POST") return respond({ error: "Method not allowed" }, 405, origin);
 
