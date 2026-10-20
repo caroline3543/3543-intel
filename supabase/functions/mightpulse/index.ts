@@ -33,7 +33,7 @@ Deno.serve(async req => {
 
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const apiKey = Deno.env.get("MIGHTPULSE_API_KEY");
+  const apiKey = Deno.env.get("MIGHTPULSE_API_KEY")?.trim();
   const officerIds = (Deno.env.get("MIGHTPULSE_ALLOWED_USER_IDS") || "")
     .split(",").map(x => x.trim()).filter(Boolean);
   if (!url || !anonKey || !apiKey || officerIds.length === 0) {
@@ -81,6 +81,7 @@ Deno.serve(async req => {
       });
     } finally { clearTimeout(timer); }
     const payload = await upstream.json().catch(() => ({ error: "Invalid upstream response" }));
+    if (!upstream.ok) console.error(JSON.stringify({ event: "mightpulse_provider_error", action, status: upstream.status }));
     if (!upstream.ok) return respond({
       error: "Provider request failed", provider_status: upstream.status,
       provider_error: typeof payload?.error === "string" ? payload.error : undefined,
@@ -90,6 +91,8 @@ Deno.serve(async req => {
       data: payload,
     }, 200, origin);
   } catch (e) {
+    const diagnostic = e instanceof Error ? `${e.name}: ${e.message}` : "Unknown transport error";
+    console.error(JSON.stringify({ event: "mightpulse_transport_error", action, diagnostic: diagnostic.split(apiKey).join("[redacted]") }));
     return respond({ error: e instanceof Error && e.name === "AbortError"
       ? "Provider timed out" : "Provider unavailable" }, 502, origin);
   }
