@@ -1,3 +1,4 @@
+import { playerDetailsPath } from "./playerDetails.js";
 import { rankingsPath } from "./rankings.js";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -10,7 +11,7 @@ function allowedOrigins(): string[] {
   return [...new Set([...APP_ORIGINS, ...(Deno.env.get("MIGHTPULSE_ALLOWED_ORIGINS") || "")
     .split(",").map(x => x.trim()).filter(Boolean)])];
 }
-const ALLOWED_ACTIONS = new Set(["usage", "alliance", "kingdom", "player", "rankings"]);
+const ALLOWED_ACTIONS = new Set(["usage", "alliance", "kingdom", "player", "rankings", "player_details"]);
 
 function respond(body: unknown, status = 200, origin = ""): Response {
   const permitted = allowedOrigins();
@@ -67,6 +68,7 @@ Deno.serve(async req => {
   const validState = Number.isSafeInteger(state) && state >= 1 && state <= 99999;
   let path = "";
   if (action === "usage") path = "/usage";
+  if (action === "player_details") path = playerDetailsPath(input.state, input.fid) || "";
   if (action === "rankings") path = rankingsPath(input.state, input.board, input.limit ?? 100) || "";
   if (action === "kingdom" && validState) path = `/states/${state}`;
   if (action === "alliance" && validState && /^[\p{L}\p{N}_-]{1,16}$/u.test(tag)) {
@@ -93,6 +95,13 @@ Deno.serve(async req => {
       error: "Provider request failed", provider_status: upstream.status,
       provider_error: typeof payload?.error === "string" ? payload.error : undefined,
     }, [400, 401, 403, 404, 429].includes(upstream.status) ? upstream.status : 502, origin);
+    if (action === "player_details") {
+      const player = payload?.player;
+      const chiefId = String(payload?.chief_id ?? player?.chief_id ?? player?.fid ?? "");
+      if (!player || Number(player.kid) !== state || chiefId !== fid) {
+        return respond({ error: "Provider returned a different player or state" }, 502, origin);
+      }
+    }
     return respond({
       source: "whiteoutstats", retrieved_at: new Date().toISOString(),
       data: payload,

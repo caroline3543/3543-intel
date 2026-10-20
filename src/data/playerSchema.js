@@ -4,6 +4,7 @@ export function newPlayer(overrides = {}) {
   return {
     id:                 uid(),
     fid:                '',
+    providerDetails:    null, // State/FID, retrieval dates, Arena heroes, chief gear and complete source response.
     observationHistory: [], // Latest 200 dated source observations; see newPlayerObservation.
     providerRankings:   {}, // Board snapshots keyed by category; scoped to the workspace state.
     avatarUrl:          null,
