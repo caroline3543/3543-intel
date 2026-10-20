@@ -132,6 +132,7 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
       </div>
 
       <div style={{ flex:1, minWidth:0 }}>
+        {player.providerStats && <div style={{ color:C.icy, fontSize:11, marginBottom:5 }}>API · Power {player.providerStats.power == null ? '—' : Number(player.providerStats.power).toLocaleString('en-US')} · Kills {player.providerStats.kills == null ? '—' : Number(player.providerStats.kills).toLocaleString('en-US')}</div>}
 
         {/* Row 1 — name + overall furnace badge together */}
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>

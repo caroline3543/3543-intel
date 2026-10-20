@@ -48,7 +48,7 @@ export function SettingsPanel({ settings, onSave, onClose }) {
           <Inp value={s.allianceTag} onChange={v => upd('allianceTag', v)} placeholder="e.g. ABC" />
         </Field>
         <Field label="State ID">
-          <Inp value={s.stateId} onChange={v => upd('stateId', v)} placeholder="e.g. 1234" inputMode="numeric" />
+          <div style={{ color:C.gold, padding:12 }}>State {s.stateId} · Use the state switcher to change states.</div>
         </Field>
 
         <Field label="4-Week Cycle Start" hint="Any date that was Day 1 of a known cycle — used by the Notice Library to work out where today falls in the 28-day schedule, so it can learn what you usually post at this point and suggest it.">

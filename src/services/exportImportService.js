@@ -1,7 +1,8 @@
+import { activeStateId, stateStorageKey } from './stateWorkspaceService.js';
 const CURRENT_VERSION = '3.1.0';
-const STORAGE_KEY = 'svs_rally_data';
+const STORAGE_KEY = () => stateStorageKey('svs_rally_data');
 
-export function saveToStorage(data) {
+export function saveToStorage(data, throwOnError = false) {
   try {
     const toSave = { ...data, lastUpdated: new Date().toISOString() };
     const serialized = JSON.stringify(toSave);
@@ -11,7 +12,7 @@ export function saveToStorage(data) {
       console.warn(`[App] localStorage approaching limit: ${(serialized.length / 1_000_000).toFixed(1)}MB`);
     }
 
-    localStorage.setItem(STORAGE_KEY, serialized);
+    localStorage.setItem(STORAGE_KEY(), serialized);
     return toSave;
   } catch (e) {
     if (e.name === 'QuotaExceededError' || e.code === 22) {
@@ -21,18 +22,19 @@ export function saveToStorage(data) {
     } else {
       console.error('[App] Failed to save', e);
     }
+    if (throwOnError) throw e;
     return data;
   }
 }
 
 export function loadFromStorage(defaultData) {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return migrateIfNeeded(JSON.parse(stored));
+    const stored = localStorage.getItem(STORAGE_KEY());
+    if (stored) { const data = migrateIfNeeded(JSON.parse(stored)); return { ...data, settings: { ...data.settings, stateId: activeStateId() } }; }
   } catch (e) {
     console.warn('Failed to load from localStorage', e);
   }
-  return structuredClone(defaultData);
+  return { ...structuredClone(defaultData), settings: { ...defaultData.settings, stateId: activeStateId() } };
 }
 
 export function exportToFile(data, allianceTag) {
@@ -47,7 +49,7 @@ export function exportToFile(data, allianceTag) {
   );
   const a = document.createElement('a');
   a.href = url;
-  a.download = `alliance-manager-${allianceTag || 'export'}-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `alliance-manager-state-${data.settings?.stateId || activeStateId()}-${allianceTag || 'export'}-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }

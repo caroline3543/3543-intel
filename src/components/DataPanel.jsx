@@ -18,7 +18,7 @@ export function DataPanel({
   syncFromCloud, syncStatus, lastSyncedAt, isCloudConfigured,
 }) {
   const fileRef = useRef();
-  const [mode, setMode]         = useState('replace');
+  const [mode, setMode]         = useState('merge');
   const [msg, setMsg]           = useState(null);
   const [xlsxLoading, setXlsxLoading] = useState(false);
   const [importing, setImporting] = useState(false);

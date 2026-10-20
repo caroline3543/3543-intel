@@ -226,7 +226,7 @@ function buildRosterSheet(players) {
     players.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
   )].sort();
 
-  const headers = ['Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
+  const headers = ['State', 'FID', 'Power (API)', 'Kills (API)', 'Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
   const rows = [headers.map(hdr)];
 
   // Alternates across the WHOLE sheet, not reset per alliance group —
@@ -591,7 +591,7 @@ export function exportRosterCsv(data, options = {}) {
     scopedPlayers.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
   )].sort();
 
-  const headers = ['Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
+  const headers = ['State', 'FID', 'Power (API)', 'Kills (API)', 'Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
 
   function escapeCsv(value) {
     const s = String(value ?? '');
@@ -623,6 +623,7 @@ export function exportRosterCsv(data, options = {}) {
       const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
 
       rows.push([
+        data.settings?.stateId || '', p.fid || '', p.providerStats?.power ?? '', p.providerStats?.kills ?? '',
         nameCell,
         p.furnaceLevel || '',
         p.allianceTag || '',
@@ -643,7 +644,7 @@ export function exportRosterCsv(data, options = {}) {
   const dateStr  = new Date().toISOString().slice(0, 10);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `alliance-manager-roster-${alliance}-${dateStr}.csv`;
+  a.download = `alliance-manager-state-${data.settings?.stateId || 'unknown'}-roster-${alliance}-${dateStr}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -700,7 +701,7 @@ export function exportWorkbook(data, options = {}) {
   // 3. One sheet per event (most recent first) — scoped to eventId if set
   const scopedEvents = eventId ? (data.events || []).filter(e => e.id === eventId) : (data.events || []);
   const sortedEvents = includeEvents ? [...scopedEvents].sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
-  const usedEventSheetNames = new Set(['Overview', 'Roster', 'Roster Data', 'Events Data', 'Plans Data', 'Roles Data']);
+  const usedEventSheetNames = new Set(['Workspace Data', 'Provider Stats', 'Overview', 'Roster', 'Roster Data', 'Events Data', 'Plans Data', 'Roles Data']);
   sortedEvents.forEach(event => {
     const includeJoiners = JOINER_COVERAGE_EVENTS.includes(event.type);
     const eventWs = buildEventSheet(event, data.players || [], includeJoiners, data.plans || []);
@@ -713,7 +714,16 @@ export function exportWorkbook(data, options = {}) {
   // file back into the app later (see xlsxImportService.js). Hidden by
   // default (Sheet > Unhide to see them) so they don't clutter the
   // view for someone just reading the report.
-  const dataSheetNames = [];
+  const dataSheetNames = ['Workspace Data'];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{stateId:data.settings?.stateId || ''}]), 'Workspace Data');
+  if (includeRoster && scopedPlayers.some(p => p.providerStats)) {
+    const stats = scopedPlayers.filter(p => p.providerStats).map(p => ({
+      State: data.settings?.stateId || '', FID:p.fid, Name:p.username, Alliance:p.allianceTag,
+      Power:p.providerStats.power, Kills:p.providerStats.kills,
+      'Furnace (raw)':p.providerStats.furnaceLevel, 'Retrieved (UTC)':p.providerStats.retrievedAt,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stats), 'Provider Stats');
+  }
   if (includeRoster) {
     const rosterDataWs = buildRosterDataSheet(scopedPlayers);
     XLSX.utils.book_append_sheet(wb, rosterDataWs, 'Roster Data');
@@ -745,7 +755,7 @@ export function exportWorkbook(data, options = {}) {
   // 5. Generate filename
   const alliance  = data.settings?.allianceTag || 'export';
   const dateStr   = new Date().toISOString().slice(0, 10);
-  const filename  = `alliance-manager-${alliance}-${dateStr}.xlsx`;
+  const filename  = `alliance-manager-state-${data.settings?.stateId || 'unknown'}-${alliance}-${dateStr}.xlsx`;
 
   // 6. Write and download
   // Note: no `type` option here — that's for XLSX.write(), which

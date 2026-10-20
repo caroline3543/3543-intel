@@ -43,6 +43,7 @@ export async function importFromXlsxFile(file) {
     };
 
     const players = sheet('Roster Data').map(row => ({
+      providerStats: parseJsonCell(row.providerStats, null),
       id: row.id, fid: row.fid || '', username: row.username || '', alias: row.alias || '',
       allianceTag: row.allianceTag || '', country: row.country || '', timezone: row.timezone || '',
       languages: parseJsonCell(row.languages, []),
@@ -85,7 +86,8 @@ export async function importFromXlsxFile(file) {
       updatedAt: row.updatedAt || new Date().toISOString(),
     })).filter(r => r.id && !r.builtin); // never import the built-in Rally Lead row as a custom role
 
-    return { players, events, svsPlans, customRoles };
+    const stateId = sheet('Workspace Data')[0]?.stateId;
+    return { players, events, svsPlans, customRoles, ...(stateId ? {settings:{stateId:String(stateId)}} : {}) };
   } catch (err) {
     throw new Error('Could not read this spreadsheet — make sure it was exported from this app.');
   }

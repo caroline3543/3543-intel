@@ -1,3 +1,6 @@
+import { StateSwitcher } from './components/workspaces/StateSwitcher.jsx';
+import { AllianceImportPanel } from './components/workspaces/AllianceImportPanel.jsx';
+import { newAlliancePlayers } from './services/allianceImportService.js';
 import { useState, useRef } from 'react';
 import { useAppState } from './hooks/useAppState.js';
 import { importFromFile, exportToFile } from './services/exportImportService.js';
@@ -45,6 +48,7 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [dataPanel, setDataPanel]   = useState(false);
   const [settingsPanel, setSettingsPanel] = useState(false);
+  const [alliancePanel, setAlliancePanel] = useState(false);
   const importFileRef = useRef();
 
   function handleGetStarted() {
@@ -75,6 +79,7 @@ export default function App() {
             <button onClick={()=>setSettingsPanel(true)} style={hdrBtn}>⚙️</button>
           </div>
         </div>
+        <StateSwitcher data={data} onPull={() => setAlliancePanel(true)} />
       </div>
 
       {tab===0 && <TabErrorBoundary><RosterTab players={players} events={events} roles={roles} onSaveCustomRoles={saveCustomRoles} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(1)} /></TabErrorBoundary>}
@@ -82,6 +87,7 @@ export default function App() {
       {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} showToast={showToast} /></TabErrorBoundary>}
       {tab===3 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} checklist={customChecklist} onSaveChecklist={saveChecklistItems} labyrinthEntries={labyrinthEntries} /></TabErrorBoundary>}
 
+      {alliancePanel && <AllianceImportPanel stateId={settings.stateId} players={players} onClose={() => setAlliancePanel(false)} onImport={rows => addPlayers(newAlliancePlayers(players, rows, settings.stateId))} />}
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
       {dataPanel    && (
         <DataPanel
