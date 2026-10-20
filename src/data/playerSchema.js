@@ -4,7 +4,9 @@ export function newPlayer(overrides = {}) {
   return {
     id:                 uid(),
     fid:                '',
-    providerStats:      null, // Separate imported stats snapshot; never replaces manual profile fields.
+    power:              null,
+    kills:              null,
+    providerStats:      null, // Complete fetched member data plus retrieval/source information.
     username:           '',
     alias:              '',
     pastUsernames:      [], // history of previous usernames, oldest first — see BulkNameAdd.jsx, which appends here on a detected FID-matched rename rather than silently overwriting

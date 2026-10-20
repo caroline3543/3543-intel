@@ -1,3 +1,4 @@
+import { ProviderStatsSection } from './ProviderStatsSection.jsx';
 import { useState, useEffect } from 'react';
 import { C, TROOP_POWER_EVENTS, ALLIANCE_RANKS } from '../../utils/constants.js';
 import { roleColor, roleIcon } from '../../utils/roles.js';
@@ -104,6 +105,8 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
             <button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, fontSize:28, cursor:'pointer', lineHeight:1, padding:'0 4px' }}>✕</button>
           </div>
         </div>
+
+        <ProviderStatsSection player={player} />
 
         {/* Rally Leader Profile — preset offense/defense squads. Not
             gated behind the "Rally Lead" role tag, since a player's

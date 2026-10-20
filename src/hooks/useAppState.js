@@ -1,3 +1,4 @@
+import { useAllianceProfileImport } from './useAllianceProfileImport.js';
 import { activeStateId, assertImportState } from '../services/stateWorkspaceService.js';
 import { useState, useEffect, useCallback } from 'react';
 import { loadFromStorage, saveToStorage, mergeImportedData } from '../services/exportImportService.js';
@@ -54,6 +55,7 @@ export function useAppState() {
     return () => window.removeEventListener('app:storage-full', handler);
   }, [showToast]);
 
+  const importAllianceProfiles = useAllianceProfileImport(data, setData, showToast);
   const allianceTag = () => data.settings?.allianceTag || '';
 
   // ── Player operations ─────────────────────────────────────
@@ -394,6 +396,7 @@ export function useAppState() {
 
     // Import
     applyImport,
+    importAllianceProfiles,
 
     // Cloud sync
     syncFromCloud,

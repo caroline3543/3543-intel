@@ -49,7 +49,7 @@ test('alliance import keeps every existing field unchanged and adds unique FIDs 
   assert.equal(added[0].fid,'456');
   assert.equal(added[0].providerStats.power,99);
   assert.equal(added[0].providerStats.furnaceLevel,35);
-  assert.equal(added[0].furnaceLevel,null);
+  assert.equal(added[0].furnaceLevel,'FC1');
   assert.equal(newAlliancePlayers([...existing,...added],rows,'3573').length,0);
 });
 test('different alliance tags can be imported into the same state without replacing other alliances', () => {
