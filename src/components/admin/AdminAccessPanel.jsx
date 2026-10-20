@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabaseClient.js';
-import { fetchMightpulseUsage } from '../../services/mightpulseService.js';
+import { fetchMightpulseUsage, fetchMightpulseAlliance } from '../../services/mightpulseService.js';
 import { C } from '../../utils/constants.js';
 
 /** Sign-in for protected API diagnostics. Auth alone never grants admin status:
@@ -55,8 +55,18 @@ export function AdminAccessPanel() {
     try {
       const response = await fetchMightpulseUsage();
       setResult(response);
-      setMessage('MightPulse responded successfully.');
+      setMessage('Whiteout Stats responded successfully.');
     } catch (e) { setMessage(e.message || 'Connection failed. Admin allowlist and deployment may not be configured.'); }
+    finally { setBusy(false); }
+  }
+
+  async function previewLunRoster() {
+    setBusy(true); setResult(null); setMessage('');
+    try {
+      const response = await fetchMightpulseAlliance(3573, 'LUN');
+      setResult(response);
+      setMessage('LUN roster retrieved for State 3573. Preview only; no player records changed.');
+    } catch (e) { setMessage(e.message || 'Unable to retrieve the LUN roster'); }
     finally { setBusy(false); }
   }
 
@@ -78,8 +88,8 @@ export function AdminAccessPanel() {
         session ? <>
           <div style={{ color: C.icy, fontSize: 12, marginBottom: 10 }}>Signed in: {session.user.email}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button style={btn} disabled={busy} onClick={testConnection}>Test MightPulse (Kingshot)</button>
-            <p style={{ color: C.muted, fontSize: 12, flexBasis: '100%' }}>MightPulse provides Kingshot data. Whiteout Survival LUN roster lookup requires a separate provider.</p>
+            <button style={btn} disabled={busy} onClick={testConnection}>Test Whiteout Stats</button>
+            <button style={btn} disabled={busy} onClick={previewLunRoster}>Preview LUN roster</button>
             <button style={{ ...btn, background: C.card, color: C.icy }} disabled={busy} onClick={signOut}>Sign out</button>
           </div>
         </> : <>
