@@ -8,6 +8,7 @@ import { C } from '../../utils/constants.js';
 export function AdminAccessPanel() {
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [result, setResult] = useState(null);
@@ -21,6 +22,19 @@ export function AdminAccessPanel() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  async function signInWithPassword(event) {
+    event.preventDefault();
+    if (!supabase || !email.trim() || !password) return;
+    setBusy(true); setMessage('');
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) throw error;
+      setPassword('');
+      setMessage('Signed in.');
+    } catch (e) { setMessage(e.message || 'Unable to sign in'); }
+    finally { setBusy(false); }
+  }
 
   async function sendLogin() {
     if (!supabase || !email.trim()) return;
@@ -79,12 +93,20 @@ export function AdminAccessPanel() {
             <button style={{ ...btn, background: C.card, color: C.icy }} disabled={busy} onClick={signOut}>Sign out</button>
           </div>
         </> : <>
+          <form onSubmit={signInWithPassword}>
           <label htmlFor="admin-email" style={{ color: C.icy, display: 'block', fontSize: 12, marginBottom: 6 }}>Email for secure sign-in</label>
           <input id="admin-email" type="email" autoComplete="email" value={email}
             onChange={e => setEmail(e.target.value)} placeholder="you@example.com"
             style={{ boxSizing: 'border-box', width: '100%', padding: 12, marginBottom: 10,
               color: C.white, background: C.bg, border: '1px solid '+C.border, borderRadius: 8 }} />
-          <button style={btn} disabled={busy || !email.trim()} onClick={sendLogin}>Send sign-in link</button>
+          <label htmlFor="admin-password" style={{ color: C.icy, display: 'block', fontSize: 12, marginBottom: 6 }}>Password</label>
+          <input id="admin-password" type="password" autoComplete="current-password" value={password}
+            onChange={e => setPassword(e.target.value)}
+            style={{ boxSizing: 'border-box', width: '100%', padding: 12, marginBottom: 10,
+              color: C.white, background: C.bg, border: '1px solid '+C.border, borderRadius: 8 }} />
+          <button type="submit" style={btn} disabled={busy || !email.trim() || !password}>Sign in</button>
+          </form>
+          <button type="button" style={{ ...btn, marginTop: 8, background: C.card, color: C.icy }} disabled={busy || !email.trim()} onClick={sendLogin}>Send sign-in link</button>
         </>}
       {message && <p role="status" style={{ color: C.icy, fontSize: 12, marginBottom: 0 }}>{message}</p>}
       {result && <details style={{ marginTop: 12 }}><summary>Response data</summary>
