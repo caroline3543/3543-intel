@@ -11,6 +11,7 @@ export function allianceRows(response, stateId, tag) {
     return {
       fid: String(member.chief_id ?? member.fid ?? member.governor_id ?? ''), username: member.nick_name || '',
       stateId: String(stateId), allianceTag: tag.trim(),
+      avatarUrl: member.avatar_url ?? null,
       power: providerNumber(member.power), kills: providerNumber(member.kills),
       furnaceLevel: member.furnace_level ?? member.stove_lv ?? member.town_center_level ?? null,
       furnaceLabel: member.furnace_level_label ?? member.tg_label ?? null,

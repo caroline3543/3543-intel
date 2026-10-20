@@ -1,3 +1,4 @@
+import { PlayerAvatar } from './PlayerAvatar.jsx';
 import { ProviderStatsSection } from './ProviderStatsSection.jsx';
 import { useState, useEffect } from 'react';
 import { C, TROOP_POWER_EVENTS, ALLIANCE_RANKS } from '../../utils/constants.js';
@@ -7,9 +8,7 @@ import { calcMetrics } from '../../data/metrics.js';
 import { ReliabilityBadge, SheetHandle } from '../common/Primitives.jsx';
 import { TroopPowerChart } from './TroopPowerChart.jsx';
 
-function initials(n) {
-  return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
-}
+
 
 function Section({ title, children }) {
   return (
@@ -86,9 +85,7 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
         {/* Header */}
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
           <div style={{ display:'flex', gap:14, alignItems:'center' }}>
-            <div style={{ width:56, height:56, borderRadius:'50%', background:rc+'33', border:`2px solid ${rc}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:22, color:C.white, flexShrink:0 }}>
-              {initials(dn)}
-            </div>
+            <PlayerAvatar player={player} size={56} color={rc} bordered />
             <div>
               <div style={{ fontSize:20, fontWeight:700, color:C.white }}>{dn}</div>
               {player.alias&&player.username&&<div style={{ fontSize:13, color:C.muted }}>{player.alias}</div>}

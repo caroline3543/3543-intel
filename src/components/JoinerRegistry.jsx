@@ -1,3 +1,4 @@
+import { PlayerAvatar } from './players/PlayerAvatar.jsx';
 import { useState } from 'react';
 import { C, HEROES_BY_GEN } from '../utils/constants.js';
 import { vibe } from '../utils/vibe.js';
@@ -11,7 +12,6 @@ const VIEWS = [
   { id:'meta',     label:'📐 Meta' },
 ];
 
-function initials(n) { return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?'; }
 
 // ── Hero Card (Registry view) ──────────────────────────────────
 function HeroCard({ hero, count, players, onUpdatePlayer }) {
@@ -83,7 +83,7 @@ function HeroCard({ hero, count, players, onUpdatePlayer }) {
               <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Owners</div>
               {owners.map(p=>(
                 <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:`1px solid ${C.border}22` }}>
-                  <div style={{ width:32, height:32, borderRadius:'50%', background:C.muted+'33', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:12, color:C.white, flexShrink:0 }}>{initials(p.username||p.alias||'?')}</div>
+                  <PlayerAvatar player={p} size={32} />
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:14, fontWeight:700, color:C.white, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.username||p.alias||'?'}</div>
                     <div style={{ fontSize:11, color:C.muted, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.allianceTag?`[${p.allianceTag}]`:''}{p.furnaceLevel?` FC${p.furnaceLevel}`:''}</div>
@@ -142,7 +142,7 @@ function HeroCard({ hero, count, players, onUpdatePlayer }) {
               <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:600, boxShadow:'0 8px 24px #000a' }}>
                 {results.map(p=>(
                   <button key={p.id} onClick={()=>{addOwner(p);vibe(8);}} style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'10px 14px', background:'none', border:'none', borderBottom:`1px solid ${C.border}22`, cursor:'pointer', textAlign:'left' }}>
-                    <div style={{ width:30, height:30, borderRadius:'50%', background:C.muted+'33', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:12, color:C.white, flexShrink:0 }}>{initials(p.username||p.alias||'?')}</div>
+                    <PlayerAvatar player={p} size={30} />
                     <div style={{ minWidth:0, flex:1 }}>
                       <div style={{ fontSize:14, fontWeight:700, color:C.white, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.username||p.alias||'?'}</div>
                       <div style={{ fontSize:11, color:C.muted, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.allianceTag?`[${p.allianceTag}]`:''}</div>

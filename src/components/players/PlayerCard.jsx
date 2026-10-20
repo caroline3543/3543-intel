@@ -1,3 +1,4 @@
+import { PlayerAvatar } from './PlayerAvatar.jsx';
 import { useState } from 'react';
 import { C, FC_BADGE_IMAGES, FC_OPTIONS } from '../../utils/constants.js';
 import { roleColor } from '../../utils/roles.js';
@@ -5,9 +6,7 @@ import { fmtDate } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
 import { DeleteConfirmModal } from '../common/DeleteConfirmModal.jsx';
 
-function initials(n) {
-  return (n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
-}
+
 
 // Troop-type colors for THIS card specifically — red/lancer/green/
 // marksman/blue, per explicit request. NOTE: this is intentionally
@@ -108,9 +107,7 @@ export function PlayerCard({ player, roles = [], onClick, onDelete, events, miss
 
       {/* Avatar */}
       <div style={{ position:'relative', flexShrink:0 }}>
-        <div style={{ width:46, height:46, borderRadius:'50%', background:rc+'33', border:`2px solid ${rc}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:17, color:C.white }}>
-          {initials(dn)}
-        </div>
+        <PlayerAvatar player={player} size={46} color={rc} bordered />
         {/* Joiner-hero indicator — supplementary info, not a headline
             element: a small neutral icon badge on the avatar corner
             instead of a row of gold pills competing with FC/troop

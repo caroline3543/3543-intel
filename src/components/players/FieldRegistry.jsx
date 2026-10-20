@@ -1,3 +1,4 @@
+import { PlayerAvatar } from './PlayerAvatar.jsx';
 import { useState } from 'react';
 import { C, TIER_OPTIONS, ALLIANCE_RANKS, HEROES_BY_GEN, FC_OPTIONS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
@@ -25,7 +26,7 @@ function heroGenLabel(hero) {
 
 const TIER_FIELD_IDS = ['infantry', 'lancer', 'marksman'];
 
-function initials(n) { return (n || '?').split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '?'; }
+
 
 function sortValues(field, values) {
   if (field.id === 'furnace') {
@@ -114,7 +115,7 @@ function ValueCard({ field, value, players, onUpdatePlayer }) {
               </div>
               {owners.map(p => (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${C.border}22` }}>
-                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: C.muted + '33', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, color: C.white, flexShrink: 0 }}>{initials(p.username || p.alias || '?')}</div>
+                  <PlayerAvatar player={p} size={32} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{p.username || p.alias || '?'}</div>
                     <div style={{ fontSize: 11, color: C.muted }}>{p.allianceTag ? `[${p.allianceTag}]` : ''}{p.furnaceLevel ? ` FC${p.furnaceLevel}` : ''}</div>
@@ -147,7 +148,7 @@ function ValueCard({ field, value, players, onUpdatePlayer }) {
                   const willReplace = !field.multi && existing;
                   return (
                     <button key={p.id} onClick={() => { addOwner(p); vibe(8); }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: `1px solid ${C.border}22`, cursor: 'pointer', textAlign: 'left' }}>
-                      <div style={{ width: 30, height: 30, borderRadius: '50%', background: C.muted + '33', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, color: C.white, flexShrink: 0 }}>{initials(p.username || p.alias || '?')}</div>
+                      <PlayerAvatar player={p} size={30} />
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{p.username || p.alias || '?'}</div>
                         <div style={{ fontSize: 11, color: C.muted }}>
