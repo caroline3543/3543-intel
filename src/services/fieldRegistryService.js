@@ -1,3 +1,4 @@
+import { stateStorageKey } from './stateWorkspaceService.js';
 // Pure functions backing FieldRegistry.jsx and RosterTab.jsx's bulk-
 // assign — no React, no side effects beyond the isolated custom-option
 // localStorage store below.
@@ -62,7 +63,7 @@ const CUSTOM_OPTIONS_KEY = 'svs_field_registry_custom_options';
 
 function loadCustomOptions() {
   try {
-    return JSON.parse(localStorage.getItem(CUSTOM_OPTIONS_KEY)) || {};
+    return JSON.parse(localStorage.getItem(stateStorageKey(CUSTOM_OPTIONS_KEY))) || {};
   } catch {
     return {};
   }
@@ -70,7 +71,7 @@ function loadCustomOptions() {
 
 function saveCustomOptions(data) {
   try {
-    localStorage.setItem(CUSTOM_OPTIONS_KEY, JSON.stringify(data));
+    localStorage.setItem(stateStorageKey(CUSTOM_OPTIONS_KEY), JSON.stringify(data));
   } catch {
     // storage full or unavailable — custom option simply won't persist
   }
@@ -100,7 +101,7 @@ const CUSTOM_HERO_GENS_KEY = 'svs_field_registry_custom_hero_gens';
 
 function loadCustomHeroGens() {
   try {
-    return JSON.parse(localStorage.getItem(CUSTOM_HERO_GENS_KEY)) || {};
+    return JSON.parse(localStorage.getItem(stateStorageKey(CUSTOM_HERO_GENS_KEY))) || {};
   } catch {
     return {};
   }
@@ -108,7 +109,7 @@ function loadCustomHeroGens() {
 
 function saveCustomHeroGens(data) {
   try {
-    localStorage.setItem(CUSTOM_HERO_GENS_KEY, JSON.stringify(data));
+    localStorage.setItem(stateStorageKey(CUSTOM_HERO_GENS_KEY), JSON.stringify(data));
   } catch {
     // storage full or unavailable — generation tag simply won't persist
   }

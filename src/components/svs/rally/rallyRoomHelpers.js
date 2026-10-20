@@ -1,3 +1,4 @@
+import { stateStorageKey } from '../../../services/stateWorkspaceService.js';
 // ── rallyRoomHelpers.js ────────────────────────────────────────
 // Pure helpers shared across all LiveRallyRoom sub-components.
 // No React. No side-effects (except localStorage read/write in the
@@ -217,7 +218,7 @@ export function normalizeTimer(t) {
 // ── Persistence ────────────────────────────────────────────────
 export function loadState(DEFAULT_STATE, defaultMsg) {
   try {
-    const r = localStorage.getItem(STORAGE_KEY);
+    const r = localStorage.getItem(stateStorageKey(STORAGE_KEY));
     if (r) {
       const p = JSON.parse(r);
       if(!p || !Array.isArray(p.timers) || !Array.isArray(p.marchRegistry) || !p.calculator) throw Error('Invalid room');
@@ -247,12 +248,12 @@ export function loadState(DEFAULT_STATE, defaultMsg) {
   return null;
 }
 
-export function saveState(s) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); return true; } catch { return false; } }
+export function saveState(s) { try { localStorage.setItem(stateStorageKey(STORAGE_KEY), JSON.stringify(s)); return true; } catch { return false; } }
 
 // SmartInputs (MarchInput, ImpactInput) live in ./SmartInputs.jsx
 // Import them directly from there — not from this file.
 
 // Read-only migration source. Never overwrite the standalone draft key.
 export function readCommandDraft() {
-  try { const data=JSON.parse(localStorage.getItem('svs_castle_command_v1')||'null');return data?.version===1&&Array.isArray(data.battles)?data:null;}catch{return null;}
+  try { const data=JSON.parse(localStorage.getItem(stateStorageKey('svs_castle_command_v1'))||'null');return data?.version===1&&Array.isArray(data.battles)?data:null;}catch{return null;}
 }

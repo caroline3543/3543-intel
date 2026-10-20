@@ -18,7 +18,7 @@ export function DataPanel({
   syncFromCloud, syncStatus, lastSyncedAt, isCloudConfigured,
 }) {
   const fileRef = useRef();
-  const [mode, setMode]         = useState('replace');
+  const [mode, setMode]         = useState('merge');
   const [msg, setMsg]           = useState(null);
   const [xlsxLoading, setXlsxLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -110,7 +110,7 @@ export function DataPanel({
       <div onClick={e => e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', padding:'16px 20px 60px', maxHeight:'86vh', overflowY:'auto' }}>
         <SheetHandle />
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <div style={{ fontSize:18, fontWeight:700, color:C.white }}>📦 Export & Import</div>
+          <div style={{ fontSize:18, fontWeight:700, color:C.white }}>📦 State {data.settings?.stateId} · Data</div>
           <button onClick={onClose} style={{ background:'none', border:'none', color:C.muted, fontSize:28, cursor:'pointer', lineHeight:1, padding:'0 4px' }}>✕</button>
         </div>
 

@@ -1,3 +1,4 @@
+import { activeStateId, assertImportState } from '../services/stateWorkspaceService.js';
 import { useState, useEffect, useCallback } from 'react';
 import { loadFromStorage, saveToStorage, mergeImportedData } from '../services/exportImportService.js';
 import {
@@ -262,7 +263,7 @@ export function useAppState() {
 
   // ── Settings ──────────────────────────────────────────────
   const saveSettings = useCallback((settings) => {
-    setData(prev => ({ ...prev, settings, lastUpdated: new Date().toISOString() }));
+    setData(prev => ({ ...prev, settings: { ...settings, stateId: activeStateId() }, lastUpdated: new Date().toISOString() }));
   }, []);
 
   // ── Player roles ──────────────────────────────────────────
@@ -284,12 +285,14 @@ export function useAppState() {
 
   // ── Import ────────────────────────────────────────────────
   const applyImport = useCallback((imported, mode) => {
+    assertImportState(imported, activeStateId());
+    imported = { ...imported, settings: { ...data.settings, ...imported.settings, stateId: activeStateId() } };
     setData(prev => {
       if (mode === 'merge') return { ...mergeImportedData(prev, imported), lastUpdated: new Date().toISOString() };
       return { ...prev, ...imported, lastUpdated: new Date().toISOString() };
     });
     showToast(`Imported (${mode}) ✓`);
-  }, [showToast]);
+  }, [showToast, data.settings]);
 
   // ── Cloud sync (manual pull — "🔄 Sync" button) ───────────
   // Pulls the latest players + plans from Supabase and merges them into
