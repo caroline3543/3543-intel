@@ -1,13 +1,37 @@
 import { useState } from 'react';
-import { C } from '../utils/constants.js';
+import { AdminAccessPanel } from './admin/AdminAccessPanel.jsx';
+import { C, HEROES_BY_GEN } from '../utils/constants.js';
 import { Field, Inp, SheetHandle } from './common/Primitives.jsx';
-import { JOINER_META } from '../data/joinerMeta.js';
+import { FORMATION_GEN_CUTOFF } from '../data/joinerMeta.js';
 
-const GENERATIONS = JOINER_META.map(g => ({ gen: g.gen, label: g.genLabel }));
+// Show every generation the game has (from HEROES_BY_GEN, currently up
+// to 11), not just the ones with authored formation data — otherwise
+// an alliance past Gen 6 can never select their real generation at
+// all, which is what actually made this setting feel non-functional.
+const GENERATIONS = HEROES_BY_GEN.map((g, i) => {
+  const gen = i + 1;
+  return {
+    gen,
+    label: g.heroes.join(', '),
+    hasFormations: gen <= FORMATION_GEN_CUTOFF,
+  };
+});
 
 export function SettingsPanel({ settings, onSave, onClose }) {
   const [s, setS] = useState(settings || {});
   function upd(k, v) { setS(prev => ({ ...prev, [k]: v })); }
+
+  // Multi-select — NOT cumulative. Selecting Gen 4 and Gen 5 means
+  // exactly those two show up in battle-plan suggestions, nothing
+  // else. Replaces the old "this generation and everything below it"
+  // single-select model, which showed generations an alliance may have
+  // already outgrown.
+  const selectedGens = s.selectedGenerations || [];
+  function toggleGen(gen) {
+    upd('selectedGenerations', selectedGens.includes(gen)
+      ? selectedGens.filter(g => g !== gen)
+      : [...selectedGens, gen].sort((a, b) => a - b));
+  }
 
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'#000c', zIndex:300, display:'flex', alignItems:'flex-end' }}>
@@ -24,30 +48,38 @@ export function SettingsPanel({ settings, onSave, onClose }) {
           <Inp value={s.allianceTag} onChange={v => upd('allianceTag', v)} placeholder="e.g. ABC" />
         </Field>
         <Field label="State ID">
-          <Inp value={s.stateId} onChange={v => upd('stateId', v)} placeholder="e.g. 1234" inputMode="numeric" />
+          <div style={{ color:C.gold, padding:12 }}>State {s.stateId} · Use the state switcher to change states.</div>
         </Field>
 
-        {/* Generation setting */}
-        <Field label="Hero Generation" hint="Only formations from this generation and below will be suggested in battle planning.">
+        <Field label="4-Week Cycle Start" hint="Any date that was Day 1 of a known cycle — used by the Notice Library to work out where today falls in the 28-day schedule, so it can learn what you usually post at this point and suggest it.">
+          <Inp type="date" value={s.cycleAnchorDate || ''} onChange={v => upd('cycleAnchorDate', v)} />
+        </Field>
+
+        {/* Generation setting — multi-select */}
+        <Field label="Hero Generations" hint="Select every generation your alliance is actively using. Only these will be suggested in battle planning. Generations marked ⚠ don't have guided formations authored yet — Battle Plan's Custom mode still works for those.">
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {GENERATIONS.map(g => {
-              const sel = (s.maxGeneration || 6) >= g.gen;
-              const active = s.maxGeneration === g.gen;
+              const sel = selectedGens.includes(g.gen);
               return (
-                <button key={g.gen} onClick={() => upd('maxGeneration', g.gen)}
-                  style={{ textAlign:'left', padding:'10px 14px', borderRadius:10, border:`1px solid ${active?C.gold:sel?C.border:C.border+'44'}`, background:active?C.gold+'22':C.section, cursor:'pointer' }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:active?C.gold:sel?C.white:C.muted }}>
-                    {active?'✓ ':''}Gen {g.gen}
-                    {active&&<span style={{ fontSize:11, fontWeight:400, color:C.gold, marginLeft:8 }}>Current</span>}
+                <button key={g.gen} onClick={() => toggleGen(g.gen)}
+                  style={{ textAlign:'left', padding:'10px 14px', borderRadius:10, border:`1px solid ${sel?C.gold:C.border+'44'}`, background:sel?C.gold+'22':C.section, cursor:'pointer' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:sel?C.gold:C.muted }}>
+                    {sel?'✓ ':''}Gen {g.gen}
                   </div>
-                  <div style={{ fontSize:11, color:active?C.gold:C.muted, marginTop:2 }}>
-                    {g.label.replace(`Gen ${g.gen} — `,'').replace(`Gen ${g.gen} —`,'')}
-                  </div>
+                  <div style={{ fontSize:11, color:sel?C.gold:C.muted, marginTop:2 }}>{g.label}</div>
+                  {!g.hasFormations && (
+                    <div style={{ fontSize:10, color:C.gold, marginTop:4 }}>⚠ No guided formations yet — Custom mode only</div>
+                  )}
                 </button>
               );
             })}
           </div>
+          {selectedGens.length === 0 && (
+            <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>Nothing selected yet — battle planning will show suggestions from every generation until you pick which ones apply to you.</div>
+          )}
         </Field>
+
+        <AdminAccessPanel />
 
         <button onClick={() => onSave(s)} style={{ width:'100%', height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>
           Save Settings

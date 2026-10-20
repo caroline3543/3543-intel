@@ -1,3 +1,6 @@
+import { StateSwitcher } from './components/workspaces/StateSwitcher.jsx';
+import { AllianceImportPanel } from './components/workspaces/AllianceImportPanel.jsx';
+import { newAlliancePlayers } from './services/allianceImportService.js';
 import { useState, useRef } from 'react';
 import { useAppState } from './hooks/useAppState.js';
 import { importFromFile, exportToFile } from './services/exportImportService.js';
@@ -12,16 +15,15 @@ import { BattleTab }    from './components/svs/BattleTab.jsx';
 import { EventsTab }    from './components/events/EventsTab.jsx';
 import { IntelTab }     from './components/stats/IntelTab.jsx';
 import { TabErrorBoundary } from './components/common/TabErrorBoundary.jsx';
-import JoinerRegistry from './components/JoinerRegistry.jsx';
 import { LandingPage }  from './components/LandingPage.jsx';
 import { DataPanel }    from './components/DataPanel.jsx';
 import { SettingsPanel } from './components/SettingsPanel.jsx';
 
 const TABS = [
   { icon:'👥', label:'Members' },   // 0
-  { icon:'⚔️', label:'Battle'  },   // 1
+  { icon:'📊', label:'Intel'   },   // 1
   { icon:'📅', label:'Events'  },   // 2
-  { icon:'📊', label:'Intel'   },   // 3
+  { icon:'⚔️', label:'Battle'  },   // 3
 ];
 
 const hdrBtn = { height:36, padding:'0 10px', borderRadius:20, background:'#152236', border:'1px solid #2A4A64', color:'#A8C4D8', fontSize:13, fontWeight:600, cursor:'pointer' };
@@ -35,6 +37,10 @@ export default function App() {
     saveSvsPlans, deleteSvsPlan, saveSettings, applyImport,
     syncFromCloud, syncStatus, lastSyncedAt, isCloudConfigured,
     roles, saveCustomRoles,
+    customChecklist, saveChecklistItems,
+    notices, saveNotice, deleteNotice,
+    asciiArts, saveAsciiArt, deleteAsciiArt, resetAsciiArtsToDefaults,
+    labyrinthEntries, saveLabyrinthEntry, deleteLabyrinthEntry,
   } = state;
 
   const [tab, setTab]               = useState(0);
@@ -42,7 +48,7 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [dataPanel, setDataPanel]   = useState(false);
   const [settingsPanel, setSettingsPanel] = useState(false);
-  const [joinerRegistryOpen, setJoinerRegistryOpen] = useState(false);
+  const [alliancePanel, setAlliancePanel] = useState(false);
   const importFileRef = useRef();
 
   function handleGetStarted() {
@@ -73,13 +79,15 @@ export default function App() {
             <button onClick={()=>setSettingsPanel(true)} style={hdrBtn}>⚙️</button>
           </div>
         </div>
+        <StateSwitcher data={data} onPull={() => setAlliancePanel(true)} />
       </div>
 
-      {tab===0 && <TabErrorBoundary><RosterTab players={players} events={events} roles={roles} onSaveCustomRoles={saveCustomRoles} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(3)} /></TabErrorBoundary>}
-      {tab===1 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} /></TabErrorBoundary>}
-      {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} showToast={showToast} /></TabErrorBoundary>}
-      {tab===3 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} /></TabErrorBoundary>}
+      {tab===0 && <TabErrorBoundary><RosterTab players={players} events={events} roles={roles} onSaveCustomRoles={saveCustomRoles} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(1)} /></TabErrorBoundary>}
+      {tab===1 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} settings={settings} notices={notices} onSaveNotice={saveNotice} onDeleteNotice={deleteNotice} asciiArts={asciiArts} onSaveArt={saveAsciiArt} onDeleteArt={deleteAsciiArt} onResetArtToDefaults={resetAsciiArtsToDefaults} labyrinthEntries={labyrinthEntries} onSaveLabyrinthEntry={saveLabyrinthEntry} onDeleteLabyrinthEntry={deleteLabyrinthEntry} /></TabErrorBoundary>}
+      {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} showToast={showToast} /></TabErrorBoundary>}
+      {tab===3 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} checklist={customChecklist} onSaveChecklist={saveChecklistItems} labyrinthEntries={labyrinthEntries} /></TabErrorBoundary>}
 
+      {alliancePanel && <AllianceImportPanel stateId={settings.stateId} players={players} onClose={() => setAlliancePanel(false)} onImport={rows => addPlayers(newAlliancePlayers(players, rows, settings.stateId))} />}
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
       {dataPanel    && (
         <DataPanel
@@ -95,15 +103,6 @@ export default function App() {
         />
       )}
       {settingsPanel && <SettingsPanel settings={settings} onSave={s=>{saveSettings(s);setSettingsPanel(false);vibe(8);}} onClose={()=>setSettingsPanel(false)} />}
-      {joinerRegistryOpen && (
-        <div style={{ position:'fixed', inset:0, zIndex:600, background:'#0A1628', display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          <JoinerRegistry
-            players={players}
-            onUpdatePlayer={savePlayer}
-            onClose={() => setJoinerRegistryOpen(false)}
-          />
-        </div>
-      )}
       {toast && <Toast msg={toast.msg} type={toast.type} />}
 
       <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(4,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>

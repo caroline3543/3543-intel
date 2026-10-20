@@ -11,20 +11,72 @@ export const C = {
   mar:     '#B8859A',
   red:     '#FF453A',
   green:   '#30D158',
+  blue:    '#0A84FF',
   border:  '#2A4A64',
 };
 
-export const TIER_OPTIONS = ['T10','FC1','FC2','FC3','FC4','FC5','T11','T12'];
+// Legion accent colors — only Foundry and Canyon Clash actually split
+// into two same-day Legion events (see TROOP_POWER_EVENTS below);
+// every other event type has no legion field at all. L1 gets the
+// darker shade, L2 the lighter tint, so the two events read as
+// obviously-related-but-distinct at a glance without reading text.
+// Canyon Clash L2 reuses the existing lancer green (C.lan) directly
+// since it already sits well in this palette; Foundry uses a new
+// purple pair since nothing existing filled that role.
+export const LEGION_COLORS = {
+  'Foundry':      { 1: '#6B4C9A', 2: '#A78BC9' },
+  'Canyon Clash': { 1: '#2F6B4A', 2: C.lan },
+};
+
+// Tier order — HIGHEST FIRST for display (picker buttons render in
+// this order), per explicit request to stop listing weakest-to-
+// strongest. This is a DISPLAY convention only — comparison logic
+// (see battleConstants.js's FC_ORDER, used for "does this player meet
+// the minimum troop tier" checks) keeps its own ascending order
+// separately; the two arrays are intentionally not the same list.
+//
+// Helios was previously a single combined 'T11/Helios' bucket. Split
+// into 4 distinct research stages (Helios FC5–FC8) mirroring the same
+// FC-stage naming already used for T10, since Helios troops apparently
+// have their own FC-style research progression rather than being one
+// flat tier. NOTE: whether a separate plain "T11" stage (before Helios
+// research begins) should also exist as its own tier is genuinely
+// unclear from available sourcing — not added here since it wasn't
+// asked for and guessing at unconfirmed mechanics seemed worse than
+// leaving it out. Flag this if T11-without-Helios turns out to be a
+// real, distinct state your alliance needs to track.
+// T12 kept at the very top, still unconfirmed (see original note below).
+export const TIER_OPTIONS = [
+  'T12','Helios FC8','Helios FC7','Helios FC6','Helios FC5',
+  'FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1','T10',
+];
+
+// Furnace level options — separate from TIER_OPTIONS above. Furnace is
+// FC1-FC8 only; T10/T11/Helios/T12 are troop camp tiers, not furnace
+// levels (see the "T11/Helios is not a furnace" fix in PlayerSheet.jsx).
+// Highest-first, matching TIER_OPTIONS' display convention above.
+export const FC_OPTIONS = ['FC8','FC7','FC6','FC5','FC4','FC3','FC2','FC1'];
+
+// Furnace-level badge icons — full FC1–FC8 set now that artwork exists
+// for all eight. Served from /public/furnace-badges/.
+export const FC_BADGE_IMAGES = {
+  FC1: '/furnace-badges/fc1.png',
+  FC2: '/furnace-badges/fc2.png',
+  FC3: '/furnace-badges/fc3.png',
+  FC4: '/furnace-badges/fc4.png',
+  FC5: '/furnace-badges/fc5.png',
+  FC6: '/furnace-badges/fc6.png',
+  FC7: '/furnace-badges/fc7.png',
+  FC8: '/furnace-badges/fc8.png',
+};
 
 // NOTE: player roles are no longer a fixed list. "Rally Lead" is the only
 // permanent, built-in role (see src/utils/roles.js) — every other role is
 // created by the alliance itself and stored in app data, not here.
 
 export const EVENT_ICONS = {
-  'SvS':                      '⚔️',
   'Foundry':                  '🔥',
   'Canyon Clash':              '🏔️',
-  'Bear Trap':                 '🪤',
   'SvS Castle Battle':         '🏰',
   'Internal Sunfire Castle':   '🏯',
   'Transfer Season':           '🚀',
@@ -86,10 +138,46 @@ export const TEAM_ROLES = [
 ];
 
 export const EVENT_TYPES = [
-  'SvS', 'SvS Castle Battle', 'Internal Sunfire Castle',
-  'Foundry', 'Canyon Clash', 'Bear Trap',
+  'SvS Castle Battle', 'Internal Sunfire Castle',
+  'Foundry', 'Canyon Clash',
   'Transfer Season', 'Custom',
 ];
 
 // Event types that automatically include joiner coverage in exports
-export const JOINER_COVERAGE_EVENTS = ['SvS', 'SvS Castle Battle', 'Internal Sunfire Castle'];
+export const JOINER_COVERAGE_EVENTS = ['SvS Castle Battle', 'Internal Sunfire Castle'];
+
+// Event types that track troop power per player, per event (see
+// SnapshotEditor.jsx and ProfileView.jsx's troop-power chart)
+export const TROOP_POWER_EVENTS = ['Foundry', 'Canyon Clash'];
+
+// RSVP prediction fields (arriving late / leaving early / discord /
+// present whole time) only make sense for the two SvS-related event
+// types — nobody needs to predict "will I be on time" for a Foundry
+// run. Every other event type skips straight to a plain roster; post-
+// event actuals (attended/no-show/voice) still apply universally via
+// EventsTab.jsx's bulk actions regardless of this list.
+export const SHOWS_RSVP_TYPES = ['SvS Castle Battle', 'Internal Sunfire Castle'];
+
+// Alliance rank — mutually exclusive (a player holds exactly one), so
+// modeled as a single value (player.allianceRank), not another entry
+// in the multi-select roles array. R5 is highest.
+export const ALLIANCE_RANKS = ['R5', 'R4', 'R3', 'R2', 'R1'];
+
+// Shared "obviously selected" style for tier/FC chips (PlayerSheet,
+// RallySlotCard, BatchAddSheet all use this) — thicker border + solid
+// fill + bold text make selection unambiguous at a glance, instead of
+// each screen's own subtle border-tint variant.
+export function tierChipStyle(selected, color = C.gold) {
+  return {
+    padding: '7px 13px',
+    borderRadius: 16,
+    flexShrink: 0,
+    border: `2px solid ${selected ? color : C.border}`,
+    background: selected ? color : C.section,
+    color: selected ? C.bg : C.muted,
+    fontWeight: selected ? 800 : 600,
+    fontSize: 13,
+    cursor: 'pointer',
+    minHeight: 36,
+  };
+}

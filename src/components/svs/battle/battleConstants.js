@@ -49,11 +49,42 @@ export const HERO_SUBS = {
   'Renee':     ['Renee'],
 };
 
-/** Resolve a raw hero name (possibly with * or **) to display + alternatives. */
+// Flat hero list for manual "pick a required hero" pickers — shared by
+// FormationPicker's custom mode and JoinerSlotRow's hero-first manual
+// assignment, so there's one list to keep in sync, not two duplicated
+// inline arrays.
+export const CUSTOM_HERO_OPTIONS = [
+  'Jessie','Seo-Yoon','Jasser','Patrick','Mia','Norah','Philly',
+  'Logan','Reina','Sergey','Wu Ming','Gwen','Lynn','Zinman',
+];
+
+// Leader heroes are a DIFFERENT hero pool from joiner heroes — these
+// are the heroes used to LEAD a rally (per joinerMeta.js's `leaders`
+// field), not to join one. Shared by FormationPicker's custom mode and
+// RallyLeaderProfileSheet.jsx's lead-hero picker.
+export const LEADER_HERO_OPTIONS = [
+  'Jeronimo','Natalia','Molly','Zinman','Flint','Philly','Alonso',
+  'Logan','Mia','Greg','Ahmose','Reina','Lynn','Hector','Norah',
+  'Gwen','Wu Ming','Renee','Wayne',
+];
+
+/**
+ * Resolve a hero name to display + alternatives. Works with either the
+ * raw spreadsheet notation ("Jessie*") OR an already-resolved display
+ * name ("Jessie") — the latter matters because once a joiner slot's
+ * heroName gets set to the resolved display form, a naive lookup by
+ * raw key alone would find nothing and silently lose the substitution
+ * alternates (Jasser, Jeronimo). Falls back to searching every group's
+ * display name before giving up.
+ */
 export function resolveHero(raw) {
   if (!raw) return null;
   const clean = raw.replace(/\*/g,'').replace(/\*\*/g,'').trim();
-  const subs  = HERO_SUBS[raw] || HERO_SUBS[clean] || [clean];
+  let subs = HERO_SUBS[raw] || HERO_SUBS[clean];
+  if (!subs) {
+    const match = Object.values(HERO_SUBS).find(arr => arr[0].toLowerCase() === clean.toLowerCase());
+    subs = match || [clean];
+  }
   return { display: subs[0], alternatives: subs.slice(1), raw };
 }
 
@@ -116,4 +147,112 @@ export function suggestJoinerHeroes(leaderPlayer, slotType, leaderRallyHeroes) {
   };
 }
 
-export const FC_ORDER = ['FC1','FC2','FC3','FC4','FC5'];
+// Deliberately ascending (low to high) — used only for indexOf-based
+// "does this player meet the minimum" comparisons in meetsTroopReqs
+// below, never rendered directly as a picker. Kept separate from
+// constants.js's TIER_OPTIONS, which is display-order (highest-first)
+// and therefore wrong to use for this kind of comparison math.
+export const FC_ORDER = ['FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','Helios FC5','Helios FC6','Helios FC7','Helios FC8'];
+
+/**
+ * Whether a player counts as attending a linked Event, for the purpose
+ * of Battle Plan eligibility (Rally Leader picker, Priority Joiner
+ * eligible lists). Mirrors EventsTab.jsx's own upcoming/actuals split
+ * exactly rather than inventing a separate rule:
+ *   - event.status === 'upcoming'  → use the RSVP prediction
+ *   - otherwise (active/completed) → use the recorded actual
+ * Returns false if there's no event, or no snapshot for this player at
+ * all (nobody has RSVP'd/been recorded for them yet).
+ */
+export function isAttending(playerId, event) {
+  if (!event) return false;
+  const snap = (event.snapshots || []).find(s => s.playerId === playerId);
+  if (!snap) return false;
+  return event.status === 'upcoming'
+    ? !!snap.rsvp?.participating
+    : snap.attendance?.attended === true;
+}
+
+/**
+ * Timing tier for a player's RSVP on a given linked Event — used to
+ * rank BOTH rally leader candidates (PlanDetail.jsx's autoFillPlan)
+ * and priority-joiner candidates (JoinerSlotRow.jsx) by how safely
+ * present they are, lower = more preferred:
+ *   0 = confirmed full-window (presentWholeTime) or no flags set
+ *   1/2 = late-only vs early-only — which is 1 vs 2 depends on
+ *         planPhase (see below); whichever means "still around for
+ *         THIS rally" ranks as 1
+ *   3 = both late AND leaving early — narrow window either way
+ *   4 = unsure — hasn't committed either way
+ *   5 = intermittent ("pops in randomly") — always last, deliberately
+ *       overriding MVP/reliability wherever those are also used to rank
+ * planPhase ('start' | 'midway', from the rally slot's own planPhase
+ * field — see newRallySlot in playerSchema.js) decides which of
+ * late/early is the safer bet: at 'start' an early-leaver still
+ * covers most of a start-phase rally (arriving-late is the real
+ * risk); at 'midway' a late-arriver has probably already shown up by
+ * now (leaving-early is the real risk — they may already be gone).
+ */
+export function timingTier(player, event, planPhase = 'start') {
+  const rsvp = event?.snapshots?.find(s => s.playerId === player.id)?.rsvp;
+  if (!rsvp) return 0;
+  if (rsvp.intermittent) return 5;
+  if (rsvp.unsure) return 4;
+  if (rsvp.willBeLate && rsvp.willLeaveEarly) return 3;
+  const lateOnly  = rsvp.willBeLate && !rsvp.willLeaveEarly;
+  const earlyOnly = rsvp.willLeaveEarly && !rsvp.willBeLate;
+  if (planPhase === 'midway') {
+    if (lateOnly)  return 1;
+    if (earlyOnly) return 2;
+  } else {
+    if (earlyOnly) return 1;
+    if (lateOnly)  return 2;
+  }
+  return 0;
+}
+
+/**
+ * Best (highest) troop tier a player has across their three troop
+ * types, as an FC_ORDER index — used by autoFillPlan (PlanDetail.jsx)
+ * to pair the strongest available troop-tier joiners with the
+ * strongest rally leaders. Distinct from getCurrentTroopPower
+ * (metrics.js), which is a numeric Foundry/Canyon Clash power
+ * snapshot, not an FC-tier classification — Caroline asked
+ * specifically for "troop tiers" here, not power.
+ */
+export function bestTroopTierIndex(player) {
+  const tiers = ['infantry','lancer','marksman'].map(k => player.troops?.[k]).filter(Boolean);
+  if (!tiers.length) return -1;
+  return Math.max(...tiers.map(t => FC_ORDER.indexOf(t)));
+}
+
+/**
+ * Checks whether a player meets a rally slot's minimum troop tier
+ * requirements. Shared by JoinerSlotRow (manual picker — greys out
+ * ineligible members) and FormationPicker's auto-suggest (which used
+ * to ignore troop tier entirely and only check hero ownership).
+ *
+ * minFC is either a plain FC level ('FC1'–'FC8', compared ordinally
+ * via FC_ORDER as before) or the sentinel 'Helios', meaning "any
+ * Helios stage qualifies" — replaces requiring one specific Helios
+ * FC5–FC8 sub-tier as the cutoff (see RallySlotCard.jsx's
+ * TIER_REQ_OPTIONS, the only place that can set this field now).
+ */
+export function meetsTroopReqs(player, troopReqs) {
+  const reqs = troopReqs || {};
+  for (const [key, minFC] of Object.entries(reqs)) {
+    if (!minFC) continue;
+    const playerTier = player.troops?.[key];
+    if (minFC === 'Helios') {
+      if (!playerTier || !playerTier.startsWith('Helios')) {
+        return { ok: false, reason: `Needs any Helios tier ${key}` };
+      }
+      continue;
+    }
+    if (!playerTier) return { ok: false, reason: `Needs ${minFC}+ ${key}` };
+    if (FC_ORDER.indexOf(playerTier) < FC_ORDER.indexOf(minFC)) {
+      return { ok: false, reason: `${key} ${playerTier} < ${minFC} required` };
+    }
+  }
+  return { ok: true, reason: null };
+}

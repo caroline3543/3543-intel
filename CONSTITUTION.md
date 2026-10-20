@@ -98,9 +98,13 @@ BattleTab and LiveRallyRoom both hit ~1000 lines before being split. Don't let i
 
 | Key | Owner | Contents |
 |-----|-------|----------|
-| `svs_live_rally_room_v2` | `LiveRallyRoom.jsx` | Timers, calculator, march registry |
-| `svs_voice_settings` | `useVoiceCountdown.js` | Voice on/off, cues, voiceURI, rate, pitch |
+| `svs_battle_pool_v1` | `useBattlePool.js` | Event-scoped readiness, battle-only profile overrides, temporary participants, commitments and holding reports |
+| `svs_live_rally_room_v2` | `LiveRallyRoom.jsx` | Timers, calculator, march registry, switching drafts, command statuses, presets, audit |
+| `svs_castle_command_v1` | Read-only legacy import | Standalone draft retained; import through Live Room Leaders |
 | `svs_onboarded` | `LandingPage.jsx` | Onboarding complete flag |
+| `svs_state_workspaces_v1` | `stateWorkspaceService.js` | Active state and available state numbers; originals retained during migration |
+| `*:state:<id>` | Respective storage owner | State-specific copies of app data, battle pool, live room, legacy command draft, custom field options and hero generations |
+| `svs_field_registry_custom_options`, `svs_field_registry_custom_hero_gens` | `fieldRegistryService.js` | Legacy custom field definitions; original copies retained |
 | (global app data) | `exportImportService.js` | Players, plans, events, scores, settings |
 
 **Never write to localStorage directly in a component** — go through the relevant service or hook.
@@ -115,6 +119,7 @@ BattleTab and LiveRallyRoom both hit ~1000 lines before being split. Don't let i
 | Timer identity system (emoji/number/border) | ❌ Reverted | Visual noise, not useful under pressure |
 | Per-leader message template | ✅ Optional override | Alliance default + per-leader override |
 | CSS files | ❌ No | Inline styles keep everything co-located |
+| Voice countdown (SpeechSynthesis announcer) | ❌ Removed | Dropped — text/visual countdown is sufficient; simplifies Live Rally Room |
 | Router | ❌ No | Tab-based nav is sufficient and simpler |
 | TypeScript | ⏳ Not yet | Future migration path, not now |
 

@@ -24,7 +24,7 @@ export function LandingPage({ onGetStarted, onImport, hasData }) {
       <div style={{ fontSize:72, marginBottom:20, ...fade() }}>🏰</div>
 
       <div style={{ fontSize:28, fontWeight:800, color:C.white, marginBottom:8, lineHeight:1.2, ...fade(100) }}>
-        Alliance Manager
+        Caroline
       </div>
       <div style={{ fontSize:16, color:C.muted, marginBottom:32, lineHeight:1.6, maxWidth:320, ...fade(150) }}>
         Build your alliance roster, assign rally teams, and coordinate your SvS battles.

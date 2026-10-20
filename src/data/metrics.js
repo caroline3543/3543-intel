@@ -1,11 +1,66 @@
 /**
+ * A player's most recently recorded troop power, from ANY event's
+ * snapshot (not just the event currently being viewed) — the single
+ * general-purpose "how strong is this player right now" number used
+ * across the app (roster sort, squad balancing, Castle Battle
+ * auto-fill). Troop power is only ever entered on Foundry/Canyon Clash
+ * events (see TROOP_POWER_EVENTS in constants.js), but once recorded
+ * it's treated as a standing proxy for the player's overall strength
+ * everywhere else, since there's no separate "power" field on the
+ * player profile itself.
+ */
+export function getCurrentTroopPower(player, events) {
+  let best = null;
+  (events || []).forEach(ev => {
+    const snap = (ev.snapshots || []).find(s => s.playerId === player.id);
+    if (snap?.troopPower != null && (!best || new Date(ev.date) > new Date(best.date))) {
+      best = { value: snap.troopPower, date: ev.date };
+    }
+  });
+  return best?.value ?? null;
+}
+
+/**
  * Calculate reliability metrics for a player across all events.
- * Returns null if the player has no event history.
+ * Returns null if the player has no qualifying event history.
+ *
+ * Only events that have actually HAPPENED count — determined by the
+ * event's own `status` field ('active' or 'completed'), not by
+ * comparing `event.date` to today's date. A date-string comparison
+ * would incorrectly count an event scheduled for later TODAY as
+ * already having happened the moment the calendar day starts, even
+ * though it hasn't actually run yet.
+ *
+ * reliabilityScore is deliberately NOT influenced by Discord/voice
+ * participation — whether someone was on voice doesn't reflect how
+ * reliably they show up. Voice participation instead determines MVP
+ * Joiner status (see isMvpJoiner below), which affects joiner
+ * allocation order, not the reliability number itself. voicePct is
+ * still returned for display purposes (e.g. ProfileView's stat grid).
  */
 export function calcMetrics(player, events) {
-  const today = new Date().toISOString().slice(0, 10);
-  const snaps = (events || []).filter(ev => ev.date && ev.date <= today).flatMap(ev =>
-    (ev.snapshots || []).filter(s => s.playerId === player.id)
+  const snaps = (events || []).filter(ev => ev.status !== 'upcoming').flatMap(ev =>
+    (ev.snapshots || []).filter(s => {
+      if (s.playerId !== player.id) return false;
+      // Substitutes aren't part of the required roster — if an event
+      // ended and nobody ever recorded whether they actually showed
+      // up, that's neutral, not a miss. Excluding the snapshot from
+      // the qualifying set entirely (rather than just not counting it
+      // as attended) keeps it out of the denominator too, so it can't
+      // quietly drag attendancePct down. The moment an officer
+      // explicitly records attendance either way — they showed up, or
+      // were explicitly marked no-show — it counts like anyone else's.
+      if (s.rsvp?.substitute && s.attendance?.attended === null && !s.attendance?.noShow) return false;
+      // An excused absence is a sanctioned absence, not a discipline
+      // flag (see playerSchema.js's newSnapshot comment on `excused`)
+      // — excluded from the qualifying set entirely, same treatment
+      // as the substitute case just above, so it can't drag
+      // attendancePct/reliabilityScore down OR break a
+      // consecutiveMisses streak. The event simply doesn't count
+      // either way, for either metric.
+      if (s.attendance?.noShow && s.attendance?.excused) return false;
+      return true;
+    })
   );
   if (!snaps.length) return null;
 
@@ -28,16 +83,15 @@ export function calcMetrics(player, events) {
   }
 
   const reliabilityScore = Math.round(
-    ap * 0.6 +
-    vp * 0.25 +
-    Math.max(0, 100 - noShows.length * 10) * 0.15
+    ap * 0.8 +
+    Math.max(0, 100 - noShows.length * 10) * 0.2
   );
 
   return {
     totalEvents:       snaps.length,
     attended:          attended.length,
     noShows:           noShows.length,
-    late:              snaps.filter(s => s.attendance.late).length,
+    late:              snaps.filter(s => s.attendance.joinedLateNoNotice).length,
     voiceCount:        voiceOn.length,
     attendancePct:     ap,
     voicePct:          vp,
@@ -45,6 +99,72 @@ export function calcMetrics(player, events) {
     consecutiveMisses,
     reliabilityScore,
   };
+}
+
+/**
+ * MVP Joiner — true if this player has EVER joined Discord voice in a
+ * real (non-upcoming) event. A binary flag, not a percentage
+ * threshold: any confirmed voice participation qualifies. Used to rank
+ * joiner allocation order (MVP joiners first), completely separate
+ * from reliabilityScore, which no longer factors in voice at all.
+ */
+export function isMvpJoiner(player, events) {
+  return (events || [])
+    .filter(ev => ev.status !== 'upcoming')
+    .some(ev => (ev.snapshots || []).some(s => s.playerId === player.id && s.voice?.joined === true));
+}
+
+/**
+ * Given a recommended formation's joiner slots (already resolved to
+ * their real hero alternatives — see battleConstants.js's
+ * resolveHero(), which knows "Jessie*" means Jessie/Jasser/Jeronimo,
+ * not literally "Jessie" with an asterisk stripped) and the current
+ * roster, pick a specific roster member for each slot — weighted by
+ * who owns any of that slot's acceptable heroes at Skill 5 and who's
+ * currently available. Reuses autoSuggestPlayers' scoring rather than
+ * duplicating it.
+ *
+ * Deliberately takes pre-resolved slots rather than raw formation
+ * strings (formation.j1 etc.) or importing battleConstants.js itself —
+ * this file is data-layer (src/data/), resolveHero() lives in the
+ * battle component tree (src/components/svs/battle/), and the
+ * substitution-notation parsing belongs there, not here.
+ *
+ * @param resolvedSlots  [{ slotLabel, heroOptions: string[] }, ...] —
+ *                       heroOptions is every acceptable hero name for
+ *                       that slot (e.g. ['Jessie','Jasser','Jeronimo']).
+ * One player is never assigned to two slots in the same call.
+ *
+ * Returns one entry per slot: { player, hero, slotIndex, slotLabel,
+ * score, reasons, missing }. `player` is null if no available roster
+ * member owns any option in that slot.
+ */
+export function suggestPriorityJoiners(resolvedSlots, players, events) {
+  if (!resolvedSlots?.length) return [];
+  const assigned = new Set();
+
+  return resolvedSlots.map(({ slotLabel, heroOptions }, slotIndex) => {
+    let best = null;
+
+    for (const hero of heroOptions || []) {
+      const ranked = autoSuggestPlayers(players, events, { heroes: [hero], requireAvailable: true })
+        .filter(c => !assigned.has(c.player.id))
+        // autoSuggestPlayers only SCORES hero ownership as a bonus, it
+        // never excludes non-owners — without this hard filter, the
+        // "best available" candidate could be someone who simply
+        // doesn't have the hero at all when nobody eligible does.
+        // Never allocate a joiner nobody can actually fulfil.
+        .filter(c => (c.player.joinerHeroes || []).some(jh => jh.hero === hero && jh.skillLevel >= 5));
+      if (ranked.length && (!best || ranked[0].score > best.score)) {
+        best = { player: ranked[0].player, hero, score: ranked[0].score, reasons: ranked[0].reasons, missing: ranked[0].missing };
+      }
+    }
+
+    if (best) assigned.add(best.player.id);
+    return best
+      ? { ...best, slotIndex, slotLabel }
+      : { player: null, hero: heroOptions?.[0] || null, slotIndex, slotLabel, score: 0, reasons: [], missing: ['No eligible attendee owns this hero'] };
+  });
 }
 
 /**

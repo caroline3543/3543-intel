@@ -1,31 +1,189 @@
 import { useState } from 'react';
 import { C } from '../../utils/constants.js';
-import { PlayerCard }       from './PlayerCard.jsx';
+import { PlayerCard, comparePriority } from './PlayerCard.jsx';
 import { ProfileView }      from './ProfileView.jsx';
 import { PlayerSheet }      from './PlayerSheet.jsx';
-import { BatchAddSheet }    from './BatchAddSheet.jsx';
 import { RoleManagerSheet } from './RoleManagerSheet.jsx';
+import { RallyLeaderProfileSheet } from './RallyLeaderProfileSheet.jsx';
+import BulkNameAdd          from './BulkNameAdd.jsx';
+import FieldRegistry        from './FieldRegistry.jsx';
+import { FIELD_DEFS, getFieldValues, assignFieldValue } from '../../services/fieldRegistryService.js';
+import { getCurrentTroopPower } from '../../data/metrics.js';
 
-export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePlayer, onAddPlayers, onUpdatePlayers, onDeletePlayer, onGoToIntel }) {
+// Auto-derived "role-like" filters computed straight from existing
+// troop-tier data — no manual role to create or assign. Only shown as
+// filter chips when at least one player actually qualifies, so an
+// alliance with nobody at Helios tier yet doesn't see empty chips.
+// Sentinel value for the "No Alliance" filter chip — distinct from ''
+// (which means "All Alliances", i.e. no filter applied at all).
+const NO_ALLIANCE = '__no_alliance__';
+
+const DERIVED_TIER_FILTERS = [
+  { id:'helios-marksman', label:'🏹 Helios Marksman', match:p => !!p.troops?.marksman?.startsWith('Helios') },
+  { id:'helios-lancer',   label:'⚔️ Helios Lancer',   match:p => !!p.troops?.lancer?.startsWith('Helios') },
+  { id:'helios-infantry', label:'🛡️ Helios Infantry', match:p => !!p.troops?.infantry?.startsWith('Helios') },
+  { id:'full-fc5', label:'💯 Full FC5', match:p => p.troops?.infantry==='FC5' && p.troops?.lancer==='FC5' && p.troops?.marksman==='FC5' },
+  { id:'full-fc6', label:'💯 Full FC6', match:p => ['FC6','Helios FC6'].includes(p.troops?.infantry) && ['FC6','Helios FC6'].includes(p.troops?.lancer) && ['FC6','Helios FC6'].includes(p.troops?.marksman) },
+  { id:'no-fid', label:'❓ No ID', match:p => !p.fid },
+];
+
+const SORT_OPTIONS = [
+  { id:'name',       label:'Name (A–Z)' },
+  { id:'priority',   label:'⭐ Priority (strongest first)' },
+  { id:'troopPower', label:'💪 Troop power (high → low)' },
+  { id:'missing',    label:'⚠ Missing info first' },
+];
+
+// Plain-language explanations for the [?] help sheet — written for
+// someone opening this page for the first time, not for an officer
+// who already knows the app.
+const HELP_ITEMS = [
+  { title: '🔎 Search', body: "Searches name, nickname, alliance tag, country, and player ID — the player ID still works even if someone renames themselves, since it doesn't change." },
+  { title: '📋 Field Registry', body: "Fill in or bulk-update furnace level, troop tiers, languages, and joiner heroes — for one player, or several at once." },
+  { title: '☑️ Select', body: "Tap Select, then tap players to choose several. With players selected, stage multiple fields (like Furnace + all three troop tiers) and apply them all in one tap instead of editing each person one by one." },
+  { title: '↕ Sort', body: "Reorder the list — alphabetical, by Priority (fully Helios-matched players first, for rally/war planning), by troop power, or missing-info-first to quickly see who still needs their profile filled in." },
+  { title: '🔎 Filters', body: "Filter by role, by alliance, or by fully-upgraded troop tiers (Full FC5, Full FC6, or Helios) to narrow the list down to who you're looking for." },
+  { title: '⚔️ By Role', body: "Switch to see everyone grouped by their assigned role instead of one flat list." },
+  { title: '👑 Rally Lead', body: "Tap the crown on a player's card to toggle whether they're a Rally Lead. This changes who's eligible to lead rallies when you build a Battle Plan." },
+  { title: '⚙ Roles', body: "Create, rename, or recolor the roles your alliance uses (besides the built-in Rally Lead role)." },
+];
+
+export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePlayer, onAddPlayers, onUpdatePlayers, onDeletePlayer, onGoToIntel, showToast }) {
   const [rosterView, setRosterView]       = useState('list');
   const [search, setSearch]               = useState('');
   const [filterRole, setFilterRole]       = useState('All');
+  const [filterTag, setFilterTag]         = useState('');
+  const [sortBy, setSortBy]               = useState('name');
+  const [sortMenuOpen, setSortMenuOpen]   = useState(false);
   const [viewingPlayer, setViewingPlayer] = useState(null);
   const [profileOpen, setProfileOpen]     = useState(false);
+  const [leaderProfileOpen, setLeaderProfileOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [sheetOpen, setSheetOpen]         = useState(false);
-  const [batchOpen, setBatchOpen]         = useState(false);
+  const [bulkAddOpen, setBulkAddOpen]     = useState(false);
+  const [fieldRegistryOpen, setFieldRegistryOpen] = useState(false);
   const [roleManagerOpen, setRoleManagerOpen] = useState(false);
+  const [troopsCopied, setTroopsCopied] = useState(false);
+  const [bulkMode, setBulkMode]         = useState(false);
+  const [bulkSel, setBulkSel]           = useState(new Set());
+  const [activeField, setActiveField]   = useState(null); // which field's value picker is open
+  const [stagedFields, setStagedFields] = useState({});   // { [fieldId]: value } — built up before one combined Apply
+  const [helpOpen, setHelpOpen]         = useState(false);
+
+  // How many of the "should be set" fields are actually missing —
+  // higher = more incomplete. NOTE: having zero roles is no longer
+  // counted here — Rally Lead is the only role that changes anything
+  // functionally (Battle Plan eligibility never checks for a "Joiner"
+  // tag), so an untagged member is a normal joiner, not an incomplete
+  // profile.
+  // Restricted to troop tiers + alliance name specifically — furnace
+  // level and joiner heroes are useful to have but aren't what this
+  // flag is for; it exists to catch profiles that can't be used for
+  // eligibility/coverage checks elsewhere in the app, and those two
+  // fields don't gate anything the way troop tiers and alliance do.
+  function missingCount(p) {
+    let n = 0;
+    if (!p.troops?.infantry) n++;
+    if (!p.troops?.lancer) n++;
+    if (!p.troops?.marksman) n++;
+    if (!p.allianceTag) n++;
+    return n;
+  }
+
+  // One-tap Rally Lead toggle — pass to PlayerCard once it can render
+  // a tap target for it; the flip logic lives here either way.
+  function toggleRallyLead(player) {
+    const has = player.roles?.includes('Rally Lead');
+    const nextRoles = has ? (player.roles||[]).filter(r => r !== 'Rally Lead') : [...(player.roles||[]), 'Rally Lead'];
+    onSavePlayer({ ...player, roles: nextRoles });
+  }
+
+  // Folds every staged field=value pair into one combined update per
+  // selected player — e.g. Furnace: FC5 AND Infantry: FC5 AND
+  // Marksman: FC5 all land in the same object, then one onUpdatePlayers
+  // batch for everyone. Chaining assignFieldValue locally like this
+  // (not one onUpdatePlayers call per field) avoids each call needing
+  // to read the result of the previous one from parent state that
+  // hasn't re-rendered yet.
+  function applyBulkFields() {
+    const entries = Object.entries(stagedFields);
+    if (entries.length === 0) return;
+    const selected = players.filter(p => bulkSel.has(p.id));
+    const updated = selected.map(p => {
+      let result = p;
+      entries.forEach(([fieldId, value]) => {
+        const field = FIELD_DEFS.find(f => f.id === fieldId);
+        if (field) result = assignFieldValue(result, field, value);
+      });
+      return result;
+    });
+    onUpdatePlayers(updated);
+    showToast?.(`Updated ${updated.length} player${updated.length!==1?'s':''} with ${entries.length} field${entries.length!==1?'s':''} ✓`);
+    setBulkSel(new Set()); setBulkMode(false); setActiveField(null); setStagedFields({});
+  }
+
+  function toggleBulkSel(id) {
+    setBulkSel(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
+  // Discord-ready list of exactly who's missing which troop tier(s) —
+  // "missing info" elsewhere is broader (languages, joiner heroes,
+  // furnace level too), so this is scoped specifically to troop tiers,
+  // since that's the actionable, chase-people-down list an officer
+  // would actually post.
+  function generateMissingTroopsText() {
+    const missing = players.filter(p => !p.troops?.infantry || !p.troops?.lancer || !p.troops?.marksman);
+    const lines = ['Missing Troop Levels', ''];
+    missing.forEach(p => {
+      const dn = p.username || p.alias || '?';
+      const gaps = [];
+      if (!p.troops?.infantry) gaps.push('Infantry');
+      if (!p.troops?.lancer)   gaps.push('Lancer');
+      if (!p.troops?.marksman) gaps.push('Marksman');
+      lines.push(`${dn} — missing ${gaps.join(', ')}`);
+    });
+    return lines.join('\n').trim();
+  }
+  function copyMissingTroops() {
+    navigator.clipboard.writeText(generateMissingTroopsText()).then(() => {
+      setTroopsCopied(true);
+      setTimeout(() => setTroopsCopied(false), 2000);
+    });
+  }
+
+  const activeDerivedFilters = DERIVED_TIER_FILTERS.filter(d => players.some(d.match));
+  const derivedMatch = DERIVED_TIER_FILTERS.find(d => d.id === filterRole);
+  const allTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
+  const allianceCounts = {};
+  players.forEach(p => { if (p.allianceTag) allianceCounts[p.allianceTag] = (allianceCounts[p.allianceTag] || 0) + 1; });
+  const troopGapCount = players.filter(p => !p.troops?.infantry || !p.troops?.lancer || !p.troops?.marksman).length;
+  const noAllianceCount = players.filter(p => !p.allianceTag).length;
 
   const filteredPlayers = players.filter(p => {
-    const t = (p.username||p.alias||'').toLowerCase();
+    const q = search.toLowerCase();
     const ms = !search
-      || t.includes(search.toLowerCase())
-      || (p.allianceTag||'').toLowerCase().includes(search.toLowerCase())
-      || (p.country||'').toLowerCase().includes(search.toLowerCase());
-    const mr = filterRole==='All' || p.roles?.includes(filterRole);
-    return ms && mr;
+      || (p.username||'').toLowerCase().includes(q)
+      || (p.alias||'').toLowerCase().includes(q)
+      || (p.allianceTag||'').toLowerCase().includes(q)
+      || (p.country||'').toLowerCase().includes(q)
+      || (p.fid||'').toLowerCase().includes(q);
+    const mr = filterRole==='All' || (derivedMatch ? derivedMatch.match(p) : p.roles?.includes(filterRole));
+    const ma = !filterTag || (filterTag===NO_ALLIANCE ? !p.allianceTag : p.allianceTag === filterTag);
+    return ms && mr && ma;
   });
+  if (sortBy === 'missing') {
+    filteredPlayers.sort((a,b) => missingCount(b) - missingCount(a));
+  } else if (sortBy === 'priority') {
+    filteredPlayers.sort(comparePriority);
+  } else if (sortBy === 'troopPower') {
+    filteredPlayers.sort((a,b) => (getCurrentTroopPower(b,events) ?? -1) - (getCurrentTroopPower(a,events) ?? -1));
+  } else {
+    filteredPlayers.sort((a,b) => (a.username||a.alias||'').localeCompare(b.username||b.alias||''));
+  }
 
   function openProfile(player) { setViewingPlayer(player); setProfileOpen(true); }
   function openEdit(player)    { setEditingPlayer(player); setSheetOpen(true); }
@@ -38,60 +196,202 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search name, tag, country…"
+          placeholder="Search name or tag"
           style={{ flex:1, height:48, background:'#152236', border:'1px solid #2A4A64', borderRadius:10, padding:'0 14px', fontSize:16, color:'#FFFFFF', fontFamily:'inherit' }}
         />
-        <button onClick={() => setBatchOpen(true)} style={{ height:48, padding:'0 12px', borderRadius:10, background:'none', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer' }}>⚡ Batch</button>
+        <button onClick={() => setBulkAddOpen(true)} style={{ height:48, padding:'0 12px', borderRadius:10, background:'none', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer' }}>➕ Bulk Add</button>
         <button onClick={openAdd} style={{ height:48, padding:'0 14px', borderRadius:10, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>＋</button>
       </div>
 
-      <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+      <div style={{ display:'flex', gap:8, marginBottom:10 }}>
         <button onClick={() => setRosterView('list')} style={{ flex:1, height:36, borderRadius:20, background:rosterView==='list'?C.gold+'22':C.section, border:`1px solid ${rosterView==='list'?C.gold:C.border}`, color:rosterView==='list'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>≡ List</button>
         <button onClick={() => setRosterView('roles')} style={{ flex:1, height:36, borderRadius:20, background:rosterView==='roles'?C.gold+'22':C.section, border:`1px solid ${rosterView==='roles'?C.gold:C.border}`, color:rosterView==='roles'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>⚔️ By Role</button>
+        <button onClick={() => setHelpOpen(true)} aria-label="How this page works"
+          style={{ flexShrink:0, width:36, height:36, borderRadius:'50%', background:C.section, border:`1px solid ${C.border}`, color:C.gold, fontWeight:800, fontSize:14, cursor:'pointer' }}>
+          ?
+        </button>
       </div>
+
+      {/* Utility row — Fields and Roles are now always-visible, labeled
+          buttons instead of hidden behind an unlabeled "⋯" overflow menu.
+          Nobody could tell that menu existed, let alone what was in it —
+          these are two of the most important entry points in the app
+          (they're how data actually gets filled in), so they get equal
+          visual weight to Sort, not a mystery icon. */}
+      <div style={{ display:'flex', gap:6, marginBottom:12, position:'relative' }}>
+        {rosterView==='list' && (
+          <button onClick={() => setSortMenuOpen(!sortMenuOpen)}
+            style={{ flex:1, minWidth:0, height:36, padding:'0 12px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', gap:6 }}>
+            <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{SORT_OPTIONS.find(o=>o.id===sortBy)?.label}</span>
+            <span style={{ fontSize:10, flexShrink:0 }}>▼</span>
+          </button>
+        )}
+        <button onClick={() => setRoleManagerOpen(true)}
+          style={{ ...(rosterView==='list' ? { flexShrink:0 } : { flex:1 }), height:36, padding:'0 14px', borderRadius:20, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+          ⚙ Roles
+        </button>
+        {rosterView==='list' && (
+          <button onClick={() => { setBulkMode(v => !v); setBulkSel(new Set()); setActiveField(null); setStagedFields({}); }}
+            style={{ flexShrink:0, height:36, padding:'0 14px', borderRadius:20, background:bulkMode?C.gold+'22':C.section, border:`1px solid ${bulkMode?C.gold:C.border}`, color:bulkMode?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>
+            ☑️ {bulkMode ? `${bulkSel.size} selected` : 'Select Players'}
+          </button>
+        )}
+
+        {sortMenuOpen && (
+          <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:'hidden', zIndex:30, boxShadow:'0 8px 24px #000a' }}>
+            {SORT_OPTIONS.map(o => (
+              <button key={o.id} onClick={() => { setSortBy(o.id); setSortMenuOpen(false); }}
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', background:sortBy===o.id?C.gold+'18':'none', border:'none', color:sortBy===o.id?C.gold:C.white, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Field Registry entry point — a plain, always-visible way in,
+          not a warning. Missing profile info isn't a problem needing a
+          red flag; it's just normal roster upkeep, so this doesn't
+          gate on incompleteCount or use alarmed styling. */}
+      {players.length > 0 && (
+        <>
+          <button
+            onClick={() => setFieldRegistryOpen(true)}
+            style={{ width:'100%', height:48, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:14, cursor:'pointer', marginBottom:6 }}
+          >
+            📋 Player Information
+          </button>
+          <div style={{ fontSize:11, color:C.muted, textAlign:'center', marginBottom:12 }}>
+            Fill in furnace, troops, languages, and joiner heroes — for one player or many at once.
+          </div>
+        </>
+      )}
+      {sortBy==='missing' && troopGapCount > 0 && (
+        <button
+          onClick={copyMissingTroops}
+          style={{ width:'100%', height:36, borderRadius:8, background:'none', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:12, cursor:'pointer', marginBottom:12 }}
+        >
+          {troopsCopied ? '✓ Copied' : `📋 Copy missing troop levels (${troopGapCount})`}
+        </button>
+      )}
 
       {rosterView==='list' && (
         <>
-          {/* Ready for SvS summary bar — only show when there are players */}
-          {players.length>0&&(()=>{
-            const avail    = players.filter(p=>p.availability?.present==='available').length;
-            const onDisc   = players.filter(p=>p.availability?.discord==='yes').length;
-            const unknown  = players.filter(p=>!p.availability||p.availability.present==='available'&&p.availability.discord==='unknown').length;
+          <div style={{ position:'relative' }}>
+            <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
+              {['All', ...roles.map(r=>r.name)].map(r => (
+                <button key={r} onClick={() => setFilterRole(r)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===r?C.gold+'22':C.section, border:`1px solid ${filterRole===r?C.gold:C.border}`, color:filterRole===r?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{r}</button>
+              ))}
+              {activeDerivedFilters.map(d => (
+                <button key={d.id} onClick={() => setFilterRole(d.id)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===d.id?C.icy+'22':C.section, border:`1px solid ${filterRole===d.id?C.icy:C.border}`, color:filterRole===d.id?C.icy:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36, flexShrink:0 }}>{d.label}</button>
+              ))}
+            </div>
+            <div style={{ position:'absolute', top:0, right:0, bottom:10, width:32, background:`linear-gradient(to right, transparent, ${C.bg})`, pointerEvents:'none', display:'flex', alignItems:'center', justifyContent:'flex-end' }}>
+              <span style={{ fontSize:14, color:C.muted, paddingRight:2 }}>›</span>
+            </div>
+          </div>
+          {(allTags.length > 0 || noAllianceCount > 0) && (
+            <div style={{ position:'relative' }}>
+              <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4 }}>
+                <button onClick={() => setFilterTag('')} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===''?C.icy+'22':C.section, border:`1px solid ${filterTag===''?C.icy:C.border}`, color:filterTag===''?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>All Alliances</button>
+                {noAllianceCount > 0 && (
+                  <button onClick={() => setFilterTag(filterTag===NO_ALLIANCE?'':NO_ALLIANCE)} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===NO_ALLIANCE?C.red+'22':C.section, border:`1px solid ${filterTag===NO_ALLIANCE?C.red:C.border}`, color:filterTag===NO_ALLIANCE?C.red:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>
+                    🚫 No Alliance ({noAllianceCount})
+                  </button>
+                )}
+                {allTags.map(t => (
+                  <button key={t} onClick={() => setFilterTag(filterTag===t?'':t)} style={{ padding:'5px 12px', borderRadius:20, whiteSpace:'nowrap', background:filterTag===t?C.icy+'22':C.section, border:`1px solid ${filterTag===t?C.icy:C.border}`, color:filterTag===t?C.icy:C.muted, fontWeight:600, fontSize:12, cursor:'pointer', minHeight:30, flexShrink:0 }}>[{t}] ({allianceCounts[t]})</button>
+                ))}
+              </div>
+              <div style={{ position:'absolute', top:0, right:0, bottom:10, width:32, background:`linear-gradient(to right, transparent, ${C.bg})`, pointerEvents:'none', display:'flex', alignItems:'center', justifyContent:'flex-end' }}>
+              <span style={{ fontSize:14, color:C.muted, paddingRight:2 }}>›</span>
+            </div>
+            </div>
+          )}
+          {players.length > 0 && (() => {
+            const activeFilterLabels = [];
+            if (search) activeFilterLabels.push(`"${search}"`);
+            if (filterRole !== 'All') activeFilterLabels.push(derivedMatch ? derivedMatch.label : filterRole);
+            if (filterTag) activeFilterLabels.push(filterTag===NO_ALLIANCE ? '🚫 No Alliance' : `[${filterTag}]`);
+            const hasFilters = activeFilterLabels.length > 0;
             return (
-              <div style={{ background:C.section, borderRadius:12, padding:'12px 16px', marginBottom:12, display:'flex', gap:0 }}>
-                <div style={{ flex:1, textAlign:'center', borderRight:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:20, fontWeight:700, color:C.green }}>{avail}</div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>Available</div>
-                </div>
-                <div style={{ flex:1, textAlign:'center', borderRight:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:20, fontWeight:700, color:C.icy }}>{onDisc}</div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>On Discord</div>
-                </div>
-                <div style={{ flex:1, textAlign:'center' }}>
-                  <div style={{ fontSize:20, fontWeight:700, color:unknown>0?C.gold:C.muted }}>{unknown}</div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>Unconfirmed</div>
-                </div>
+              <div style={{ fontSize:13, color:C.muted, marginBottom:12, display:'flex', alignItems:'center', flexWrap:'wrap', gap:6 }}>
+                <span>{hasFilters ? filteredPlayers.length : `${filteredPlayers.length} of ${players.length}`} player{filteredPlayers.length!==1?'s':''} shown</span>
+                {hasFilters && (
+                  <>
+                    <span style={{ color:C.border }}>·</span>
+                    <span style={{ color:C.icy, fontWeight:600 }}>Filters: {activeFilterLabels.join(' · ')}</span>
+                    <button onClick={() => { setSearch(''); setFilterRole('All'); setFilterTag(''); }}
+                      style={{ fontSize:12, color:C.gold, background:'none', border:'none', cursor:'pointer', fontWeight:700, padding:0, marginLeft:4 }}>
+                      Clear filters
+                    </button>
+                  </>
+                )}
               </div>
             );
           })()}
-          <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:10, marginBottom:4, alignItems:'center' }}>
-            {['All',...roles.map(r=>r.name)].map(r => (
-              <button key={r} onClick={() => setFilterRole(r)} style={{ padding:'7px 14px', borderRadius:20, whiteSpace:'nowrap', background:filterRole===r?C.gold+'22':C.section, border:`1px solid ${filterRole===r?C.gold:C.border}`, color:filterRole===r?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', minHeight:36 }}>{r}</button>
-            ))}
-            <button onClick={() => setRoleManagerOpen(true)} style={{ padding:'0 10px', minHeight:36, borderRadius:20, whiteSpace:'nowrap', background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:13, cursor:'pointer', flexShrink:0 }}>⚙ Roles</button>
-          </div>
-          {players.length > 0 && (
-            <div style={{ fontSize:13, color:C.muted, marginBottom:12 }}>
-              {filteredPlayers.length} of {players.length} player{players.length!==1?'s':''}
-            </div>
-          )}
+          {bulkMode && bulkSel.size > 0 && (() => {
+            const activeFieldDef = FIELD_DEFS.find(f => f.id === activeField);
+            const options = activeFieldDef ? getFieldValues(players, activeFieldDef) : [];
+            const stagedEntries = Object.entries(stagedFields);
+            return (
+              <div style={{ background:C.card, border:`1px solid ${C.gold}44`, borderRadius:12, padding:14, marginBottom:14 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:C.white, marginBottom:10 }}>Assign to {bulkSel.size} selected</div>
+
+                {stagedEntries.length > 0 && (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:10 }}>
+                    {stagedEntries.map(([fid, val]) => {
+                      const f = FIELD_DEFS.find(fd => fd.id === fid);
+                      return (
+                        <span key={fid} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 10px', borderRadius:16, background:C.green+'18', border:`1px solid ${C.green}44`, color:C.green, fontSize:12, fontWeight:600 }}>
+                          {f?.icon} {f?.label}: {val}
+                          <button onClick={() => setStagedFields(prev => { const n = { ...prev }; delete n[fid]; return n; })}
+                            style={{ background:'none', border:'none', color:C.green, cursor:'pointer', fontWeight:700, padding:0, fontSize:13, lineHeight:1 }}>✕</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:activeField?10:0 }}>
+                  {FIELD_DEFS.map(f => {
+                    const staged = stagedFields[f.id] !== undefined;
+                    const open = activeField === f.id;
+                    return (
+                      <button key={f.id} onClick={() => setActiveField(open ? null : f.id)}
+                        style={{ padding:'7px 12px', borderRadius:16, whiteSpace:'nowrap', background:open?C.gold+'22':(staged?C.green+'14':C.section), border:`1px solid ${open?C.gold:(staged?C.green+'66':C.border)}`, color:open?C.gold:(staged?C.green:C.muted), fontWeight:600, fontSize:12, cursor:'pointer', flexShrink:0 }}>
+                        {staged?'✓ ':''}{f.icon} {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {activeFieldDef && (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:12 }}>
+                    {options.length === 0 && <div style={{ fontSize:12, color:C.muted }}>No existing values yet — add one via Field Registry first.</div>}
+                    {options.map(opt => (
+                      <button key={opt} onClick={() => { setStagedFields(prev => ({ ...prev, [activeField]: opt })); setActiveField(null); }}
+                        style={{ padding:'6px 12px', borderRadius:16, background:stagedFields[activeField]===opt?C.gold+'22':C.section, border:`1px solid ${stagedFields[activeField]===opt?C.gold:C.border}`, color:stagedFields[activeField]===opt?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:'pointer' }}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button onClick={applyBulkFields} disabled={stagedEntries.length===0}
+                  style={{ width:'100%', height:44, borderRadius:10, background:stagedEntries.length?C.gold:C.section, color:stagedEntries.length?C.bg:C.muted, fontWeight:700, fontSize:14, border:stagedEntries.length?'none':`1px solid ${C.border}`, cursor:stagedEntries.length?'pointer':'default' }}>
+                  Apply {stagedEntries.length || ''} field{stagedEntries.length!==1?'s':''} to {bulkSel.size} player{bulkSel.size!==1?'s':''}
+                </button>
+              </div>
+            );
+          })()}
           {players.length === 0 && (
             <div style={{ textAlign:'center', padding:'60px 20px' }}>
               <div style={{ fontSize:52, marginBottom:16 }}>👥</div>
               <div style={{ fontSize:18, fontWeight:700, color:C.white, marginBottom:8 }}>No players yet</div>
-              <div style={{ fontSize:15, color:C.muted, marginBottom:28 }}>Batch add your alliance or add one by one</div>
+              <div style={{ fontSize:15, color:C.muted, marginBottom:28 }}>Bulk add names, then fill in details via Field Registry — or add one by one</div>
               <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
-                <button onClick={() => setBatchOpen(true)} style={{ height:52, padding:'0 24px', borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>⚡ Batch Add</button>
+                <button onClick={() => setBulkAddOpen(true)} style={{ height:52, padding:'0 24px', borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>➕ Bulk Add</button>
                 <button onClick={openAdd} style={{ height:52, padding:'0 24px', borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:15, cursor:'pointer' }}>＋ Add One</button>
               </div>
             </div>
@@ -100,22 +400,59 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
             <div style={{ textAlign:'center', padding:'40px 20px', color:C.muted }}>No results for "{search||filterRole}"</div>
           )}
           {filteredPlayers.map(p => (
-            <PlayerCard key={p.id} player={p} roles={roles} onClick={() => openProfile(p)} onDelete={onDeletePlayer} events={events}/>
+            <PlayerCard
+              key={p.id}
+              player={p}
+              roles={roles}
+              onClick={() => { if (bulkMode) toggleBulkSel(p.id); else openProfile(p); }}
+              onDelete={onDeletePlayer}
+              events={events}
+              missingCount={sortBy==='missing' ? missingCount(p) : 0}
+              troopPower={getCurrentTroopPower(p, events)}
+              onToggleRallyLead={() => toggleRallyLead(p)}
+              onOpenFields={() => setFieldRegistryOpen(true)}
+              bulkMode={bulkMode}
+              isSelected={bulkSel.has(p.id)}
+            />
           ))}
         </>
       )}
 
       {rosterView==='roles' && (() => {
-        const avail  = players.filter(p => p.availability?.present==='available');
-        const byRole = roles.map(roleDef => ({ roleDef, members:avail.filter(p => p.roles?.includes(roleDef.name)) })).filter(g => g.members.length > 0);
+        const byRole = roles.map(roleDef => ({ roleDef, members:players.filter(p => p.roles?.includes(roleDef.name)) })).filter(g => g.members.length > 0);
+        const joiners = players.filter(p => !(p.roles||[]).length);
+        const rallyLeadCount = players.filter(p => p.roles?.includes('Rally Lead')).length;
         return (
           <div>
             <div style={{ background:C.section, borderRadius:12, padding:16, marginBottom:16 }}>
-              <div style={{ fontSize:13, color:C.icy, marginBottom:4 }}>Available for SvS</div>
+              <div style={{ fontSize:13, color:C.icy, marginBottom:4 }}>Rally Leads assigned</div>
               <div style={{ fontSize:28, fontWeight:700, color:C.white }}>
-                {avail.length} <span style={{ fontSize:16, color:C.muted }}>of {players.length}</span>
+                {rallyLeadCount} <span style={{ fontSize:16, color:C.muted }}>of {players.length}</span>
               </div>
+              <div style={{ fontSize:12, color:C.muted, marginTop:4 }}>Everyone else is available as a joiner by default — no role needed.</div>
             </div>
+            {joiners.length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
+                  🎯 Joiners · {joiners.length}
+                </div>
+                {joiners.map(m => (
+                  <div key={m.id} onClick={() => openProfile(m)} style={{ background:C.card, borderRadius:10, padding:'10px 14px', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
+                    <div>
+                      <div style={{ fontWeight:700, color:C.white, fontSize:15 }}>{m.username||m.alias||'?'}</div>
+                      <div style={{ fontSize:12, color:C.icy }}>
+                        {[m.furnaceLevel&&`${m.furnaceLevel}`, m.allianceTag&&`[${m.allianceTag}]`].filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:4 }}>
+                      {[m.troops?.infantry, m.troops?.lancer, m.troops?.marksman].map((t,i) => (
+                        <span key={i} style={{ fontSize:11, padding:'2px 6px', borderRadius:6, background:[C.inf,C.lan,C.mar][i]+'22', color:[C.inf,C.lan,C.mar][i] }}>{t||'?'}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {byRole.map(({ roleDef, members }) => (
               <div key={roleDef.id} style={{ marginBottom:16 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:roleDef.color, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
@@ -127,8 +464,6 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
                       <div style={{ fontWeight:700, color:C.white, fontSize:15 }}>{m.username||m.alias||'?'}</div>
                       <div style={{ fontSize:12, color:C.icy }}>
                         {[m.furnaceLevel&&`${m.furnaceLevel}`, m.allianceTag&&`[${m.allianceTag}]`].filter(Boolean).join(' · ')}
-                        {m.availability?.timing==='late'?' · 🕐':''}
-                        {m.availability?.discord==='yes'?' · 🎙️':''}
                       </div>
                     </div>
                     <div style={{ display:'flex', gap:4 }}>
@@ -152,6 +487,14 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         onClose={() => setProfileOpen(false)}
         onEdit={() => { setProfileOpen(false); openEdit(viewingPlayer); }}
         events={events}
+        onOpenLeaderProfile={() => setLeaderProfileOpen(true)}
+        onSave={updated => { onSavePlayer(updated); setViewingPlayer(updated); }}
+      />
+      <RallyLeaderProfileSheet
+        player={viewingPlayer}
+        open={leaderProfileOpen}
+        onClose={() => setLeaderProfileOpen(false)}
+        onSave={updated => { onSavePlayer(updated); setViewingPlayer(updated); }}
       />
       <PlayerSheet
         open={sheetOpen}
@@ -160,15 +503,9 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         onClose={() => { setSheetOpen(false); setEditingPlayer(null); }}
         onSave={onSavePlayer}
         existingTags={[...new Set(players.map(p=>p.allianceTag).filter(Boolean))]}
-        existingEvents={events.filter(e=>e.status!=='completed').slice(0,8)}
+        existingPlayers={players}
+        onOpenExisting={openProfile}
         onGoToIntel={onGoToIntel}
-      />
-      <BatchAddSheet
-        open={batchOpen}
-        onClose={() => setBatchOpen(false)}
-        members={players}
-        onAddNew={onAddPlayers}
-        onUpdateExisting={onUpdatePlayers}
       />
       <RoleManagerSheet
         open={roleManagerOpen}
@@ -178,6 +515,50 @@ export function RosterTab({ players, events, roles, onSaveCustomRoles, onSavePla
         players={players}
         onUpdatePlayers={onUpdatePlayers}
       />
+
+      {helpOpen && (
+        <div onClick={() => setHelpOpen(false)} style={{ position:'fixed', inset:0, background:'#000c', zIndex:700, display:'flex', alignItems:'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background:C.card, borderRadius:'20px 20px 0 0', width:'100%', maxHeight:'80vh', overflowY:'auto', padding:'16px 20px 32px' }}>
+            <div style={{ width:40, height:4, borderRadius:2, background:C.border, margin:'0 auto 16px' }} />
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+              <div style={{ fontSize:18, fontWeight:700, color:C.white }}>How this page works</div>
+              <button onClick={() => setHelpOpen(false)} style={{ background:'none', border:'none', color:C.muted, fontSize:28, cursor:'pointer', lineHeight:1, padding:'0 4px' }}>✕</button>
+            </div>
+            {HELP_ITEMS.map(h => (
+              <div key={h.title} style={{ marginBottom:16 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:C.gold, marginBottom:4 }}>{h.title}</div>
+                <div style={{ fontSize:13, color:C.icy, lineHeight:1.5 }}>{h.body}</div>
+              </div>
+            ))}
+            <button onClick={() => setHelpOpen(false)} style={{ width:'100%', height:48, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer', marginTop:4 }}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {bulkAddOpen && (
+        <div style={{ position:'fixed', inset:0, zIndex:600 }}>
+          <BulkNameAdd
+            onAddPlayers={onAddPlayers}
+            onUpdatePlayers={onUpdatePlayers}
+            onClose={() => setBulkAddOpen(false)}
+            showToast={showToast}
+            onGoToFieldRegistry={() => { setBulkAddOpen(false); setFieldRegistryOpen(true); }}
+            existingPlayers={players}
+          />
+        </div>
+      )}
+
+      {fieldRegistryOpen && (
+        <div style={{ position:'fixed', inset:0, zIndex:600, background:C.bg }}>
+          <FieldRegistry
+            players={players}
+            onUpdatePlayer={onSavePlayer}
+            onClose={() => setFieldRegistryOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

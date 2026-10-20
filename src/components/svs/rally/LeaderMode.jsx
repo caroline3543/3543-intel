@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { CLOSED } from '../../../services/battleOperationsService.js';
 import { C } from '../../../utils/constants.js';
 import { vibe } from '../../../utils/vibe.js';
 import {
@@ -35,12 +36,12 @@ export function LeaderMode({ timer, allTimers = [], onClose }) {
 
   const secsToOpen   = openRallyAtUtc != null ? openRallyAtUtc - now : null;
   const secsToImpact = impactAtUtc    != null ? impactAtUtc    - now : null;
-  const stage      = getTimerStage(secsToOpen, secsToImpact);
+  const stage = timer.review||timer.captureHold||timer.paused?{stage:'hold',label:'Hold · review sequence',color:C.gold}:CLOSED.includes(timer.status)?{stage:'closed',label:timer.status,color:C.icy}:getTimerStage(secsToOpen,secsToImpact);
   const color      = RALLY_COLORS[timer.rallyType] || C.gold;
-  const isRallyOpen  = stage?.stage === 'filling' || stage?.stage === 'impact';
+  const isRallyOpen = timer.actualOpenAtUtc!=null||['Opened','Reported','Confirmed'].includes(timer.status);
   const bigCountdown = isRallyOpen ? secsToImpact : (secsToOpen ?? secsToImpact);
   const bigLabel     = isRallyOpen
-    ? (stage?.stage === 'impact' ? '✓ Impact' : 'Impact in')
+    ? (stage?.stage === 'impact' ? 'Projected impact passed' : 'Projected impact in')
     : (openRallyAtUtc != null ? 'Open rally in' : 'Countdown');
 
   // Vibrate on stage transitions
@@ -88,7 +89,7 @@ export function LeaderMode({ timer, allTimers = [], onClose }) {
       {stage && <div style={{ fontSize:stage.stage==='open_now'?26:18, fontWeight:800, color:stage.color, marginBottom:16, textAlign:'center' }}>{stage.label}</div>}
 
       <div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>{bigLabel}</div>
-      <div style={{ fontSize:80, fontWeight:900, color:stage?stage.color:color, fontVariantNumeric:'tabular-nums', letterSpacing:'0.04em', lineHeight:1, marginBottom:20, textAlign:'center' }}>
+      <div style={{ fontSize:48, fontWeight:900, color:stage?stage.color:color, fontVariantNumeric:'tabular-nums', letterSpacing:'0.04em', lineHeight:1, marginBottom:20, textAlign:'center' }}>
         {bigCountdown != null ? secsToHHMMSS(bigCountdown) : '--:--:--'}
       </div>
 
@@ -96,7 +97,7 @@ export function LeaderMode({ timer, allTimers = [], onClose }) {
         {openRallyAtUtc != null && (
           <div style={{ textAlign:'center' }}>
             <div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>Open rally</div>
-            <div style={{ fontSize:18, fontWeight:700, color:isRallyOpen?C.green:color }}>{isRallyOpen ? '✓ Opened' : fmtSend(openRallyAtUtc) + ' UTC'}</div>
+            <div style={{ fontSize:18, fontWeight:700, color:isRallyOpen?C.green:color }}>{timer.actualOpenAtUtc!=null ? 'Confirmed '+fmtSend(timer.actualOpenAtUtc) : fmtSend(openRallyAtUtc) + ' UTC'}</div>
           </div>
         )}
         {marchesAtUtc != null && (
@@ -108,7 +109,7 @@ export function LeaderMode({ timer, allTimers = [], onClose }) {
         {impactAtUtc != null && (
           <div style={{ textAlign:'center' }}>
             <div style={{ fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>Impact</div>
-            <div style={{ fontSize:18, fontWeight:700, color:stage?.stage==='impact'?C.green:color }}>{stage?.stage==='impact'?'✓ ':''}{fmtSend(impactAtUtc)} UTC</div>
+            <div style={{ fontSize:18, fontWeight:700, color:stage?.stage==='impact'?C.green:color }}>{timer.actualImpactAtUtc!=null?'Confirmed ':'Projected '}{fmtSend(impactAtUtc)} UTC</div>
           </div>
         )}
       </div>

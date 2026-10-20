@@ -1,3 +1,5 @@
+import { useBattlePool } from '../../hooks/useBattlePool.js';
+import { mergePoolPlayers } from '../../services/battlePoolService.js';
 import { useState } from 'react';
 import { LiveRallyRoom } from './LiveRallyRoom.jsx';
 import { PlanList }   from './battle/PlanList.jsx';
@@ -6,16 +8,20 @@ import { PlanDetail } from './battle/PlanDetail.jsx';
 // ── BattleTab ──────────────────────────────────────────────────
 // Thin coordinator. Owns the view stack (plans → detail → liveRoom)
 // and the four plan-level mutations (create / update / delete / duplicate).
-export function BattleTab({ plans, players, events, onSave, onDelete, showToast, onGoToMembers, settings }) {
+export function BattleTab({ plans, players, events, onSave, onDelete, showToast, onGoToMembers, settings, checklist, onSaveChecklist }) {
   const [view, setView]                 = useState('plans');
   const [activePlanId, setActivePlanId] = useState(null);
   const [liveRoomPlan, setLiveRoomPlan] = useState(null);
 
   const activePlan   = plans.find(p => p.id === activePlanId);
+  const currentPlan = view==='liveRoom'?(plans.find(p=>p.id===liveRoomPlan?.id)||liveRoomPlan):activePlan;
+  const poolController=useBattlePool(currentPlan?.eventId);
+  const battlePlayers=mergePoolPlayers(players,poolController.pool);
+  const poolEvent=events.find(e=>e.id===currentPlan?.eventId);
   const existingTags = [...new Set(players.map(p => p.allianceTag).filter(Boolean))];
 
   function createPlan(plan)    { onSave([...plans, plan]); setActivePlanId(plan.id); showToast('Plan created ✓'); }
-  function updatePlan(updated) { onSave(plans.map(p => p.id === updated.id ? updated : p)); }
+  function updatePlan(updated) { onSave(plans.map(p => p.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : p)); }
 
   function deletePlan(id) {
     onDelete(id);
@@ -30,6 +36,7 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
       name: `${plan.name || 'Plan'} (copy)`,
       status: 'draft',
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     onSave([...plans, copy]);
   }
@@ -37,24 +44,30 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
   function handleGoLive(plan) { setLiveRoomPlan(plan); setView('liveRoom'); }
 
   if (view === 'liveRoom') {
-    return <LiveRallyRoom onBack={() => setView('plans')} players={players} planData={liveRoomPlan}/>;
+    return <LiveRallyRoom onBack={() => setView('plans')} players={battlePlayers} planData={currentPlan} poolController={poolController} poolEvent={poolEvent}/>;
   }
 
   if (activePlan) {
     return (
       <PlanDetail
         plan={activePlan}
-        players={players}
+        plans={plans}
+        players={battlePlayers}
+        poolController={poolController}
+        events={events}
         onUpdate={updatePlan}
         onBack={() => setActivePlanId(null)}
         onGoLive={handleGoLive}
         onGoToMembers={onGoToMembers}
-        maxGeneration={settings?.maxGeneration || 6}
+        selectedGenerations={settings?.selectedGenerations || []}
+        checklist={checklist}
+        onSaveChecklist={onSaveChecklist}
       />
     );
   }
 
   return (
+    <>
     <PlanList
       plans={plans}
       onSelectPlan={setActivePlanId}
@@ -65,5 +78,6 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
       existingTags={existingTags}
       showToast={showToast}
     />
+    </>
   );
 }

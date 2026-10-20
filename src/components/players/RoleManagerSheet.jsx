@@ -40,7 +40,7 @@ export function RoleManagerSheet({ open, onClose, roles, onSaveCustomRoles, play
   function commitRename(role) {
     const trimmed = (drafts[role.id] || '').trim();
     if (!trimmed || trimmed === role.name) { setDrafts(prev => ({ ...prev, [role.id]: role.name })); return; }
-    onSaveCustomRoles(customRoles.map(r => r.id === role.id ? { ...r, name: trimmed } : r));
+    onSaveCustomRoles(customRoles.map(r => r.id === role.id ? { ...r, name: trimmed, updatedAt: new Date().toISOString() } : r));
     const affected = players.filter(p => p.roles?.includes(role.name));
     if (affected.length) {
       onUpdatePlayers(affected.map(p => ({ ...p, roles: p.roles.map(r => r === role.name ? trimmed : r) })));

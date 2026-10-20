@@ -12,7 +12,8 @@
 
 export function parseMarchInput(raw) {
   if (!raw && raw !== 0) return null;
-  const str = String(raw).replace(/[^0-9]/g, '');
+  const str = String(raw).trim();
+  if (!/^\d+(:\d{1,2})?$/.test(str)) return null;
   if (!str) return null;
 
   let mins, secs;

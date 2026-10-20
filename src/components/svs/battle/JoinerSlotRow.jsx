@@ -1,79 +1,162 @@
 import { useState } from 'react';
+import { eligibleTypes } from '../../../services/battlePoolService.js';
 import { C } from '../../../utils/constants.js';
-import { FC_ORDER } from './battleConstants.js';
+import { meetsTroopReqs, playerCanFillSlot, resolveHero, CUSTOM_HERO_OPTIONS, timingTier as sharedTimingTier } from './battleConstants.js';
+import { calcMetrics, isMvpJoiner } from '../../../data/metrics.js';
 
 // ── JoinerSlotRow ──────────────────────────────────────────────
 // One priority-joiner row inside a rally slot.
+//
+// HERO-FIRST flow: the required hero is fixed first (either preset by
+// FormationPicker's auto-fill, or picked here manually), and only
+// members who can actually fulfill that hero are ever shown —
+// eligible = owns the hero at Skill 5, meets the rally's troop-tier
+// minimums, and isn't already assigned elsewhere in this plan (the
+// Rally Leader is excluded upstream in RallySlotCard, which never
+// includes them in the `players` array passed down here at all).
+//
+// NOTE — the `players` array arrives already attendance-filtered:
+// RallySlotCard gates it on `linkedEvent` via `isAttending()` before
+// this component ever sees it, so nothing here re-checks whether
+// someone is coming to the event at all. (An earlier version of this
+// comment said Battle Plans weren't linked to a specific Event —
+// that's no longer true, `plan.eventId`/`linkedEvent` exist now;
+// corrected here.)
+//
+// Ranking beyond raw eligibility, most-preferred first:
+//   1. Timing tier, from this player's RSVP on `linkedEvent` —
+//      full-window/no flags, then partial-window (willBeLate OR
+//      willLeaveEarly), then `intermittent` ("pops in randomly")
+//      LAST — deliberately checked before MVP/reliability below it,
+//      so an unpredictable joiner never outranks a dependable one for
+//      a specific priority slot, no matter how good their event-wide
+//      numbers are. Nobody is ever removed from the list for this,
+//      only sorted down and labelled — same non-exclusionary approach
+//      reliabilityScore already used.
+//   2. MVP Joiner status (ever joined Discord voice — see metrics.js)
+//   3. `reliabilityScore` (real historical attendance rate)
+//   4. Name
+//
 // Props:
-//   slot            – joiner slot object
+//   slot            – joiner slot object { heroName, playerId, ... }
 //   index           – 0-based position
-//   players         – full roster array
+//   players         – roster array, already leader- and attendance-
+//                     filtered upstream
+//   events          – full events array (for reliability/MVP ranking)
+//   linkedEvent     – the Event this plan is linked to — its
+//                     snapshots carry each attendee's RSVP timing
+//                     (willBeLate / willLeaveEarly / intermittent)
+//   planPhase       – 'start' | 'midway' (from the rally slot) — which
+//                     half of the timing tiers below ranks higher
 //   onUpdate        – (updatedSlot) => void
-//   allAssignedIds  – Set of playerIds already assigned in this rally slot
+//   allAssignedIds  – Set of playerIds already assigned elsewhere in this plan
 //   troopReqs       – { infantry, lancer, marksman } minimum FC strings
-export function JoinerSlotRow({ slot, index, players, onUpdate, allAssignedIds, troopReqs = {} }) {
-  const [open, setOpen] = useState(false);
-
-  const player        = players.find(p => p.id === slot.playerId);
-  const playerJoiners = player
-    ? (player.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero)
-    : [];
+export function JoinerSlotRow({ slot, index, players, events = [], linkedEvent = null, planPhase = 'start', onUpdate, allAssignedIds, troopReqs = {}, rallySlot }) {
+  const [open, setOpen]             = useState(false);
+  const [pickingHero, setPickingHero] = useState(false);
 
   const isComplete = !!(slot.playerName && slot.heroName);
   const isUnavail  = slot.confirmed === false && slot.playerId;
+  const hasReqs     = Object.values(troopReqs || {}).some(Boolean);
 
-  function meetsReqs(p) {
-    const reqs = troopReqs || {};
-    for (const [key, minFC] of Object.entries(reqs)) {
-      if (!minFC) continue;
-      const playerTier = p.troops?.[key];
-      if (!playerTier) return { ok: false, reason: `Needs ${minFC}+ ${key}` };
-      if (FC_ORDER.indexOf(playerTier) < FC_ORDER.indexOf(minFC)) {
-        return { ok: false, reason: `${key} ${playerTier} < ${minFC} required` };
-      }
+  // Ranking logic itself now lives in battleConstants.js's timingTier
+  // (shared with PlanDetail.jsx's autoFillPlan, which ranks rally
+  // LEADER candidates by the same tiers) — this wrapper just supplies
+  // this row's linkedEvent/planPhase closure.
+  function timingTier(p) { return sharedTimingTier(p, linkedEvent, planPhase); }
+
+  function timingLabel(tier) {
+    switch (tier) {
+      case 5: return { text:'🎲 intermittent',          color:C.muted };
+      case 4: return { text:'❓ unsure',                 color:C.muted };
+      case 3: return { text:'⏰ late + leaves early',    color:C.gold  };
+      case 2: return { text:'⏰ arriving late',          color:C.gold  };
+      case 1: return { text:'🚪 leaving early',          color:C.gold  };
+      default: return null;
     }
-    return { ok: true, reason: null };
   }
 
-  const hasReqs    = Object.values(troopReqs || {}).some(Boolean);
-  const eligible   = players.filter(p => !hasReqs || meetsReqs(p).ok);
-  const ineligible = hasReqs ? players.filter(p => !meetsReqs(p).ok) : [];
+  // Eligible members for a given required hero — hard-filtered, then
+  // ranked by: timing tier first (see timingTier above), then MVP
+  // Joiner status (ever joined Discord voice — see metrics.js), then
+  // historical reliability, then name.
+  function eligibleFor(hero) {
+    return players
+      .filter(p => !allAssignedIds.has(p.id) || p.id === slot.playerId)
+      .filter(p => playerCanFillSlot(p, hero))
+      .filter(p => rallySlot ? eligibleTypes(p,rallySlot).length>0 : !hasReqs || meetsTroopReqs(p, troopReqs).ok)
+      .sort((a, b) => {
+        const tA = timingTier(a), tB = timingTier(b);
+        if (tA !== tB) return tA - tB;
+        const mvpA = isMvpJoiner(a, events), mvpB = isMvpJoiner(b, events);
+        if (mvpA !== mvpB) return mvpA ? -1 : 1;
+        const ra = calcMetrics(a, events)?.reliabilityScore || 0;
+        const rb = calcMetrics(b, events)?.reliabilityScore || 0;
+        if (rb !== ra) return rb - ra;
+        return (a.username || a.alias || '').localeCompare(b.username || b.alias || '');
+      });
+  }
 
-  const withJoiners    = eligible.filter(p => (p.joinerHeroes || []).some(jh => jh.skillLevel >= 5));
-  const withoutJoiners = eligible.filter(p => !(p.joinerHeroes || []).some(jh => jh.skillLevel >= 5));
+  const eligible = slot.heroName ? eligibleFor(slot.heroName) : [];
 
+  // Alternate heroes accepted for whatever's currently required — e.g.
+  // "Jessie" also accepts Jasser/Jeronimo per the community spreadsheet
+  // substitution notes. Surfaced as quick-tap swaps rather than making
+  // the officer hunt through the full hero list for a known substitute,
+  // even when the current hero came from a Gen-suggested formation.
+  const currentAlternatives = slot.heroName ? (resolveHero(slot.heroName)?.alternatives || []) : [];
+
+  function setHero(hero) {
+    // Changing the required hero can invalidate whoever was previously
+    // assigned (they may not own the new hero) — clear the member so
+    // the eligible list is re-derived cleanly for the new requirement.
+    onUpdate({ ...slot, heroName: hero, playerId: null, playerName: '', confirmed: true, replacedBy: null });
+    setPickingHero(false);
+  }
+
+  function assignMember(p) {
+    onUpdate({ ...slot, playerId: p.id, playerName: p.username || p.alias || '', confirmed: true, replacedBy: null });
+  }
+
+  function clearMember() {
+    onUpdate({ ...slot, playerId: null, playerName: '', confirmed: true, replacedBy: null });
+  }
+
+  // Replacement suggestions when marked unavailable mid-battle — same
+  // eligibility rules as the main picker, just excluding whoever's
+  // currently (unavailable) assigned.
   const suggestions = isUnavail && slot.heroName
-    ? eligible
-        .filter(p => p.id !== slot.playerId)
-        .filter(p => !allAssignedIds.has(p.id))
-        .filter(p => p.availability?.present !== 'unavailable')
-        .filter(p => (p.joinerHeroes || []).some(jh => jh.hero === slot.heroName && jh.skillLevel >= 5))
-        .slice(0, 3)
+    ? eligibleFor(slot.heroName).filter(p => p.id !== slot.playerId).slice(0, 3)
     : [];
 
   return (
     <div style={{ background: C.bg, borderRadius: 10, marginBottom: 6, border: `1px solid ${isComplete ? C.green + '33' : C.border + '44'}` }}>
-      {/* Row header */}
+      {/* Row header — required hero first, then who's fulfilling it */}
       <div onClick={() => setOpen(!open)} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', cursor:'pointer' }}>
         <div style={{ width:22, height:22, borderRadius:'50%', background: isComplete ? C.green+'33' : C.border, border: `1.5px solid ${isComplete ? C.green : C.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color: isComplete ? C.green : C.muted, flexShrink:0 }}>
           {isComplete ? '✓' : index + 1}
         </div>
 
         <div style={{ flex:1, minWidth:0 }}>
-          {slot.playerName ? (
+          {slot.heroName ? (
             <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-              <span style={{ fontSize:14, fontWeight:700, color: isUnavail ? C.muted : C.white, textDecoration: isUnavail ? 'line-through' : 'none' }}>
-                {slot.replacedBy ? slot.replacedBy.playerName : slot.playerName}
-              </span>
-              {slot.heroName && <span style={{ fontSize:12, color:C.gold, fontWeight:600 }}>→ {slot.replacedBy?.heroName || slot.heroName}</span>}
-              {isUnavail && <span style={{ fontSize:11, color:C.red, fontWeight:600 }}>Unavailable</span>}
-              {slot.replacedBy && <span style={{ fontSize:11, color:C.green }}>← sub</span>}
+              <span style={{ fontSize:14, fontWeight:700, color:C.gold }}>{slot.heroName}</span>
+              <span style={{ fontSize:13, color:C.muted }}>→</span>
+              {slot.playerName ? (
+                <>
+                  <span style={{ fontSize:14, fontWeight:700, color: isUnavail ? C.muted : C.white, textDecoration: isUnavail ? 'line-through' : 'none' }}>
+                    {slot.replacedBy ? slot.replacedBy.playerName : slot.playerName}
+                  </span>
+                  <span style={{ fontSize:13, color:C.green }}>✓</span>
+                  {isUnavail && <span style={{ fontSize:11, color:C.red, fontWeight:600 }}>Unavailable</span>}
+                  {slot.replacedBy && <span style={{ fontSize:11, color:C.green }}>← sub</span>}
+                </>
+              ) : (
+                <span style={{ fontSize:13, color:C.muted }}>Select member</span>
+              )}
             </div>
           ) : (
-            <span style={{ fontSize:14, color:C.muted }}>Assign member {index + 1}</span>
-          )}
-          {slot.playerId && playerJoiners.length === 0 && (
-            <div style={{ fontSize:11, color:C.gold, marginTop:2 }}>⚠ No joiner heroes recorded — add in 🦸 Joiner Registry</div>
+            <span style={{ fontSize:14, color:C.muted }}>Priority joiner {index + 1} — set required hero</span>
           )}
         </div>
         <span style={{ color:C.muted, fontSize:13 }}>{open ? '▲' : '▼'}</span>
@@ -82,106 +165,77 @@ export function JoinerSlotRow({ slot, index, players, onUpdate, allAssignedIds, 
       {open && (
         <div style={{ padding:'0 12px 12px' }}>
 
-          {/* Member picker */}
+          {/* Required hero */}
           <div style={{ marginBottom:10 }}>
-            <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:6 }}>
-              Member
-              {hasReqs && (
-                <span style={{ fontSize:10, color:C.gold, fontWeight:400, marginLeft:8 }}>
-                  {eligible.length} eligible · {ineligible.length} below troop tier
-                </span>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em' }}>Required hero</label>
+              {slot.heroName && (
+                <button onClick={() => setPickingHero(!pickingHero)} style={{ background:'none', border:'none', color:C.gold, fontSize:11, fontWeight:600, cursor:'pointer', padding:0 }}>
+                  {pickingHero ? 'Cancel' : 'Change'}
+                </button>
               )}
-            </label>
-            {players.length === 0 ? (
-              <div style={{ fontSize:13, color:C.muted, padding:'8px 0' }}>No members in roster</div>
-            ) : (
-              <div style={{ maxHeight:160, overflowY:'auto' }}>
-                {/* Eligible with heroes */}
-                {withJoiners.length > 0 && (
+            </div>
+            {(!slot.heroName || pickingHero) && (
+              <div>
+                {pickingHero && currentAlternatives.length > 0 && (
                   <div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:10, color:C.gold, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>Has joiner heroes</div>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                      {withJoiners.map(p => {
-                        const sel     = slot.playerId === p.id;
-                        const already = allAssignedIds.has(p.id) && !sel;
-                        return (
-                          <button key={p.id} onClick={() => !already && onUpdate({ ...slot, playerId:p.id, playerName:p.username||p.alias||'', heroName:'', confirmed:true, replacedBy:null })}
-                            style={{ padding:'5px 10px', borderRadius:14, border:`1px solid ${sel?C.gold:C.border}`, background:sel?C.gold+'22':already?C.border+'11':C.section, color:sel?C.gold:already?C.muted:C.icy, fontWeight:600, fontSize:12, cursor:already?'default':'pointer', opacity:already?0.5:1 }}>
-                            {p.username || p.alias}
-                            <span style={{ fontSize:10, color:sel?C.gold:C.muted }}> ·{(p.joinerHeroes||[]).filter(jh=>jh.skillLevel>=5).length}🦸</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {/* Eligible without heroes */}
-                {withoutJoiners.length > 0 && (
-                  <div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:10, color:C.muted, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>No heroes recorded</div>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                      {withoutJoiners.map(p => {
-                        const sel     = slot.playerId === p.id;
-                        const already = allAssignedIds.has(p.id) && !sel;
-                        return (
-                          <button key={p.id} onClick={() => !already && onUpdate({ ...slot, playerId:p.id, playerName:p.username||p.alias||'', heroName:'', confirmed:true, replacedBy:null })}
-                            style={{ padding:'5px 10px', borderRadius:14, border:`1px solid ${sel?C.gold:C.border}`, background:sel?C.gold+'22':C.section, color:sel?C.gold:C.muted, fontWeight:600, fontSize:12, cursor:already?'default':'pointer', opacity:already?0.5:1 }}>
-                            {p.username || p.alias}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {/* Ineligible — below troop tier */}
-                {ineligible.length > 0 && (
-                  <div>
-                    <div style={{ fontSize:10, color:C.red, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>
-                      ✗ Below troop tier requirement
+                    <div style={{ fontSize:10, color:C.gold, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>
+                      Alternates for {slot.heroName}
                     </div>
                     <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                      {ineligible.map(p => {
-                        const reason = meetsReqs(p).reason;
-                        return (
-                          <div key={p.id} title={reason} style={{ padding:'5px 10px', borderRadius:14, border:`1px solid ${C.red}33`, background:C.red+'0a', color:C.muted, fontSize:12, opacity:0.6, cursor:'not-allowed', display:'flex', alignItems:'center', gap:4 }}>
-                            <span style={{ fontSize:10, color:C.red }}>✗</span>
-                            {p.username || p.alias}
-                            <span style={{ fontSize:10, color:C.red+88 }}>{reason}</span>
-                          </div>
-                        );
-                      })}
+                      {currentAlternatives.map(alt => (
+                        <button key={alt} onClick={() => setHero(alt)}
+                          style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${C.gold}`, background:C.gold+'18', color:C.gold, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                          ⇄ {alt}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
-                {eligible.length === 0 && hasReqs && (
-                  <div style={{ fontSize:13, color:C.red, padding:'8px 0', textAlign:'center' }}>
-                    ⚠ No members meet the troop tier requirements for this rally.
-                  </div>
-                )}
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {CUSTOM_HERO_OPTIONS.map(hero => (
+                    <button key={hero} onClick={() => setHero(hero)}
+                      style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${slot.heroName===hero?C.gold:C.border}`, background:slot.heroName===hero?C.gold+'22':C.section, color:slot.heroName===hero?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                      {hero}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Hero picker */}
-          {slot.playerId && playerJoiners.length > 0 && (
+          {/* Eligible member list — only once a hero requirement exists */}
+          {slot.heroName && !pickingHero && (
             <div style={{ marginBottom:10 }}>
-              <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:6 }}>Hero to bring</label>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                {playerJoiners.map(hero => {
-                  const sel = slot.heroName === hero;
-                  return (
-                    <button key={hero} onClick={() => onUpdate({ ...slot, heroName:hero })}
-                      style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${sel?C.gold:C.border}`, background:sel?C.gold+'22':C.section, color:sel?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer' }}>
-                      ✓ {hero}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {slot.playerId && playerJoiners.length === 0 && (
-            <div style={{ background:C.section, borderRadius:8, padding:'8px 12px', marginBottom:10, fontSize:12, color:C.muted }}>
-              No Skill 5 joiner heroes for this member. Add them in the 🦸 Joiner Registry (Intel tab).
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', display:'block', marginBottom:6 }}>
+                Eligible attendees
+                <span style={{ fontSize:10, color:C.muted, fontWeight:400, marginLeft:8 }}>{eligible.length} eligible</span>
+              </label>
+
+              {eligible.length === 0 ? (
+                <div style={{ background:C.red+'0a', border:`1px solid ${C.red}33`, borderRadius:8, padding:12 }}>
+                  <div style={{ fontSize:13, color:C.red, fontWeight:700, marginBottom:6 }}>⚠ No eligible attendees</div>
+                  <div style={{ fontSize:12, color:C.muted }}>Required hero: <span style={{ color:C.white }}>{slot.heroName}</span></div>
+                  {hasReqs && <div style={{ fontSize:12, color:C.muted }}>Minimum troop tier requirements apply</div>}
+                  <div style={{ fontSize:12, color:C.muted }}>Eligible attendees: 0</div>
+                </div>
+              ) : (
+                  <div style={{ maxHeight:160, overflowY:'auto', display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {eligible.map(p => {
+                    const sel = slot.playerId === p.id;
+                    const mvp = isMvpJoiner(p, events);
+                    const tier = timingTier(p);
+                    const tag  = timingLabel(tier);
+                    return (
+                      <button key={p.id} onClick={() => assignMember(p)}
+                        style={{ padding:'6px 12px', borderRadius:14, border:`1px solid ${sel?C.gold:mvp?C.green+'88':C.border}`, background:sel?C.gold+'22':C.section, color:sel?C.gold:C.icy, fontWeight:600, fontSize:13, cursor:'pointer', opacity: tier===5 ? 0.65 : 1 }}>
+                        {sel ? '✓ ' : ''}{mvp && <span style={{ color:C.green }}>🎙️MVP </span>}{p.username || p.alias}{p.furnaceLevel ? ` · ${p.furnaceLevel}` : ''}
+                        {tag && <span style={{ color:tag.color, marginLeft:5, fontWeight:400 }}>{tag.text}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -192,7 +246,7 @@ export function JoinerSlotRow({ slot, index, players, onUpdate, allAssignedIds, 
                 style={{ flex:1, height:36, borderRadius:8, border:`1px solid ${slot.confirmed===false?C.green:C.red}44`, background:slot.confirmed===false?C.green+'18':C.red+'18', color:slot.confirmed===false?C.green:C.red, fontWeight:600, fontSize:12, cursor:'pointer' }}>
                 {slot.confirmed === false ? '✓ Mark available' : '⚠ Mark unavailable'}
               </button>
-              <button onClick={() => onUpdate({ ...slot, playerId:null, playerName:'', heroName:'', confirmed:true, replacedBy:null })}
+              <button onClick={clearMember}
                 style={{ height:36, padding:'0 12px', borderRadius:8, border:`1px solid ${C.border}`, background:'none', color:C.muted, fontSize:12, cursor:'pointer' }}>
                 Clear
               </button>

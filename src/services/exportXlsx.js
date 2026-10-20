@@ -8,13 +8,15 @@
  * Export types:
  *   - Full roster
  *   - Event attendance (+ joiner coverage for SvS/Castle events)
- *   - Prep scores
+ *   - Battle plan records
  *
  * Called from DataPanel via exportWorkbook(data, options).
  */
 
 import * as XLSX from 'xlsx';
-import { JOINER_COVERAGE_EVENTS } from '../utils/constants.js';
+import { JOINER_COVERAGE_EVENTS, SHOWS_RSVP_TYPES } from '../utils/constants.js';
+import { buildEarlyHeliosSummary } from './heliosSummary.js';
+import { buildRosterDataSheet, buildEventsDataSheet, buildPlansDataSheet, buildRolesDataSheet } from './xlsxDataSheets.js';
 
 // ── Styling helpers ────────────────────────────────────────────
 const HEADER_STYLE = {
@@ -87,63 +89,288 @@ function autoFilter(ws, range) {
   ws['!autofilter'] = { ref: range };
 }
 
-// ── Sheet 1: Roster ────────────────────────────────────────────
-function buildRosterSheet(players) {
-  const headers = [
-    'Username', 'Nickname', 'Alliance', 'Furnace',
-    'Infantry', 'Lancer', 'Marksman',
-    'Role(s)', 'Joiner Heroes',
-    'Availability', 'Discord', 'Country', 'Languages',
-    'Player ID', 'Reliability', 'Last Updated',
-  ];
+// Excel worksheet names must be unique (and ≤31 chars). Two events
+// sharing a name — same-day Legion 1/2 events before the auto-name
+// included Legion, or two manually-renamed Custom events — used to
+// throw "Worksheet with name X already exists!" and abort the whole
+// export. This disambiguates instead of crashing, regardless of why
+// the names collided.
+function uniqueSheetName(rawName, used) {
+  const base = (rawName || 'Event').replace(/[\\/:*?[\]]/g, '').slice(0, 28) || 'Event';
+  if (!used.has(base)) return base;
+  let n = 2;
+  let candidate;
+  do {
+    const suffix = ` (${n})`;
+    candidate = base.slice(0, 31 - suffix.length) + suffix;
+    n++;
+  } while (used.has(candidate));
+  return candidate;
+}
 
+// Ascending — matches the same convention used in constants.js
+// (TIER_OPTIONS, display-order, highest-first) and battleConstants.js
+// (FC_ORDER, comparison-order, ascending). This one stays ascending
+// since it's used for stage lookup (indexOf-based "which is higher").
+const HELIOS_ORDER = ['Helios FC5', 'Helios FC6', 'Helios FC7', 'Helios FC8'];
+
+// Repeated ☀️ by stage — FC5 gets one sun, FC8 gets four. Chosen over
+// four unrelated emoji so the marker is self-explanatory at a glance
+// (more suns = higher stage) without needing a legend, while still
+// genuinely differentiating the four stages the way a single flat
+// ☀️ couldn't. See the cover sheet for a written legend too.
+const HELIOS_EMOJI = {
+  'Helios FC5': '☀️',
+  'Helios FC6': '☀️☀️',
+  'Helios FC7': '☀️☀️☀️',
+  'Helios FC8': '☀️☀️☀️☀️',
+};
+
+// Highest Helios stage reached by ANY of a player's three troops —
+// they don't all need to match. Returns null if none of their troops
+// have reached Helios yet.
+function heliosStage(p) {
+  const tiers = [p.troops?.infantry, p.troops?.lancer, p.troops?.marksman];
+  let best = null, bestIdx = -1;
+  tiers.forEach(t => {
+    const idx = HELIOS_ORDER.indexOf(t);
+    if (idx > bestIdx) { bestIdx = idx; best = t; }
+  });
+  return best;
+}
+
+function heliosFlag(p) {
+  const stage = heliosStage(p);
+  return stage ? HELIOS_EMOJI[stage] : '';
+}
+
+// Within-alliance sort order: strongest troop tier to weakest — ranked
+// by the WORST of their three troops first (an "all FC5" player
+// outranks one who's FC5/FC5/FC4, who in turn outranks a player who's
+// FC4/FC4/FC4 even though both of the latter share the same worst
+// tier — the sum of all three tiers breaks that tie, since more troops
+// at a higher tier should rank higher within the same "worst tier"
+// bracket). Rally Lead / Helios status is no longer a sort priority —
+// the point of this ordering is to surface who's STRONG regardless of
+// existing tags, since that's what actually identifies rally leader
+// and joiner candidates. They're still shown as 👑/☀️ flags on the
+// name, just not used to reorder the list anymore.
+const TIER_RANK_ORDER = ['T10','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8','Helios FC5','Helios FC6','Helios FC7','Helios FC8','T12'];
+function tierRank(t) { const i = TIER_RANK_ORDER.indexOf(t); return i === -1 ? -1 : i; }
+
+function rosterSortKey(p) {
+  const ranks = [p.troops?.infantry, p.troops?.lancer, p.troops?.marksman].map(tierRank);
+  return {
+    minRank: Math.min(...ranks),
+    sumRank: ranks.reduce((a, b) => a + b, 0),
+  };
+}
+
+function compareRosterOrder(a, b) {
+  const ka = rosterSortKey(a), kb = rosterSortKey(b);
+  if (ka.minRank !== kb.minRank) return kb.minRank - ka.minRank;
+  if (ka.sumRank !== kb.sumRank) return kb.sumRank - ka.sumRank;
+  return (a.username || a.alias || '').localeCompare(b.username || b.alias || '');
+}
+
+// Groups players by alliance — its own visible section rather than a
+// column value buried in a flat list — sorted alphabetically by tag,
+// with players who have no alliance set trailing in their own group
+// last rather than scattered through the alphabetical order. Within
+// each group, strongest-to-weakest via compareRosterOrder above.
+function groupByAllianceStrongest(players) {
+  const groups = {};
+  players.forEach(p => {
+    const key = p.allianceTag || '__none__';
+    (groups[key] = groups[key] || []).push(p);
+  });
+  const tags = Object.keys(groups).filter(k => k !== '__none__').sort((a, b) => a.localeCompare(b));
+  if (groups['__none__']) tags.push('__none__');
+  return tags.map(key => ({
+    label: key === '__none__' ? 'No Alliance' : key,
+    players: [...groups[key]].sort(compareRosterOrder),
+  }));
+}
+
+// Rally Leader heroes are NOT the same as joiner heroes — this was
+// wrong in an earlier version of this export, which used joinerHeroes
+// as a stand-in. A Rally Leader's actual heroes are the preset squad
+// lead heroes saved on their Rally Leader Profile (leaderProfile.teams
+// — see RallyLeaderProfileSheet.jsx), grouped by team type since
+// offense and defense loadouts are different heroes, not one flat list.
+function leaderHeroesText(p) {
+  const teams = p.leaderProfile?.teams || [];
+  return teams
+    .map(t => {
+      const heroes = (t.leadHeroes || []).filter(Boolean);
+      if (heroes.length === 0) return null;
+      const label = t.type === 'offense' ? 'Offense' : t.type === 'defense' ? 'Defense' : 'Team';
+      return `${label}: ${heroes.join(', ')}`;
+    })
+    .filter(Boolean)
+    .join(' | ');
+}
+
+// ── Sheet 1: Roster ────────────────────────────────────────────
+// Merged with what used to be the separate Joiner Coverage sheet — one
+// tick-mark column per joiner hero (✓ if that player has it at Skill
+// 5), same style as the old coverage sheet, plus a totals row at the
+// bottom. Name/Furnace/Alliance/Troops/Rally Leader Heroes cover the
+// rest. Everything not shown here (country, languages, full role list,
+// player ID, last-updated) still lives in the hidden Roster Data sheet
+// for re-import; this pretty sheet is just for reading.
+function buildRosterSheet(players) {
+  const groups = groupByAllianceStrongest(players);
+
+  const allJoiners = [...new Set(
+    players.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
+  )].sort();
+
+  const headers = ['State', 'FID', 'Power (API)', 'Kills (API)', 'Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
   const rows = [headers.map(hdr)];
 
-  players.forEach((p, i) => {
-    const joiners = (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero).join(', ');
-    const style   = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
+  // Alternates across the WHOLE sheet, not reset per alliance group —
+  // a group boundary landing on an even/odd row shouldn't cause two
+  // same-styled rows to sit next to each other right after a subheader.
+  let rowIndex = 0;
 
+  groups.forEach(group => {
     rows.push([
-      cell(p.username || '', style),
-      cell(p.alias || '', style),
-      cell(p.allianceTag || '', style),
-      cell(p.furnaceLevel || '', style),
-      cell(p.troops?.infantry || '', style),
-      cell(p.troops?.lancer || '', style),
-      cell(p.troops?.marksman || '', style),
-      cell((p.roles || []).join(', '), style),
-      cell(joiners, style),
-      yesNo(p.availability?.present),
-      yesNo(p.availability?.discord),
-      cell(p.country || '', style),
-      cell((p.languages || []).join(', '), style),
-      cell(p.fid || '', style),
-      cell('', style),   // reliability — calculated in Intel tab, not stored
-      cell(p.profileLastUpdated ? new Date(p.profileLastUpdated).toLocaleDateString() : '', style),
+      cell(`⚑ ${group.label} (${group.players.length})`, SUBHEADER_STYLE),
+      ...Array(headers.length - 1).fill(null).map(() => cell('', SUBHEADER_STYLE)),
     ]);
+
+    group.players.forEach(p => {
+      const style = rowIndex % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
+      rowIndex++;
+      const isLead = p.roles?.includes('Rally Lead');
+      const flags = `${isLead ? '👑' : ''}${heliosFlag(p)}`;
+      const displayName = p.username || p.alias || '';
+      const nameCell = flags ? `${flags} ${displayName}` : displayName;
+      const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
+
+      rows.push([
+        cell(nameCell, style),
+        cell(p.furnaceLevel || '', style),
+        cell(p.allianceTag || '', style),
+        cell(p.troops?.infantry || '', style),
+        cell(p.troops?.lancer || '', style),
+        cell(p.troops?.marksman || '', style),
+        cell(isLead ? leaderHeroesText(p) : '', style),
+        ...allJoiners.map(h => owned.has(h) ? cell('✓', YES_STYLE) : cell('', style)),
+        cell(owned.size, owned.size >= 3 ? YES_STYLE : owned.size >= 1 ? GOLD_STYLE : NO_STYLE),
+      ]);
+    });
   });
 
+  // Coverage totals row — same "how many people have this hero"
+  // summary the old standalone Joiner Coverage sheet had.
+  if (allJoiners.length > 0) {
+    rows.push([]);
+    rows.push([
+      cell('COVERAGE', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      cell('', SUBHEADER_STYLE),
+      ...allJoiners.map(h => {
+        const count = players.filter(p => (p.joinerHeroes || []).some(jh => jh.hero === h && jh.skillLevel >= 5)).length;
+        return cell(count, count === 0 ? NO_STYLE : count < 3 ? GOLD_STYLE : YES_STYLE);
+      }),
+      cell('', SUBHEADER_STYLE),
+    ]);
+  }
+
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  setColWidths(ws, [18, 14, 10, 9, 9, 9, 9, 22, 30, 12, 10, 16, 20, 12, 12, 14]);
+  const baseWidths = [22, 9, 10, 9, 9, 9, 30];
+  const heroWidths = allJoiners.map(() => 10);
+  setColWidths(ws, [...baseWidths, ...heroWidths, 14]);
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  autoFilter(ws, `A1:P1`);
+  autoFilter(ws, `A1:${XLSX.utils.encode_col(headers.length - 1)}1`);
   return ws;
 }
 
 // ── Sheet 2: Event Attendance ──────────────────────────────────
-function buildEventSheet(event, players, includeJoiners) {
+// plans is optional — only needed to populate Rally Leader Heroes
+// (looks for rally slots, in plans linked to this event via
+// plan.eventId, where this player is the leader). Pass [] or omit it
+// and that column just comes out blank instead of erroring.
+function buildEventSheet(event, players, includeJoiners, plans = []) {
   const snapMap = Object.fromEntries((event.snapshots || []).map(s => [s.playerId, s]));
-  const eventPlayers = event.participantIds?.length > 0
-    ? players.filter(p => event.participantIds.includes(p.id))
-    : players;
+  // Explicit roster, no fallback — an event with nobody added yet
+  // exports as empty, not the entire player base. See EventsTab.jsx;
+  // the old "empty participantIds = show everyone" behavior was
+  // retired app-wide and this export had been left out of sync with it.
+  const eventPlayers = players.filter(p => (event.participantIds || []).includes(p.id));
+  const isUpcoming = event.status === 'upcoming';
 
-  // Base columns
-  const baseHeaders = [
-    'Username', 'Alliance', 'Furnace',
-    'Showed Up', 'Late', 'Left Early', 'No-show',
-    'On Discord', 'Joined Rallies', 'Followed Plan', 'Ignored Orders',
-    'Performance', 'Notes',
-  ];
+  const linkedPlans = (plans || []).filter(p => p.eventId === event.id);
+  function rallyLeaderHeroesFor(playerId) {
+    const heroes = new Set();
+    linkedPlans.forEach(plan => (plan.rallySlots || []).forEach(slot => {
+      if (slot.leaderId === playerId) (slot.leaderRallyHeroes || []).forEach(h => heroes.add(h));
+    }));
+    return [...heroes].join(', ');
+  }
+
+  // Categorizes each participant by how they RSVP'd (upcoming) or
+  // showed up (completed) — one category per person, first-match-wins
+  // down a priority list, so someone who's both "unsure" and "will be
+  // late" lands under Unsure (the one that needs a follow-up most).
+  // Ordered so anything needing attention surfaces at the TOP of the
+  // sheet — the big "everything's fine" bucket sits last. Present
+  // Whole Time and voice chat are folded in here as their own
+  // categories (compound-labeled when both apply) rather than separate
+  // tick columns — joiner heroes are the only tick-grid left in this
+  // sheet, everything else is conveyed by which subheading a row sits
+  // under.
+  const UPCOMING_CATEGORY_ORDER = ['Unsure', 'Not Yet Confirmed', 'Pops In Randomly', 'Coming Late', 'Leaving Early', 'Present Whole Time + Voice', 'Present Whole Time', 'Joining Voice Chat', 'Confirmed'];
+  const COMPLETED_CATEGORY_ORDER = ['No-Show', 'Excused Absence', 'Late (No Notice)', 'Not Recorded', 'Attended + Voice', 'Attended'];
+  function rsvpCategoryFor(snap) {
+    const r = snap?.rsvp || {};
+    if (r.unsure) return 'Unsure';
+    if (r.participating === false) return 'Not Yet Confirmed';
+    if (r.intermittent) return 'Pops In Randomly';
+    if (r.willBeLate) return 'Coming Late';
+    if (r.willLeaveEarly) return 'Leaving Early';
+    if (r.presentWholeTime && r.willJoinDiscord) return 'Present Whole Time + Voice';
+    if (r.presentWholeTime) return 'Present Whole Time';
+    if (r.willJoinDiscord) return 'Joining Voice Chat';
+    return 'Confirmed';
+  }
+  function attendanceCategoryFor(snap) {
+    const a = snap?.attendance || {};
+    const v = snap?.voice || {};
+    if (a.noShow && a.excused) return 'Excused Absence';
+    if (a.noShow) return 'No-Show';
+    if (a.joinedLateNoNotice) return 'Late (No Notice)';
+    if (a.attended === true && v.joined === true) return 'Attended + Voice';
+    if (a.attended === true) return 'Attended';
+    return 'Not Recorded';
+  }
+  const categoryOrder = isUpcoming ? UPCOMING_CATEGORY_ORDER : COMPLETED_CATEGORY_ORDER;
+  const categoryFn    = isUpcoming ? rsvpCategoryFor : attendanceCategoryFor;
+
+  // Base columns differ by phase — RSVP (a prediction) for upcoming
+  // events, post-event actuals otherwise. Never both at once. Troop
+  // tiers and Rally Leader Heroes were missing before (added a couple
+  // turns back) — the latter blank unless plans is passed in.
+  //
+  // Deliberately NOT included as columns: Participating, On Time (removed
+  // from the app entirely), Will Be Late, Will Leave Early, Pops In
+  // Randomly, Unsure, Attended, No-show, Excused, Late (No Notice) — all
+  // of these are now conveyed by the category subheading each row sits
+  // under (see categoryFn below), so a tick/cross column repeating the
+  // same fact was redundant. Only genuinely ORTHOGONAL facts — voice
+  // chat and whole-time presence, neither of which factors into the
+  // category classification — still get their own column.
+  // All three phases share the same columns now — voice chat, whole
+  // time, and RSVP/attendance status all live in the category
+  // subheading instead of a column. Troop tiers and Rally Leader
+  // Heroes stay on every variant regardless of event type.
+  const baseHeaders = ['Username', 'Alliance', 'Furnace', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', 'Notes'];
 
   // Joiner columns — added for SvS / Castle events
   const joinerHeroList = includeJoiners
@@ -161,178 +388,178 @@ function buildEventSheet(event, players, includeJoiners) {
     rows.push(subRow);
   }
 
-  eventPlayers.forEach((p, i) => {
-    const snap  = snapMap[p.id];
-    const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
-    const perf  = snap?.performanceTag || '';
-    const perfLabel = perf === 'strong' ? '⭐ Strong' : perf === 'reliable' ? '✓ Reliable' : perf === 'issue' ? '⚠ Issue' : perf === 'noshow' ? '✗ No-show' : perf === 'improving' ? '↑ Improving' : '';
+  // Group into categories (in the priority order above), each with its
+  // own subheader row — mirrors the same grouping pattern already used
+  // for the alliance-grouped roster sheet elsewhere in this file.
+  const grouped = {};
+  eventPlayers.forEach(p => {
+    const cat = categoryFn(snapMap[p.id]);
+    (grouped[cat] = grouped[cat] || []).push(p);
+  });
+  const colCount = allHeaders.length;
 
-    const base = [
-      cell(p.username || '', style),
-      cell(p.allianceTag || '', style),
-      cell(p.furnaceLevel || '', style),
-      yesNo(snap?.attendance?.attended),
-      yesNo(snap?.attendance?.late),
-      yesNo(snap?.attendance?.leftEarly),
-      yesNo(snap?.attendance?.noShow),
-      yesNo(snap?.voice?.joined),
-      yesNo(snap?.combat?.joinedRallies),
-      yesNo(snap?.combat?.followedOrders),
-      yesNo(snap?.combat?.wentRogue ? true : false),
-      cell(perfLabel, style),
-      cell(snap?.notes || '', style),
-    ];
+  let rowIndex = 0; // alternates across the WHOLE sheet, not reset per group
+  categoryOrder.forEach(cat => {
+    const group = grouped[cat];
+    if (!group || !group.length) return;
 
-    if (includeJoiners) {
-      const playerJoiners = new Set(
-        (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero)
-      );
-      joinerHeroList.forEach(hero => {
-        base.push(playerJoiners.has(hero) ? cell('✓', YES_STYLE) : cell('', style));
-      });
-    }
+    rows.push([
+      cell(`▸ ${cat} (${group.length})`, SUBHEADER_STYLE),
+      ...Array(colCount - 1).fill(null).map(() => cell('', SUBHEADER_STYLE)),
+    ]);
 
-    rows.push(base);
+    group.forEach(p => {
+      const snap  = snapMap[p.id];
+      const style = rowIndex % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
+      rowIndex++;
+      const troopCells = [cell(p.troops?.infantry || '', style), cell(p.troops?.lancer || '', style), cell(p.troops?.marksman || '', style)];
+      const leaderCell = cell(rallyLeaderHeroesFor(p.id), style);
+
+      const base = [
+        cell(p.username || '', style),
+        cell(p.allianceTag || '', style),
+        cell(p.furnaceLevel || '', style),
+        ...troopCells,
+        leaderCell,
+        cell(snap?.notes || '', style),
+      ];
+
+      if (includeJoiners) {
+        const playerJoiners = new Set(
+          (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero)
+        );
+        joinerHeroList.forEach(hero => {
+          base.push(playerJoiners.has(hero) ? cell('✓', YES_STYLE) : cell('', style));
+        });
+      }
+
+      rows.push(base);
+    });
   });
 
-  // Summary row
-  const total     = eventPlayers.length;
-  const attended  = Object.values(snapMap).filter(s => s.attendance?.attended === true).length;
-  const noShow    = Object.values(snapMap).filter(s => s.attendance?.noShow).length;
-  const discord   = Object.values(snapMap).filter(s => s.voice?.joined === true).length;
-
+  // Summary row — total is eventPlayers.length directly since each
+  // category subheading above already shows its own (N) count; no
+  // separate per-status math needed here anymore.
+  const total = eventPlayers.length;
   rows.push([]);
   rows.push([
-    cell('SUMMARY', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell(`${attended}/${total} showed up`, SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell(`${noShow} no-shows`, SUBHEADER_STYLE),
-    cell(`${discord} on Discord`, SUBHEADER_STYLE),
+    cell('SUMMARY', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
+    cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE), cell('', SUBHEADER_STYLE),
+    cell(`${total} total`, SUBHEADER_STYLE),
   ]);
 
+  // SvS-type events only (same gate as the RSVP UI): how many players
+  // arriving early are Helios (at least one troop), and who. Norah
+  // joiners first. Substitutes are left out, same as the text copies.
+  if (SHOWS_RSVP_TYPES.includes(event.type)) {
+    const participants = eventPlayers.filter(p => !snapMap[p.id]?.rsvp?.substitute);
+    const { earlyTotal, norah, others, count } = buildEarlyHeliosSummary(participants, p => snapMap[p.id]);
+    const blank = n => Array(n).fill(null).map(() => cell('', SUBHEADER_STYLE));
+    rows.push([]);
+    rows.push([
+      cell('☀️ EARLY HELIOS', SUBHEADER_STYLE), ...blank(6),
+      cell(`${count} of ${earlyTotal} arriving early`, SUBHEADER_STYLE),
+    ]);
+    const pushGroup = (label, list, isNorah) => {
+      if (!list.length) return;
+      rows.push([cell(`▸ ${label} (${list.length})`, SUBHEADER_STYLE), ...blank(allHeaders.length - 1)]);
+      list.forEach(p => {
+        const style = rowIndex % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
+        rowIndex++;
+        rows.push([
+          cell(p.username || p.alias || '', style),
+          cell(p.allianceTag || '', style),
+          cell(p.furnaceLevel || '', style),
+          cell(p.troops?.infantry || '', style),
+          cell(p.troops?.lancer || '', style),
+          cell(p.troops?.marksman || '', style),
+          cell('', style),
+          cell(isNorah ? 'Norah joiner' : '', isNorah ? YES_STYLE : style),
+        ]);
+      });
+    };
+    pushGroup('Norah joiners', norah, true);
+    pushGroup('Other Helios', others, false);
+  }
+
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  const baseWidths = [18, 10, 9, 11, 8, 11, 9, 11, 14, 14, 14, 14, 24];
+  const baseWidths = [18, 10, 9, 9, 9, 9, 26, 24];
   const joinerWidths = joinerHeroList.map(() => 10);
   setColWidths(ws, [...baseWidths, ...joinerWidths]);
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
   return ws;
 }
 
-// ── Sheet 3: Joiner Coverage ───────────────────────────────────
-function buildJoinerCoverageSheet(players) {
-  const allJoiners = [...new Set(
-    players.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
-  )].sort();
-
-  if (allJoiners.length === 0) return null;
-
-  const headers = ['Username', 'Alliance', 'Furnace', 'Role(s)', ...allJoiners, 'Total Heroes'];
-  const rows = [headers.map(hdr)];
-
-  players.forEach((p, i) => {
-    const style = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
-    const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
-    const count = owned.size;
-
-    const row = [
-      cell(p.username || '', style),
-      cell(p.allianceTag || '', style),
-      cell(p.furnaceLevel || '', style),
-      cell((p.roles || []).join(', '), style),
-      ...allJoiners.map(h => owned.has(h) ? cell('✓', YES_STYLE) : cell('', style)),
-      cell(count, count >= 3 ? YES_STYLE : count >= 1 ? GOLD_STYLE : NO_STYLE),
-    ];
-    rows.push(row);
-  });
-
-  // Coverage totals row
-  rows.push([]);
-  const totalsRow = [
-    cell('COVERAGE', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    cell('', SUBHEADER_STYLE),
-    ...allJoiners.map(h => {
-      const count = players.filter(p =>
-        (p.joinerHeroes || []).some(jh => jh.hero === h && jh.skillLevel >= 5)
-      ).length;
-      return cell(count, count === 0 ? NO_STYLE : count < 3 ? GOLD_STYLE : YES_STYLE);
-    }),
-    cell('', SUBHEADER_STYLE),
-  ];
-  rows.push(totalsRow);
-
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  const baseWidths = [18, 10, 9, 22];
-  const heroWidths = allJoiners.map(() => 10);
-  setColWidths(ws, [...baseWidths, ...heroWidths, 12]);
-  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  autoFilter(ws, `A1:${XLSX.utils.encode_col(headers.length - 1)}1`);
-  return ws;
-}
-
-// ── Sheet 4: Prep Scores ───────────────────────────────────────
-function buildScoresSheet(prepScores, players) {
-  const headers = ['Member', 'Alliance', 'Prep Points', 'Target', 'Gap to Target', '% Complete', 'On Roster', 'Notes', 'Last Updated'];
-  const rows = [headers.map(hdr)];
-
-  const sorted = [...prepScores].sort((a, b) => (b.prepScore || 0) - (a.prepScore || 0));
-
-  sorted.forEach((entry, i) => {
-    const style    = i % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
-    const onRoster = players.some(p => p.id === entry.playerId || p.username === entry.playerName);
-    const gap      = entry.targetScore && entry.prepScore != null ? entry.targetScore - entry.prepScore : null;
-    const pct      = entry.targetScore && entry.prepScore != null
-      ? Math.min(100, Math.round((entry.prepScore / entry.targetScore) * 100))
-      : null;
-
-    rows.push([
-      cell(entry.playerName || '', style),
-      cell(entry.allianceTag || '', style),
-      cell(entry.prepScore ?? '', { ...style, numFmt: '#,##0' }),
-      cell(entry.targetScore ?? '', { ...style, numFmt: '#,##0' }),
-      cell(gap != null ? gap : '', { ...style, numFmt: '#,##0' }),
-      cell(pct != null ? `${pct}%` : '', pct >= 100 ? YES_STYLE : pct >= 50 ? GOLD_STYLE : NO_STYLE),
-      cell(onRoster ? '✓' : '', onRoster ? YES_STYLE : style),
-      cell(entry.notes || '', style),
-      cell(entry.lastUpdated ? new Date(entry.lastUpdated).toLocaleDateString() : '', style),
-    ]);
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  setColWidths(ws, [18, 10, 14, 14, 14, 12, 10, 24, 14]);
-  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  autoFilter(ws, 'A1:I1');
-  return ws;
+// Standalone per-event export — "export from this event's own page"
+// rather than only as part of the full multi-event workbook. Always
+// includes joiner heroes and Rally Leader Heroes regardless of event
+// type, since the officer asked for this on THIS event specifically —
+// unlike the full export's includeJoiners gate (JOINER_COVERAGE_EVENTS
+// only), which stays untouched for that other flow.
+export function exportEventParticipants(event, players, plans = []) {
+  const wb = XLSX.utils.book_new();
+  const eventWs = buildEventSheet(event, players || [], true, plans);
+  const sheetName = (event.name || event.type || 'Event').slice(0, 31).replace(/[[\]*/\\?:]/g, ' ');
+  XLSX.utils.book_append_sheet(wb, eventWs, sheetName || 'Event');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const fileName = `${(event.name || event.type || 'event').replace(/[^a-z0-9]+/gi, '_')}_${dateStr}.xlsx`;
+  XLSX.writeFile(wb, fileName);
 }
 
 // ── Cover sheet ────────────────────────────────────────────────
-function buildCoverSheet(data) {
+// authorNote is optional free text from whoever's exporting — a place
+// to say something to whoever opens this file (what changed, what to
+// look at first, a heads-up) without needing to explain it separately
+// over Discord. Entirely optional; the cover sheet looks exactly as it
+// did before this if nothing's written.
+function buildCoverSheet(data, rosterCount = null, authorNote = '') {
   const now      = new Date().toLocaleString();
   const alliance = data.settings?.allianceName || data.settings?.allianceTag || 'Alliance';
+  const memberCount = rosterCount != null ? rosterCount : (data.players?.length || 0);
+
   const rows = [
-    [cell('SUNFIRE COMMAND', { font: { bold: true, sz: 18, name: 'Arial', color: { rgb: 'F5A623' } } })],
+    [cell('CAROLINE', { font: { bold: true, sz: 18, name: 'Arial', color: { rgb: 'F5A623' } } })],
     [cell(alliance, { font: { bold: true, sz: 14, name: 'Arial', color: { rgb: 'FFFFFF' } } })],
     [],
+  ];
+
+  const merges = [];
+  const trimmedNote = (authorNote || '').trim();
+  if (trimmedNote) {
+    rows.push([cell('📝 A note from the officer:', SUBHEADER_STYLE)]);
+    const noteRow = rows.length; // 0-indexed row this note's text will land on, for the merge below
+    rows.push([cell(trimmedNote, {
+      font:      { italic: true, sz: 12, name: 'Arial', color: { rgb: 'FFFFFF' } },
+      alignment: { wrapText: true, vertical: 'top' },
+    })]);
+    merges.push({ s: { r: noteRow, c: 0 }, e: { r: noteRow, c: 1 } }); // spans both columns so long notes aren't squeezed into column A alone
+    rows.push([]);
+  }
+
+  rows.push(
     [cell('Exported:', SUBHEADER_STYLE), cell(now, ROW_STYLE)],
-    [cell('Members:', SUBHEADER_STYLE), cell(data.players?.length || 0, ROW_STYLE)],
+    [cell('Members:', SUBHEADER_STYLE), cell(memberCount, ROW_STYLE)],
     [cell('Events:', SUBHEADER_STYLE), cell(data.events?.length || 0, ROW_STYLE)],
     [cell('State:', SUBHEADER_STYLE), cell(data.settings?.stateId || '', ROW_STYLE)],
     [],
+    [cell('Questions about this file? Contact Caroline.', { font: { bold: true, sz: 11, name: 'Arial', color: { rgb: 'F5A623' } } })],
+    [],
     [cell('Sheets in this file:', SUBHEADER_STYLE)],
-    [cell('• Roster', ROW_STYLE), cell('All members and their combat stats', ROW_STYLE)],
-    [cell('• Joiner Coverage', ROW_STYLE), cell('Hero Skill 5 ownership across the alliance', ROW_STYLE)],
-    [cell('• Prep Scores', ROW_STYLE), cell('SvS prep points and targets', ROW_STYLE)],
+    [cell('• Roster', ROW_STYLE), cell('Name, furnace, alliance, troop tiers, Rally Leader preset heroes, and joiner hero coverage (✓ per hero)', ROW_STYLE)],
     [cell('• [Event sheets]', ROW_STYLE), cell('One sheet per event — attendance, Discord, performance', ROW_STYLE)],
     [],
+    [cell('Name flags:', SUBHEADER_STYLE)],
+    [cell('👑', ROW_STYLE), cell('Rally Lead', ROW_STYLE)],
+    [cell('☀️ / ☀️☀️ / ☀️☀️☀️ / ☀️☀️☀️☀️', ROW_STYLE), cell('Helios FC5 / FC6 / FC7 / FC8 — one sun per stage, highest of their three troops', ROW_STYLE)],
+    [],
+    [cell('This file also contains hidden "…Data" sheets (Roster Data, Events Data, etc.) with one row per record. These are how this app reads a spreadsheet back in — leave them alone unless you know what you\'re doing.', { font: { italic: true, sz: 9, name: 'Arial', color: { rgb: '888888' } } })],
+    [],
     [cell('Note: SvS and Castle events include joiner coverage columns in their attendance sheet.', { font: { italic: true, sz: 9, name: 'Arial', color: { rgb: '888888' } } })],
-  ];
+  );
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{ wch: 22 }, { wch: 60 }];
+  if (merges.length) ws['!merges'] = merges;
 
   // Dark background for the whole cover
   applyStyle(ws, 'A1:B2', {
@@ -342,45 +569,201 @@ function buildCoverSheet(data) {
   return ws;
 }
 
-// ── Main export function ───────────────────────────────────────
-export function exportWorkbook(data) {
-  const wb = XLSX.utils.book_new();
+// ── CSV fallback — Roster only ─────────────────────────────────
+// A flat CSV sidesteps everything that could go wrong with the xlsx
+// binary format entirely: no cell styling, no multiple sheets, no
+// hidden sheets, no bookType — just plain comma-separated text with a
+// UTF-8 byte-order mark so Excel/Numbers/Sheets all detect the
+// encoding correctly (needed for the 👑/☀️ flags and any accented
+// names to render right instead of turning into garbled characters).
+// Same alliance scoping as the xlsx roster; everything else the xlsx
+// export has (event sheets, hidden re-import data) doesn't have a CSV
+// equivalent — CSV is one flat table, not a workbook, so this is
+// Roster-only by nature, not by omission.
+export function exportRosterCsv(data, options = {}) {
+  const { rosterAllianceTags = null, authorNote = '' } = options;
+  const scopedPlayers = (rosterAllianceTags && rosterAllianceTags.length > 0)
+    ? (data.players || []).filter(p => rosterAllianceTags.includes(p.allianceTag))
+    : (data.players || []);
+  const groups = groupByAllianceStrongest(scopedPlayers);
 
-  // 1. Cover sheet
-  const coverWs = buildCoverSheet(data);
-  XLSX.utils.book_append_sheet(wb, coverWs, 'Overview');
+  const allJoiners = [...new Set(
+    scopedPlayers.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
+  )].sort();
 
-  // 2. Full roster
-  const rosterWs = buildRosterSheet(data.players || []);
-  XLSX.utils.book_append_sheet(wb, rosterWs, 'Roster');
+  const headers = ['State', 'FID', 'Power (API)', 'Kills (API)', 'Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
 
-  // 3. Joiner coverage
-  const joinerWs = buildJoinerCoverageSheet(data.players || []);
-  if (joinerWs) XLSX.utils.book_append_sheet(wb, joinerWs, 'Joiner Coverage');
-
-  // 4. Prep scores
-  if ((data.prepScores || []).length > 0) {
-    const scoresWs = buildScoresSheet(data.prepScores, data.players || []);
-    XLSX.utils.book_append_sheet(wb, scoresWs, 'Prep Scores');
+  function escapeCsv(value) {
+    const s = String(value ?? '');
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
-  // 5. One sheet per event (most recent first)
-  const sortedEvents = [...(data.events || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const rows = [];
+  // CSV has no cover sheet to hold this, so it goes as leading rows
+  // above the header instead — still the first thing anyone sees when
+  // they open the file.
+  const trimmedNote = (authorNote || '').trim();
+  if (trimmedNote) {
+    rows.push(['A note from the officer:']);
+    rows.push([trimmedNote]);
+    rows.push([]);
+  }
+  rows.push(headers);
+  groups.forEach(group => {
+    // CSV can't carry cell styling like the xlsx subheader row does,
+    // so a plain row with just the alliance name in the Name column
+    // stands in as the visible section break instead.
+    rows.push([`⚑ ${group.label} (${group.players.length})`, ...Array(headers.length - 1).fill('')]);
+
+    group.players.forEach(p => {
+      const isLead = p.roles?.includes('Rally Lead');
+      const flags = `${isLead ? '👑' : ''}${heliosFlag(p)}`;
+      const displayName = p.username || p.alias || '';
+      const nameCell = flags ? `${flags} ${displayName}` : displayName;
+      const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
+
+      rows.push([
+        data.settings?.stateId || '', p.fid || '', p.providerStats?.power ?? '', p.providerStats?.kills ?? '',
+        nameCell,
+        p.furnaceLevel || '',
+        p.allianceTag || '',
+        p.troops?.infantry || '',
+        p.troops?.lancer || '',
+        p.troops?.marksman || '',
+        isLead ? leaderHeroesText(p) : '',
+        ...allJoiners.map(h => owned.has(h) ? '✓' : ''),
+        owned.size,
+      ]);
+    });
+  });
+
+  const csvBody = rows.map(r => r.map(escapeCsv).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csvBody], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const alliance = data.settings?.allianceTag || 'export';
+  const dateStr  = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `alliance-manager-state-${data.settings?.stateId || 'unknown'}-roster-${alliance}-${dateStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Main export function ───────────────────────────────────────
+// options lets a caller (e.g. a future DataPanel.jsx checklist) export
+// only part of the data instead of always generating everything:
+//   includeRoster      – Roster (name/furnace/alliance/troops/leader
+//                        heroes/joiner coverage tick-grid, all in one
+//                        sheet) + Roster Data + Roles Data
+//   rosterAllianceTags – array of alliance tags to include in the
+//                        roster (and Roster Data); null or [] means
+//                        every alliance, unfiltered — "export one
+//                        alliance or more than one"
+//   includeEvents      – event attendance sheets + Events Data
+//   includePlans       – Plans Data (battle plan records)
+//   eventId            – when set, scopes BOTH events and plans to just
+//                        that one event (plans via plan.eventId) —
+//                        "battle plans due a specific event only"
+//   authorNote         – optional free text shown prominently on the
+//                        cover sheet, for whoever's exporting to leave
+//                        a message for whoever opens the file
+// Calling exportWorkbook(data) with no options exports everything, same
+// as before this option support existed.
+export function exportWorkbook(data, options = {}) {
+  const {
+    includeRoster      = true,
+    rosterAllianceTags = null,
+    includeEvents      = true,
+    includePlans       = true,
+    eventId            = null,
+    authorNote         = '',
+  } = options;
+
+  const wb = XLSX.utils.book_new();
+
+  // Alliance-scoped roster — null/empty means no filter (every alliance)
+  const scopedPlayers = (rosterAllianceTags && rosterAllianceTags.length > 0)
+    ? (data.players || []).filter(p => rosterAllianceTags.includes(p.allianceTag))
+    : (data.players || []);
+
+  // 1. Cover sheet
+  const coverWs = buildCoverSheet(data, includeRoster ? scopedPlayers.length : null, authorNote);
+  XLSX.utils.book_append_sheet(wb, coverWs, 'Overview');
+
+  // 2. Roster (alliance-scoped) — includes the merged joiner coverage tick-grid
+  if (includeRoster) {
+    const rosterWs = buildRosterSheet(scopedPlayers);
+    XLSX.utils.book_append_sheet(wb, rosterWs, 'Roster');
+  }
+
+  // 3. One sheet per event (most recent first) — scoped to eventId if set
+  const scopedEvents = eventId ? (data.events || []).filter(e => e.id === eventId) : (data.events || []);
+  const sortedEvents = includeEvents ? [...scopedEvents].sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
+  const usedEventSheetNames = new Set(['Workspace Data', 'Provider Stats', 'Overview', 'Roster', 'Roster Data', 'Events Data', 'Plans Data', 'Roles Data']);
   sortedEvents.forEach(event => {
     const includeJoiners = JOINER_COVERAGE_EVENTS.includes(event.type);
-    const eventWs = buildEventSheet(event, data.players || [], includeJoiners);
-    // Sheet name max 31 chars, strip special chars
-    const sheetName = (event.name || event.type || 'Event')
-      .replace(/[\\/:*?[\]]/g, '')
-      .slice(0, 28);
+    const eventWs = buildEventSheet(event, data.players || [], includeJoiners, data.plans || []);
+    const sheetName = uniqueSheetName(event.name || event.type || 'Event', usedEventSheetNames);
+    usedEventSheetNames.add(sheetName);
     XLSX.utils.book_append_sheet(wb, eventWs, sheetName);
   });
 
-  // 6. Generate filename
+  // 4. Raw "…Data" sheets — one row per record, for re-importing this
+  // file back into the app later (see xlsxImportService.js). Hidden by
+  // default (Sheet > Unhide to see them) so they don't clutter the
+  // view for someone just reading the report.
+  const dataSheetNames = ['Workspace Data'];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{stateId:data.settings?.stateId || ''}]), 'Workspace Data');
+  if (includeRoster && scopedPlayers.some(p => p.providerStats)) {
+    const stats = scopedPlayers.filter(p => p.providerStats).map(p => ({
+      State: data.settings?.stateId || '', FID:p.fid, Name:p.username, Alliance:p.allianceTag,
+      Power:p.providerStats.power, Kills:p.providerStats.kills,
+      'Furnace (raw)':p.providerStats.furnaceLevel, 'Retrieved (UTC)':p.providerStats.retrievedAt,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stats), 'Provider Stats');
+  }
+  if (includeRoster) {
+    const rosterDataWs = buildRosterDataSheet(scopedPlayers);
+    XLSX.utils.book_append_sheet(wb, rosterDataWs, 'Roster Data');
+    dataSheetNames.push('Roster Data');
+
+    const rolesDataWs = buildRolesDataSheet(data.customRoles || []);
+    XLSX.utils.book_append_sheet(wb, rolesDataWs, 'Roles Data');
+    dataSheetNames.push('Roles Data');
+  }
+
+  if (includeEvents) {
+    const eventsDataWs = buildEventsDataSheet(scopedEvents);
+    XLSX.utils.book_append_sheet(wb, eventsDataWs, 'Events Data');
+    dataSheetNames.push('Events Data');
+  }
+
+  if (includePlans) {
+    // "Battle plans due a specific event only" — plans link to an
+    // event via plan.eventId, so scoping by eventId filters here too.
+    const scopedPlans = eventId ? (data.svsPlans || []).filter(p => p.eventId === eventId) : (data.svsPlans || []);
+    const plansDataWs = buildPlansDataSheet(scopedPlans);
+    XLSX.utils.book_append_sheet(wb, plansDataWs, 'Plans Data');
+    dataSheetNames.push('Plans Data');
+  }
+
+  wb.Workbook = wb.Workbook || {};
+  wb.Workbook.Sheets = wb.SheetNames.map(name => ({ Hidden: dataSheetNames.includes(name) ? 1 : 0 }));
+
+  // 5. Generate filename
   const alliance  = data.settings?.allianceTag || 'export';
   const dateStr   = new Date().toISOString().slice(0, 10);
-  const filename  = `sunfire-${alliance}-${dateStr}.xlsx`;
+  const filename  = `alliance-manager-state-${data.settings?.stateId || 'unknown'}-${alliance}-${dateStr}.xlsx`;
 
-  // 7. Write and download
-  XLSX.writeFile(wb, filename, { bookType: 'xlsx', type: 'binary', cellStyles: true });
+  // 6. Write and download
+  // Note: no `type` option here — that's for XLSX.write(), which
+  // returns raw data; writeFile() handles the browser download/file
+  // write itself and picks the right encoding automatically. Passing
+  // type:'binary' here was almost certainly why exported files failed
+  // to open anywhere (Excel, Numbers, Google Sheets alike) — a
+  // genuinely corrupt file fails everywhere, which is exactly what was
+  // reported.
+  XLSX.writeFile(wb, filename, { bookType: 'xlsx', cellStyles: true });
 }

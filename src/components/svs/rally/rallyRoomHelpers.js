@@ -1,8 +1,10 @@
+import { stateStorageKey } from '../../../services/stateWorkspaceService.js';
 // ── rallyRoomHelpers.js ────────────────────────────────────────
 // Pure helpers shared across all LiveRallyRoom sub-components.
 // No React. No side-effects (except localStorage read/write in the
 // persistence functions at the bottom).
 
+import { C } from '../../../utils/constants.js';
 import {
   parseMarchInput, validateMarchInput, fmtMarch,
   parseImpactInput, validateImpactInput,
@@ -119,7 +121,7 @@ export function computeLeaderTimes(leader, calc, referenceOverride) {
 
   // 'impact' mode
   if (calc.impactEpochSecs == null) return empty;
-  const openRallyAtUtc = calcRallyOpenSecs(calc.impactEpochSecs, leader.marchSecs, rallyDurMins, offset);
+  const openRallyAtUtc = calcRallyOpenSecs(calc.impactEpochSecs, leader.marchSecs, rallyDurMins, leader.offsetConvention==='later'?-offset:offset);
   const marchesAtUtc   = openRallyAtUtc + rallyDurMins * 60;
   const impactAtUtc    = marchesAtUtc + leader.marchSecs;
   return { openRallyAtUtc, marchesAtUtc, impactAtUtc, referenceTimeUtc: calc.impactEpochSecs };
@@ -138,8 +140,8 @@ export function fmtSend(secs) {
 // ── 6-phase stage system ───────────────────────────────────────
 export function getTimerStage(secsToOpen, secsToImpact) {
   if (secsToImpact == null) return null;
-  if (secsToImpact <= 0)                     return { stage:'impact',    label:'✓ Impact',                      color:'#30D158', bg:'#0A2A14' };
-  if (secsToOpen != null && secsToOpen <= 0) return { stage:'filling',   label:'✓ Rally Open — Joiners Joining', color:'#30D158', bg:'#0A2A14' };
+  if (secsToImpact <= 0)                     return { stage:'impact',    label:'Projected impact · confirm outcome', color:C.gold, bg:C.section };
+  if (secsToOpen != null && secsToOpen <= 0) return { stage:'filling',   label:'Scheduled open passed · confirm opening', color:C.gold, bg:C.section };
   if (secsToOpen == null) {
     if (secsToImpact <= 10) return { stage:'open_now',  label:'⚠ OPEN RALLY NOW',      color:'#FF453A', bg:'#3A0A0A' };
     if (secsToImpact <= 30) return { stage:'prepare',   label:'Prepare To Open Rally', color:'#FF8C00', bg:'#2A1500' };
@@ -216,12 +218,14 @@ export function normalizeTimer(t) {
 // ── Persistence ────────────────────────────────────────────────
 export function loadState(DEFAULT_STATE, defaultMsg) {
   try {
-    const r = localStorage.getItem(STORAGE_KEY);
+    const r = localStorage.getItem(stateStorageKey(STORAGE_KEY));
     if (r) {
       const p = JSON.parse(r);
+      if(!p || !Array.isArray(p.timers) || !Array.isArray(p.marchRegistry) || !p.calculator) throw Error('Invalid room');
       const rawTimers   = Array.isArray(p.timers)   ? p.timers   : [];
       const rawArchived = Array.isArray(p.archived) ? p.archived : [];
       return {
+        ...p,
         timers:        rawTimers.map(normalizeTimer).filter(Boolean),
         archived:      rawArchived.map(normalizeTimer).filter(Boolean),
         marchRegistry: Array.isArray(p.marchRegistry) ? p.marchRegistry : [],
@@ -231,21 +235,25 @@ export function loadState(DEFAULT_STATE, defaultMsg) {
           // Never trust a persisted numeric impact value across a reload —
           // re-derive it fresh from the human-readable string, since the
           // old field may be an intraday value, not epoch.
-          impactEpochSecs: p.calculator?.impactTimeRaw
-            ? (parseImpactInput(p.calculator.impactTimeRaw)?.epochSecs ?? null)
-            : null,
+          impactEpochSecs: Number.isFinite(p.calculator?.impactEpochSecs) && p.calculator.impactEpochSecs > 1e9 ? p.calculator.impactEpochSecs : (p.calculator?.impactTimeRaw ? (parseImpactInput(p.calculator.impactTimeRaw)?.epochSecs ?? null) : null),
+          utcDate: p.calculator?.utcDate || new Date().toISOString().slice(0,10),
           countdownSecs:   p.calculator?.countdownSecs    || COUNTDOWN_DEFAULT,
           rallyDuration:   p.calculator?.rallyDuration    || 3,
-          leaders:         Array.isArray(p.calculator?.leaders) ? p.calculator.leaders : [],
+          leaders: Array.isArray(p.calculator?.leaders) ? p.calculator.leaders.map(l=>l.offsetConvention==='later'?l:{...l,offset:p.calculator?.timingMode==='countdown'?(l.offset||0):-(l.offset||0),offsetConvention:'later'}) : [],
           messageTemplate: p.calculator?.messageTemplate  || defaultMsg,
         },
       };
     }
-  } catch {}
+  } catch { throw Error('Saved Live Room data is invalid'); }
   return null;
 }
 
-export function saveState(s) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {} }
+export function saveState(s) { try { localStorage.setItem(stateStorageKey(STORAGE_KEY), JSON.stringify(s)); return true; } catch { return false; } }
 
 // SmartInputs (MarchInput, ImpactInput) live in ./SmartInputs.jsx
 // Import them directly from there — not from this file.
+
+// Read-only migration source. Never overwrite the standalone draft key.
+export function readCommandDraft() {
+  try { const data=JSON.parse(localStorage.getItem(stateStorageKey('svs_castle_command_v1'))||'null');return data?.version===1&&Array.isArray(data.battles)?data:null;}catch{return null;}
+}
