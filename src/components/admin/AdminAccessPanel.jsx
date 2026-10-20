@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabaseClient.js';
-import { fetchMightpulseUsage } from '../../services/mightpulseService.js';
+import { fetchMightpulseUsage, fetchMightpulseAlliance } from '../../services/mightpulseService.js';
 import { C } from '../../utils/constants.js';
 
 /** Sign-in for protected API diagnostics. Auth alone never grants admin status:
@@ -46,6 +46,16 @@ export function AdminAccessPanel() {
     finally { setBusy(false); }
   }
 
+  async function previewLunRoster() {
+    setBusy(true); setResult(null); setMessage('');
+    try {
+      const response = await fetchMightpulseAlliance(3573, 'LUN');
+      setResult(response);
+      setMessage('LUN roster retrieved for State 3573. Preview only; no player records changed.');
+    } catch (e) { setMessage(e.message || 'Unable to retrieve the LUN roster'); }
+    finally { setBusy(false); }
+  }
+
   async function signOut() {
     setBusy(true);
     await supabase.auth.signOut();
@@ -65,6 +75,7 @@ export function AdminAccessPanel() {
           <div style={{ color: C.icy, fontSize: 12, marginBottom: 10 }}>Signed in: {session.user.email}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button style={btn} disabled={busy} onClick={testConnection}>Test MightPulse</button>
+            <button style={btn} disabled={busy} onClick={previewLunRoster}>Preview LUN roster</button>
             <button style={{ ...btn, background: C.card, color: C.icy }} disabled={busy} onClick={signOut}>Sign out</button>
           </div>
         </> : <>
@@ -76,6 +87,9 @@ export function AdminAccessPanel() {
           <button style={btn} disabled={busy || !email.trim()} onClick={sendLogin}>Send sign-in link</button>
         </>}
       {message && <p role="status" style={{ color: C.icy, fontSize: 12, marginBottom: 0 }}>{message}</p>}
+      {result && <details style={{ marginTop: 12 }}><summary>Response data</summary>
+        <pre style={{ overflow: 'auto', maxHeight: 320, fontSize: 12, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(result.data, null, 2)}</pre>
+      </details>}
       {result && <p style={{ color: C.green, fontSize: 12, marginBottom: 0 }}>API connected · Checked {new Date(result.retrieved_at).toLocaleString()}</p>}
     </section>
   );
