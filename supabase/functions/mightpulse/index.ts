@@ -14,7 +14,7 @@ function respond(body: unknown, status = 200, origin = ""): Response {
   if (origin && permitted.includes(origin)) headers["Access-Control-Allow-Origin"] = origin;
   headers["Access-Control-Allow-Headers"] = "authorization, apikey, content-type";
   headers["Access-Control-Allow-Methods"] = "POST, OPTIONS";
-  return new Response(JSON.stringify(body), { status, headers });
+  return new Response(status === 204 ? null : JSON.stringify(body), { status, headers });
 }
 
 Deno.serve(async req => {
