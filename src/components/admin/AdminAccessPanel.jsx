@@ -42,7 +42,7 @@ export function AdminAccessPanel() {
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        options: { emailRedirectTo: window.location.origin },
+        options: { shouldCreateUser: false, emailRedirectTo: window.location.origin },
       });
       if (error) throw error;
       setMessage('Check your email for a sign-in link. Signing in does not grant admin access automatically.');
