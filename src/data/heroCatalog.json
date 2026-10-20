@@ -1,0 +1,730 @@
+{
+  "50000": {
+    "name": "Eugene",
+    "slug": "eugene",
+    "image": "/images/heroes/Eugene/Eugene.png",
+    "troop": "Infantry",
+    "generation": 0,
+    "rarity": "Rare"
+  },
+  "50001": {
+    "name": "Smith",
+    "slug": "smith",
+    "image": "/images/heroes/Smith/Smith.png",
+    "troop": "Infantry",
+    "generation": 0,
+    "rarity": "Rare"
+  },
+  "50002": {
+    "name": "Charlie",
+    "slug": "charlie",
+    "image": "/images/heroes/Charlie/Charlie.png",
+    "troop": "Lancer",
+    "generation": 0,
+    "rarity": "Rare"
+  },
+  "50003": {
+    "name": "Cloris",
+    "slug": "cloris",
+    "image": "/images/heroes/Cloris/Cloris.png",
+    "troop": "Marksman",
+    "generation": 0,
+    "rarity": "Rare"
+  },
+  "50004": {
+    "name": "Sergey",
+    "slug": "sergey",
+    "image": "/images/heroes/Sergey/Sergey.png",
+    "troop": "Infantry",
+    "generation": 0,
+    "rarity": "Epic"
+  },
+  "50005": {
+    "name": "Patrick",
+    "slug": "patrick",
+    "image": "/images/heroes/Patrick/Patrick.png",
+    "troop": "Lancer",
+    "generation": 0,
+    "rarity": "Epic"
+  },
+  "50006": {
+    "name": "Bahiti",
+    "slug": "bahiti",
+    "image": "/images/heroes/Bahiti/Bahiti.png",
+    "troop": "Marksman",
+    "generation": 0,
+    "rarity": "Epic"
+  },
+  "50007": {
+    "name": "Jessie",
+    "slug": "jessie",
+    "image": "/images/heroes/Jessie/Jessie.png",
+    "troop": "Lancer",
+    "generation": 0,
+    "rarity": "Epic"
+  },
+  "50008": {
+    "name": "Gina",
+    "slug": "gina",
+    "image": "/images/heroes/Gina/Gina.png",
+    "troop": "Marksman",
+    "generation": 0,
+    "rarity": "Epic"
+  },
+  "50009": {
+    "name": "Natalia",
+    "slug": "natalia",
+    "image": "/images/heroes/Natalia/Natalia.png",
+    "troop": "Infantry",
+    "generation": 1,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Gale Force",
+      "image": "/images/heroes/Natalia/weapons/Natalia-GaleForce.png"
+    }
+  },
+  "50010": {
+    "name": "Logan",
+    "slug": "logan",
+    "image": "/images/heroes/Logan/Logan.png",
+    "troop": "Infantry",
+    "generation": 3,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "First of Steel",
+      "image": "/images/heroes/Logan/weapons/Logan-FirstOfSteel.png"
+    }
+  },
+  "50011": {
+    "name": "Jeronimo",
+    "slug": "jeronimo",
+    "image": "/images/heroes/Jeronimo/Jeronimo.png",
+    "troop": "Infantry",
+    "generation": 1,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Dawnbreak",
+      "image": "/images/heroes/Jeronimo/weapons/Jeronimo-Dawnbreak.png"
+    }
+  },
+  "50012": {
+    "name": "Molly",
+    "slug": "molly",
+    "image": "/images/heroes/Molly/Molly.png",
+    "troop": "Lancer",
+    "generation": 1,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Yeti Spirit",
+      "image": "/images/heroes/Molly/weapons/Molly-YetiSpirit.png"
+    }
+  },
+  "50013": {
+    "name": "Philly",
+    "slug": "philly",
+    "image": "/images/heroes/Philly/Philly.png",
+    "troop": "Lancer",
+    "generation": 2,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Pharmacologica",
+      "image": "/images/heroes/Philly/weapons/Philly-Pharmacologica.png"
+    }
+  },
+  "50014": {
+    "name": "Reina",
+    "slug": "reina",
+    "image": "/images/heroes/Reina/Reina.jpg",
+    "troop": "Lancer",
+    "generation": 4,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Ninjaken - Raikiri",
+      "image": "/images/heroes/Reina/weapons/Reina-NinjakenRaikiri.png"
+    }
+  },
+  "50015": {
+    "name": "Gordon",
+    "slug": "gordon",
+    "image": "/images/heroes/Gordon/Gordon.jpg",
+    "troop": "Lancer",
+    "generation": 7,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Bonecrux Venom",
+      "image": "/images/heroes/Gordon/weapons/Gordon-BonecruxVenom.png"
+    }
+  },
+  "50016": {
+    "name": "Mia",
+    "slug": "mia",
+    "image": "/images/heroes/Mia/Mia.png",
+    "troop": "Lancer",
+    "generation": 3,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Fate Crystal",
+      "image": "/images/heroes/Mia/weapons/Mia-FateCrystal.png"
+    }
+  },
+  "50017": {
+    "name": "Zinman",
+    "slug": "zinman",
+    "image": "/images/heroes/Zinman/Zinman.png",
+    "troop": "Marksman",
+    "generation": 1,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Woodpecker",
+      "image": "/images/heroes/Zinman/weapons/Zinman-Woodpecker.png"
+    }
+  },
+  "50018": {
+    "name": "Alonso",
+    "slug": "alonso",
+    "image": "/images/heroes/Alonso/Alonso.png",
+    "troop": "Marksman",
+    "generation": 2,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Captain Ahab",
+      "image": "/images/heroes/Alonso/weapons/Alonso-CaptainAhab.png"
+    }
+  },
+  "50019": {
+    "name": "Wu Ming",
+    "slug": "wu-ming",
+    "image": "/images/heroes/WuMing/WuMing.jpg",
+    "troop": "Infantry",
+    "generation": 6,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Dragonslayer",
+      "image": "/images/heroes/WuMing/weapons/WuMing-Dragonslayer.png"
+    }
+  },
+  "50020": {
+    "name": "Greg",
+    "slug": "greg",
+    "image": "/images/heroes/Greg/Greg.png",
+    "troop": "Marksman",
+    "generation": 3,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "State Edict",
+      "image": "/images/heroes/Greg/weapons/Greg-StateEdict.png"
+    }
+  },
+  "50021": {
+    "name": "Flint",
+    "slug": "flint",
+    "image": "/images/heroes/Flint/Flint.png",
+    "troop": "Infantry",
+    "generation": 2,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Dragonbane",
+      "image": "/images/heroes/Flint/weapons/Flint-Dragonbane.png"
+    }
+  },
+  "50022": {
+    "name": "Lynn",
+    "slug": "lynn",
+    "image": "/images/heroes/Lynn/Lynn.jpg",
+    "troop": "Marksman",
+    "generation": 4,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Ella's Tear",
+      "image": "/images/heroes/Lynn/weapons/Lynn-EllaSTear.png"
+    }
+  },
+  "50023": {
+    "name": "Ahmose",
+    "slug": "ahmose",
+    "image": "/images/heroes/Ahmose/Ahmose.png",
+    "troop": "Infantry",
+    "generation": 4,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Guardian's Relic",
+      "image": "/images/heroes/Ahmose/weapons/Ahmose-GuardianSRelic.png"
+    }
+  },
+  "50024": {
+    "name": "Hector",
+    "slug": "hector",
+    "image": "/images/heroes/Hector/Hector.jpg",
+    "troop": "Infantry",
+    "generation": 5,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Steel Fangs",
+      "image": "/images/heroes/Hector/weapons/Hector-SteelFangs.png"
+    }
+  },
+  "50025": {
+    "name": "Norah",
+    "slug": "norah",
+    "image": "/images/heroes/Norah/Norah.jpg",
+    "troop": "Lancer",
+    "generation": 5,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Snow Cruiser",
+      "image": "/images/heroes/Norah/weapons/Norah-SnowCruiser.png"
+    }
+  },
+  "50026": {
+    "name": "Gwen",
+    "slug": "gwen",
+    "image": "/images/heroes/Gwen/Gwen.jpg",
+    "troop": "Marksman",
+    "generation": 5,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Wings of Hope",
+      "image": "/images/heroes/Gwen/weapons/Gwen-WingsOfHope.png"
+    }
+  },
+  "50027": {
+    "name": "Seo-yoon",
+    "slug": "seo-yoon",
+    "image": "/images/heroes/SeoYoon/SeoYoon.jpg",
+    "troop": "Marksman",
+    "generation": 0,
+    "rarity": "Epic"
+  },
+  "50028": {
+    "name": "Jasser",
+    "slug": "jasser",
+    "image": "/images/heroes/Jasser/Jasser.jpg",
+    "troop": "Marksman",
+    "generation": 0,
+    "rarity": "Epic"
+  },
+  "50029": {
+    "name": "Lumak Bokan",
+    "slug": "lumak-bokan",
+    "image": "/images/heroes/LumakBokan/LumakBokan.png",
+    "troop": "Lancer",
+    "generation": 0,
+    "rarity": "Epic"
+  },
+  "50030": {
+    "name": "Renee",
+    "slug": "renee",
+    "image": "/images/heroes/Renee/Renee.jpg",
+    "troop": "Lancer",
+    "generation": 6,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Illusion Magiball",
+      "image": "/images/heroes/Renee/weapons/Renee-IllusionMagiball.png"
+    }
+  },
+  "50031": {
+    "name": "Wayne",
+    "slug": "wayne",
+    "image": "/images/heroes/Wayne/Wayne.jpg",
+    "troop": "Marksman",
+    "generation": 6,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Power Boomerang",
+      "image": "/images/heroes/Wayne/weapons/Wayne-PowerBoomerang.png"
+    }
+  },
+  "50032": {
+    "name": "Edith",
+    "slug": "edith",
+    "image": "/images/heroes/Edith/Edith.jpg",
+    "troop": "Infantry",
+    "generation": 7,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Charm Toolkit",
+      "image": "/images/heroes/Edith/weapons/Edith-CharmToolkit.png"
+    }
+  },
+  "50033": {
+    "name": "Bradley",
+    "slug": "bradley",
+    "image": "/images/heroes/Bradley/Bradley.jpg",
+    "troop": "Marksman",
+    "generation": 7,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Thunder Cannon",
+      "image": "/images/heroes/Bradley/weapons/Bradley-ThunderCannon.png"
+    }
+  },
+  "50034": {
+    "name": "Gatot",
+    "slug": "gatot",
+    "image": "/images/heroes/Gatot/Gatot.jpg",
+    "troop": "Infantry",
+    "generation": 8,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Golden Fang",
+      "image": "/images/heroes/Gatot/weapons/Gatot-GoldenFang.png"
+    }
+  },
+  "50035": {
+    "name": "Sonya",
+    "slug": "sonya",
+    "image": "/images/heroes/Sonya/Sonya.jpg",
+    "troop": "Lancer",
+    "generation": 8,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Mangrove Frog",
+      "image": "/images/heroes/Sonya/weapons/Sonya-MangroveFrog.png"
+    }
+  },
+  "50036": {
+    "name": "Hendrik",
+    "slug": "hendrik",
+    "image": "/images/heroes/Hendrik/Hendrik.jpg",
+    "troop": "Marksman",
+    "generation": 8,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Abyss Driver",
+      "image": "/images/heroes/Hendrik/weapons/Hendrik-AbyssDriver.png"
+    }
+  },
+  "50037": {
+    "name": "Ling Xue",
+    "slug": "ling-xue",
+    "image": "/images/heroes/LingXue/LingXue.jpg",
+    "troop": "Lancer",
+    "generation": 0,
+    "rarity": "Epic"
+  },
+  "50038": {
+    "name": "Magnus",
+    "slug": "magnus",
+    "image": "/images/heroes/Magnus/Magnus.jpg",
+    "troop": "Infantry",
+    "generation": 9,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Storm Axe",
+      "image": "/images/heroes/Magnus/weapons/Magnus-StormAxe.png"
+    }
+  },
+  "50039": {
+    "name": "Fred",
+    "slug": "fred",
+    "image": "/images/heroes/Fred/Fred.jpg",
+    "troop": "Lancer",
+    "generation": 9,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Blazebearer",
+      "image": "/images/heroes/Fred/weapons/Fred-Blazebearer.png"
+    }
+  },
+  "50040": {
+    "name": "Xura",
+    "slug": "xura",
+    "image": "/images/heroes/Xura/Xura.jpg",
+    "troop": "Marksman",
+    "generation": 9,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Witch Mask",
+      "image": "/images/heroes/Xura/weapons/Xura-WitchMask.png"
+    }
+  },
+  "50041": {
+    "name": "Gregory",
+    "slug": "gregory",
+    "image": "/images/heroes/Gregory/Gregory.jpg",
+    "troop": "Infantry",
+    "generation": 10,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Solarsword",
+      "image": "/images/heroes/Gregory/weapons/Gregory-Solarsword.png"
+    }
+  },
+  "50042": {
+    "name": "Freya",
+    "slug": "freya",
+    "image": "/images/heroes/Freya/Freya.jpg",
+    "troop": "Lancer",
+    "generation": 10,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Blood Moon Scythe",
+      "image": "/images/heroes/Freya/weapons/Freya-BloodMoonScythe.png"
+    }
+  },
+  "50043": {
+    "name": "Blanchette",
+    "slug": "blanchette",
+    "image": "/images/heroes/Blanchette/Blanchette.jpg",
+    "troop": "Marksman",
+    "generation": 10,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Wolf Hunter",
+      "image": "/images/heroes/Blanchette/weapons/Blanchette-WolfHunter.png"
+    }
+  },
+  "50044": {
+    "name": "Eleonora",
+    "slug": "eleonora",
+    "image": "/images/heroes/Eleonora/Eleonora.jpg",
+    "troop": "Infantry",
+    "generation": 11,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Scepter of Solaris",
+      "image": "/images/heroes/Eleonora/weapons/Eleonora-ScepterOfSolaris.png"
+    }
+  },
+  "50045": {
+    "name": "Lloyd",
+    "slug": "lloyd",
+    "image": "/images/heroes/Lloyd/Lloyd.jpg",
+    "troop": "Lancer",
+    "generation": 11,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Mastercraft Treasure",
+      "image": "/images/heroes/Lloyd/weapons/Lloyd-MastercraftTreasure.png"
+    }
+  },
+  "50046": {
+    "name": "Rufus",
+    "slug": "rufus",
+    "image": "/images/heroes/Rufus/Rufus.jpg",
+    "troop": "Marksman",
+    "generation": 11,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Meteor Blaster",
+      "image": "/images/heroes/Rufus/weapons/Rufus-MeteorBlaster.png"
+    }
+  },
+  "50047": {
+    "name": "Hervor",
+    "slug": "hervor",
+    "image": "/images/heroes/Hervor/Hervor.jpg",
+    "troop": "Infantry",
+    "generation": 12,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Hammer of Sathla",
+      "image": "/images/heroes/Hervor/weapons/Hervor-HammerOfSathla.png"
+    }
+  },
+  "50048": {
+    "name": "Karol",
+    "slug": "karol",
+    "image": "/images/heroes/Karol/Karol.jpg",
+    "troop": "Lancer",
+    "generation": 12,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Spirit of Winterwind",
+      "image": "/images/heroes/Karol/weapons/Karol-SpiritOfWinterwind.png"
+    }
+  },
+  "50049": {
+    "name": "Ligeia",
+    "slug": "ligeia",
+    "image": "/images/heroes/Ligeia/Ligeia.jpg",
+    "troop": "Marksman",
+    "generation": 12,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Fateweaver",
+      "image": "/images/heroes/Ligeia/weapons/Ligeia-Fateweaver.png"
+    }
+  },
+  "50050": {
+    "name": "Gisela",
+    "slug": "gisela",
+    "image": "/images/heroes/Gisela/Gisela.jpg",
+    "troop": "Infantry",
+    "generation": 13,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Helacore",
+      "image": "/images/heroes/Gisela/weapons/Gisela-Helacore.png"
+    }
+  },
+  "50051": {
+    "name": "Flora",
+    "slug": "flora",
+    "image": "/images/heroes/Flora/Flora.jpg",
+    "troop": "Lancer",
+    "generation": 13,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Kernel of Plenty",
+      "image": "/images/heroes/Flora/weapons/Flora-KernelOfPlenty.png"
+    }
+  },
+  "50052": {
+    "name": "Vulcanus",
+    "slug": "vulcanus",
+    "image": "/images/heroes/Vulcanus/Vulcanus.jpg",
+    "troop": "Marksman",
+    "generation": 13,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Doom Sigil",
+      "image": "/images/heroes/Vulcanus/weapons/Vulcanus-DoomSigil.png"
+    }
+  },
+  "50053": {
+    "name": "Elif",
+    "slug": "elif",
+    "image": "/images/heroes/Elif/Elif.png",
+    "troop": "Infantry",
+    "generation": 14,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Moonscar Lv.10",
+      "image": "/images/heroes/Elif/weapons/Elif-MoonscarLv10.png"
+    }
+  },
+  "50054": {
+    "name": "Dominic",
+    "slug": "dominic",
+    "image": "/images/heroes/Dominic/Dominic.png",
+    "troop": "Lancer",
+    "generation": 14,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Exobox",
+      "image": "/images/heroes/Dominic/weapons/Dominic-Exobox.png"
+    }
+  },
+  "50055": {
+    "name": "Cara",
+    "slug": "cara",
+    "image": "/images/heroes/Cara/Cara.png",
+    "troop": "Marksman",
+    "generation": 14,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Velocomet",
+      "image": "/images/heroes/Cara/weapons/Cara-Velocomet.png"
+    }
+  },
+  "50056": {
+    "name": "Hank",
+    "slug": "hank",
+    "image": "/images/heroes/Hank/Hank.png",
+    "troop": "Infantry",
+    "generation": 15,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Roaring Rage",
+      "image": "/images/heroes/Hank/weapons/Hank-RoaringRage.png"
+    }
+  },
+  "50057": {
+    "name": "Estrella",
+    "slug": "estrella",
+    "image": "/images/heroes/Estrella/Estrella.png",
+    "troop": "Lancer",
+    "generation": 15,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Dreamscape Painting",
+      "image": "/images/heroes/Estrella/weapons/Estrella-DreamscapePainting.png"
+    }
+  },
+  "50058": {
+    "name": "Viveca",
+    "slug": "viveca",
+    "image": "/images/heroes/Viveca/Viveca.png",
+    "troop": "Marksman",
+    "generation": 15,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Dark Star",
+      "image": "/images/heroes/Viveca/weapons/Viveca-DarkStar.png"
+    }
+  },
+  "50059": {
+    "name": "Seigel",
+    "slug": "seigel",
+    "image": "/images/heroes/Seigel/Seigel.png",
+    "troop": "Infantry",
+    "generation": 16,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Blacklight Halberd",
+      "image": "/images/heroes/Seigel/weapons/Seigel-BlacklightHalberd.png"
+    }
+  },
+  "50060": {
+    "name": "Ursar",
+    "slug": "ursar",
+    "image": "/images/heroes/Ursar/Ursar.png",
+    "troop": "Lancer",
+    "generation": 16,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Progenitor Spear",
+      "image": "/images/heroes/Ursar/weapons/Ursar-ProgenitorSpear.png"
+    }
+  },
+  "50061": {
+    "name": "Aisling",
+    "slug": "aisling",
+    "image": "/images/heroes/Aisling/Aisling.png",
+    "troop": "Marksman",
+    "generation": 16,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Cord of Destiny",
+      "image": "/images/heroes/Aisling/weapons/Aisling-CordOfDestiny.png"
+    }
+  },
+  "50062": {
+    "name": "Aiden",
+    "slug": "aiden",
+    "image": "/images/heroes/Aiden/Aiden.png",
+    "troop": "Infantry",
+    "generation": 17,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Burning Fist",
+      "image": "/images/heroes/Aiden/weapons/Aiden-BurningFist.png"
+    }
+  },
+  "50063": {
+    "name": "Bertha",
+    "slug": "bertha",
+    "image": "/images/heroes/Bertha/Bertha.png",
+    "troop": "Lancer",
+    "generation": 17,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "Adjudicator",
+      "image": "/images/heroes/Bertha/weapons/Bertha-Adjudicator.png"
+    }
+  },
+  "50064": {
+    "name": "Eleanor",
+    "slug": "eleanor",
+    "image": "/images/heroes/Eleanor/Eleanor.png",
+    "troop": "Marksman",
+    "generation": 17,
+    "rarity": "Legendary",
+    "widget": {
+      "name": "The Warden",
+      "image": "/images/heroes/Eleanor/weapons/Eleanor-TheWarden.png"
+    }
+  }
+}
