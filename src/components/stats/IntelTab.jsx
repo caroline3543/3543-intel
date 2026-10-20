@@ -1,3 +1,4 @@
+import { StateRankingsPanel } from './rankings/StateRankingsPanel.jsx';
 import { useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { calcMetrics } from '../../data/metrics.js';
@@ -288,7 +289,8 @@ function LabyrinthRankings({ entries, existingTags, players, onSave, onDelete, o
   );
 }
 
-export function IntelTab({ players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice, asciiArts = [], onSaveArt, onDeleteArt, onResetArtToDefaults, labyrinthEntries = [], onSaveLabyrinthEntry, onDeleteLabyrinthEntry }) {
+export function IntelTab({ onUpdatePlayers, onViewPlayer, players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice, asciiArts = [], onSaveArt, onDeleteArt, onResetArtToDefaults, labyrinthEntries = [], onSaveLabyrinthEntry, onDeleteLabyrinthEntry }) {
+  const [rankingsOpen,setRankingsOpen] = useState(false);
   const [registryOpen, setRegistryOpen] = useState(false);
   const [noticesOpen, setNoticesOpen]   = useState(false);
   const [artOpen, setArtOpen]           = useState(false);
@@ -328,6 +330,8 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
   const rallyLeads   = players.filter(p=>p.roles?.includes('Rally Lead')).length;
   const withJoiners  = players.filter(p=>(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5)).length;
   const englishDiscordPlayers = players.filter(p=>p.languages?.includes('English') && p.availability?.discord==='yes');
+
+  if (rankingsOpen) return <StateRankingsPanel stateId={settings.stateId} players={players} onUpdatePlayers={onUpdatePlayers} onViewPlayer={onViewPlayer} showToast={showToast} onClose={()=>setRankingsOpen(false)}/>;
 
   if (registryOpen) {
     return (
@@ -388,6 +392,7 @@ export function IntelTab({ players, events, onUpdatePlayer, showToast, settings 
 
   return (
     <div style={{ padding:'16px 20px' }}>
+      <button onClick={()=>setRankingsOpen(true)} style={{width:'100%',minHeight:64,padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.gold}`,color:C.gold,fontWeight:700,fontSize:15,textAlign:'left',marginBottom:16}}>🏆 State {settings.stateId} rankings →<div style={{fontSize:12,fontWeight:400,color:C.icy,marginTop:5}}>Power · Kills · Transfer score · Labyrinth · Gear & more</div></button>
 
       {/* Summary line — replaces the 6-card grid */}
       <div style={{ background:C.section, borderRadius:12, padding:'14px 16px', marginBottom:16, display:'flex', flexWrap:'wrap' }}>

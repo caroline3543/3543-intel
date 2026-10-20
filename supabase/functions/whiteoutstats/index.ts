@@ -1,3 +1,4 @@
+import { rankingsPath } from "./rankings.js";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const API_ROOT = "https://api.whiteoutstats.com/v1";
@@ -9,7 +10,7 @@ function allowedOrigins(): string[] {
   return [...new Set([...APP_ORIGINS, ...(Deno.env.get("MIGHTPULSE_ALLOWED_ORIGINS") || "")
     .split(",").map(x => x.trim()).filter(Boolean)])];
 }
-const ALLOWED_ACTIONS = new Set(["usage", "alliance", "kingdom", "player"]);
+const ALLOWED_ACTIONS = new Set(["usage", "alliance", "kingdom", "player", "rankings"]);
 
 function respond(body: unknown, status = 200, origin = ""): Response {
   const permitted = allowedOrigins();
@@ -66,6 +67,7 @@ Deno.serve(async req => {
   const validState = Number.isSafeInteger(state) && state >= 1 && state <= 99999;
   let path = "";
   if (action === "usage") path = "/usage";
+  if (action === "rankings") path = rankingsPath(input.state, input.board, input.limit ?? 100) || "";
   if (action === "kingdom" && validState) path = `/states/${state}`;
   if (action === "alliance" && validState && /^[\p{L}\p{N}_-]{1,16}$/u.test(tag)) {
     path = `/alliances/${state}/${encodeURIComponent(tag)}?include=info,roster`;

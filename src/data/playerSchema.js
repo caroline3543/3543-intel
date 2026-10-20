@@ -4,6 +4,7 @@ export function newPlayer(overrides = {}) {
   return {
     id:                 uid(),
     fid:                '',
+    providerRankings:   {}, // Board snapshots keyed by category; scoped to the workspace state.
     avatarUrl:          null,
     power:              null,
     kills:              null,

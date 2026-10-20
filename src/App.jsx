@@ -42,6 +42,7 @@ export default function App() {
     labyrinthEntries, saveLabyrinthEntry, deleteLabyrinthEntry,
   } = state;
 
+  const [rankingPlayerId,setRankingPlayerId] = useState(null);
   const [tab, setTab]               = useState(0);
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem('svs_onboarded'));
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -81,8 +82,8 @@ export default function App() {
         <StateSwitcher data={data} onPull={() => setAlliancePanel(true)} />
       </div>
 
-      {tab===0 && <TabErrorBoundary><RosterTab players={players} events={events} roles={roles} onSaveCustomRoles={saveCustomRoles} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(1)} /></TabErrorBoundary>}
-      {tab===1 && <TabErrorBoundary><IntelTab players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} settings={settings} notices={notices} onSaveNotice={saveNotice} onDeleteNotice={deleteNotice} asciiArts={asciiArts} onSaveArt={saveAsciiArt} onDeleteArt={deleteAsciiArt} onResetArtToDefaults={resetAsciiArtsToDefaults} labyrinthEntries={labyrinthEntries} onSaveLabyrinthEntry={saveLabyrinthEntry} onDeleteLabyrinthEntry={deleteLabyrinthEntry} /></TabErrorBoundary>}
+      {tab===0 && <TabErrorBoundary><RosterTab initialPlayerId={rankingPlayerId} onInitialPlayerOpened={()=>setRankingPlayerId(null)} players={players} events={events} roles={roles} onSaveCustomRoles={saveCustomRoles} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(1)} /></TabErrorBoundary>}
+      {tab===1 && <TabErrorBoundary><IntelTab onUpdatePlayers={updatePlayers} onViewPlayer={id=>{setRankingPlayerId(id);setTab(0);}} players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} settings={settings} notices={notices} onSaveNotice={saveNotice} onDeleteNotice={deleteNotice} asciiArts={asciiArts} onSaveArt={saveAsciiArt} onDeleteArt={deleteAsciiArt} onResetArtToDefaults={resetAsciiArtsToDefaults} labyrinthEntries={labyrinthEntries} onSaveLabyrinthEntry={saveLabyrinthEntry} onDeleteLabyrinthEntry={deleteLabyrinthEntry} /></TabErrorBoundary>}
       {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} showToast={showToast} /></TabErrorBoundary>}
       {tab===3 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} checklist={customChecklist} onSaveChecklist={saveChecklistItems} labyrinthEntries={labyrinthEntries} /></TabErrorBoundary>}
 
