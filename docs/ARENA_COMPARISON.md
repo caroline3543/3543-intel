@@ -1,6 +1,6 @@
 # Exploration Arena comparison
 
-Open Intel → Arena comparison. Select two different saved players in the active state. The advisor reads matching state/FID providerDetails.heroes snapshots and never saves trial edits to player records or requests provider data. Fetching existing heroes and gear remains available from each player's profile.
+Open Intel → Arena comparison. Select two different saved players in the active state. The advisor reads matching state/FID providerDetails.heroes snapshots and never saves trial edits to player records. Explicit ID fetches are described below; opening the comparison alone makes no provider request.
 
 The initial trial is ordered by reported position code, but no source-code-to-front/back mapping is claimed as verified. Both formations must be checked in game and explicitly confirmed before positioning suggestions or recording results. Changing a position swaps existing occupants, prevents duplicate selection, and clears confirmation. The diagram labels front/back and left/right; matching displayed positions are not interpreted as target pairs.
 
@@ -15,3 +15,18 @@ Outcome modelling is unavailable: no fabricated win percentage, invented skill m
 Manually recorded win/loss/draw outcomes preserve both teams and notes. The latest 100 save under svs_arena_results_v1:state:<id> through a hook/service, remain device-local and are separate from cloud player records and roster backups. Counts describe observations across potentially different formations, not forecasts. Results can be removed using inline confirmation. Storage errors are reported. Wrong-state or malformed stored trials are ignored.
 
 Validation: seven service tests cover source identity, snapshots, unique placement swaps, missing stats, scoped comparisons, advice gates, equipment comparability and bounded state-specific logs. Chromium fixture tests phone/desktop UI, manual alternatives, confirmation/swap behaviour, battle persistence, cancellation of result removal, unchanged roster data and state isolation, with no provider calls. Physical iPhone Safari and a live provider refresh remain unverified.
+
+## Fetch by player ID and Holger
+
+The comparison now accepts an in-game chief ID on either side and calls the existing authenticated player_details action with the active state. Saved-player selection fills the ID field. An opponent does not need to exist in Members. The returned player identity, state, timestamp and non-empty defence hero data are validated before replacing a comparison. Failed, cancelled, superseded or out-of-state responses keep the previous team. Fetched profiles are ephemeral comparison copies; no player save/import callback is called and no new roster record is created. Each control identifies the currently displayed ID when an edited input has not been fetched.
+
+Your fetched defence is the starting point for an editable attack trial. The opponent editor is restricted to verifying the position mapping of their recorded defence; owned alternative entry is available only on your side. Reload restores the source snapshot, and re-fetching replaces that side's trial formation. Holger inputs survive a re-fetch of the same FID. The provider's defence team is not a verified full catalogue of owned heroes or their equipment. Unreported owned alternatives must still be entered manually. Cached responses and source dates remain visible. Both lookups use existing proxy authentication/authorization; no secrets, endpoints, database policies or Edge Function code change.
+
+Holger combat skill levels are explicit manual inputs for both sides because this integration has no verified expert-level API schema. Unknown is distinct from level 0 (not unlocked). Official level tables give 2% Attack and Health per skill level, up to 20% at level 10. Arena Elite applies to escorts; Legacy applies to heroes, as clarified by the official Chinese/Japanese skill descriptions. The two unit pools are kept separate and never combined into a 40% hero bonus. The advisor compares bonus differences in percentage points, includes known opponent advantages as matchup gaps, flags unknown values, and stores inputs with actual battle results. Reported hero power is never multiplied by these inputs because the combat stat formula and the provider's inclusion of modifiers are unverified. Shop/token skills and Expedition affinity stats are not applied to this Exploration model.
+
+Sources checked 2026-10-21:
+- https://www.whiteoutsurvival.wiki/experts/holger/ (skill level tables)
+- https://www.whiteoutsurvival.wiki/tw/experts/霍爾格/ (separate escort and hero effects)
+- https://www.whiteoutsurvival.wiki/ja/experts/ホルガー/ (separate escort and hero effects)
+
+Additional validation: five service tests cover fetched identities/states, defence equipment, invalid/missing responses, cancellation, and Holger validation/pool separation. A second Chromium fixture stubs the proxy client and verifies own/opponent ID fetches, an opponent outside Members, attack changes retaining opponent defence, Holger notes and recorded snapshots, wrong-state rejection, delayed-response cancellation and unchanged roster records. All 118 service tests pass. Live authenticated provider requests and physical iPhone Safari remain unverified.
