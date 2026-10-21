@@ -1,3 +1,4 @@
+import {gameLanguageCode} from './gameLanguageService.js';
 import { normalizeAvatarUrl } from './playerAvatarService.js';
 // Whiteout Stats' own levelLabel(): /static/app.js (20261020kvkcol).
 // Completed Fire Crystal tier = floor((raw furnace level - 30) / 5).
@@ -18,6 +19,8 @@ export function providerNumber(value) {
 }
 export function providerProfilePatch(row) {
   const patch = {};
+  const language=gameLanguageCode(row.raw?.language);
+  if(language)patch.gameLanguage=language;
   const avatar = normalizeAvatarUrl(row.avatarUrl);
   if (avatar) patch.avatarUrl = avatar;
   if (row.username?.trim()) patch.username = row.username.trim();

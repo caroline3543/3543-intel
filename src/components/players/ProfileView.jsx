@@ -1,3 +1,4 @@
+import {withGameLanguage,gameLanguageName} from '../../services/gameLanguageService.js';
 import { PlayerEquipmentSection } from './PlayerEquipmentSection.jsx';
 import { PlayerHistorySection } from './PlayerHistorySection.jsx';
 import { PlayerRankingsSection } from './PlayerRankingsSection.jsx';
@@ -255,7 +256,8 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
         <Section title="Identity">
           <Row label="Player ID" value={player.fid}/>
           <Row label="Country"   value={player.country}/>
-          <Row label="Languages" value={player.languages?.join(', ')}/>
+          <Row label="Game language" value={gameLanguageName(withGameLanguage(player).gameLanguage)}/>
+          <Row label="Languages" value={withGameLanguage(player).languages?.join(', ')}/>
         </Section>
 
         {/* 6. Event history */}

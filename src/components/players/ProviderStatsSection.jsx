@@ -1,9 +1,13 @@
+import {providerField,gameLanguageName} from '../../services/gameLanguageService.js';
+import {RecordedActivity} from './RecordedActivity.jsx';
 import { C } from '../../utils/constants.js';
 const label = key => key.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase()) + (['furnace_level','stove_lv','town_center_level'].includes(key) ? ' (provider code)' : '');
-function Value({value}) {
+function Value({value,fieldKey}) {
+  if(['last_active_at','last_login'].includes(fieldKey))return <RecordedActivity value={value}/>;
+  if(fieldKey==='language' && gameLanguageName(value))return <span>{gameLanguageName(value)} · game setting</span>;
   if (value === null) return <span style={{color:C.muted}}>Not supplied</span>;
   if (Array.isArray(value)) return value.length ? <ol style={{paddingLeft:20}}>{value.map((item,i)=><li key={i}><Value value={item}/></li>)}</ol> : <span>None</span>;
-  if (typeof value === 'object') return <dl style={{margin:0}}>{Object.entries(value).map(([key,item])=><div key={key} style={{padding:'5px 0'}}><dt style={{color:C.muted}}>{label(key)}</dt><dd style={{margin:'3px 0 0',overflowWrap:'anywhere'}}><Value value={item}/></dd></div>)}</dl>;
+  if (typeof value === 'object') return <dl style={{margin:0}}>{Object.entries(value).map(([key,item])=><div key={key} style={{padding:'5px 0'}}><dt style={{color:C.muted}}>{label(key)}</dt><dd style={{margin:'3px 0 0',overflowWrap:'anywhere'}}><Value value={item} fieldKey={key}/></dd></div>)}</dl>;
   return <span>{typeof value === 'boolean' ? (value?'Yes':'No') : typeof value === 'number' ? value.toLocaleString('en-US') : String(value)}</span>;
 }
 export function ProviderStatsSection({player}) {
@@ -16,6 +20,7 @@ export function ProviderStatsSection({player}) {
     </div>
     {player.furnaceLevel && <p style={{color:C.gold,fontSize:14}}>Furnace {player.furnaceLevel}</p>}
     {stats && <p style={{fontSize:11,color:C.muted}}>Whiteout Stats · State {stats.stateId} · [{stats.allianceTag}]{stats.retrievedAt ? ` · Pulled ${new Date(stats.retrievedAt).toISOString().replace('T',' ').replace('.000Z',' UTC')}` : ''}</p>}
+    {providerField(player,'last_active_at')!=null && <div style={{fontSize:13,color:C.icy,marginBottom:12}}><div style={{color:C.muted,marginBottom:4}}>Last active · provider record</div><RecordedActivity value={providerField(player,'last_active_at')}/></div>}
     {stats?.raw && <details><summary style={{minHeight:44,display:'list-item',paddingTop:12,color:C.gold,cursor:'pointer'}}>All fetched player data</summary><div style={{fontSize:13,color:C.icy}}><Value value={stats.raw}/></div></details>}
   </section>;
 }

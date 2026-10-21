@@ -19,6 +19,7 @@ export function newPlayer(overrides = {}) {
     country:            '',
     timezone:           '',
     languages:          [],
+    gameLanguage:       null, // Primary language from the game setting; manual additional languages are retained.
     furnaceLevel:       null,
     infantryCampLevel:  null,
     lancerCampLevel:    null,
