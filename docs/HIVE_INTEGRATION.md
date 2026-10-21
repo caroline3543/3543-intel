@@ -1,0 +1,13 @@
+# Bear Hive integration
+
+The Hive tab hosts the existing standalone Bear Hive planner in a same-origin iframe, preserving its own green identity, controls, CSS, map engine, templates, attendance and exports. React styles remain inline. Vendored source: caroline3543/Bear-Trap-Calculator, commit 59a9ccc9a7395175c94c4da50c3bf3caa0f16e68, bear-hive-planner/dist. The original planner remains independently deployed and unchanged.
+
+Each state and case-sensitive alliance tag has its own storage key: bear-hive-intel:state:<state>:alliance:<encoded-tag>, with -history and -dark companions. The old standalone bear-hive-v1 key is neither read nor changed. To migrate a saved standalone plan, download its backup there and restore it through Plan settings in the matching integrated workspace. Planner backups are separate from the main roster JSON export.
+
+React sends only a minimal roster (local ID, chief ID, exact name, furnace and valid reported coordinates) through origin/source-checked postMessage. No session tokens, secrets or full provider payloads are sent. Both ends enforce state and alliance identity. An update matches chief IDs, preserves planner IDs, placements, locks, notes and attendance, adds new members to Other players, never deletes missing members, and only replaces reported coordinates with an equally/newer dated observation. Unknown or duplicated chief IDs are excluded from the roster bridge. Cross-workspace backups are rejected.
+
+Reported locations use validated profile coordinates, not a guessed city layout. The map shows retrieval timestamps; provider caching still applies. It is separate from planned positions and has no live map, shield or marching feed. Refresh player reuses the authenticated per-player details flow and saves via the existing player operation. There is no background scanning or bulk API fetch. Traps, banners, HQ and other structures are not inferred from player coordinates.
+
+Vendored changes are limited to: namespaced KEY and share URL query preservation in app.js; bootstrap/validation guard/message bridge scripts referenced by index.html. Standalone gesture and model code is retained. An inline embedding style in index.html hides duplicate headings and sizes the viewport to the embedded frame.
+
+Validation: node --test tests/*.test.js; npm run build; the original planner's 12 test/*.test.cjs model suites against a CommonJS scratch copy of the vendored files. Browser fixture uses synthetic records only and passed phone/desktop loading, templates, dark mode, expansion, roster preservation, location selection, alliance/state isolation and reload persistence with zero page errors. Physical iPhone Safari and authenticated live provider refresh require separate verification.

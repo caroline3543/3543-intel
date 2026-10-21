@@ -1,3 +1,4 @@
+import {HiveTab} from './components/hive/HiveTab.jsx';
 import { StateSwitcher } from './components/workspaces/StateSwitcher.jsx';
 import { AllianceImportPanel } from './components/workspaces/AllianceImportPanel.jsx';
 import { useState, useRef } from 'react';
@@ -23,6 +24,7 @@ const TABS = [
   { icon:'📊', label:'Intel'   },   // 1
   { icon:'📅', label:'Events'  },   // 2
   { icon:'⚔️', label:'Battle'  },   // 3
+  { icon:'▦', label:'Hive' },      // 4
 ];
 
 const hdrBtn = { height:36, padding:'0 10px', borderRadius:20, background:'#152236', border:'1px solid #2A4A64', color:'#A8C4D8', fontSize:13, fontWeight:600, cursor:'pointer' };
@@ -67,8 +69,8 @@ export default function App() {
   }
 
   return (
-    <div style={{ background:'#0A1628', minHeight:'100vh', color:'#FFFFFF', fontFamily:'system-ui,-apple-system,sans-serif', paddingBottom:80, maxWidth:480, margin:'0 auto' }}>
-      <div style={{ padding:'20px 20px 14px', borderBottom:'1px solid #2A4A64', position:'sticky', top:0, background:'#0A1628', zIndex:50 }}>
+    <div style={{ background:'#0A1628', minHeight:'100vh', color:'#FFFFFF', fontFamily:'system-ui,-apple-system,sans-serif', paddingBottom:tab===4?60:80, height:tab===4?'100dvh':undefined, overflow:tab===4?'hidden':undefined, maxWidth:480, margin:'0 auto' }}>
+      {tab!==4 && <div style={{ padding:'20px 20px 14px', borderBottom:'1px solid #2A4A64', position:'sticky', top:0, background:'#0A1628', zIndex:50 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
             <div style={{ fontSize:20, fontWeight:700, color:'#FFFFFF' }}>🏰 {settings?.allianceName || 'My Alliance'}</div>
@@ -80,12 +82,14 @@ export default function App() {
           </div>
         </div>
         <StateSwitcher data={data} onPull={() => setAlliancePanel(true)} />
-      </div>
+      </div>}
 
       {tab===0 && <TabErrorBoundary><RosterTab initialPlayerId={rankingPlayerId} onInitialPlayerOpened={()=>setRankingPlayerId(null)} players={players} events={events} roles={roles} onSaveCustomRoles={saveCustomRoles} onSavePlayer={savePlayer} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} onDeletePlayer={id=>setDeleteTarget(id)} showToast={showToast} onGoToIntel={()=>setTab(1)} /></TabErrorBoundary>}
       {tab===1 && <TabErrorBoundary><IntelTab onUpdatePlayers={updatePlayers} onViewPlayer={id=>{setRankingPlayerId(id);setTab(0);}} players={players} events={events} onUpdatePlayer={savePlayer} showToast={showToast} settings={settings} notices={notices} onSaveNotice={saveNotice} onDeleteNotice={deleteNotice} asciiArts={asciiArts} onSaveArt={saveAsciiArt} onDeleteArt={deleteAsciiArt} onResetArtToDefaults={resetAsciiArtsToDefaults} labyrinthEntries={labyrinthEntries} onSaveLabyrinthEntry={saveLabyrinthEntry} onDeleteLabyrinthEntry={deleteLabyrinthEntry} /></TabErrorBoundary>}
       {tab===2 && <TabErrorBoundary><EventsTab events={events} players={players} onCreateEvent={createEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onAddPlayers={addPlayers} onUpdatePlayers={updatePlayers} showToast={showToast} /></TabErrorBoundary>}
       {tab===3 && <TabErrorBoundary><BattleTab plans={svsPlans} players={players} events={events} onSave={saveSvsPlans} onDelete={deleteSvsPlan} showToast={showToast} onGoToMembers={()=>setTab(0)} settings={settings} checklist={customChecklist} onSaveChecklist={saveChecklistItems} labyrinthEntries={labyrinthEntries} /></TabErrorBoundary>}
+
+      {tab===4 && <TabErrorBoundary><HiveTab players={players} settings={settings} onSavePlayer={savePlayer} onImportAlliance={()=>setAlliancePanel(true)} onViewPlayer={id=>{setRankingPlayerId(id);setTab(0);}} /></TabErrorBoundary>}
 
       {alliancePanel && <AllianceImportPanel stateId={settings.stateId} players={players} onClose={() => setAlliancePanel(false)} onImport={importAllianceProfiles} />}
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
@@ -105,7 +109,7 @@ export default function App() {
       {settingsPanel && <SettingsPanel settings={settings} onSave={s=>{saveSettings(s);setSettingsPanel(false);vibe(8);}} onClose={()=>setSettingsPanel(false)} />}
       {toast && <Toast msg={toast.msg} type={toast.type} />}
 
-      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(4,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>
+      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(5,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>
         {TABS.map((t,i) => (
           <button key={i} onClick={()=>{setTab(i);vibe(8);}} style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color:tab===i?'#F5A623':'#5A7A94', gap:2, fontSize:9, fontWeight:600, transition:'color 150ms ease', WebkitTapHighlightColor:'transparent' }}>
             <span style={{ fontSize:19 }}>{t.icon}</span>{t.label}
