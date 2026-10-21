@@ -30,3 +30,5 @@ Sources checked 2026-10-21:
 - https://www.whiteoutsurvival.wiki/ja/experts/ホルガー/ (separate escort and hero effects)
 
 Additional validation: five service tests cover fetched identities/states, defence equipment, invalid/missing responses, cancellation, and Holger validation/pool separation. A second Chromium fixture stubs the proxy client and verifies own/opponent ID fetches, an opponent outside Members, attack changes retaining opponent defence, Holger notes and recorded snapshots, wrong-state rejection, delayed-response cancellation and unchanged roster records. All 118 service tests pass. Live authenticated provider requests and physical iPhone Safari remain unverified.
+
+Portrait controls and researched skill references: see [ARENA_RESEARCH.md](ARENA_RESEARCH.md). Your attack portraits support direct mouse/touch swaps, tap/keyboard placement and Undo. Defence portraits require explicit unlocking for position mapping. Neither operation changes source snapshots or Members records. Primary-source skill tables are supplied separately from the unvalidated full combat model.

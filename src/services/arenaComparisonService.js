@@ -1,3 +1,4 @@
+import {explorationResearchAdvice} from './arenaResearchService.js';
 import {compareHolger} from './arenaHolgerService.js';
 import {interpretHero,interpretedStars} from './equipmentCatalogService.js';
 export const ARENA_SLOTS=['Front left','Front right','Back left','Back centre','Back right'];
@@ -57,6 +58,7 @@ export function compareArenaTeams(yours,theirs){
    recommendations.push({kind:'Class matchup to test',text:`The opponent has ${type} in front. ${counter} deals 10% extra class damage to ${type}. ${alternatives.length?`Review ${alternatives.map(h=>h.name).join(', ')} as an alternative.`:`Add an owned ${counter} alternative if available.`} Development and skill effects still matter; this does not establish who will target whom.`});
   }
  }
+ recommendations.push(...explorationResearchAdvice(a,b));
  // Objective gaps between matching heroes; never turn gear levels into invented damage.
  for(const h of a.filter(Boolean)){
   const other=b.find(o=>o && String(o.id ?? o.hero_id)===String(h.id ?? h.hero_id));if(!other)continue;
