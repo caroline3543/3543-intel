@@ -51,6 +51,7 @@ export async function importFromXlsxFile(file) {
       id: row.id, fid: row.fid || '', username: row.username || '', alias: row.alias || '',
       allianceTag: row.allianceTag || '', country: row.country || '', timezone: row.timezone || '',
       languages: parseJsonCell(row.languages, []),
+      gameLanguage: row.gameLanguage || null,
       furnaceLevel: row.furnaceLevel || null,
       infantryCampLevel: row.infantryCampLevel || null,
       lancerCampLevel: row.lancerCampLevel || null,

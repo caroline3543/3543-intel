@@ -1,3 +1,4 @@
+import {withGameLanguage} from './gameLanguageService.js';
 import { recordPlayerObservation, PROFILE_HISTORY_FIELDS } from './playerObservationService.js';
 import { newPlayer } from '../data/playerSchema.js';
 import { providerNumber, providerProfilePatch } from './providerProfileService.js';
@@ -57,7 +58,7 @@ export function mergeAllianceProfiles(existing, rows, stateId) {
     if (previous && patch.allianceTag && previous.allianceTag !== patch.allianceTag) {
       player.allianceHistory = [...(previous.allianceHistory || []), {from:previous.allianceTag || '',to:patch.allianceTag,at}];
     }
-    const tracked=recordPlayerObservation(previous,player,{stateId,stream:'profile',observedAt:row.retrievedAt,values:Object.fromEntries(PROFILE_HISTORY_FIELDS.filter(key=>patch[key]!=null).map(key=>[key,patch[key]]))});
+    const tracked=recordPlayerObservation(previous,withGameLanguage(player,previous?.gameLanguage),{stateId,stream:'profile',observedAt:row.retrievedAt,values:Object.fromEntries(PROFILE_HISTORY_FIELDS.filter(key=>patch[key]!=null).map(key=>[key,patch[key]]))});
     if (previous) { players[index] = tracked; updated.push(tracked); }
     else { players.push(tracked); added.push(tracked); }
   }

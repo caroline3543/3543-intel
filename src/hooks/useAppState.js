@@ -1,6 +1,7 @@
+import {withGameLanguage} from '../services/gameLanguageService.js';
 import { useAllianceProfileImport } from './useAllianceProfileImport.js';
 import { activeStateId, assertImportState } from '../services/stateWorkspaceService.js';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { loadFromStorage, saveToStorage, mergeImportedData } from '../services/exportImportService.js';
 import {
   pushPlayer, deletePlayerRemote, pushPlan, deletePlanRemote, pullAll, isCloudConfigured,
@@ -60,7 +61,7 @@ export function useAppState() {
 
   // ── Player operations ─────────────────────────────────────
   const savePlayer = useCallback((player) => {
-    const stamped = { ...player, profileLastUpdated: new Date().toISOString() };
+    const stamped = withGameLanguage({ ...player, profileLastUpdated: new Date().toISOString() });
     setData(prev => {
       const isEdit = prev.players.some(p => p.id === stamped.id);
       return {
@@ -322,7 +323,7 @@ export function useAppState() {
   }, [showToast]);
 
   // ── Derived state (computed, not stored) ──────────────────
-  const players     = data.players     || [];
+  const players     = useMemo(()=>(data.players || []).map(p=>withGameLanguage(p)),[data.players]);
   const events      = data.events      || [];
   const svsPlans    = data.svsPlans    || [];
   const prepScores  = data.prepScores  || [];

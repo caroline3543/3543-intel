@@ -30,7 +30,7 @@ export function buildRosterDataSheet(players) {
     'id','fid','username','alias','allianceTag','country','timezone','languages',
     'furnaceLevel','infantryCampLevel','lancerCampLevel','marksmanCampLevel','troops',
     'joinerHeroes','roles','teamAssignment','notes',
-    'profileLastUpdated','createdAt','eventHistory','providerStats','power','kills','avatarUrl','providerRankings','observationHistory','providerDetails',
+    'profileLastUpdated','createdAt','eventHistory','providerStats','power','kills','avatarUrl','providerRankings','observationHistory','providerDetails','gameLanguage',
   ];
   const rows = [headers.map(cell)];
   (players || []).forEach(p => {
@@ -40,7 +40,7 @@ export function buildRosterDataSheet(players) {
       cell(p.furnaceLevel), cell(p.infantryCampLevel), cell(p.lancerCampLevel), cell(p.marksmanCampLevel),
       jsonCell(p.troops), jsonCell(p.joinerHeroes), jsonCell(p.roles),
       cell(p.teamAssignment), cell(p.notes),
-      cell(p.profileLastUpdated), cell(p.createdAt), jsonCell(p.eventHistory), jsonCell(p.providerStats), cell(p.power), cell(p.kills), cell(p.avatarUrl), jsonCell(p.providerRankings), jsonCell(p.observationHistory), jsonCell(p.providerDetails),
+      cell(p.profileLastUpdated), cell(p.createdAt), jsonCell(p.eventHistory), jsonCell(p.providerStats), cell(p.power), cell(p.kills), cell(p.avatarUrl), jsonCell(p.providerRankings), jsonCell(p.observationHistory), jsonCell(p.providerDetails), cell(p.gameLanguage),
     ]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
