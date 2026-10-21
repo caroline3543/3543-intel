@@ -1,0 +1,21 @@
+{
+  "note": "Legacy debt ratchet. Values may only go down. Regenerate with: node scripts/check-constitution.mjs --update-baseline",
+  "hardcodedHexInJsx": 33,
+  "oversizeFiles": {
+    "src/components/JoinerRegistry.jsx": 348,
+    "src/components/ascii/AsciiArtLibrary.jsx": 323,
+    "src/components/events/EventsTab.jsx": 1092,
+    "src/components/notices/NoticeLibrary.jsx": 366,
+    "src/components/players/BatchAddSheet.jsx": 304,
+    "src/components/players/FieldRegistry.jsx": 327,
+    "src/components/players/PlayerSheet.jsx": 305,
+    "src/components/players/ProfileView.jsx": 310,
+    "src/components/players/RosterTab.jsx": 550,
+    "src/components/svs/battle/FormationPicker.jsx": 484,
+    "src/hooks/useAppState.js": 409,
+    "src/services/eventListHelpers.js": 355,
+    "src/services/exportImportService.js": 218,
+    "src/services/exportXlsx.js": 770
+  },
+  "typecheckErrors": 59
+}
