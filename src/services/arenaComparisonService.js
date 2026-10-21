@@ -1,3 +1,4 @@
+import {compareHolger} from './arenaHolgerService.js';
 import {interpretHero,interpretedStars} from './equipmentCatalogService.js';
 export const ARENA_SLOTS=['Front left','Front right','Back left','Back centre','Back right'];
 export const arenaNumber=v=>['string','number'].includes(typeof v)&&String(v).trim()!==''&&Number.isFinite(Number(v))&&Number(v)>=0?Number(v):null;
@@ -12,7 +13,7 @@ export function arenaTeam(player,stateId){
  }
  // Source position codes remain visible. Their front/back mapping is not assumed verified.
  heroes.sort((a,b)=>(arenaNumber(interpretHero(a.raw).position)??999)-(arenaNumber(interpretHero(b.raw).position)??999));
- return {playerId:player?.id || '',playerName:player?.username || player?.alias || '',fid:String(player?.fid || ''),stateId:String(stateId),sourceAt:valid?details.heroes?.retrievedAt || null:null,heroes,slots:Array.from({length:5},(_,i)=>heroes[i]?.key || ''),confirmed:false};
+ return {playerId:player?.id || '',playerName:player?.username || player?.alias || '',fid:String(player?.fid || ''),stateId:String(stateId),sourceAt:valid?details.heroes?.retrievedAt || null:null,holger:{arenaElite:null,legacy:null,source:'Unknown'},heroes,slots:Array.from({length:5},(_,i)=>heroes[i]?.key || ''),confirmed:false};
 }
 export function placeArenaHero(team,index,key){
  if(!Number.isInteger(index)||index<0||index>4 || (key && !team.heroes.some(h=>h.key===key)))throw Error('Choose a valid hero and position.');
@@ -33,6 +34,9 @@ export function compareArenaTeams(yours,theirs){
  const complete=ac.filled===5 && bc.filled===5;
  const total=hs=>hs.every(h=>h && arenaNumber(h.power)>0)?hs.reduce((s,h)=>s+Number(h.power),0):null;
  const yourPower=total(a),opponentPower=total(b),recommendations=[],gaps=[];
+ const holger=compareHolger(yours.holger,theirs.holger);
+ if(!holger.complete)gaps.push('Holger combat skill levels are incomplete. Unknown bonuses are not treated as zero.');
+ for(const [key,label] of [['heroDifference','Hero'],['escortDifference','Escort']]){const difference=holger[key];if(difference<0 && difference!=null)recommendations.push({kind:'Holger bonus gap',text:`The opponent has ${Math.abs(difference)} percentage points more ${label.toLowerCase()} Attack and Health bonus from Holger. This is separate from reported hero power; formation changes do not remove that bonus gap.`})}
  if(!complete)gaps.push('Fill all five positions on both teams.');
  if(!yours.confirmed || !theirs.confirmed)gaps.push('Check both formations against the game and confirm positions.');
  for(const [label,c] of [['Your team',ac],['Opponent',bc]]){
@@ -66,5 +70,5 @@ export function compareArenaTeams(yours,theirs){
   }
  }
  if(!recommendations.length)recommendations.push({kind:'Next test',text:'No supported counter identified from this snapshot. Check Exploration skill effects and record an actual battle before choosing upgrades.'});
- return {available:true,yours:ac,theirs:bc,yourPower,opponentPower,powerDifference:yourPower!=null && opponentPower!=null?yourPower-opponentPower:null,gaps,recommendations,complete,positionsConfirmed:yours.confirmed&&theirs.confirmed};
+ return {available:true,holger,yours:ac,theirs:bc,yourPower,opponentPower,powerDifference:yourPower!=null && opponentPower!=null?yourPower-opponentPower:null,gaps,recommendations,complete,positionsConfirmed:yours.confirmed&&theirs.confirmed};
 }
