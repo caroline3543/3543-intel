@@ -77,6 +77,7 @@ export const FC_BADGE_IMAGES = {
 export const EVENT_ICONS = {
   'Foundry':                  '🔥',
   'Canyon Clash':              '🏔️',
+  'Bear Trap':                 '🐻',
   'SvS Castle Battle':         '🏰',
   'Internal Sunfire Castle':   '🏯',
   'Transfer Season':           '🚀',
@@ -139,7 +140,7 @@ export const TEAM_ROLES = [
 
 export const EVENT_TYPES = [
   'SvS Castle Battle', 'Internal Sunfire Castle',
-  'Foundry', 'Canyon Clash',
+  'Foundry', 'Canyon Clash', 'Bear Trap',
   'Transfer Season', 'Custom',
 ];
 

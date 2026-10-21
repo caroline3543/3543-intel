@@ -5,7 +5,6 @@ import { ProfileView }      from './ProfileView.jsx';
 import { PlayerSheet }      from './PlayerSheet.jsx';
 import { RoleManagerSheet } from './RoleManagerSheet.jsx';
 import { RallyLeaderProfileSheet } from './RallyLeaderProfileSheet.jsx';
-import BulkNameAdd          from './BulkNameAdd.jsx';
 import FieldRegistry        from './FieldRegistry.jsx';
 import { FIELD_DEFS, getFieldValues, assignFieldValue } from '../../services/fieldRegistryService.js';
 import { getCurrentTroopPower } from '../../data/metrics.js';
@@ -39,8 +38,8 @@ const SORT_OPTIONS = [
 // who already knows the app.
 const HELP_ITEMS = [
   { title: '🔎 Search', body: "Searches name, nickname, alliance tag, country, and player ID — the player ID still works even if someone renames themselves, since it doesn't change." },
-  { title: '📋 Field Registry', body: "Fill in or bulk-update furnace level, troop tiers, languages, and joiner heroes — for one player, or several at once." },
-  { title: '☑️ Select', body: "Tap Select, then tap players to choose several. With players selected, stage multiple fields (like Furnace + all three troop tiers) and apply them all in one tap instead of editing each person one by one." },
+  { title: '📋 Field Registry', body: "Fill in or bulk-update troop tiers, languages, and joiner heroes — for one player, or several at once." },
+  { title: '☑️ Select', body: "Tap Select, then tap players to choose several. With players selected, stage multiple fields (like all three troop tiers) and apply them all in one tap instead of editing each person one by one." },
   { title: '↕ Sort', body: "Reorder the list — alphabetical, by Priority (fully Helios-matched players first, for rally/war planning), by troop power, or missing-info-first to quickly see who still needs their profile filled in." },
   { title: '🔎 Filters', body: "Filter by role, by alliance, or by fully-upgraded troop tiers (Full FC5, Full FC6, or Helios) to narrow the list down to who you're looking for." },
   { title: '⚔️ By Role', body: "Switch to see everyone grouped by their assigned role instead of one flat list." },
@@ -60,7 +59,6 @@ export function RosterTab({ initialPlayerId, onInitialPlayerOpened, players, eve
   const [leaderProfileOpen, setLeaderProfileOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [sheetOpen, setSheetOpen]         = useState(false);
-  const [bulkAddOpen, setBulkAddOpen]     = useState(false);
   const [fieldRegistryOpen, setFieldRegistryOpen] = useState(false);
   const [roleManagerOpen, setRoleManagerOpen] = useState(false);
   const [troopsCopied, setTroopsCopied] = useState(false);
@@ -194,7 +192,6 @@ export function RosterTab({ initialPlayerId, onInitialPlayerOpened, players, eve
 
   function openProfile(player) { setViewingPlayer(player); setProfileOpen(true); }
   function openEdit(player)    { setEditingPlayer(player); setSheetOpen(true); }
-  function openAdd()           { setEditingPlayer(null); setSheetOpen(true); }
 
   return (
     <div style={{ padding:'16px 20px 0' }}>
@@ -206,8 +203,6 @@ export function RosterTab({ initialPlayerId, onInitialPlayerOpened, players, eve
           placeholder="Search name or tag"
           style={{ flex:1, height:48, background:'#152236', border:'1px solid #2A4A64', borderRadius:10, padding:'0 14px', fontSize:16, color:'#FFFFFF', fontFamily:'inherit' }}
         />
-        <button onClick={() => setBulkAddOpen(true)} style={{ height:48, padding:'0 12px', borderRadius:10, background:'none', border:`1px solid ${C.gold}`, color:C.gold, fontWeight:700, fontSize:14, cursor:'pointer' }}>➕ Bulk Add</button>
-        <button onClick={openAdd} style={{ height:48, padding:'0 14px', borderRadius:10, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>＋</button>
       </div>
 
       <div style={{ display:'flex', gap:8, marginBottom:10 }}>
@@ -269,7 +264,7 @@ export function RosterTab({ initialPlayerId, onInitialPlayerOpened, players, eve
             📋 Player Information
           </button>
           <div style={{ fontSize:11, color:C.muted, textAlign:'center', marginBottom:12 }}>
-            Fill in furnace, troops, languages, and joiner heroes — for one player or many at once.
+            Fill in troops, languages, and joiner heroes — for one player or many at once.
           </div>
         </>
       )}
@@ -361,7 +356,7 @@ export function RosterTab({ initialPlayerId, onInitialPlayerOpened, players, eve
                 )}
 
                 <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:activeField?10:0 }}>
-                  {FIELD_DEFS.map(f => {
+                  {FIELD_DEFS.filter(f => !/furnace/i.test(`${f.id} ${f.label}`)).map(f => {
                     const staged = stagedFields[f.id] !== undefined;
                     const open = activeField === f.id;
                     return (
@@ -396,11 +391,7 @@ export function RosterTab({ initialPlayerId, onInitialPlayerOpened, players, eve
             <div style={{ textAlign:'center', padding:'60px 20px' }}>
               <div style={{ fontSize:52, marginBottom:16 }}>👥</div>
               <div style={{ fontSize:18, fontWeight:700, color:C.white, marginBottom:8 }}>No players yet</div>
-              <div style={{ fontSize:15, color:C.muted, marginBottom:28 }}>Bulk add names, then fill in details via Field Registry — or add one by one</div>
-              <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
-                <button onClick={() => setBulkAddOpen(true)} style={{ height:52, padding:'0 24px', borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:15, border:'none', cursor:'pointer' }}>➕ Bulk Add</button>
-                <button onClick={openAdd} style={{ height:52, padding:'0 24px', borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:700, fontSize:15, cursor:'pointer' }}>＋ Add One</button>
-              </div>
+              <div style={{ fontSize:15, color:C.muted }}>Players sync in from the game API — nothing to add by hand.</div>
             </div>
           )}
           {players.length > 0 && filteredPlayers.length === 0 && (
@@ -541,19 +532,6 @@ export function RosterTab({ initialPlayerId, onInitialPlayerOpened, players, eve
               Got it
             </button>
           </div>
-        </div>
-      )}
-
-      {bulkAddOpen && (
-        <div style={{ position:'fixed', inset:0, zIndex:600 }}>
-          <BulkNameAdd
-            onAddPlayers={onAddPlayers}
-            onUpdatePlayers={onUpdatePlayers}
-            onClose={() => setBulkAddOpen(false)}
-            showToast={showToast}
-            onGoToFieldRegistry={() => { setBulkAddOpen(false); setFieldRegistryOpen(true); }}
-            existingPlayers={players}
-          />
         </div>
       )}
 
