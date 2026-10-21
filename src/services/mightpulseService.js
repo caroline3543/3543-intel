@@ -19,7 +19,10 @@ export async function mightpulseRequest(action, params = {}) {
     }
     const status = detail?.provider_status ? ` (provider HTTP ${detail.provider_status})` : '';
     const providerDetail = typeof detail?.provider_error === 'string' ? `: ${detail.provider_error}` : '';
-    throw new Error(detail?.error ? detail.error + status + providerDetail : error.message || 'Whiteout Stats request failed');
+    const failure=new Error(detail?.error ? detail.error + status + providerDetail : error.message || 'Whiteout Stats request failed');
+    failure.status=error.context instanceof Response?error.context.status:null;
+    failure.providerStatus=detail?.provider_status || null;
+    throw failure;
   }
   return data;
 }

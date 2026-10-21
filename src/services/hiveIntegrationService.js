@@ -1,6 +1,7 @@
 // The planner receives a minimal roster, never authentication or provider payloads.
 export function reportedLocation(player,stateId){
- const sources=[{raw:player.providerDetails?.raw?.player,state:player.providerDetails?.stateId,at:player.providerDetails?.retrievedAt},{raw:player.providerStats?.raw,state:player.providerStats?.stateId,at:player.providerStats?.retrievedAt}];
+ const observation=player.providerStats?.locationObservation;
+ const sources=[{raw:observation,state:observation?.stateId,at:observation?.retrievedAt},{raw:player.providerDetails?.raw?.player,state:player.providerDetails?.stateId,at:player.providerDetails?.retrievedAt},{raw:player.providerStats?.raw,state:player.providerStats?.stateId,at:player.providerStats?.retrievedAt}];
  for(const source of sources.sort((a,b)=>(Date.parse(b.at)||0)-(Date.parse(a.at)||0))){
   if(String(source.state)!==String(stateId) || (source.raw?.kid!=null && String(source.raw.kid)!==String(stateId)))continue;
   const ids=[source.raw?.chief_id,source.raw?.fid].filter(v=>v!=null && v!=='');
