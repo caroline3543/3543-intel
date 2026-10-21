@@ -1,0 +1,17 @@
+# Exploration Arena comparison
+
+Open Intel → Arena comparison. Select two different saved players in the active state. The advisor reads matching state/FID providerDetails.heroes snapshots and never saves trial edits to player records or requests provider data. Fetching existing heroes and gear remains available from each player's profile.
+
+The initial trial is ordered by reported position code, but no source-code-to-front/back mapping is claimed as verified. Both formations must be checked in game and explicitly confirmed before positioning suggestions or recording results. Changing a position swaps existing occupants, prevents duplicate selection, and clears confirmation. The diagram labels front/back and left/right; matching displayed positions are not interpreted as target pairs.
+
+Users can add owned alternatives from the existing hero catalogue with manually entered levels, stars, hero power, widget level, Exploration skill levels and equipment values. Manual alternatives remain labelled and unknown values remain unknown. Catalogue generations are visible so users can choose heroes actually available to them. Trials reset when leaving the comparison or choosing/reloading a player; logged battles preserve their trial snapshots.
+
+The side-by-side comparison shows hero identity/class, power, levels, stars, reported skills, widgets and all four equipment slots. Selected hero power is summed only when all five positive values are supplied. Overall account power, chief gear, charms, pets and Expedition modifiers are not used in this Exploration assessment.
+
+Advice uses the official traditional Arena guide: https://www.whiteoutsurvival.wiki/guide-for-arena/ (checked 2026-10-21). Infantry receives +10% class damage against Lancer, Lancer against Marksman, Marksman against Infantry; Infantry is a general frontline starting point with exceptions. Free swaps are explicitly trials. Class suggestions do not assert targeting. Gear gaps are compared only for the same hero, slot, class, quality and ascension stage. Development gaps do not claim quantified damage gains or investment returns. No universal named lineup is hardcoded.
+
+Outcome modelling is unavailable: no fabricated win percentage, invented skill mechanics, power-to-probability conversion, or Favoured label is displayed. Skill IDs and gear levels alone do not specify the full damage, timing and targeting model. UI shows missing data/coverage and source dates. The new Expedition Arena uses separate rules and is explicitly outside this version.
+
+Manually recorded win/loss/draw outcomes preserve both teams and notes. The latest 100 save under svs_arena_results_v1:state:<id> through a hook/service, remain device-local and are separate from cloud player records and roster backups. Counts describe observations across potentially different formations, not forecasts. Results can be removed using inline confirmation. Storage errors are reported. Wrong-state or malformed stored trials are ignored.
+
+Validation: seven service tests cover source identity, snapshots, unique placement swaps, missing stats, scoped comparisons, advice gates, equipment comparability and bounded state-specific logs. Chromium fixture tests phone/desktop UI, manual alternatives, confirmation/swap behaviour, battle persistence, cancellation of result removal, unchanged roster data and state isolation, with no provider calls. Physical iPhone Safari and a live provider refresh remain unverified.

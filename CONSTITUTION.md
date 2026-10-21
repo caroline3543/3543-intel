@@ -102,6 +102,7 @@ BattleTab and LiveRallyRoom both hit ~1000 lines before being split. Don't let i
 | `svs_live_rally_room_v2` | `LiveRallyRoom.jsx` | Timers, calculator, march registry, switching drafts, command statuses, presets, audit |
 | `svs_castle_command_v1` | Read-only legacy import | Standalone draft retained; import through Live Room Leaders |
 | `bear-hive-intel:state:<id>:alliance:<tag>` and `-history` / `-dark` | Embedded Bear Hive planner | Separate layouts, attendance, recovery history and theme for each state/alliance; planner backup/restore stays available |
+| `svs_arena_results_v1:state:<id>` | Arena results hook/service | Latest 100 manually recorded Exploration Arena outcomes with trial snapshots; device-only, separate from player records |
 | `svs_onboarded` | `LandingPage.jsx` | Onboarding complete flag |
 | `svs_state_workspaces_v1` | `stateWorkspaceService.js` | Active state and available state numbers; originals retained during migration |
 | `*:state:<id>` | Respective storage owner | State-specific copies of app data, battle pool, live room, legacy command draft, custom field options and hero generations |

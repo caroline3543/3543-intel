@@ -1,0 +1,17 @@
+import {useState} from 'react';
+import catalog from '../../../data/heroCatalog.json';
+import {C} from '../../../utils/constants.js';
+import {arenaButton,arenaInput} from './arenaStyles.js';
+const slots=['Goggles','Gloves','Belt','Boots'];
+export function ArenaHeroEditor({onAdd,onClose,existingIds}){
+ const [id,setId]=useState(''),[fields,setFields]=useState({}),[gear,setGear]=useState({});
+ const number=v=>v==='' || v==null?null:Number(v);
+ function save(e){e.preventDefault();if(!catalog[id] || existingIds.includes(id))return;
+  const raw={id:Number(id),level:number(fields.level),stars:number(fields.stars),power:number(fields.power),exclusive_gear_level:number(fields.widget),skill_levels:[1,2,3].filter(i=>fields[`skill${i}`]!=='' && fields[`skill${i}`]!=null).map(i=>({label:`Exploration skill ${i}`,level:Number(fields[`skill${i}`])})),gear:slots.filter(s=>gear[s]?.enhancement!==undefined && gear[s]?.enhancement!=='').map(s=>({slot:s,troop_label:catalog[id].troop,quality_label:gear[s].quality || undefined,red:gear[s].quality==='Red',enhancement_level:number(gear[s].enhancement)+(gear[s].quality==='Red'?100:0),refine_level:number(gear[s].mastery)}))};
+  onAdd({key:`manual-${id}`,raw,origin:'Manual trial'});
+ }
+ return <form onSubmit={save} style={{padding:12,border:`1px solid ${C.border}`,borderRadius:8,marginTop:8}}><h4 style={{marginTop:0}}>Add an owned alternative</h4><p style={{fontSize:12,color:C.muted}}>Trial only. Enter actual values; blanks remain unknown.</p><label>Hero<select aria-label="Alternative hero" required value={id} onChange={e=>setId(e.target.value)} style={arenaInput}><option value="">Choose hero</option>{Object.entries(catalog).filter(([key])=>!existingIds.includes(key)).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([key,h])=><option key={key} value={key}>{h.name} · Gen {h.generation}</option>)}</select></label>
+ <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:8}}>{[['level','Level',1,100,1],['stars','Stars',0,5,0.1],['power','Hero power',0,1000000000,1],['widget','Widget level',0,20,1],...[1,2,3].map(i=>[`skill${i}`,`Exploration skill ${i}`,1,5,1])].map(([key,label,min,max,step])=><label key={key} style={{fontSize:12}}>{label}<input aria-label={`Alternative ${label}`} type="number" min={min} max={max} step={step} value={fields[key]??''} onChange={e=>setFields({...fields,[key]:e.target.value})} style={arenaInput}/></label>)}</div>
+ <details><summary style={{minHeight:44,paddingTop:12,cursor:'pointer'}}>Alternative hero gear</summary>{slots.map(s=><fieldset key={s} style={{border:`1px solid ${C.border}`,margin:'8px 0'}}><legend>{s}</legend><label>Quality<select aria-label={`${s} quality`} style={arenaInput} value={gear[s]?.quality || ''} onChange={e=>setGear({...gear,[s]:{...gear[s],quality:e.target.value}})}><option value="">Unknown quality</option>{['Common','Uncommon','Rare','Epic','Mythic','Red'].map(q=><option key={q}>{q}</option>)}</select></label>{['enhancement','mastery'].map(key=><label key={key} style={{display:'block',fontSize:12}}>{key}<input aria-label={`${s} ${key}`} type="number" min="0" max="999" step="0.1" style={arenaInput} value={gear[s]?.[key]??''} onChange={e=>setGear({...gear,[s]:{...gear[s],[key]:e.target.value}})}/></label>)}</fieldset>)}</details>
+ <div style={{display:'flex',gap:8,marginTop:8}}><button type="submit" style={arenaButton}>Add to trial</button><button type="button" onClick={onClose} style={arenaButton}>Cancel</button></div></form>;
+}
