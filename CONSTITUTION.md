@@ -16,7 +16,7 @@ The app must be fast, reliable, and obvious to use with one hand.
 
 ### UI
 - **No `window.confirm` or `window.alert`** — use `DeleteConfirmModal` or inline two-step confirmation
-- **No CSS files** — all styling is inline `style={{}}` using `C.` colour tokens from `utils/constants.js`
+- **No CSS files** — React UI styling is inline `style={{}}` using `C.` colour tokens from `utils/constants.js`. Exception: the existing Bear Hive planner is vendored under `public/hive` with its original isolated styles inside its same-origin iframe; do not import those styles into React.
 - **No router** — navigation is tab-based via `setTab()` or local view state
 - **No hover states** — mobile-first, tap only
 - **Minimum 44px touch targets** on all interactive elements
@@ -101,6 +101,7 @@ BattleTab and LiveRallyRoom both hit ~1000 lines before being split. Don't let i
 | `svs_battle_pool_v1` | `useBattlePool.js` | Event-scoped readiness, battle-only profile overrides, temporary participants, commitments and holding reports |
 | `svs_live_rally_room_v2` | `LiveRallyRoom.jsx` | Timers, calculator, march registry, switching drafts, command statuses, presets, audit |
 | `svs_castle_command_v1` | Read-only legacy import | Standalone draft retained; import through Live Room Leaders |
+| `bear-hive-intel:state:<id>:alliance:<tag>` and `-history` / `-dark` | Embedded Bear Hive planner | Separate layouts, attendance, recovery history and theme for each state/alliance; planner backup/restore stays available |
 | `svs_onboarded` | `LandingPage.jsx` | Onboarding complete flag |
 | `svs_state_workspaces_v1` | `stateWorkspaceService.js` | Active state and available state numbers; originals retained during migration |
 | `*:state:<id>` | Respective storage owner | State-specific copies of app data, battle pool, live room, legacy command draft, custom field options and hero generations |
