@@ -1,3 +1,4 @@
+import {AllianceWatchPanel} from "./history/AllianceWatchPanel.jsx";
 import {ArenaComparePanel} from './arena/ArenaComparePanel.jsx';
 import { PlayerChangesPanel } from './history/PlayerChangesPanel.jsx';
 import { StateRankingsPanel } from './rankings/StateRankingsPanel.jsx';
@@ -9,7 +10,8 @@ import JoinerRegistry from '../JoinerRegistry.jsx';
 import NoticeLibrary from '../notices/NoticeLibrary.jsx';
 import AsciiArtLibrary from '../ascii/AsciiArtLibrary.jsx';
 
-export function IntelTab({ onUpdatePlayers, onViewPlayer, players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice, asciiArts = [], onSaveArt, onDeleteArt, onResetArtToDefaults }) {
+export function IntelTab({ allianceWatches = [], onUpdateAllianceWatches, onUpdatePlayers, onViewPlayer, players, events, onUpdatePlayer, showToast, settings = {}, notices = [], onSaveNotice, onDeleteNotice, asciiArts = [], onSaveArt, onDeleteArt, onResetArtToDefaults }) {
+  const [watchOpen,setWatchOpen]=useState(false);
   const [arenaOpen,setArenaOpen]=useState(false);
   const [changesOpen,setChangesOpen] = useState(false);
   const [rankingsOpen,setRankingsOpen] = useState(false);
@@ -51,6 +53,8 @@ export function IntelTab({ onUpdatePlayers, onViewPlayer, players, events, onUpd
   const rallyLeads   = players.filter(p=>p.roles?.includes('Rally Lead')).length;
   const withJoiners  = players.filter(p=>(p.joinerHeroes||[]).some(jh=>jh.skillLevel>=5)).length;
   const englishDiscordPlayers = players.filter(p=>p.languages?.includes('English') && p.availability?.discord==='yes');
+
+  if (watchOpen) return <AllianceWatchPanel stateId={settings.stateId} watches={allianceWatches} onUpdate={onUpdateAllianceWatches} onClose={()=>setWatchOpen(false)}/>;
 
   if (arenaOpen) return <ArenaComparePanel players={players} onViewPlayer={onViewPlayer} onClose={()=>setArenaOpen(false)}/>;
 
@@ -102,6 +106,7 @@ export function IntelTab({ onUpdatePlayers, onViewPlayer, players, events, onUpd
 
   return (
     <div style={{ padding:'16px 20px' }}>
+      <button onClick={()=>setWatchOpen(true)} style={{width:'100%',minHeight:64,padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.gold}`,color:C.gold,fontWeight:700,fontSize:15,textAlign:'left',marginBottom:12}}>Alliance watch →<div style={{fontSize:12,fontWeight:400,color:C.icy,marginTop:5}}>Whole rosters · Furnace changes · Power spikes · Member changes</div></button>
       <button onClick={()=>setChangesOpen(true)} style={{width:'100%',minHeight:64,padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.gold}`,color:C.gold,fontWeight:700,fontSize:15,textAlign:'left',marginBottom:12}}>What changed? →<div style={{fontSize:12,fontWeight:400,color:C.icy,marginTop:5}}>Power · Kills · Furnace · Rankings · Names & alliances</div></button>
       <button onClick={()=>setRankingsOpen(true)} style={{width:'100%',minHeight:64,padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.gold}`,color:C.gold,fontWeight:700,fontSize:15,textAlign:'left',marginBottom:16}}>🏆 State {settings.stateId} rankings →<div style={{fontSize:12,fontWeight:400,color:C.icy,marginTop:5}}>Power · Kills · Transfer score · Labyrinth · Gear & more</div></button>
 

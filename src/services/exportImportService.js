@@ -1,3 +1,4 @@
+import { mergeAllianceWatches } from "./allianceWatchService.js";
 import { mergeObservationHistory } from './playerObservationService.js';
 import { activeStateId, stateStorageKey } from './stateWorkspaceService.js';
 const CURRENT_VERSION = '3.1.0';
@@ -188,6 +189,7 @@ export function mergeImportedData(current, incoming) {
   return {
     ...current,
     ...incoming,
+    allianceWatches: mergeAllianceWatches(current.allianceWatches, incoming.allianceWatches),
     players:     [...pm.values()],
     events:      [...em.values()],
     svsPlans:    [...sm.values()],

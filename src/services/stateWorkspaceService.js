@@ -49,6 +49,7 @@ export function assertImportState(imported, stateId) {
   if (source && String(source) !== String(stateId)) {
     throw new Error(`This file belongs to State ${source}. Switch states before importing it.`);
   }
+  if ((imported?.allianceWatches || []).some(w => String(w.stateId) !== String(stateId))) throw new Error('This file contains alliance watches from a different state.');
   const stats = (imported?.players || []).find(p => p.providerStats?.stateId && String(p.providerStats.stateId) !== String(stateId));
   if (stats) throw new Error('This file contains player stats from a different state.');
   const rankings = (imported?.players || []).some(p => Object.values(p.providerRankings || {}).some(r => r.stateId && String(r.stateId) !== String(stateId)));
