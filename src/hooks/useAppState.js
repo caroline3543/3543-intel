@@ -59,6 +59,10 @@ export function useAppState() {
   const importAllianceProfiles = useAllianceProfileImport(data, setData, showToast);
   const allianceTag = () => data.settings?.allianceTag || '';
 
+  const updateAllianceWatches = useCallback(updater => {
+    setData(prev => ({...prev, allianceWatches:updater(prev.allianceWatches || []), lastUpdated:new Date().toISOString()}));
+  }, []);
+
   // ── Player operations ─────────────────────────────────────
   const savePlayer = useCallback((player) => {
     const stamped = withGameLanguage({ ...player, profileLastUpdated: new Date().toISOString() });
@@ -338,6 +342,8 @@ export function useAppState() {
   return {
     // Raw data
     data,
+    allianceWatches: data.allianceWatches || [],
+    updateAllianceWatches,
 
     // Derived arrays
     players,
