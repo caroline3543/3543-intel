@@ -2,7 +2,7 @@
 // Deploy only after OAuth credentials, secure token tables and ownership rules are configured.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const ROOT='https://sheets.googleapis.com/v4/spreadsheets';
-const ALLOWED_ORIGINS=['https://3543-intel.vercel.app'];
+const ALLOWED_ORIGINS=['https://3543-intel.vercel.app','https://3543-intel-git-feat-spreadsheet-s-8ea8a3-sunfire-castle-planner.vercel.app'];
 function respond(req:Request,data:unknown,status=200){
  const origin=req.headers.get('origin')||'';
  const headers:Record<string,string>={'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin'};
