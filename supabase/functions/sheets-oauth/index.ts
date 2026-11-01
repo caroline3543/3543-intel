@@ -5,7 +5,7 @@
 // Intentionally unavailable until configured; no credentials are exposed to the browser.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const scope = 'https://www.googleapis.com/auth/spreadsheets';
-const ALLOWED_ORIGINS=['https://3543-intel.vercel.app'];
+const ALLOWED_ORIGINS=['https://3543-intel.vercel.app','https://3543-intel-git-feat-spreadsheet-s-8ea8a3-sunfire-castle-planner.vercel.app'];
 const json = (data: unknown, status = 200, origin = '') => new Response(JSON.stringify(data), {status, headers:{'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin', ...(ALLOWED_ORIGINS.includes(origin)?{'Access-Control-Allow-Origin':origin}:{}),'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'POST, GET, OPTIONS'}});
 const required=(k:string)=>{const v=Deno.env.get(k);if(!v)throw new Error('Missing server configuration: '+k);return v};
 function b64(bytes:Uint8Array){return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
