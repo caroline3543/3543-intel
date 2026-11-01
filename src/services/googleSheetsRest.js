@@ -12,7 +12,7 @@ export function assertSpreadsheetId(id) {
   return id;
 }
 
-export function makeSheetRange(title, a1 = 'A1:ZZ') {
+export function makeSheetRange(title, a1 = 'A1:ZZ1000') {
   if (typeof title !== 'string' || !title || title.length > 100) throw new Error('Invalid worksheet title');
   if (!/^[A-Z]+[1-9]\d*(?::[A-Z]+[1-9]\d*)?$/.test(a1) &&
       !/^[A-Z]+[1-9]\d*:[A-Z]+$/.test(a1)) throw new Error('Invalid A1 range');
