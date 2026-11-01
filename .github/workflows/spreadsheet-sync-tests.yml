@@ -1,0 +1,24 @@
+name: Spreadsheet sync foundation tests
+on:
+  pull_request:
+    paths:
+      - 'src/services/googleSheets*.js'
+      - 'src/services/spreadsheet*.js'
+      - 'tests/*Sheets*.test.js'
+      - 'tests/spreadsheet*.test.js'
+      - 'package.json'
+      - '.github/workflows/spreadsheet-sync-tests.yml'
+  push:
+    branches:
+      - feat/spreadsheet-sync-foundation
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm test
