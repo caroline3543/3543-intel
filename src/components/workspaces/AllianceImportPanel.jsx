@@ -31,7 +31,7 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
         <h2 id="alliance-import-title" style={{ fontSize:19 }}>Pull alliance · State {stateId}</h2>
         <button onClick={onClose} style={{ ...button, background:C.card, color:C.white }} aria-label="Close alliance import">✕</button>
       </div>
-      <p style={{ color:C.icy, fontSize:13 }}>Sign in through Settings → Admin access first. Enter any alliance tag in this state. Check the preview, then import.</p>
+      <p style={{ color:C.icy, fontSize:13 }}>Enter an alliance tag in this state. Preview the available player data before importing it into your current state workspace.</p>
       <form onSubmit={lookup}>
         <label htmlFor="alliance-tag">Alliance tag (case sensitive)</label>
         <input id="alliance-tag" value={tag} disabled={busy} onChange={e => { setTag(e.target.value); setRows(null); }} placeholder="e.g. LUN" required maxLength={12}
