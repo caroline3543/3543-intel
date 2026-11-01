@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabaseClient.js';
 
 /** Feature-gated setup screen. No Sheets writes and no browser OAuth secrets. */
@@ -10,6 +10,7 @@ export function SpreadsheetManager({ onClose }) {
   const [email,setEmail]=useState('');
   const [otp,setOtp]=useState('');
   const [otpSent,setOtpSent]=useState(false);
+  const [connection,setConnection]=useState(null);
   const enabled = import.meta.env.VITE_ENABLE_GOOGLE_SHEETS === 'true';
   async function sendLoginCode() {
     if(!supabase)return;
@@ -26,6 +27,18 @@ export function SpreadsheetManager({ onClose }) {
     if(error){setMessage('The code could not be verified.');setStatus('error');return;}
     setStatus('idle');setMessage('Signed in. You can now connect Google Sheets.');
   }
+  async function refreshConnection() {
+    if(!supabase||!enabled)return;
+    try {
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token){setConnection(null);return;}
+      const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-status`,{headers:{
+        Authorization:`Bearer ${session.access_token}`,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,
+      }});
+      if(response.ok)setConnection(await response.json());
+    }catch {setConnection(null);}
+  }
+  useEffect(()=>{refreshConnection();},[]);
   async function connect() {
     if (!enabled || !supabase) return;
     setStatus('connecting');setMessage('');
@@ -107,6 +120,8 @@ export function SpreadsheetManager({ onClose }) {
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16}}>
       <h3 style={{margin:'0 0 8px'}}>Sync status</h3>
+      {connection&&<p style={{color:'#A8C4D8',fontSize:14}}>Google account: {connection.connected?'Connected':'Not connected'}</p>}
+      <button type="button" onClick={refreshConnection} style={{background:'#1E3A52',color:'white',border:0,borderRadius:10,padding:12,minHeight:44,marginBottom:12}}>Refresh connection status</button>
       <p style={{margin:0,fontSize:14,color:'#A8C4D8'}}>No Google spreadsheet synchronisation is active. Changes made here are not sent to Google Sheets.</p>
     </section>
   </div>;
