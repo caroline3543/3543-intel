@@ -63,7 +63,7 @@ export function SpreadsheetManager({ onClose }) {
       <h3 style={{margin:'0 0 8px'}}>Find a spreadsheet</h3>
       <label htmlFor="spreadsheet-id" style={{display:'block',fontSize:14,color:'#A8C4D8',marginBottom:8}}>Google spreadsheet ID or URL</label>
       <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
-        const value=e.target.value;const found=value.match(/spreadsheets\\/d\\/([A-Za-z0-9_-]+)/);
+        const value=e.target.value;const found=value.match(new RegExp('spreadsheets/d/([A-Za-z0-9_-]+)'));
         setSpreadsheetId(found?found[1]:value);
       }} placeholder="Paste a Google Sheets URL" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:12}}/>
       <button style={{...button,opacity:!enabled||status==='loading'?0.5:1}} disabled={!enabled||status==='loading'||!spreadsheetId.trim()} onClick={previewMetadata}>
