@@ -58,7 +58,7 @@ Deno.serve(async req=>{
     const encrypted=await encrypt(tokens.refresh_token);
     const {error:saveError}=await service.from('spreadsheet_google_credentials').upsert({user_id:rows[0].user_id,refresh_token_encrypted:encrypted,updated_at:new Date().toISOString()},{onConflict:'user_id'});
     if(saveError)return json({error:'Credential storage unavailable'},503);
-    return new Response(null,{status:303,headers:{Location:'https://3543-intel.vercel.app/?sheets_connected=1','Cache-Control':'no-store'}});
+    return new Response(null,{status:303,headers:{Location:'https://3543-intel-git-feat-spreadsheet-s-8ea8a3-sunfire-castle-planner.vercel.app/?sheets_connected=1','Cache-Control':'no-store'}});
   }
   return json({error:'Not found'},404);
  }catch(e){console.error('Sheets OAuth configuration/processing error',e instanceof Error?e.name:'unknown');return json({error:'OAuth flow unavailable'},503)}
