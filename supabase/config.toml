@@ -1,0 +1,2 @@
+[functions.whiteoutstats]
+verify_jwt = false
