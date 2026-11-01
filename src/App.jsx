@@ -18,6 +18,7 @@ import { TabErrorBoundary } from './components/common/TabErrorBoundary.jsx';
 import { LandingPage }  from './components/LandingPage.jsx';
 import { DataPanel }    from './components/DataPanel.jsx';
 import { SettingsPanel } from './components/SettingsPanel.jsx';
+import { SpreadsheetManager } from './components/spreadsheets/SpreadsheetManager.jsx';
 
 const TABS = [
   { icon:'👥', label:'Members' },   // 0
@@ -25,6 +26,7 @@ const TABS = [
   { icon:'📅', label:'Events'  },   // 2
   { icon:'⚔️', label:'Battle'  },   // 3
   { icon:'▦', label:'Hive' },      // 4
+  { icon:'📋', label:'Sheets' },    // 5
 ];
 
 const hdrBtn = { height:36, padding:'0 10px', borderRadius:20, background:'#152236', border:'1px solid #2A4A64', color:'#A8C4D8', fontSize:13, fontWeight:600, cursor:'pointer' };
@@ -91,6 +93,8 @@ export default function App() {
 
       {tab===4 && <TabErrorBoundary><HiveTab players={players} settings={settings} onSavePlayer={savePlayer} onImportAlliance={()=>setAlliancePanel(true)} onViewPlayer={id=>{setRankingPlayerId(id);setTab(0);}} /></TabErrorBoundary>}
 
+      {tab===5 && <TabErrorBoundary><SpreadsheetManager onClose={()=>setTab(0)} /></TabErrorBoundary>}
+
       {alliancePanel && <AllianceImportPanel stateId={settings.stateId} players={players} onClose={() => setAlliancePanel(false)} onImport={importAllianceProfiles} />}
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
       {dataPanel    && (
@@ -109,7 +113,7 @@ export default function App() {
       {settingsPanel && <SettingsPanel settings={settings} onSave={s=>{saveSettings(s);setSettingsPanel(false);vibe(8);}} onClose={()=>setSettingsPanel(false)} />}
       {toast && <Toast msg={toast.msg} type={toast.type} />}
 
-      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(5,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>
+      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(6,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>
         {TABS.map((t,i) => (
           <button key={i} onClick={()=>{setTab(i);vibe(8);}} style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'none', border:'none', cursor:'pointer', color:tab===i?'#F5A623':'#5A7A94', gap:2, fontSize:9, fontWeight:600, transition:'color 150ms ease', WebkitTapHighlightColor:'transparent' }}>
             <span style={{ fontSize:19 }}>{t.icon}</span>{t.label}
