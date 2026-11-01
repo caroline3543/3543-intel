@@ -7,7 +7,25 @@ export function SpreadsheetManager({ onClose }) {
   const [message,setMessage] = useState('');
   const [spreadsheetId,setSpreadsheetId]=useState('');
   const [sheetInfo,setSheetInfo]=useState(null);
+  const [email,setEmail]=useState('');
+  const [otp,setOtp]=useState('');
+  const [otpSent,setOtpSent]=useState(false);
   const enabled = import.meta.env.VITE_ENABLE_GOOGLE_SHEETS === 'true';
+  async function sendLoginCode() {
+    if(!supabase)return;
+    setStatus('signing-in');setMessage('');
+    const {error}=await supabase.auth.signInWithOtp({email:email.trim(),options:{shouldCreateUser:false}});
+    if(error){setMessage('Could not send a sign-in code. Verify the email is registered.');setStatus('error');return;}
+    setOtpSent(true);setStatus('idle');
+    setMessage('Check your email for the sign-in code.');
+  }
+  async function verifyLoginCode() {
+    if(!supabase)return;
+    setStatus('signing-in');setMessage('');
+    const {error}=await supabase.auth.verifyOtp({email:email.trim(),token:otp.trim(),type:'email'});
+    if(error){setMessage('The code could not be verified.');setStatus('error');return;}
+    setStatus('idle');setMessage('Signed in. You can now connect Google Sheets.');
+  }
   async function connect() {
     if (!enabled || !supabase) return;
     setStatus('connecting');setMessage('');
@@ -55,6 +73,18 @@ export function SpreadsheetManager({ onClose }) {
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
       <h3 style={{margin:'0 0 8px'}}>Connect Google Sheets</h3>
       <p style={{fontSize:14,color:'#A8C4D8',lineHeight:1.6,margin:'0 0 16px'}}>Connect a Google account, then select a spreadsheet and preview its player records before importing. Existing roster data will remain unchanged until an import is explicitly approved.</p>
+      {enabled && supabase && <div style={{marginBottom:14}}>
+        <label htmlFor="sheet-auth-email" style={{display:'block',fontSize:14,color:'#A8C4D8',marginBottom:6}}>App account email</label>
+        <input id="sheet-auth-email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}
+         placeholder="Your existing account email" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:8}}/>
+        {otpSent && <input aria-label="Email verification code" value={otp} onChange={e=>setOtp(e.target.value)}
+         inputMode="numeric" autoComplete="one-time-code" placeholder="Email verification code"
+         style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:8}}/>}
+        <button type="button" onClick={otpSent?verifyLoginCode:sendLoginCode} disabled={status==='signing-in'||!email.trim()||(otpSent&&!otp.trim())}
+         style={{...button,background:'#1E3A52',color:'white',marginBottom:8}}>
+          {otpSent?'Verify sign-in code':'Email me a sign-in code'}
+        </button>
+      </div>}
       {enabled ? <button disabled={status==='connecting'||!supabase} style={{...button,opacity:status==='connecting'?0.6:1}} onClick={connect}>{status==='connecting'?'Opening Google…':'Connect Google account'}</button>
       : <div role="status" style={{padding:12,border:'1px solid #5A7A94',borderRadius:10,color:'#A8C4D8',fontSize:14}}>Connection is not enabled in this build. Secure OAuth configuration and database migration must be completed first.</div>}
       {message&&<p role="alert" style={{fontSize:14,color:'#FFC5A8'}}>{message}</p>}
