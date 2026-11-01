@@ -12,6 +12,7 @@ export function SpreadsheetManager({ onClose }) {
   const [otpSent,setOtpSent]=useState(false);
   const [connection,setConnection]=useState(null);
   const [previewRows,setPreviewRows]=useState(null);
+  const [signedInEmail,setSignedInEmail]=useState(null);
   const enabled = import.meta.env.VITE_ENABLE_GOOGLE_SHEETS === 'true';
   async function sendLoginCode() {
     if(!supabase)return;
@@ -26,6 +27,9 @@ export function SpreadsheetManager({ onClose }) {
     setStatus('signing-in');setMessage('');
     const {error}=await supabase.auth.verifyOtp({email:email.trim(),token:otp.trim(),type:'email'});
     if(error){setMessage('The code could not be verified.');setStatus('error');return;}
+    const {data:{user}}=await supabase.auth.getUser();
+    setSignedInEmail(user?.email||email.trim());
+    setOtpSent(false);setOtp('');
     setStatus('idle');setMessage('Signed in. You can now connect Google Sheets.');
   }
   async function refreshConnection() {
@@ -39,7 +43,17 @@ export function SpreadsheetManager({ onClose }) {
       if(response.ok)setConnection(await response.json());
     }catch {setConnection(null);}
   }
-  useEffect(()=>{refreshConnection();},[]);
+  useEffect(()=>{
+    if(!supabase)return;
+    let mounted=true;
+    supabase.auth.getUser().then(({data:{user}})=>{if(mounted)setSignedInEmail(user?.email||null);});
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
+      if(!mounted)return;
+      setSignedInEmail(session?.user?.email||null);
+    });
+    refreshConnection();
+    return ()=>{mounted=false;subscription.unsubscribe();};
+  },[]);
   async function connect() {
     if (!enabled || !supabase) return;
     setStatus('connecting');setMessage('');
@@ -101,7 +115,8 @@ export function SpreadsheetManager({ onClose }) {
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
       <h3 style={{margin:'0 0 8px'}}>Connect Google Sheets</h3>
       <p style={{fontSize:14,color:'#A8C4D8',lineHeight:1.6,margin:'0 0 16px'}}>Connect a Google account, then select a spreadsheet and preview its player records before importing. Existing roster data will remain unchanged until an import is explicitly approved.</p>
-      {enabled && supabase && <div style={{marginBottom:14}}>
+      <p role="status" style={{fontSize:14,color:signedInEmail?'#A7E7C0':'#FFC5A8'}}>{signedInEmail?`Signed in as ${signedInEmail}`:'Not signed in to the app'}</p>
+      {enabled && supabase && !signedInEmail && <div style={{marginBottom:14}}>
         <label htmlFor="sheet-auth-email" style={{display:'block',fontSize:14,color:'#A8C4D8',marginBottom:6}}>App account email</label>
         <input id="sheet-auth-email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}
          placeholder="Your existing account email" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:8}}/>
@@ -113,8 +128,9 @@ export function SpreadsheetManager({ onClose }) {
           {otpSent?'Verify sign-in code':'Email me a sign-in code'}
         </button>
       </div>}
-      {enabled ? <button disabled={status==='connecting'||!supabase} style={{...button,opacity:status==='connecting'?0.6:1}} onClick={connect}>{status==='connecting'?'Opening Google…':'Connect Google account'}</button>
+      {enabled ? <button disabled={status==='connecting'||!supabase||!signedInEmail} style={{...button,opacity:status==='connecting'?0.6:1}} onClick={connect}>{status==='connecting'?'Opening Google…':'Connect Google account'}</button>
       : <div role="status" style={{padding:12,border:'1px solid #5A7A94',borderRadius:10,color:'#A8C4D8',fontSize:14}}>Connection is not enabled in this build. Secure OAuth configuration and database migration must be completed first.</div>}
+      {otpSent&&!signedInEmail&&<p style={{fontSize:13,color:'#A8C4D8'}}>If the email link opens another browser or the production app, copy the numeric code from the email and enter it here in this preview. Signing in on another domain does not share this preview’s session.</p>}
       {message&&<p role="alert" style={{fontSize:14,color:'#FFC5A8'}}>{message}</p>}
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
