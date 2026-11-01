@@ -18,7 +18,7 @@ export function SpreadsheetManager({ onClose }) {
     if(!supabase)return;
     setStatus('signing-in');setMessage('');
     const {error}=await supabase.auth.signInWithOtp({email:email.trim(),options:{shouldCreateUser:false,emailRedirectTo:window.location.origin+'/?sheets_auth=1'}});
-    if(error){setMessage('Could not send a sign-in code. Verify the email is registered.');setStatus('error');return;}
+    if(error){const rateLimited=error.status===429||error.code==='over_email_send_rate_limit';setMessage(rateLimited?'Supabase email limit reached. Please try again after the limit resets, or configure custom SMTP.':'Email sign-in failed: '+(error.message||'Check your account and authentication settings.'));setStatus('error');return;}
     setOtpSent(true);setStatus('idle');
     setMessage('Check your email for the sign-in code.');
   }
