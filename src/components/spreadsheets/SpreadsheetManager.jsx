@@ -11,6 +11,7 @@ export function SpreadsheetManager({ onClose }) {
   const [otp,setOtp]=useState('');
   const [otpSent,setOtpSent]=useState(false);
   const [connection,setConnection]=useState(null);
+  const [previewRows,setPreviewRows]=useState(null);
   const enabled = import.meta.env.VITE_ENABLE_GOOGLE_SHEETS === 'true';
   async function sendLoginCode() {
     if(!supabase)return;
@@ -77,6 +78,20 @@ export function SpreadsheetManager({ onClose }) {
       setSheetInfo(result);setStatus('ready');
     }catch(error){setStatus('error');setMessage(error.message||'Preview failed');}
   }
+  async function previewRowsForWorksheet(title) {
+    setStatus('loading');setMessage('');setPreviewRows(null);
+    try {
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token)throw new Error('Sign in first.');
+      const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-rows-preview`,{
+        method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({spreadsheetId:spreadsheetId.trim(),worksheetTitle:title}),
+      });
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||'Could not preview rows');
+      setPreviewRows({title,rows:data.rows});setStatus('ready');
+    }catch(e){setStatus('error');setMessage(e.message||'Worksheet preview failed');}
+  }
   const button={background:'#F5A623',color:'#0A1628',border:'none',padding:'12px 16px',minHeight:48,borderRadius:12,fontSize:16,fontWeight:700,width:'100%',cursor:'pointer'};
   return <div style={{padding:20,minHeight:'60vh',color:'#fff'}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
@@ -115,8 +130,9 @@ export function SpreadsheetManager({ onClose }) {
       {sheetInfo&&<div aria-live="polite" style={{marginTop:14,color:'#A8C4D8'}}>
         <strong style={{color:'white'}}>{sheetInfo.title}</strong>
         <p style={{fontSize:13,margin:'8px 0'}}>Worksheets (read-only)</p>
-        {(sheetInfo.worksheets||[]).map(w=><div key={w.id} style={{padding:'10px 0',borderTop:'1px solid #2A4A64',fontSize:14}}>{w.title} · up to {w.rows} rows</div>)}
+        {(sheetInfo.worksheets||[]).map(w=><div key={w.id} style={{padding:'10px 0',borderTop:'1px solid #2A4A64',fontSize:14}}>{w.title} · up to {w.rows} rows <button type="button" onClick={()=>previewRowsForWorksheet(w.title)} style={{border:0,borderRadius:8,padding:'8px 12px',marginLeft:8,background:'#1E3A52',color:'white'}}>Preview</button></div>)}
       </div>}
+      {previewRows&&<div style={{marginTop:14}}><strong>Read-only preview: {previewRows.title}</strong><p style={{fontSize:12,color:'#A8C4D8'}}>First 101 rows maximum. No changes have been saved.</p><div style={{overflowX:'auto',maxHeight:340,overflowY:'auto',fontSize:12}}><table style={{borderCollapse:'collapse'}}><tbody>{previewRows.rows.map((row,i)=><tr key={i}>{row.slice(0,20).map((v,j)=><td key={j} style={{border:'1px solid #36536B',padding:6,whiteSpace:'nowrap'}}>{String(v??'')}</td>)}</tr>)}</tbody></table></div></div>}
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16}}>
       <h3 style={{margin:'0 0 8px'}}>Sync status</h3>
