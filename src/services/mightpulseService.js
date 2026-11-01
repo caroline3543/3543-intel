@@ -1,16 +1,13 @@
 import { supabase } from './supabaseClient.js';
 
 /**
- * Authenticated server-side proxy. Never store the Whiteout Stats secret in Vite variables.
- * Requires signed-in Supabase user allowlisted by the Edge Function.
+ * Public read-only server-side lookups. Never store the Whiteout Stats secret in Vite variables.
+ * The Edge Function must enforce request validation and durable rate limits before enabling anonymous calls.
  */
 export async function mightpulseRequest(action, params = {}) {
   if (!supabase) throw new Error('Supabase is not configured');
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError || !session?.access_token) throw new Error('Officer sign-in is required');
   const { data, error } = await supabase.functions.invoke('whiteoutstats', {
     body: { action, ...params },
-    headers: { Authorization: `Bearer ${session.access_token}` },
   });
   if (error) {
     let detail = null;

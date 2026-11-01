@@ -36,19 +36,11 @@ Deno.serve(async req => {
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const apiKey = Deno.env.get("WHITEOUTSTATS_API_KEY")?.trim();
-  const officerIds = (Deno.env.get("MIGHTPULSE_ALLOWED_USER_IDS") || "")
-    .split(",").map(x => x.trim()).filter(Boolean);
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!apiKey) return respond({ error: "Set WHITEOUTSTATS_API_KEY in Supabase Edge Function secrets using a Whiteout Stats wos_ key." }, 503, origin);
-  if (!url || !anonKey || officerIds.length === 0) {
+  if (!url || !anonKey || !serviceKey) {
     return respond({ error: "API integration is not fully configured" }, 503, origin);
   }
-
-  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!token) return respond({ error: "Sign-in required" }, 401, origin);
-  const supabase = createClient(url, anonKey);
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) return respond({ error: "Invalid user session" }, 401, origin);
-  if (!officerIds.includes(user.id)) return respond({ error: "Officer access required" }, 403, origin);
 
   if (!/^wos_[\x21-\x7E]+$/.test(apiKey)) {
     return respond({ error: "WHITEOUTSTATS_API_KEY contains an invalid value. Replace it in Supabase Edge Function secrets with the complete generated wos_ key." }, 503, origin);
@@ -78,6 +70,26 @@ Deno.serve(async req => {
     path = `/players/${fid}?include=base`;
   }
   if (!path) return respond({ error: "Invalid action parameters" }, 400, origin);
+
+  // Fail closed unless database-backed limits are available. Do not trust Origin as authentication.
+  // Each request consumes one per-client allowance and one global daily allowance.
+  const limiter = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const claimedIp = req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "";
+  const ipBytes = new TextEncoder().encode(claimedIp || "unknown");
+  const digest = await crypto.subtle.digest("SHA-256", ipBytes);
+  const clientHash = Array.from(new Uint8Array(digest)).map(v => v.toString(16).padStart(2, "0")).join("");
+  try {
+    const { data: allowed, error: limitError } = await limiter.rpc("consume_whiteoutstats_lookup", { p_client_hash: clientHash });
+    if (limitError) {
+      console.error(JSON.stringify({ event: "lookup_limiter_unavailable", detail: limitError.code || "database_error" }));
+      return respond({ error: "Lookup protection unavailable. Try later." }, 503, origin);
+    }
+    if (!allowed) return respond({ error: "Lookup limit reached. Try again later." }, 429, origin);
+  } catch {
+    return respond({ error: "Lookup protection unavailable. Try later." }, 503, origin);
+  }
 
   try {
     const controller = new AbortController();
