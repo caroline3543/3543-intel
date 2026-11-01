@@ -16,7 +16,7 @@ export function SpreadsheetManager({ onClose }) {
   async function sendLoginCode() {
     if(!supabase)return;
     setStatus('signing-in');setMessage('');
-    const {error}=await supabase.auth.signInWithOtp({email:email.trim(),options:{shouldCreateUser:false}});
+    const {error}=await supabase.auth.signInWithOtp({email:email.trim(),options:{shouldCreateUser:false,emailRedirectTo:window.location.origin+'/?sheets_auth=1'}});
     if(error){setMessage('Could not send a sign-in code. Verify the email is registered.');setStatus('error');return;}
     setOtpSent(true);setStatus('idle');
     setMessage('Check your email for the sign-in code.');
