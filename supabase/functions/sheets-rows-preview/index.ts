@@ -18,7 +18,7 @@ Deno.serve(async req=>{
   const input=await req.json().catch(()=>null);
   const id=input?.spreadsheetId, worksheetTitle=input?.worksheetTitle;
   if(typeof id!=='string'||!/^[A-Za-z0-9_-]{15,200}$/.test(id))return reply(req,{error:'Invalid spreadsheet ID'},400);
-  if(typeof worksheetTitle!=='string'||!worksheetTitle||worksheetTitle.length>100)return reply(req,{error:'Invalid worksheet title'},400);
+  if(typeof worksheetTitle!=='string'||!worksheetTitle||worksheetTitle.length>100||/[\\x00-\\x1f]/.test(worksheetTitle))return reply(req,{error:'Invalid worksheet title'},400);
   const admin=createClient(secret('SUPABASE_URL'),secret('SUPABASE_SERVICE_ROLE_KEY'),{auth:{persistSession:false}});
   const {data:credential,error:dbError}=await admin.from('spreadsheet_google_credentials').select('refresh_token_encrypted').eq('user_id',user.id).maybeSingle();
   if(dbError||!credential)return reply(req,{error:'Google account not connected'},409);
@@ -31,10 +31,10 @@ Deno.serve(async req=>{
   if(!tokenResponse.ok)return reply(req,{error:'Google account must be reconnected'},401);
   const access=await tokenResponse.json();
   if(!access.access_token)return reply(req,{error:'Google token refresh unavailable'},502);
-  const range="'"+worksheetTitle.replace(/'/g,"''")+"'!A1:ZZ101";
+  const range="'"+worksheetTitle.replace(/'/g,"''")+"'!A1:T101";
   const g=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(id)+'/values/'+encodeURIComponent(range)+'?valueRenderOption=UNFORMATTED_VALUE',{headers:{Authorization:'Bearer '+access.access_token}});
   if(!g.ok)return reply(req,{error:'Worksheet could not be read',providerStatus:g.status},g.status===404?404:502);
   const data=await g.json();
-  return reply(req,{range:data.range,rows:data.values||[],rowLimit:101,readOnly:true});
+  return reply(req,{range:data.range,rows:data.values||[],rowLimit:101,columnLimit:20,readOnly:true});
  }catch(e){console.error('Sheets preview error',e instanceof Error?e.name:'unknown');return reply(req,{error:'Worksheet preview unavailable'},503)}
 });
