@@ -1,4 +1,5 @@
 import { ImportedWorksheetIntel } from '../spreadsheets/ImportedWorksheetIntel.jsx';
+import {readEventCloudRows,saveEventCloudIfUnchanged} from '../../services/eventCloudService.js';
 import {proposeSheetEventPower,applySheetEventPowerProposal} from '../../services/sheetEventMatchService.js';
 import { useState, useEffect, useRef } from 'react';
 import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES, ALLIANCE_RANKS } from '../../utils/constants.js';
@@ -37,8 +38,21 @@ import { SquadBalancerPanel } from './SquadBalancerPanel.jsx';
 // hard eligibility filter for leader/joiner picks), it's just set
 // automatically the moment someone is added here, not chosen manually.
 export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, onAddPlayers, onUpdatePlayers, plans = [] }) {
+  const [cloudBackupBusy,setCloudBackupBusy]=useState(false);
   const [filterType, setFilterType]   = useState('All');
   const sheetMatches=proposeSheetEventPower({events,players});
+  async function backupEventToCloud(){
+    if(!activeEvent||cloudBackupBusy)return;
+    if(!window.confirm('Create a cloud backup of this event? If a cloud copy already exists, this action will stop to prevent overwriting it.'))return;
+    setCloudBackupBusy(true);
+    try{
+      const cloud=await readEventCloudRows();
+      if(cloud.some(row=>row.id===activeEvent.id))throw Error('A cloud copy exists. Nothing was overwritten.');
+      await saveEventCloudIfUnchanged(activeEvent);
+      showToast('Event cloud backup confirmed.');
+    }catch(e){showToast(e.message||'Cloud backup failed');}
+    finally{setCloudBackupBusy(false)}
+  }
   function approveSheetPower(proposal){
     const event=events.find(e=>e.id===proposal.eventId);
     if(!event)return;
@@ -580,6 +594,12 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   return (
     <div style={{ padding:'16px 20px 0' }}>
       <ImportedWorksheetIntel kind="Events" players={players} />
+      {activeEvent&&<div style={{margin:'8px 0 12px'}}>
+        <button type="button" disabled={cloudBackupBusy} onClick={backupEventToCloud} style={{minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>
+          {cloudBackupBusy?'Checking cloud…':'Back up event to cloud'}
+        </button>
+        <p style={{fontSize:12,color:'#A8C4D8'}}>Creates a backup only when no cloud copy exists. Existing cloud events are never overwritten.</p>
+      </div>}
       {(sheetMatches.proposals.length>0||sheetMatches.conflicts.length>0)&&<section style={{margin:'12px 0',padding:14,background:'#152236',borderRadius:12,border:'1px solid #36536B',color:'#A8C4D8'}}>
         <strong style={{color:'white'}}>Spreadsheet event matches</strong>
         <p style={{fontSize:12}}>Approved changes are saved in this device's event workspace. They are not backed up or synced to Supabase yet.</p>
