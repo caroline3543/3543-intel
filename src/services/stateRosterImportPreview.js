@@ -1,5 +1,6 @@
 import { normalizeStateId } from './stateWorkspaceService.js';
 import { normalizeChiefId } from './spreadsheetMappingService.js';
+import { parseJoinerHeroes } from './joinerHeroSheetParser.js';
 
 /** Pure dry-run plan. Never mutates players, cloud data or Google Sheets. */
 export function planStateRosterImport({values,mapping,players,stateId,worksheetAlliance}) {
@@ -56,11 +57,18 @@ export function planStateRosterImport({values,mapping,players,stateId,worksheetA
       extraFields[property]=Number(raw);
     }
   }
+  let joinerHeroes=null;
+  const heroCol=mapping.joiner_heroes===''?NaN:Number(mapping.joiner_heroes);
+  if(Number.isInteger(heroCol)&&heroCol>=0&&String(cells[heroCol]??'').trim()){
+   try{joinerHeroes=parseJoinerHeroes(cells[heroCol]);}
+   catch(e){errors.push('Row '+row+': '+e.message);}
+  }
+  const changedHeroes=!!match&&joinerHeroes!==null&&joinerHeroes.some(h=>!match.joinerHeroes?.some(v=>v.hero.toLowerCase()===h.hero.toLowerCase()&&Number(v.skillLevel)===h.skillLevel));
   const username=usernameColumn===null?'':String(cells[usernameColumn]??'').trim();
-  const changed=!!match&&(Object.entries(manualFields).some(([k,v])=>String(match.troops?.[k]??'')!==v)||Object.entries(extraFields).some(([k,v])=>String(match[k]??'')!==String(v)));
+  const changed=!!match&&(changedHeroes||Object.entries(manualFields).some(([k,v])=>String(match.troops?.[k]??'')!==v)||Object.entries(extraFields).some(([k,v])=>String(match[k]??'')!==String(v)));
   const changedTiers=!!match&&Object.entries(manualFields).some(([k,v])=>String(match.troops?.[k]??'')!==v);
   const changedExtras=!!match&&Object.entries(extraFields).some(([k,v])=>String(match[k]??'')!==String(v));
-  candidates.push({row,fid,kind:match?'existing':'new',manualFields,extraFields,username,playerId:match?.id??null,changed,changedTiers,changedExtras});
+  candidates.push({row,fid,kind:match?'existing':'new',manualFields,extraFields,joinerHeroes,changedHeroes,username,playerId:match?.id??null,changed,changedTiers,changedExtras});
  }
  return {stateId:state,worksheetAlliance,candidates,matched:candidates.filter(x=>x.kind==='existing').length,newPlayers:candidates.filter(x=>x.kind==='new').length,proposedChanges:candidates.filter(x=>x.changed).length,errors,readOnly:true,canApply:false,headers};
 }
