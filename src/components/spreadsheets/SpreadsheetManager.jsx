@@ -162,7 +162,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     const player=players.find(p=>p.id===row.playerId&&String(p.fid)===row.fid);
     if(!player)return setMessage('Player no longer in roster. Re-preview.');
     const entryKey=plan.type==='Combat'?row.troopType:row.eventId+'|'+String(row.updates['Event Date UTC']||'').slice(0,10);
-    if(plan.type==='Events'&&(!row.eventId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(row.updates['Event Date UTC']||'').slice(0,10))))return setMessage('Event ID and UTC date are required.');
+    if(plan.type==='Events'&&(!row.eventId||!/^\d{4}-\d{2}-\d{2}$/.test(String(row.updates['Event Date UTC']||'').slice(0,10))))return setMessage('Event ID and UTC date are required.');
     if(!window.confirm('Import '+plan.type+' row '+row.row+' for player '+row.fid+' in state '+plan.stateId+'?'))return;
     setApplyingFid(row.fid);setMessage('');
     try{
