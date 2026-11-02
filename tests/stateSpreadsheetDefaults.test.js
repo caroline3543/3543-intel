@@ -13,3 +13,12 @@ test('State default sheets are isolated and persist as IDs',()=>{
 test('Invalid spreadsheet ID cannot be saved',()=>{
  assert.throws(()=>normalizeSpreadsheetId('not a url'),/valid Google Sheets/);
 });
+
+test('Sheets API refresh opens the existing reviewed alliance import workflow',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const app=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
+ const sheets=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');
+ assert.ok(app.includes('onPullApiData={()=>setAlliancePanel(true)}'));
+ assert.ok(sheets.includes('onClick={onPullApiData}'));
+ assert.ok(sheets.includes('Pull / refresh API player data'));
+});
