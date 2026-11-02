@@ -4,11 +4,14 @@ import { IMPORT_FIELDS, detectMapping, assessMapping } from '../../services/work
 import { planStateRosterImport } from '../../services/stateRosterImportPreview.js';
 import { previewSpecialWorksheet } from '../../services/specialWorksheetPreview.js';
 import { readStateSheet, saveStateSheet, clearStateSheet } from '../../services/stateSpreadsheetDefaults.js';
+import { getWorkspaces, normalizeStateId } from '../../services/stateWorkspaceService.js';
 
 /** Feature-gated setup screen. No Sheets writes and no browser OAuth secrets. */
-export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpdated, onPullApiData }) {
+export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpdated, onPullApiData, onSelectSheetState }) {
   const [status,setStatus] = useState('idle');
   const [message,setMessage] = useState('');
+  const [newSheetState,setNewSheetState]=useState('');
+  const [addingSheetState,setAddingSheetState]=useState(false);
   const [spreadsheetId,setSpreadsheetId]=useState(()=>readStateSheet(stateId)||'');
   const [savedSpreadsheetId,setSavedSpreadsheetId]=useState(()=>readStateSheet(stateId)||'');
   const [refreshingSavedSheet,setRefreshingSavedSheet]=useState(false);
@@ -328,6 +331,29 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         <button type="button" style={button} onClick={onPullApiData} disabled={!onPullApiData}>Pull / refresh API player data</button>
         <p style={{color:'#A8C4D8',fontSize:12,margin:'8px 0 0'}}>You'll enter an alliance tag, preview the API results and approve the roster update. No changes are made until approval.</p>
       </div>
+      <label htmlFor="spreadsheet-id" style={{display:'block',fontSize:14,color:'#A8C4D8',marginBottom:8}}>Google spreadsheet ID or URL</label>
+      <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
+        const value=e.target.value;const found=value.match(new RegExp('spreadsheets/d/([A-Za-z0-9_-]+)'));
+        setSpreadsheetId(found?found[1]:value);
+        setPreviewRows(null);setSheetInfo(null);setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
+      }} placeholder="Paste a Google Sheets URL" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:12}}/>
+      <button style={{...button,opacity:!enabled||status==='loading'?0.5:1}} disabled={!enabled||status==='loading'||!spreadsheetId.trim()} onClick={previewMetadata}>
+        {status==='loading'?'Reading worksheets…':'Preview worksheets'}
+      </button>
+      <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
+        <label htmlFor="sheet-state-choice" style={{display:'block',color:'#A8C4D8',fontSize:14,marginBottom:8}}>Spreadsheet state</label>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <select id="sheet-state-choice" value={stateId} onChange={e=>onSelectSheetState?.(e.target.value)} style={{flex:1,minWidth:140,padding:12,fontSize:16,borderRadius:10,background:'#0A1628',color:'white',border:'1px solid #5A7A94'}}>
+            {getWorkspaces().states.map(id=><option key={id} value={id}>State {id}</option>)}
+          </select>
+          <button type="button" style={button} onClick={()=>setAddingSheetState(!addingSheetState)}>+ State</button>
+        </div>
+        {addingSheetState&&<form onSubmit={e=>{e.preventDefault();try{const id=normalizeStateId(newSheetState);setMessage('');onSelectSheetState?.(id)}catch(error){setMessage(error.message)}}} style={{display:'flex',gap:8,marginTop:10}}>
+          <input aria-label="New state number" inputMode="numeric" value={newSheetState} onChange={e=>setNewSheetState(e.target.value)} placeholder="State number" style={{minWidth:0,flex:1,padding:12,fontSize:16,background:'#0A1628',color:'white',border:'1px solid #5A7A94',borderRadius:10}}/>
+          <button type="submit" style={button} disabled={!newSheetState.trim()}>Add & select</button>
+        </form>}
+        <p style={{fontSize:12,color:'#A8C4D8',margin:'10px 0 0'}}>Each state keeps its own saved spreadsheet link. Switching states reloads that state's roster and saved link.</p>
+      </div>
       <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
         <strong style={{color:'white'}}>State {stateId} default spreadsheet</strong>
         <p style={{color:'#A8C4D8',fontSize:13,overflowWrap:'anywhere',margin:'8px 0'}}>{savedSpreadsheetId?`Saved: ${savedSpreadsheetId}`:'No spreadsheet saved for this state yet.'}</p>
@@ -338,15 +364,6 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         </div>
         <p style={{fontSize:12,color:'#A8C4D8',margin:'10px 0 0'}}>Saved on this device for this state. Refresh retrieves the current Google worksheet list; preview rows to review changes. App edits are not automatically written to Google yet.</p>
       </div>
-      <label htmlFor="spreadsheet-id" style={{display:'block',fontSize:14,color:'#A8C4D8',marginBottom:8}}>Google spreadsheet ID or URL</label>
-      <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
-        const value=e.target.value;const found=value.match(new RegExp('spreadsheets/d/([A-Za-z0-9_-]+)'));
-        setSpreadsheetId(found?found[1]:value);
-        setPreviewRows(null);setSheetInfo(null);setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
-      }} placeholder="Paste a Google Sheets URL" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:12}}/>
-      <button style={{...button,opacity:!enabled||status==='loading'?0.5:1}} disabled={!enabled||status==='loading'||!spreadsheetId.trim()} onClick={previewMetadata}>
-        {status==='loading'?'Reading worksheets…':'Preview worksheets'}
-      </button>
       {sheetInfo&&<div aria-live="polite" style={{marginTop:14,color:'#A8C4D8'}}>
         <strong style={{color:'white'}}>{sheetInfo.title}</strong>
         <p style={{fontSize:13,margin:'8px 0'}}>Worksheets (read-only)</p>
