@@ -3,7 +3,7 @@ import { supabase } from '../../services/supabaseClient.js';
 import { IMPORT_FIELDS, detectMapping, assessMapping } from '../../services/worksheetMappingPreview.js';
 import { planStateRosterImport } from '../../services/stateRosterImportPreview.js';
 import { previewSpecialWorksheet } from '../../services/specialWorksheetPreview.js';
-import { readStateSheet, saveStateSheet, clearStateSheet } from '../../services/stateSpreadsheetDefaults.js';
+import { readStateSheet, saveStateSheet, clearStateSheet, normalizeSpreadsheetId } from '../../services/stateSpreadsheetDefaults.js';
 import { getWorkspaces, normalizeStateId } from '../../services/stateWorkspaceService.js';
 
 /** Feature-gated setup screen. No Sheets writes and no browser OAuth secrets. */
@@ -136,14 +136,15 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   },[signedInEmail,stateId,enabled]);
   async function saveDefaultSpreadsheet(){
     try{
-      const normalized=saveStateSheet(stateId,spreadsheetId);
+      const normalized=normalizeSpreadsheetId(spreadsheetId);
+      setMessage('Saving this state’s spreadsheet to Supabase…');
+      await stateDefaultRequest('POST',{stateId,spreadsheetId:normalized});
+      saveStateSheet(stateId,normalized);
       setSavedSpreadsheetId(normalized);
       setSpreadsheetId(normalized);
-      setMessage('Saved locally. Saving to Supabase…');
-      await stateDefaultRequest('POST',{stateId,spreadsheetId:normalized});
       setCloudDefaultFeedback('Saved in Supabase for State '+stateId+'.');
       setMessage('Default saved for State '+stateId+' on this device and in Supabase.');
-    }catch(error){setMessage(error.message||'Could not save spreadsheet.');}
+    }catch(error){setMessage('Could not save the cloud default: '+(error.message||'Try again')+'. Existing saved link was kept.');}
   }
   async function removeDefaultSpreadsheet(){
     try{await stateDefaultRequest('POST',{stateId,spreadsheetId:null});
