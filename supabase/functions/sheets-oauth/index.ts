@@ -19,6 +19,7 @@ async function encrypt(text:string){
  return JSON.stringify({v:1,iv:b64(iv),ciphertext:b64(new Uint8Array(encrypted))});
 }
 Deno.serve(async req=>{
+ let stage='initialisation';
  try{
   const origin=req.headers.get('origin')||'';
   if(origin&&!ALLOWED_ORIGINS.includes(origin))return json({error:'Origin not allowed'},403,origin);
@@ -51,15 +52,18 @@ Deno.serve(async req=>{
     const {data:rows,error:consumeError}=await service.from('spreadsheet_oauth_states').delete().eq('state_hash',stateHash).gt('expires_at',new Date().toISOString()).select('user_id');
     if(consumeError||!rows||rows.length!==1)return json({error:'Expired or reused OAuth state'},400);
     if(!code)return json({error:'Google authorization was declined or incomplete'},400);
+    stage='google_token_exchange';
     const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({code,client_id:required('GOOGLE_CLIENT_ID'),client_secret:required('GOOGLE_CLIENT_SECRET'),redirect_uri:base.toString(),grant_type:'authorization_code'})});
     if(!tokenResponse.ok)return json({error:'Google token exchange failed'},502);
     const tokens=await tokenResponse.json();
     if(!tokens.refresh_token)return json({error:'Google did not provide offline access; reconnect account'},409);
+    stage='token_encryption';
     const encrypted=await encrypt(tokens.refresh_token);
+    stage='credential_storage';
     const {error:saveError}=await service.from('spreadsheet_google_credentials').upsert({user_id:rows[0].user_id,refresh_token_encrypted:encrypted,updated_at:new Date().toISOString()},{onConflict:'user_id'});
     if(saveError)return json({error:'Credential storage unavailable'},503);
     return new Response(null,{status:303,headers:{Location:'https://3543-intel-git-feat-spreadsheet-s-8ea8a3-sunfire-castle-planner.vercel.app/?sheets_connected=1','Cache-Control':'no-store'}});
   }
   return json({error:'Not found'},404);
- }catch(e){console.error('Sheets OAuth configuration/processing error',e instanceof Error?e.name:'unknown');return json({error:'OAuth flow unavailable'},503)}
+ }catch(e){console.error('Sheets OAuth processing stage',stage,'error class',e instanceof Error?e.name:'unknown');return json({error:'OAuth flow unavailable'},503)}
 });
