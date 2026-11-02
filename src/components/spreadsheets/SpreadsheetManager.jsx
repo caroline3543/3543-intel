@@ -135,6 +135,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         throw new Error(result.error||'Spreadsheet creation failed.');
       }
       setCreatedWorkbook(result);
+      if(result.spreadsheetId){setSpreadsheetId(result.spreadsheetId);setSheetInfo(null);setPreviewRows(null);setMessage('Workbook created. Its ID is ready below; select Preview worksheets to verify the new file.');}
     }catch(error){setMessage(error.message||'Spreadsheet creation failed.');}
     finally{setCreatingWorkbook(false);}
   }
