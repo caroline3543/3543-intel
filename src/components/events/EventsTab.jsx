@@ -1,5 +1,6 @@
 import { ImportedWorksheetIntel } from '../spreadsheets/ImportedWorksheetIntel.jsx';
 import {readEventCloudRows,saveEventCloudIfUnchanged} from '../../services/eventCloudService.js';
+import {compareEventCopies} from '../../services/eventCloudComparison.js';
 import {proposeSheetEventPower,applySheetEventPowerProposal} from '../../services/sheetEventMatchService.js';
 import { useState, useEffect, useRef } from 'react';
 import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES, ALLIANCE_RANKS } from '../../utils/constants.js';
@@ -65,8 +66,18 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
       const existing=cloud.find(row=>row.id===activeEvent.id);
       if(!existing){showToast('No cloud backup exists for this event.');return;}
       if(existing.data?.id!==activeEvent.id)throw Error('Cloud event identity mismatch');
-      if(JSON.stringify(existing.data)===JSON.stringify(activeEvent)){showToast('Event already matches the cloud backup.');return;}
-      if(!window.confirm('Replace this device\'s event with the cloud backup? This replaces its local attendance, snapshots and assignments.'))return;
+      const comparison=compareEventCopies(activeEvent,existing.data);
+      if(comparison.unchanged){showToast('Event already matches the cloud backup.');return;}
+      const summary=[
+        'Restore cloud copy of '+(activeEvent.name||activeEvent.type)+'?',
+        'Participants added: '+comparison.added,
+        'Participants removed: '+comparison.removed,
+        'Changed participant snapshots: '+comparison.changedSnapshots,
+        'Squads or assignments changed: '+(comparison.changedSquads?'Yes':'No'),
+        'Changed event fields: '+(comparison.changedDetails.join(', ')||'None'),
+        'This replaces this device\'s version. Continue?',
+      ].join('\\n');
+      if(!window.confirm(summary))return;
       onUpdateEvent({...existing.data,id:activeEvent.id});
       showToast('Cloud event restored to this device.');
     }catch(e){showToast(e.message||'Cloud restore failed');}
