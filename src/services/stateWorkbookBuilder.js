@@ -23,7 +23,7 @@ export function makeStateWorkbook(stateId,players){
   groups.get(tag).push([
    String(d.fid??p.id??''),String(d.username??''),state,tag,
    d.furnaceLevel??'',d.power??'',d.kills??'',d.gameLanguage??'',
-   d.infantryCampLevel??'',d.lancerCampLevel??'',d.marksmanCampLevel??'',
+   '', '', '',
    '', '', '', '',p.updated_at??''
   ]);
  }
