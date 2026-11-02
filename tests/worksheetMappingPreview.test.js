@@ -25,3 +25,10 @@ test('one source column cannot map to two app fields',()=>{
  assert.equal(report.validForFutureImport,false);
  assert.match(report.errors.join(' '),/only one field/);
 });
+
+test('troop tiers and event powers map without requesting quantities',()=>{
+ const headers=['Player ID','Infantry Troop Level','Lancer Troop Level','Marksman Troop Level','Foundry Troop Power','Canyon Clash Troop Power','In-game Language','Joiner Heroes'];
+ const mapping=detectMapping(headers);
+ assert.deepEqual([mapping.infantry_tier,mapping.lancer_tier,mapping.marksman_tier,mapping.foundry_troop_power,mapping.canyon_troop_power,mapping.game_language,mapping.joiner_heroes],['1','2','3','4','5','6','7']);
+ assert.equal(assessMapping([headers,['123456789','T10','FC1','FC2','100000','150000','English','Jessie']],mapping).validForFutureImport,true);
+});
