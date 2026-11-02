@@ -5,6 +5,7 @@ import { planStateRosterImport } from '../../services/stateRosterImportPreview.j
 import { previewSpecialWorksheet } from '../../services/specialWorksheetPreview.js';
 import { makeSheetReadBaseline } from '../../services/sheetReadBaselineService.js';
 import { planSheetWrites } from '../../services/sheetWritePlanService.js';
+import { prepareExportApproval } from '../../services/sheetExportApprovalService.js';
 import { readStateSheet, saveStateSheet, clearStateSheet, normalizeSpreadsheetId } from '../../services/stateSpreadsheetDefaults.js';
 import { getWorkspaces, normalizeStateId } from '../../services/stateWorkspaceService.js';
 
@@ -29,6 +30,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   const [previewRows,setPreviewRows]=useState(null);
   const [writeBaseline,setWriteBaseline]=useState(null);
   const [writeReview,setWriteReview]=useState(null);
+  const [exportReceipt,setExportReceipt]=useState(null);
   const [checkingWrites,setCheckingWrites]=useState(false);
   const [columnMapping,setColumnMapping]=useState({});
   const [previewAlliance,setPreviewAlliance]=useState('');
@@ -162,7 +164,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     if(!savedSpreadsheetId||refreshingSavedSheet)return;
     setRefreshingSavedSheet(true);
     setSpreadsheetId(savedSpreadsheetId);
-    setSheetInfo(null);setPreviewRows(null);setWriteReview(null);setColumnMapping({});setPreviewAlliance('');
+    setSheetInfo(null);setPreviewRows(null);setWriteReview(null);setExportReceipt(null);setColumnMapping({});setPreviewAlliance('');
     setMessage('Refreshing worksheets from the saved Google spreadsheet…');
     try{
       const {data:{session}}=await supabase.auth.getSession();
@@ -177,7 +179,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   }
   async function checkGoogleWrites(){
     if(!previewRows||checkingWrites)return;
-    setCheckingWrites(true);setWriteReview(null);
+    setCheckingWrites(true);setWriteReview(null);setExportReceipt(null);
     try{
       if(previewRows.truncated)throw Error('This worksheet exceeds the safe review limit.');
       if(!writeBaseline)throw Error('No baseline. Preview this worksheet again to record the starting values.');
@@ -191,6 +193,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       const result=await response.json().catch(()=>({}));
       if(!response.ok)throw Error(result.error||'Google preflight failed.');
       setWriteReview({plan,checked:result});
+      if(result.allMatched){setExportReceipt(await prepareExportApproval(plan,result));}
     }catch(error){setMessage('Export review failed: '+(error.message||'Unknown error'));}
     finally{setCheckingWrites(false);}
   }
@@ -393,7 +396,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
         const value=e.target.value;const found=value.match(new RegExp('spreadsheets/d/([A-Za-z0-9_-]+)'));
         setSpreadsheetId(found?found[1]:value);
-        setPreviewRows(null);setWriteBaseline(null);setWriteReview(null);setSheetInfo(null);setPreviewAlliance('');setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
+        setPreviewRows(null);setWriteBaseline(null);setWriteReview(null);setExportReceipt(null);setSheetInfo(null);setPreviewAlliance('');setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
       }} placeholder="Paste the Google Sheets link for this state" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:12}}/>
       <button style={{...button,opacity:!enabled||status==='loading'?0.5:1}} disabled={!enabled||status==='loading'||!spreadsheetId.trim()} onClick={previewMetadata}>
         {status==='loading'?'Reading worksheets…':'Load worksheets'}
@@ -436,6 +439,12 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
           {writeReview.checked?.checked?.filter(x=>!x.match).map((x,i)=><p key={i}>Row {x.row}, {x.column}: {x.reason}</p>)}
           <p>Automatic exports are disabled.</p>
         </div>}
+      </section>}
+      {exportReceipt&&writeReview?.checked?.allMatched&&<section aria-label="Verified export review receipt" style={{background:'#152236',border:'1px solid #36536B',borderRadius:12,padding:14,marginBottom:14}}>
+        <strong>Read-only verification receipt</strong>
+        <p style={{fontSize:13,color:'#A8C4D8'}}>Verified {exportReceipt.review.changes.length} proposed changes for State {exportReceipt.review.stateId}. This receipt documents the reviewed values; it does not approve or send any Google edits.</p>
+        <p style={{fontSize:12,color:'#A8C4D8',overflowWrap:'anywhere'}}>Review fingerprint: {exportReceipt.hash.slice(0,16)}</p>
+        <p style={{fontSize:12,color:'#A8C4D8'}}>Checked at {new Date(exportReceipt.reviewedAt).toLocaleString()}. Recheck Google before any future write.</p>
       </section>}
       {previewRows&&['Combat','Events'].includes(previewRows.title)&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
         <h4 style={{margin:'0 0 8px',fontSize:18}}>{previewRows.title} import preview</h4>
