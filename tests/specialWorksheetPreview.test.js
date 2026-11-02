@@ -11,3 +11,5 @@ test('Reject malformed numeric spreadsheet values',()=>{const p=previewSpecialWo
 test('Warn if imported worksheet is longer than 100 rows',()=>{const values=[['Player ID','State','Alliance','Troop Type'],...Array.from({length:101},(_,i)=>['123456789','3573','LUN','Infantry'])];const p=previewSpecialWorksheet({type:'Combat',values,players,stateId:'3573'});assert.ok(p.errors.some(e=>e.includes('100-row')))});
 
 test('Workbook creation prepares the resulting spreadsheet ID for preview',async()=>{const {readFileSync}=await import('node:fs');const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');assert.ok(source.includes('setSpreadsheetId(result.spreadsheetId)'));});
+
+test('Switching spreadsheet invalidates a previously reviewed import',async()=>{const {readFileSync}=await import('node:fs');const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');assert.ok(source.includes('setPreviewRows(null);setSheetInfo(null);setColumnMapping({})'));assert.ok(source.includes('previewRows.spreadsheetId!==spreadsheetId.trim()'));});
