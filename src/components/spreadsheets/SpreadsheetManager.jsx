@@ -107,8 +107,9 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   }
   function saveDefaultSpreadsheet(){
     try{
-      saveStateSheet(stateId,spreadsheetId);
-      setSavedSpreadsheetId(spreadsheetId.trim());
+      const normalized=saveStateSheet(stateId,spreadsheetId);
+      setSavedSpreadsheetId(normalized);
+      setSpreadsheetId(normalized);
       setMessage('Default spreadsheet saved for State '+stateId+'. It will load automatically when you return to this state.');
     }catch(error){setMessage(error.message||'Could not save spreadsheet.');}
   }
