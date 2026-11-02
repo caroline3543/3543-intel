@@ -42,8 +42,8 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   function approveSheetPower(proposal){
     const event=events.find(e=>e.id===proposal.eventId);
     if(!event)return;
-    if(!window.confirm('Apply imported troop power '+proposal.power+' to '+proposal.playerName+' in '+event.name+'? Attendance and assignments will remain unchanged.'))return;
-    try{onUpdateEvent(applySheetEventPowerProposal(event,proposal));}
+    if(!window.confirm('Apply imported troop power '+proposal.power+' to '+proposal.playerName+' in '+event.name+' on this device only? This is not a cloud-synced event update. Attendance and assignments will remain unchanged.'))return;
+    try{onUpdateEvent(applySheetEventPowerProposal(event,proposal));showToast('Troop power saved to this device. Event cloud sync is not yet available.');}
     catch(e){window.alert(e.message||'Could not apply imported power.');}
   }
   const [toastMsg, setToastMsg]       = useState(null);
@@ -582,6 +582,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
       <ImportedWorksheetIntel kind="Events" players={players} />
       {(sheetMatches.proposals.length>0||sheetMatches.conflicts.length>0)&&<section style={{margin:'12px 0',padding:14,background:'#152236',borderRadius:12,border:'1px solid #36536B',color:'#A8C4D8'}}>
         <strong style={{color:'white'}}>Spreadsheet event matches</strong>
+        <p style={{fontSize:12}}>Approved changes are saved in this device's event workspace. They are not backed up or synced to Supabase yet.</p>
         <p style={{fontSize:13}}>{sheetMatches.proposals.length} safe troop-power updates · {sheetMatches.conflicts.length} conflicts needing manual review</p>
         {sheetMatches.proposals.slice(0,20).map(x=><div key={x.eventId+':'+x.playerId} style={{padding:'6px 0',fontSize:13}}>{x.playerName} · {x.power.toLocaleString()} troop power
           <button type="button" onClick={()=>approveSheetPower(x)} style={{marginLeft:8,minHeight:40,padding:'8px 12px',borderRadius:8,background:'#1E3A52',color:'white',border:'1px solid #5A7A94'}}>Apply to event</button>
