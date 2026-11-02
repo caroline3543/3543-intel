@@ -113,7 +113,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||'Could not preview rows');
       setPreviewAlliance(title);
-      setPreviewRows({title,rows:data.rows,truncated:!!data.truncated});setColumnMapping(detectMapping(data.rows?.[0]||[]));setStatus('ready');
+      setPreviewRows({title,spreadsheetId:spreadsheetId.trim(),rows:data.rows,truncated:!!data.truncated});setColumnMapping(detectMapping(data.rows?.[0]||[]));setStatus('ready');
     }catch(e){setStatus('error');setMessage(e.message||'Worksheet preview failed');}
   }
   async function createStateWorkbook() {
@@ -160,6 +160,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   }
   async function applySpecialRow(plan,row){
     if(applyingFid||plan.errors.length||!Object.keys(row.updates).length)return;
+    if(!previewRows||previewRows.spreadsheetId!==spreadsheetId.trim())return setMessage('Spreadsheet changed. Preview the current file before approving an import.');
     const player=players.find(p=>p.id===row.playerId&&String(p.fid)===row.fid);
     if(!player)return setMessage('Player no longer in roster. Re-preview.');
     const entryKey=plan.type==='Combat'?row.troopType:row.eventId+'|'+String(row.updates['Event Date UTC']||'').slice(0,10);
@@ -270,6 +271,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
         const value=e.target.value;const found=value.match(new RegExp('spreadsheets/d/([A-Za-z0-9_-]+)'));
         setSpreadsheetId(found?found[1]:value);
+        setPreviewRows(null);setSheetInfo(null);setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
       }} placeholder="Paste a Google Sheets URL" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:12}}/>
       <button style={{...button,opacity:!enabled||status==='loading'?0.5:1}} disabled={!enabled||status==='loading'||!spreadsheetId.trim()} onClick={previewMetadata}>
         {status==='loading'?'Reading worksheets…':'Preview worksheets'}
