@@ -14,6 +14,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   const [addingSheetState,setAddingSheetState]=useState(false);
   const [spreadsheetId,setSpreadsheetId]=useState(()=>readStateSheet(stateId)||'');
   const [savedSpreadsheetId,setSavedSpreadsheetId]=useState(()=>readStateSheet(stateId)||'');
+  const [cloudDefaultFeedback,setCloudDefaultFeedback]=useState('Stored on this device. Sign in to load cloud defaults.');
   const [refreshingSavedSheet,setRefreshingSavedSheet]=useState(false);
   const [sheetInfo,setSheetInfo]=useState(null);
   const [email,setEmail]=useState('');
@@ -108,18 +109,48 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       setStatus('error');setMessage(error.message || 'Could not connect Google Sheets');
     }
   }
-  function saveDefaultSpreadsheet(){
+  async function stateDefaultRequest(method,payload){
+    const {data:{session}}=await supabase.auth.getSession();
+    if(!session?.access_token)throw Error('Sign in to sync saved spreadsheet links.');
+    const res=await fetch(import.meta.env.VITE_SUPABASE_URL+'/functions/v1/sheets-state-default',{method,headers:{Authorization:'Bearer '+session.access_token,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:JSON.stringify(payload)}:{})});
+    const result=await res.json().catch(()=>({}));
+    if(!res.ok)throw Error(result.error||'Could not sync spreadsheet default.');
+    return result;
+  }
+  useEffect(()=>{
+    if(!signedInEmail||!enabled||!supabase)return;
+    let active=true;
+    stateDefaultRequest('GET').then(result=>{
+      if(!active)return;
+      const remote=result.defaults?.[String(stateId)];
+      if(remote){
+        setSavedSpreadsheetId(remote);setSpreadsheetId(remote);
+        saveStateSheet(stateId,remote);
+        setSheetInfo(null);setPreviewRows(null);
+        setCloudDefaultFeedback('Default loaded from Supabase. Available across signed-in devices.');
+      }else if(readStateSheet(stateId)){
+        setCloudDefaultFeedback('This device has a saved link. Select Save as state default to make it available across devices.');
+      }else setCloudDefaultFeedback('No default saved in Supabase for this state.');
+    }).catch(error=>{if(active)setCloudDefaultFeedback('Cloud lookup unavailable: '+error.message)});
+    return ()=>{active=false};
+  },[signedInEmail,stateId,enabled]);
+  async function saveDefaultSpreadsheet(){
     try{
       const normalized=saveStateSheet(stateId,spreadsheetId);
       setSavedSpreadsheetId(normalized);
       setSpreadsheetId(normalized);
-      setMessage('Default spreadsheet saved for State '+stateId+'. It will load automatically when you return to this state.');
+      setMessage('Saved locally. Saving to Supabase…');
+      await stateDefaultRequest('POST',{stateId,spreadsheetId:normalized});
+      setCloudDefaultFeedback('Saved in Supabase for State '+stateId+'.');
+      setMessage('Default saved for State '+stateId+' on this device and in Supabase.');
     }catch(error){setMessage(error.message||'Could not save spreadsheet.');}
   }
-  function removeDefaultSpreadsheet(){
-    clearStateSheet(stateId);
-    setSavedSpreadsheetId('');
-    setMessage('Default spreadsheet cleared for State '+stateId+'. No Google data was deleted.');
+  async function removeDefaultSpreadsheet(){
+    try{await stateDefaultRequest('POST',{stateId,spreadsheetId:null});
+      clearStateSheet(stateId);setSavedSpreadsheetId('');
+      setCloudDefaultFeedback('No saved default for this state.');
+      setMessage('Default cleared across devices. No Google file was deleted.');
+    }catch(error){setMessage('Could not clear cloud default: '+error.message)}
   }
   async function refreshSavedSpreadsheet(){
     if(!savedSpreadsheetId||refreshingSavedSheet)return;
@@ -362,7 +393,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
           <button type="button" onClick={refreshSavedSpreadsheet} disabled={!savedSpreadsheetId||refreshingSavedSheet||!signedInEmail} style={button}>{refreshingSavedSheet?'Refreshing…':'Pull / refresh from Google'}</button>
           {savedSpreadsheetId&&<button type="button" onClick={removeDefaultSpreadsheet} style={button}>Clear default</button>}
         </div>
-        <p style={{fontSize:12,color:'#A8C4D8',margin:'10px 0 0'}}>Saved on this device for this state. Refresh retrieves the current Google worksheet list; preview rows to review changes. App edits are not automatically written to Google yet.</p>
+        <p style={{fontSize:12,color:'#A8C4D8',margin:'10px 0 0'}}>{cloudDefaultFeedback} Refresh retrieves the Google worksheet list; preview rows to review changes. App edits are not automatically written to Google yet.</p>
       </div>
       {sheetInfo&&<div aria-live="polite" style={{marginTop:14,color:'#A8C4D8'}}>
         <strong style={{color:'white'}}>{sheetInfo.title}</strong>
