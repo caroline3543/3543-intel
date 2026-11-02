@@ -10,3 +10,9 @@ test('No baseline blocks export',()=>assert.throws(()=>plan({baseline:null}),/ba
 test('A different sheet baseline blocks export',()=>assert.throws(()=>plan({baseline:{...baseline,spreadsheetId:'other'}}),/baseline/));
 test('Simultaneous edits become conflicts, not automatic writes',()=>{const p=plan({rows:[headers,['123456789','3573','LUN','No','50']]});assert.equal(p.proposals.length,0);assert.equal(p.conflicts.length,1)});
 test('Duplicate IDs and mismatched alliances never produce writes',()=>{const p=plan({rows:[headers,['123456789','3573','BAD','Maybe','50'],['123456789','3573','LUN','Maybe','50']]});assert.equal(p.proposals.length,0);assert.equal(p.conflicts.length,2)});
+
+test('Duplicate IDs block every occurrence even if the first row otherwise matches',()=>{
+ const p=plan({rows:[headers,['123456789','3573','LUN','Maybe','50'],['123456789','3573','LUN','Maybe','50']]});
+ assert.equal(p.proposals.length,0);
+ assert.equal(p.conflicts.length,2);
+});
