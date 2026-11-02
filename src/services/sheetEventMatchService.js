@@ -7,6 +7,7 @@ export function proposeSheetEventPower({events=[],players=[]}){
   if(separator<1){conflicts.push({playerId:p.id,key,reason:'Missing event ID or date'});continue;}
   const eventId=key.slice(0,separator),date=key.slice(separator+1),event=byId.get(eventId);
   if(!event||String(event.date).slice(0,10)!==date){conflicts.push({playerId:p.id,key,reason:'Event ID/date not found'});continue;}
+  if(!['Foundry','Foundry Battle','Canyon Clash'].includes(String(event.type))){conflicts.push({playerId:p.id,key,reason:'Event type does not use troop power'});continue;}
   if(!event.participantIds?.includes(p.id)){conflicts.push({playerId:p.id,key,reason:'Player is not an existing event participant'});continue;}
   const power=fields['Event Troop Power'];
   if(typeof power!=='number'||!Number.isFinite(power)||power<0||power>1e12)continue;
@@ -19,7 +20,7 @@ export function proposeSheetEventPower({events=[],players=[]}){
  return {proposals,conflicts};
 }
 export function applySheetEventPowerProposal(event,proposal){
- if(event.id!==proposal.eventId||!event.participantIds?.includes(proposal.playerId))throw Error('Event participation changed');
+ if(event.id!==proposal.eventId||String(event.date).slice(0,10)!==proposal.key.slice(proposal.key.lastIndexOf('|')+1)||!event.participantIds?.includes(proposal.playerId))throw Error('Event participation changed');
  const snapshots=event.snapshots.map(s=>{
   if(s.playerId!==proposal.playerId)return s;
   if(s.snapshotId!==proposal.snapshotId||s.troopPower!=null)throw Error('Event snapshot changed');
