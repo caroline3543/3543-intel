@@ -156,7 +156,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     }catch(e){setMessage(e.message||'Player creation failed.');}
     finally{setApplyingFid(null);}
   }
-  async function applySingleTierChange(candidate) {
+  async function applySingleTierChange(candidate, mode = 'tiers') {
     if(applyingFid||!stateId||!candidate.changed||candidate.kind!=='existing')return;
     const existing=players.find(p=>p.id===candidate.playerId&&String(p.fid)===candidate.fid);
     if(!existing)throw new Error('Player no longer in roster. Reload preview.');
@@ -165,10 +165,16 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     try{
       const {data:{session}}=await supabase.auth.getSession();
       if(!session?.access_token)throw new Error('Please sign in.');
-      const expected=Object.fromEntries(Object.keys(candidate.manualFields).map(k=>[k,existing.troops?.[k]??'']));
+      const changedTiers=Object.fromEntries(Object.entries(candidate.manualFields).filter(([k,v])=>String(existing.troops?.[k]??'')!==v));
+      const changedExtras=Object.fromEntries(Object.entries(candidate.extraFields||{}).filter(([k,v])=>String(existing[k]??'')!==String(v)));
+      const tiers=mode==='tiers'?changedTiers:{};
+      const extraFields=mode==='extras'?changedExtras:{};
+      if(!Object.keys(tiers).length&&!Object.keys(extraFields).length)throw new Error('No changes found for this category.');
+      const expected=Object.fromEntries(Object.keys(tiers).map(k=>[k,existing.troops?.[k]??'']));
+      const expectedExtras=Object.fromEntries(Object.keys(extraFields).map(k=>[k,existing[k]??'']));
       const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-apply-troop-import`,{
         method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},
-        body:JSON.stringify({stateId:String(stateId),fid:candidate.fid,alliance:previewAlliance,troops:candidate.manualFields,expected}),
+        body:JSON.stringify({stateId:String(stateId),fid:candidate.fid,alliance:previewAlliance,troops:tiers,extraFields,expected,expectedExtras}),
       });
       const result=await response.json();
       if(!response.ok)throw new Error(result.error||'Import failed.');
@@ -252,8 +258,9 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
             <strong style={{color:'white'}}>State {plan.stateId} roster comparison</strong>
             <p>{plan.matched} existing players · {plan.proposedChanges} proposed troop-level updates · {plan.newPlayers} unmatched player IDs · {plan.errors.length} conflicts</p>
             {plan.errors.length>0&&<ul style={{paddingLeft:20,color:'#FFC5A8'}}>{plan.errors.slice(0,10).map((error,i)=><li key={i}>{error}</li>)}</ul>}
-            {plan.candidates.filter(x=>x.changed).length>0&&<div style={{maxHeight:200,overflowY:'auto',marginBottom:12}}>{plan.candidates.filter(x=>x.changed).slice(0,25).map(x=><div key={x.fid} style={{fontSize:12,margin:'6px 0',color:'#A8C4D8'}}>Player {x.fid}: {Object.entries(x.manualFields).map(([type,tier])=>type+' '+tier).join(' · ')}
-              <button type="button" disabled={!!applyingFid||plan.errors.length>0||report.errors.length>0||!plan.worksheetAlliance||!onRosterUpdated} onClick={()=>applySingleTierChange(x)} style={{display:'block',padding:'8px 12px',minHeight:40,borderRadius:8,marginTop:4,background:'#1E3A52',color:'white',border:'1px solid #5A7A94'}}> {applyingFid===x.fid?'Applying…':'Review & apply this player'} </button></div>)}</div>}
+            {plan.candidates.filter(x=>x.changed).length>0&&<div style={{maxHeight:200,overflowY:'auto',marginBottom:12}}>{plan.candidates.filter(x=>x.changed).slice(0,25).map(x=><div key={x.fid} style={{fontSize:12,margin:'6px 0',color:'#A8C4D8'}}>Player {x.fid}: {[...Object.entries(x.manualFields),...Object.entries(x.extraFields||{})].map(([type,value])=>type+' '+value).join(' · ')}
+              <button type="button" disabled={!!applyingFid||plan.errors.length>0||report.errors.length>0||!plan.worksheetAlliance||!onRosterUpdated} onClick={()=>applySingleTierChange(x)} style={{display:'block',padding:'8px 12px',minHeight:40,borderRadius:8,marginTop:4,background:'#1E3A52',color:'white',border:'1px solid #5A7A94'}}> {applyingFid===x.fid?'Applying…':'Apply troop levels'} </button>
+              <button type="button" disabled={!!applyingFid||!x.changedExtras||plan.errors.length>0||report.errors.length>0||!plan.worksheetAlliance||!onRosterUpdated} onClick={()=>applySingleTierChange(x,'extras')} style={{display:'block',padding:'8px 12px',minHeight:40,borderRadius:8,marginTop:4,background:'#1E3A52',color:'white',border:'1px solid #5A7A94'}}>Apply event power / language</button></div>)}</div>}
             {plan.candidates.filter(x=>x.kind==='new').slice(0,30).map(x=><div key={'new-'+x.fid} style={{margin:'8px 0',fontSize:13,color:'#A8C4D8'}}>
               New: {x.username||'(missing username)'} · {x.fid}
               <button type="button" disabled={!!applyingFid||!x.username||plan.errors.length>0||report.errors.length>0||!onRosterUpdated||!/^[A-Za-z0-9_-]{2,10}$/.test(previewAlliance)}
