@@ -113,7 +113,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||'Could not preview rows');
       setPreviewAlliance(title);
-      setPreviewRows({title,rows:data.rows});setColumnMapping(detectMapping(data.rows?.[0]||[]));setStatus('ready');
+      setPreviewRows({title,rows:data.rows,truncated:!!data.truncated});setColumnMapping(detectMapping(data.rows?.[0]||[]));setStatus('ready');
     }catch(e){setStatus('error');setMessage(e.message||'Worksheet preview failed');}
   }
   async function createStateWorkbook() {
@@ -281,6 +281,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       {previewRows&&['Combat','Events'].includes(previewRows.title)&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
         <h4 style={{margin:'0 0 8px',fontSize:18}}>{previewRows.title} import preview</h4>
         {(()=>{try{const plan=previewSpecialWorksheet({type:previewRows.title,values:previewRows.rows,players,stateId});
+          if(previewRows.truncated)plan.errors.push('Worksheet has additional rows beyond the 100-row review limit. Approval is blocked.');
           return <div style={{color:'#A8C4D8',fontSize:14}}>
             <p>{plan.matched} matching rows · {plan.errors.length} conflicts · State {plan.stateId}</p>
             {plan.errors.length>0&&<ul>{plan.errors.slice(0,20).map((e,i)=><li key={i}>{e}</li>)}</ul>}
