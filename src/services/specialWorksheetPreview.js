@@ -15,6 +15,7 @@ export function previewSpecialWorksheet({type,values,players,stateId}){
  const col=h=>headers.indexOf(h), indexed=new Map();
  for(const p of players){const id=normalizeChiefId(p.fid);if(id){if(indexed.has(id))indexed.set(id,null);else indexed.set(id,p)}}
  const errors=[],matches=[],seen=new Set();
+ if(values.length>101&&values.slice(101).some(cells=>(cells||[]).some(v=>String(v??'').trim())))errors.push('Worksheet exceeds the 100-row review limit. Split the import into smaller worksheets; extra rows have not been reviewed.');
  for(let i=1;i<Math.min(values.length,102);i++){
   const cells=values[i]||[];if(!cells.some(v=>String(v??'').trim()))continue;
   const row=i+1,id=normalizeChiefId(cells[col('Player ID')]),rowState=String(cells[col('State')]??'').trim();
@@ -37,6 +38,7 @@ export function previewSpecialWorksheet({type,values,players,stateId}){
   if(seen.has(key)){errors.push('Row '+row+': duplicate player/event or troop');continue}seen.add(key);
   const updates={};let invalid=false;
   for(const name of rules.numeric){const c=col(name);if(c<0)continue;const raw=String(cells[c]??'').trim();if(!raw)continue;
+   if(!/^(?:\\d+|\\d{1,3}(?:,\\d{3})+)(?:\\.\\d+)?$/.test(raw)){errors.push('Row '+row+': invalid '+name);invalid=true;break}
    const n=Number(raw.replace(/,/g,''));if(!Number.isFinite(n)||n<0||n>1e12||(name.endsWith('%')&&n>100000)){errors.push('Row '+row+': invalid '+name);invalid=true;break}updates[name]=n;
   }
   if(invalid)continue;
