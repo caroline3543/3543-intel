@@ -31,7 +31,7 @@ Deno.serve(async req=>{
   if(!tokenResponse.ok)return reply(req,{error:'Google account must be reconnected'},401);
   const access=await tokenResponse.json();
   if(!access.access_token)return reply(req,{error:'Google token refresh unavailable'},502);
-  const range="'"+worksheetTitle.replace(/'/g,"''")+"'!A1:T101";
+  const range="'"+worksheetTitle.replace(/'/g,"''")+"'!A1:T102";
   const g=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(id)+'/values/'+encodeURIComponent(range)+'?valueRenderOption=UNFORMATTED_VALUE',{headers:{Authorization:'Bearer '+access.access_token}});
   if(!g.ok)return reply(req,{error:'Worksheet could not be read',providerStatus:g.status},g.status===404?404:502);
   const data=await g.json();
