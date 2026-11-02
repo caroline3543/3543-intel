@@ -13,3 +13,7 @@ test('Export review refuses unverified and conflicting data',()=>{
  assert.throws(()=>canonicalExportReview({...plan,conflicts:[{reason:'Conflict'}]},checked),/conflicts/);
  assert.throws(()=>canonicalExportReview(plan,{...checked,checked:[]}),/Incomplete/);
 });
+
+test('Receipt refuses a verified cell that does not match its proposal',()=>{
+ assert.throws(()=>canonicalExportReview(plan,{...checked,checked:[{row:3,column:'Availability',match:true}]}),/Verification does not match/);
+});
