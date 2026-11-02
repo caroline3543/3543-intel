@@ -342,20 +342,6 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       {message&&<p role="alert" style={{fontSize:14,color:'#FFC5A8'}}>{message}</p>}
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
-      <h3 style={{margin:'0 0 8px'}}>Create a new spreadsheet</h3>
-      <p style={{color:'#A8C4D8',fontSize:14,lineHeight:1.5}}>
-        Create a new Google file from the selected state's saved roster. Includes alliance tabs, Combat and Events. This does not replace your saved default unless you choose to save it.
-      </p>
-      <label htmlFor="create-workbook-state" style={{display:'block',color:'#A8C4D8',fontSize:14,marginBottom:6}}>State number</label>
-      <input id="create-workbook-state" inputMode="numeric" value={createState} onChange={e=>setCreateState(e.target.value)}
-        placeholder="e.g. 3573" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:10}}/>
-      <button type="button" style={button} disabled={!enabled||!signedInEmail||creatingWorkbook||!createState.trim()} onClick={createStateWorkbook}>
-        {creatingWorkbook?'Creating spreadsheet…':'Create spreadsheet'}
-      </button>
-      <p style={{color:'#A8C4D8',fontSize:12,margin:'10px 0 0'}}>Creates a separate Google file. It will not overwrite any existing spreadsheet. Automatic two-way sync is not enabled.</p>
-      {createdWorkbook?.spreadsheetUrl&&<p style={{fontSize:14,marginTop:12}}><a href={createdWorkbook.spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{color:'#F5A623'}}>Open created spreadsheet</a>{createdWorkbook.players!=null?` · ${createdWorkbook.players} players in ${createdWorkbook.alliances} alliance tabs`:''}</p>}
-    </section>
-    <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
       <h3 style={{margin:'0 0 8px'}}>Your state spreadsheet</h3>
       <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
         <label htmlFor="sheet-state-choice" style={{display:'block',color:'#A8C4D8',fontSize:14,marginBottom:8}}>Spreadsheet state</label>
@@ -363,23 +349,13 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
           <select id="sheet-state-choice" value={stateId} onChange={e=>onSelectSheetState?.(e.target.value)} style={{flex:1,minWidth:140,padding:12,fontSize:16,borderRadius:10,background:'#0A1628',color:'white',border:'1px solid #5A7A94'}}>
             {getWorkspaces().states.map(id=><option key={id} value={id}>State {id}</option>)}
           </select>
-          <button type="button" style={button} onClick={()=>setAddingSheetState(!addingSheetState)}>+ State</button>
+          <button type="button" style={secondaryButton} onClick={()=>setAddingSheetState(!addingSheetState)}>+ State</button>
         </div>
         {addingSheetState&&<form onSubmit={e=>{e.preventDefault();try{const id=normalizeStateId(newSheetState);setMessage('');onSelectSheetState?.(id)}catch(error){setMessage(error.message)}}} style={{display:'flex',gap:8,marginTop:10}}>
           <input aria-label="New state number" inputMode="numeric" value={newSheetState} onChange={e=>setNewSheetState(e.target.value)} placeholder="State number" style={{minWidth:0,flex:1,padding:12,fontSize:16,background:'#0A1628',color:'white',border:'1px solid #5A7A94',borderRadius:10}}/>
           <button type="submit" style={button} disabled={!newSheetState.trim()}>Add & select</button>
         </form>}
         <p style={{fontSize:12,color:'#A8C4D8',margin:'10px 0 0'}}>Each state keeps its own saved spreadsheet link. Switching states reloads that state's roster and saved link.</p>
-      </div>
-      <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
-        <strong style={{color:'white'}}>State {stateId} default spreadsheet</strong>
-        <p style={{color:'#A8C4D8',fontSize:13,overflowWrap:'anywhere',margin:'8px 0'}}>{savedSpreadsheetId?`Saved link: ${savedSpreadsheetId}`:'No spreadsheet saved for this state yet.'}</p>
-        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-          <button type="button" onClick={saveDefaultSpreadsheet} disabled={!spreadsheetId.trim()||!enabled} style={secondaryButton}>Save link for this state</button>
-          <button type="button" onClick={refreshSavedSpreadsheet} disabled={!savedSpreadsheetId||refreshingSavedSheet||!signedInEmail} style={button}>{refreshingSavedSheet?'Refreshing…':'Pull / refresh from Google'}</button>
-          {savedSpreadsheetId&&<button type="button" onClick={removeDefaultSpreadsheet} style={{...secondaryButton,color:'#A8C4D8'}}>Remove saved link</button>}
-        </div>
-        <p style={{fontSize:12,color:'#A8C4D8',margin:'10px 0 0'}}>{cloudDefaultFeedback} Refresh retrieves the Google worksheet list; preview rows to review changes. App edits are not automatically written to Google yet.</p>
       </div>
       <label htmlFor="spreadsheet-id" style={{display:'block',fontSize:14,color:'#A8C4D8',marginBottom:8}}>Spreadsheet link</label>
       <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
@@ -391,9 +367,19 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         {status==='loading'?'Reading worksheets…':'Load worksheets'}
       </button>
       <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
+        <strong style={{color:'white'}}>Saved spreadsheet · State {stateId}</strong>
+        <p style={{color:'#A8C4D8',fontSize:13,overflowWrap:'anywhere',margin:'8px 0'}}>{savedSpreadsheetId?`Saved link: ${savedSpreadsheetId}`:'No spreadsheet saved for this state yet.'}</p>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+          <button type="button" onClick={saveDefaultSpreadsheet} disabled={!spreadsheetId.trim()||!enabled} style={secondaryButton}>Save link for this state</button>
+          <button type="button" onClick={refreshSavedSpreadsheet} disabled={!savedSpreadsheetId||refreshingSavedSheet||!signedInEmail} style={button}>{refreshingSavedSheet?'Refreshing…':'Refresh Google worksheets'}</button>
+          {savedSpreadsheetId&&<button type="button" onClick={removeDefaultSpreadsheet} style={{...secondaryButton,color:'#A8C4D8'}}>Remove saved link</button>}
+        </div>
+        <p style={{fontSize:12,color:'#A8C4D8',margin:'10px 0 0'}}>{cloudDefaultFeedback} Refreshing reads the worksheet list. Importing data requires reviewing individual rows. App changes are not automatically sent to Google.</p>
+      </div>
+      <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
         <strong style={{color:'white'}}>Update player records</strong>
         <p style={{color:'#A8C4D8',fontSize:13,lineHeight:1.5,margin:'8px 0'}}>Retrieve current player profiles from the Mightpulse API. You'll review the changes before applying them to the app roster.</p>
-        <button type="button" style={button} onClick={onPullApiData} disabled={!onPullApiData}>Refresh player data from API</button>
+        <button type="button" style={secondaryButton} onClick={onPullApiData} disabled={!onPullApiData}>Refresh player data from API</button>
         <p style={{color:'#A8C4D8',fontSize:12,margin:'8px 0 0'}}>Does not modify Google Sheets. Updates are applied to the app only after approval.</p>
       </div>
       {sheetInfo&&<div aria-live="polite" style={{marginTop:14,color:'#A8C4D8'}}>
@@ -449,6 +435,21 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       </div>}
       {previewRows&&<div style={{marginTop:14}}><strong>Read-only preview: {previewRows.title}</strong><p style={{fontSize:12,color:'#A8C4D8'}}>First 101 rows maximum. No changes have been saved.</p><div style={{overflowX:'auto',maxHeight:340,overflowY:'auto',fontSize:12}}><table style={{borderCollapse:'collapse'}}><tbody>{previewRows.rows.map((row,i)=><tr key={i}>{row.slice(0,20).map((v,j)=><td key={j} style={{border:'1px solid #36536B',padding:6,whiteSpace:'nowrap'}}>{String(v??'')}</td>)}</tr>)}</tbody></table></div></div>}
     </section>
+    <details style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
+      <summary style={{fontSize:17,fontWeight:700,cursor:'pointer',minHeight:44}}>Create a new Google spreadsheet</summary>
+      <h3 style={{margin:'0 0 8px'}}>Create a new spreadsheet</h3>
+      <p style={{color:'#A8C4D8',fontSize:14,lineHeight:1.5}}>
+        Create a new Google file from the selected state's saved roster. Includes alliance tabs, Combat and Events. This does not replace your saved default unless you choose to save it.
+      </p>
+      <label htmlFor="create-workbook-state" style={{display:'block',color:'#A8C4D8',fontSize:14,marginBottom:6}}>State number</label>
+      <input id="create-workbook-state" inputMode="numeric" value={createState} onChange={e=>setCreateState(e.target.value)}
+        placeholder="e.g. 3573" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:10}}/>
+      <button type="button" style={button} disabled={!enabled||!signedInEmail||creatingWorkbook||!createState.trim()} onClick={createStateWorkbook}>
+        {creatingWorkbook?'Creating spreadsheet…':'Create spreadsheet'}
+      </button>
+      <p style={{color:'#A8C4D8',fontSize:12,margin:'10px 0 0'}}>Creates a separate Google file. It will not overwrite any existing spreadsheet. Automatic two-way sync is not enabled.</p>
+      {createdWorkbook?.spreadsheetUrl&&<p style={{fontSize:14,marginTop:12}}><a href={createdWorkbook.spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{color:'#F5A623'}}>Open created spreadsheet</a>{createdWorkbook.players!=null?` · ${createdWorkbook.players} players in ${createdWorkbook.alliances} alliance tabs`:''}</p>}
+    </details>
     <section style={{background:'#152236',padding:18,borderRadius:16}}>
       <h3 style={{margin:'0 0 8px'}}>Sync status</h3>
       <p style={{color:'#A8C4D8',fontSize:14}}>Google account: {connectionChecking?'Checking…':connection?(connection.connected?'Saved connection found':'Not connected'):'Not checked'}</p>
