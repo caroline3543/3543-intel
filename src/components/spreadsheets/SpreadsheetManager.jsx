@@ -157,7 +157,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     if(!savedSpreadsheetId||refreshingSavedSheet)return;
     setRefreshingSavedSheet(true);
     setSpreadsheetId(savedSpreadsheetId);
-    setSheetInfo(null);setPreviewRows(null);
+    setSheetInfo(null);setPreviewRows(null);setColumnMapping({});setPreviewAlliance('');
     setMessage('Refreshing worksheets from the saved Google spreadsheet…');
     try{
       const {data:{session}}=await supabase.auth.getSession();
@@ -172,7 +172,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   }
   async function previewMetadata() {
     if(!enabled||!supabase)return;
-    setStatus('loading');setMessage('');setSheetInfo(null);
+    setStatus('loading');setMessage('');setSheetInfo(null);setPreviewRows(null);setColumnMapping({});setPreviewAlliance('');
     try {
       const {data:{session}}=await supabase.auth.getSession();
       if(!session?.access_token)throw new Error('Sign in first.');
@@ -362,7 +362,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
         const value=e.target.value;const found=value.match(new RegExp('spreadsheets/d/([A-Za-z0-9_-]+)'));
         setSpreadsheetId(found?found[1]:value);
-        setPreviewRows(null);setSheetInfo(null);setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
+        setPreviewRows(null);setSheetInfo(null);setPreviewAlliance('');setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
       }} placeholder="Paste the Google Sheets link for this state" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:12}}/>
       <button style={{...button,opacity:!enabled||status==='loading'?0.5:1}} disabled={!enabled||status==='loading'||!spreadsheetId.trim()} onClick={previewMetadata}>
         {status==='loading'?'Reading worksheets…':'Load worksheets'}
@@ -371,7 +371,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         <strong style={{color:'white'}}>Saved spreadsheet · State {stateId}</strong>
         <p style={{color:'#A8C4D8',fontSize:13,overflowWrap:'anywhere',margin:'8px 0'}}>{savedSpreadsheetId?`Saved link: ${savedSpreadsheetId}`:'No spreadsheet saved for this state yet.'}</p>
         <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-          <button type="button" onClick={saveDefaultSpreadsheet} disabled={!spreadsheetId.trim()||!enabled} style={secondaryButton}>Save link for this state</button>
+          <button type="button" onClick={saveDefaultSpreadsheet} disabled={!spreadsheetId.trim()||!enabled||!signedInEmail} style={secondaryButton}>Save link for this state</button>
           <button type="button" onClick={refreshSavedSpreadsheet} disabled={!savedSpreadsheetId||refreshingSavedSheet||!signedInEmail} style={button}>{refreshingSavedSheet?'Refreshing…':'Refresh Google worksheets'}</button>
           {savedSpreadsheetId&&<button type="button" onClick={removeDefaultSpreadsheet} style={{...secondaryButton,color:'#A8C4D8'}}>Remove saved link</button>}
         </div>
