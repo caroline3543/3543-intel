@@ -1,6 +1,6 @@
 import { ImportedWorksheetIntel } from '../spreadsheets/ImportedWorksheetIntel.jsx';
 import {readEventCloudRows,saveEventCloudIfUnchanged} from '../../services/eventCloudService.js';
-import {compareEventCopies,proposeSnapshotRestores,applySnapshotRestore} from '../../services/eventCloudComparison.js';
+import {compareEventCopies,proposeSnapshotRestores,applySnapshotRestore,describeSnapshotChanges} from '../../services/eventCloudComparison.js';
 import {proposeSheetEventPower,applySheetEventPowerProposal} from '../../services/sheetEventMatchService.js';
 import { useState, useEffect, useRef } from 'react';
 import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES, ALLIANCE_RANKS } from '../../utils/constants.js';
@@ -101,7 +101,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     if(cloudBackupBusy)return;
     const latest=events.find(e=>e.id===proposal.eventId);
     if(!latest)return;
-    if(!window.confirm('Restore cloud snapshot for this participant? Their RSVP, attendance and troop power may change. Event team assignments stay unchanged.'))return;
+    if(!window.confirm('Restore this participant snapshot? Changed fields: '+(describeSnapshotChanges(proposal.localSnapshot,proposal.cloudSnapshot).join(', ')||'Other snapshot data')+'. Event team assignments remain unchanged.'))return;
     setCloudBackupBusy(true);
     try{
       const cloud=await readEventCloudRows();
@@ -662,7 +662,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
         </button>
         <button type="button" disabled={cloudBackupBusy} onClick={restoreEventFromCloud} style={{marginLeft:8,minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>Restore cloud backup</button>
         <button type="button" disabled={cloudBackupBusy} onClick={reviewSnapshotRestores} style={{marginLeft:8,minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>Review participant restores</button>
-        {snapshotRestores.filter(p=>p.eventId===activeEvent.id).slice(0,30).map(p=><div key={p.playerId} style={{padding:'7px 0',fontSize:13,color:'#A8C4D8'}}>Participant: {players.find(x=>x.id===p.playerId)?.username||p.playerId}
+        {snapshotRestores.filter(p=>p.eventId===activeEvent.id).slice(0,30).map(p=><div key={p.playerId} style={{padding:'7px 0',fontSize:13,color:'#A8C4D8'}}>Participant: {players.find(x=>x.id===p.playerId)?.username||p.playerId} · Changes: {describeSnapshotChanges(p.localSnapshot,p.cloudSnapshot).join(', ')||'Other snapshot data'}
           <button type="button" disabled={cloudBackupBusy} onClick={()=>restoreOneSnapshot(p)} style={{marginLeft:8,minHeight:40,padding:'8px 12px',borderRadius:8,background:'#1E3A52',color:'white'}}>Restore snapshot</button>
         </div>)}
         <p style={{fontSize:12,color:'#A8C4D8'}}>Backup updates use cloud version checks. Restore replaces this device's event only after confirmation.</p>
