@@ -263,7 +263,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       </div>}
       {previewRows&&previewRows.rows.length>0&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
         <h4 style={{margin:'0 0 8px',fontSize:18}}>Map columns (read-only)</h4>
-        <p style={{fontSize:13,color:'#A8C4D8',margin:'0 0 12px'}}>Check how worksheet headings correspond to app fields. For Joiner Heroes, enter only heroes with expedition skill level 5, for example Jessie:5; Norah:5. API-controlled fields cannot be overwritten.</p>
+        <p style={{fontSize:13,color:'#A8C4D8',margin:'0 0 12px'}}>Check how worksheet headings correspond to app fields. For Joiner Heroes, enter only confirmed skill-5 heroes by name, for example Jessie; Norah; Mia. The app automatically records skill level 5. API-controlled fields cannot be overwritten.</p>
         {IMPORT_FIELDS.map(field=><label key={field.key} style={{display:'block',marginBottom:10,fontSize:14,color:'#A8C4D8'}}>
           {field.label} {field.authority==='api'?'· API-owned':field.authority==='manual'?'· Manual':'· Identity'}
           <select value={columnMapping[field.key]??''} onChange={e=>setColumnMapping(prev=>({...prev,[field.key]:e.target.value}))} style={{display:'block',width:'100%',minHeight:44,marginTop:5,background:'#152236',color:'white',border:'1px solid #5A7A94',borderRadius:9,padding:9,fontSize:16}}>
