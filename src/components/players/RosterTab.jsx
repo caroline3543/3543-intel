@@ -1,3 +1,4 @@
+import {WorkspaceIntro} from '../common/WorkspaceIntro.jsx';
 import { useState, useEffect } from 'react';
 import { C } from '../../utils/constants.js';
 import { PlayerCard, comparePriority } from './PlayerCard.jsx';
@@ -195,6 +196,7 @@ export function RosterTab({ initialPlayerId, onInitialPlayerOpened, players, eve
 
   return (
     <div style={{ padding:'16px 20px 0' }}>
+      <WorkspaceIntro title="Members" description="Find and update player profiles, troop levels and alliance assignments." detail="Search first, then open a player to review or edit their details."/>
 
       <div style={{ display:'flex', gap:8, marginBottom:12 }}>
         <input
