@@ -1,4 +1,4 @@
-/** Parse explicitly supplied joiners. Format: Jessie:5; Norah:4. No inferred skill levels. */
+/** Only explicitly confirmed skill-5 joiner heroes are eligible for import. */
 export function parseJoinerHeroes(value) {
  const raw=String(value??'').trim();
  if(!raw)return [];
@@ -7,10 +7,11 @@ export function parseJoinerHeroes(value) {
  const seen=new Set();
  return entries.map(entry=>{
   const match=/^([^:]{2,60}):\s*([1-5])$/.exec(entry);
-  if(!match)throw Error('Use Hero Name:Skill Level (1-5), separated by semicolons');
+  if(!match)throw Error('Specify Hero Name:5 for each qualified joiner');
   const hero=match[1].trim(),skillLevel=Number(match[2]),key=hero.toLocaleLowerCase();
+  if(skillLevel!==5)throw Error(hero+' is not skill level 5; only level-5 joiners are collected');
   if(seen.has(key))throw Error('Duplicate joiner hero: '+hero);
   seen.add(key);
-  return {hero,skillLevel};
+  return {hero,skillLevel:5};
  });
 }
