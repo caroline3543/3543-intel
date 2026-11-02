@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabaseClient.js';
 import { IMPORT_FIELDS, detectMapping, assessMapping } from '../../services/worksheetMappingPreview.js';
 import { planStateRosterImport } from '../../services/stateRosterImportPreview.js';
+import { previewSpecialWorksheet } from '../../services/specialWorksheetPreview.js';
 
 /** Feature-gated setup screen. No Sheets writes and no browser OAuth secrets. */
 export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpdated }) {
@@ -261,7 +262,18 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         <p style={{fontSize:13,margin:'8px 0'}}>Worksheets (read-only)</p>
         {(sheetInfo.worksheets||[]).map(w=><div key={w.id} style={{padding:'10px 0',borderTop:'1px solid #2A4A64',fontSize:14}}>{w.title} · up to {w.rows} rows <button type="button" onClick={()=>previewRowsForWorksheet(w.title)} style={{border:0,borderRadius:8,padding:'8px 12px',marginLeft:8,background:'#1E3A52',color:'white'}}>Preview</button></div>)}
       </div>}
-      {previewRows&&previewRows.rows.length>0&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
+      {previewRows&&['Combat','Events'].includes(previewRows.title)&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
+        <h4 style={{margin:'0 0 8px',fontSize:18}}>{previewRows.title} import preview</h4>
+        {(()=>{try{const plan=previewSpecialWorksheet({type:previewRows.title,values:previewRows.rows,players,stateId});
+          return <div style={{color:'#A8C4D8',fontSize:14}}>
+            <p>{plan.matched} matching rows · {plan.errors.length} conflicts · State {plan.stateId}</p>
+            {plan.errors.length>0&&<ul>{plan.errors.slice(0,20).map((e,i)=><li key={i}>{e}</li>)}</ul>}
+            {plan.matches.slice(0,20).map((m,i)=><p key={i} style={{fontSize:12,margin:'4px 0'}}>{m.fid} · {m.username} {m.troopType||m.eventId} · {Object.keys(m.updates).length} filled values</p>)}
+            <p>Read-only review. Combat and event values are not yet written to the app. Blank values are ignored.</p>
+          </div>;
+        }catch(e){return <p style={{color:'#FFC5A8'}}>{e.message}</p>}})()}
+      </div>}
+      {previewRows&&previewRows.rows.length>0&&!['Combat','Events'].includes(previewRows.title)&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
         <h4 style={{margin:'0 0 8px',fontSize:18}}>Map columns (read-only)</h4>
         <p style={{fontSize:13,color:'#A8C4D8',margin:'0 0 12px'}}>Check how worksheet headings correspond to app fields. For Joiner Heroes, enter only confirmed skill-5 heroes by name, for example Jessie; Norah; Mia. The app automatically records skill level 5. API-controlled fields cannot be overwritten.</p>
         {IMPORT_FIELDS.map(field=><label key={field.key} style={{display:'block',marginBottom:10,fontSize:14,color:'#A8C4D8'}}>
