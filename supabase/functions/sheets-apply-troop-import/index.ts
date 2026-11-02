@@ -22,7 +22,10 @@ Deno.serve(async req=>{
   if(!/^[1-9]\d{0,4}$/.test(state)||!/^\d{4,15}$/.test(fid)||typeof x.alliance!=='string'||!x.alliance.trim())return response(req,{error:'Invalid state, ID or alliance'},400);
   const mode=x.mode==='create'?'create':'update';
   const tiers=x.troops;
-  if(!tiers||Array.isArray(tiers)||typeof tiers!=='object'||(mode==='update'&&!Object.keys(tiers).length)||Object.keys(tiers).some(k=>!['infantry','lancer','marksman'].includes(k)||typeof tiers[k]!=='string'||!/^(T\d{1,2}|FC\d{1,2})$/.test(tiers[k])))return response(req,{error:'Invalid troop-level data'},400);
+  const extras=x.extraFields||{};
+  if(typeof extras!=='object'||Array.isArray(extras)||Object.keys(extras).some(k=>!['foundryTroopPower','canyonTroopPower','gameLanguage'].includes(k)))return response(req,{error:'Unexpected manual field'},400);
+  if(Object.entries(extras).some(([k,v])=>k==='gameLanguage'?(typeof v!=='string'||v.length>80):(typeof v!=='number'||!Number.isSafeInteger(v)||v<0||v>999999999999)))return response(req,{error:'Invalid manually entered value'},400);
+  if(!tiers||Array.isArray(tiers)||typeof tiers!=='object'||(mode==='update'&&!Object.keys(tiers).length&&!Object.keys(extras).length)||Object.keys(tiers).some(k=>!['infantry','lancer','marksman'].includes(k)||typeof tiers[k]!=='string'||!/^(T\d{1,2}|FC\d{1,2})$/.test(tiers[k])))return response(req,{error:'Invalid troop-level data'},400);
   const admin=createClient(url,key,{auth:{persistSession:false}});
   if(mode==='create'){
    const username=String(x.username||'').trim();
@@ -38,7 +41,15 @@ Deno.serve(async req=>{
   const player=matches[0];
   if(String(player.alliance_tag||'').toUpperCase()!==x.alliance.trim().toUpperCase())return response(req,{error:'Alliance no longer matches; reload preview'},409);
   const expected=x.expected||{};
+  if(Object.keys(extras).some(k=>String(player.data?.[k]??'')!==String((x.expectedExtras||{})[k]??'')))return response(req,{error:'Manual fields changed since preview; reload'},409);
+  if(!Object.keys(tiers).length&&Object.keys(extras).length){
+   const {data:updated,error:applyError}=await admin.rpc('apply_sheet_manual_fields',{p_state:state,p_record_id:player.id,p_expected_updated_at:player.updated_at,p_fields:extras});
+   if(applyError)return response(req,{error:'Manual fields could not be saved'},503);
+   if(!updated)return response(req,{error:'Player changed during review; reload'},409);
+   return response(req,{ok:true,stateId:state,fid,updatedFields:Object.keys(extras)});
+  }
   if(Object.keys(tiers).some(k=>String(player.data?.troops?.[k]??'')!==String(expected[k]??'')))return response(req,{error:'Player troop levels changed since preview; reload'},409);
+  if(Object.keys(extras).length)return response(req,{error:'Review troop levels and other changes separately for safe updates'},409);
   const {data:success,error:writeError}=await admin.rpc('apply_sheet_troop_levels',{p_state:state,p_record_id:player.id,p_expected_updated_at:player.updated_at,p_troops:tiers});
   if(writeError)return response(req,{error:'Could not apply troop update'},503);
   if(!success)return response(req,{error:'Roster changed during review; reload'},409);
