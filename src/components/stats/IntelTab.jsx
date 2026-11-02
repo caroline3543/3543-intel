@@ -1,3 +1,4 @@
+import {WorkspaceIntro} from '../common/WorkspaceIntro.jsx';
 import {AllianceWatchPanel} from "./history/AllianceWatchPanel.jsx";
 import {ArenaComparePanel} from './arena/ArenaComparePanel.jsx';
 import { PlayerChangesPanel } from './history/PlayerChangesPanel.jsx';
@@ -106,6 +107,7 @@ export function IntelTab({ allianceWatches = [], onUpdateAllianceWatches, onUpda
 
   return (
     <div style={{ padding:'16px 20px' }}>
+      <WorkspaceIntro title="Intel" description="Watch alliance changes, compare players and review state rankings." detail="Select a tool below. Viewing intelligence does not change your roster."/>
       <button onClick={()=>setWatchOpen(true)} style={{width:'100%',minHeight:64,padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.gold}`,color:C.gold,fontWeight:700,fontSize:15,textAlign:'left',marginBottom:12}}>Alliance watch →<div style={{fontSize:12,fontWeight:400,color:C.icy,marginTop:5}}>Whole rosters · Furnace changes · Power spikes · Member changes</div></button>
       <button onClick={()=>setChangesOpen(true)} style={{width:'100%',minHeight:64,padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.gold}`,color:C.gold,fontWeight:700,fontSize:15,textAlign:'left',marginBottom:12}}>What changed? →<div style={{fontSize:12,fontWeight:400,color:C.icy,marginTop:5}}>Power · Kills · Furnace · Rankings · Names & alliances</div></button>
       <button onClick={()=>setRankingsOpen(true)} style={{width:'100%',minHeight:64,padding:16,borderRadius:12,background:C.card,border:`1px solid ${C.gold}`,color:C.gold,fontWeight:700,fontSize:15,textAlign:'left',marginBottom:16}}>🏆 State {settings.stateId} rankings →<div style={{fontSize:12,fontWeight:400,color:C.icy,marginTop:5}}>Power · Kills · Transfer score · Labyrinth · Gear & more</div></button>
