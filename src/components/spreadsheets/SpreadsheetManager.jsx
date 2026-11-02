@@ -183,6 +183,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       if(!writeBaseline)throw Error('No baseline. Preview this worksheet again to record the starting values.');
       const plan=planSheetWrites({stateId:String(stateId),spreadsheetId:previewRows.spreadsheetId,worksheetTitle:previewRows.title,players,rows:previewRows.rows,baseline:writeBaseline});
       if(plan.conflicts.length||!plan.proposals.length){setWriteReview({plan,checked:null});return;}
+      if(plan.proposals.length>20){setWriteReview({plan,checked:null,limitReached:true});return;}
       const proposals=plan.proposals.slice(0,20).map(p=>({...p,alliance:players.find(player=>String(player.fid)===p.fid)?.allianceTag||''}));
       const {data:{session}}=await supabase.auth.getSession();
       if(!session?.access_token)throw Error('Sign in to check Google cells.');
@@ -195,7 +196,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   }
   async function previewMetadata() {
     if(!enabled||!supabase)return;
-    setStatus('loading');setMessage('');setSheetInfo(null);setPreviewRows(null);setColumnMapping({});setPreviewAlliance('');
+    setStatus('loading');setMessage('');setSheetInfo(null);setPreviewRows(null);setWriteReview(null);setColumnMapping({});setPreviewAlliance('');
     try {
       const {data:{session}}=await supabase.auth.getSession();
       if(!session?.access_token)throw new Error('Sign in first.');
@@ -224,7 +225,8 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       setPreviewAlliance(title);
       setWriteReview(null);
       const key=String(stateId)+':'+spreadsheetId.trim()+':'+title;
-      if(!data.truncated&&(!writeBaseline||writeBaseline.stateId+':'+writeBaseline.spreadsheetId+':'+writeBaseline.worksheetTitle!==key)){
+      if(data.truncated){setWriteBaseline(null);}
+      else if(!writeBaseline||writeBaseline.stateId+':'+writeBaseline.spreadsheetId+':'+writeBaseline.worksheetTitle!==key){
         try{setWriteBaseline(makeSheetReadBaseline({stateId:String(stateId),spreadsheetId:spreadsheetId.trim(),worksheetTitle:title,rows:data.rows}));}
         catch{setWriteBaseline(null);}
       }
@@ -428,6 +430,8 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         {writeReview&&<div role="status" aria-live="polite" style={{fontSize:13,color:'#A8C4D8',marginTop:12}}>
           <p>{writeReview.plan.proposals.length} proposed changes · {writeReview.plan.conflicts.length} conflicts</p>
           {writeReview.plan.conflicts.slice(0,10).map((x,i)=><p key={i}>Row {x.row}: {x.reason}</p>)}
+          {writeReview.limitReached&&<p>More than 20 changes require review. No partial preflight was run; narrow the worksheet or review changes in batches before exporting.</p>}
+          {writeReview.plan.proposals.slice(0,20).map((p,i)=><div key={i} style={{padding:'8px 0',borderTop:'1px solid #36536B'}}><strong>Row {p.row} · {p.column}</strong><p style={{margin:'4px 0'}}>Google: {p.expected||'(empty)'} → App: {p.value||'(empty)'}</p></div>)}
           {writeReview.checked&&<p>{writeReview.checked.allMatched?'Google values still match the reviewed proposal.':'Google values changed. Review conflicts and refresh again.'} No Google cells were written.</p>}
           {writeReview.checked?.checked?.filter(x=>!x.match).map((x,i)=><p key={i}>Row {x.row}, {x.column}: {x.reason}</p>)}
           <p>Automatic exports are disabled.</p>
