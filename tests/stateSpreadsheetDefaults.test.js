@@ -22,3 +22,5 @@ test('Sheets API refresh opens the existing reviewed alliance import workflow',a
  assert.ok(sheets.includes('onClick={onPullApiData}'));
  assert.ok(sheets.includes('Pull / refresh API player data'));
 });
+
+test('Spreadsheet preview allows selecting and adding state workspaces while keeping state-specific links',async()=>{const {readFileSync}=await import('node:fs');const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');const app=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');assert.ok(source.includes('Spreadsheet state'));assert.ok(source.includes('Add & select'));assert.ok(source.includes('onSelectSheetState?.(id)'));assert.ok(app.includes('saveToStorage(data,true);selectWorkspace(id)'));});
