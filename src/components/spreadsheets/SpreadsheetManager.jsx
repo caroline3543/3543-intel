@@ -157,6 +157,22 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     }catch(e){setMessage(e.message||'Player creation failed.');}
     finally{setApplyingFid(null);}
   }
+  async function applySpecialRow(plan,row){
+    if(applyingFid||plan.errors.length||!Object.keys(row.updates).length)return;
+    const player=players.find(p=>p.id===row.playerId&&String(p.fid)===row.fid);
+    if(!player)return setMessage('Player no longer in roster. Re-preview.');
+    const entryKey=plan.type==='Combat'?row.troopType:row.eventId+'|'+String(row.updates['Event Date UTC']||'').slice(0,10);
+    if(plan.type==='Events'&&(!row.eventId||!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(row.updates['Event Date UTC']||'').slice(0,10))))return setMessage('Event ID and UTC date are required.');
+    if(!window.confirm('Import '+plan.type+' row '+row.row+' for player '+row.fid+' in state '+plan.stateId+'?'))return;
+    setApplyingFid(row.fid);setMessage('');
+    try{
+      const {data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw Error('Sign in required');
+      const container=plan.type==='Combat'?'sheetCombat':'sheetEvents';
+      const response=await fetch(import.meta.env.VITE_SUPABASE_URL+'/functions/v1/sheets-apply-troop-import',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({mode:'special',kind:plan.type,stateId:plan.stateId,fid:row.fid,alliance:player.allianceTag,entryKey,entry:row.updates,expectedEntry:player[container]?.[entryKey]??null})});
+      const result=await response.json();if(!response.ok)throw Error(result.error||'Import failed');
+      setPreviewRows(null);await onRosterUpdated?.();setMessage('Saved '+plan.type+' entry for '+row.fid+'. Re-preview to continue.');
+    }catch(e){setMessage(e.message||'Import failed');}finally{setApplyingFid(null)}
+  }
   async function applyJoinerHeroes(candidate) {
     if(applyingFid||!candidate.changedHeroes||!candidate.playerId||!candidate.joinerHeroes?.length)return;
     const existing=players.find(p=>p.id===candidate.playerId&&String(p.fid)===candidate.fid);
@@ -268,8 +284,10 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
           return <div style={{color:'#A8C4D8',fontSize:14}}>
             <p>{plan.matched} matching rows · {plan.errors.length} conflicts · State {plan.stateId}</p>
             {plan.errors.length>0&&<ul>{plan.errors.slice(0,20).map((e,i)=><li key={i}>{e}</li>)}</ul>}
-            {plan.matches.slice(0,20).map((m,i)=><p key={i} style={{fontSize:12,margin:'4px 0'}}>{m.fid} · {m.username} {m.troopType||m.eventId} · {Object.keys(m.updates).length} filled values</p>)}
-            <p>Read-only review. Combat and event values are not yet written to the app. Blank values are ignored.</p>
+            {plan.matches.slice(0,20).map((m,i)=><div key={i} style={{fontSize:12,margin:'7px 0'}}>{m.fid} · {m.username} {m.troopType||m.eventId} · {Object.keys(m.updates).length} filled values
+            <button type="button" disabled={!!applyingFid||!!plan.errors.length||!onRosterUpdated||!Object.keys(m.updates).length||(plan.type==='Events'&&(!m.eventId||!String(m.updates['Event Date UTC']||'').trim()))} onClick={()=>applySpecialRow(plan,m)} style={{marginLeft:8,padding:'8px 12px',background:'#1E3A52',color:'white',borderRadius:8,border:'1px solid #5A7A94'}}>Approve row</button>
+          </div>)}
+            <p>Review each row before writing to the player's saved Combat or Events worksheet data. Blank values are ignored. Existing event planner assignments are not overwritten.</p>
           </div>;
         }catch(e){return <p style={{color:'#FFC5A8'}}>{e.message}</p>}})()}
       </div>}
