@@ -26,6 +26,13 @@ export function previewSpecialWorksheet({type,values,players,stateId}){
   if(type==='Combat'&&!rules.types.includes(troop)){errors.push('Row '+row+': invalid troop type');continue}
   const eventId=type==='Events'?String(cells[col('Event ID')]??'').trim():'';
   const date=type==='Events'?String(cells[col('Event Date UTC')]??'').trim():'';
+  if(type==='Events'){
+   // Newly created workbooks contain player placeholders without event identity.
+   // Do not offer these as importable event records.
+   if(!eventId&&!date)continue;
+   const validDate=/^\d{4}-\d{2}-\d{2}$/.test(date)&&!Number.isNaN(Date.parse(date+'T00:00:00Z'))&&new Date(date+'T00:00:00Z').toISOString().slice(0,10)===date;
+   if(!eventId||!validDate){errors.push('Row '+row+': Event ID and valid UTC date (YYYY-MM-DD) are required');continue;}
+  }
   const key=type==='Combat'?[id,troop].join(':'):[id,eventId,date].join(':');
   if(seen.has(key)){errors.push('Row '+row+': duplicate player/event or troop');continue}seen.add(key);
   const updates={};let invalid=false;
