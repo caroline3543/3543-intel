@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabaseClient.js';
 import { IMPORT_FIELDS, detectMapping, assessMapping } from '../../services/worksheetMappingPreview.js';
+import { planStateRosterImport } from '../../services/stateRosterImportPreview.js';
 
 /** Feature-gated setup screen. No Sheets writes and no browser OAuth secrets. */
-export function SpreadsheetManager({ onClose }) {
+export function SpreadsheetManager({ onClose, players = [], stateId }) {
   const [status,setStatus] = useState('idle');
   const [message,setMessage] = useState('');
   const [spreadsheetId,setSpreadsheetId]=useState('');
@@ -14,6 +15,7 @@ export function SpreadsheetManager({ onClose }) {
   const [connection,setConnection]=useState(null);
   const [previewRows,setPreviewRows]=useState(null);
   const [columnMapping,setColumnMapping]=useState({});
+  const [previewAlliance,setPreviewAlliance]=useState('');
   const [signedInEmail,setSignedInEmail]=useState(null);
   const [createState,setCreateState]=useState('');
   const [createdWorkbook,setCreatedWorkbook]=useState(null);
@@ -98,7 +100,7 @@ export function SpreadsheetManager({ onClose }) {
     }catch(error){setStatus('error');setMessage(error.message||'Preview failed');}
   }
   async function previewRowsForWorksheet(title) {
-    setStatus('loading');setMessage('');setPreviewRows(null);setColumnMapping({});
+    setStatus('loading');setMessage('');setPreviewRows(null);setColumnMapping({});setPreviewAlliance('');
     try {
       const {data:{session}}=await supabase.auth.getSession();
       if(!session?.access_token)throw new Error('Sign in first.');
@@ -108,6 +110,7 @@ export function SpreadsheetManager({ onClose }) {
       });
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||'Could not preview rows');
+      setPreviewAlliance(title);
       setPreviewRows({title,rows:data.rows});setColumnMapping(detectMapping(data.rows?.[0]||[]));setStatus('ready');
     }catch(e){setStatus('error');setMessage(e.message||'Worksheet preview failed');}
   }
@@ -202,7 +205,14 @@ export function SpreadsheetManager({ onClose }) {
         {(()=>{const report=assessMapping(previewRows.rows,columnMapping);return <div aria-live="polite" style={{fontSize:14,color:'#A8C4D8'}}>
           <strong style={{color:'white'}}>Import assessment: {report.totalRows} populated rows</strong>
           {report.errors.length>0?<ul style={{paddingLeft:20}}>{report.errors.map((error,i)=><li key={i} style={{color:'#FFC5A8'}}>{error}</li>)}</ul>:<p style={{color:'#A7E7C0'}}>No structural issues detected in the previewed rows.</p>}
-          <p style={{marginBottom:0}}>This is a structural preview only. No existing player matching or roster import has been performed. Spreadsheet and database records remain unchanged.</p>
+          <p style={{marginBottom:0}}>Structural checks only. No records have been changed.</p>
+          {stateId&&(()=>{try{const plan=planStateRosterImport({values:previewRows.rows,mapping:columnMapping,players,stateId,worksheetAlliance:previewAlliance});return <div style={{marginTop:12,borderTop:'1px solid #36536B',paddingTop:12}}>
+            <strong style={{color:'white'}}>State {plan.stateId} roster comparison</strong>
+            <p>{plan.matched} existing players · {plan.newPlayers} unmatched player IDs · {plan.errors.length} conflicts</p>
+            {plan.errors.length>0&&<ul style={{paddingLeft:20,color:'#FFC5A8'}}>{plan.errors.slice(0,10).map((error,i)=><li key={i}>{error}</li>)}</ul>}
+            <p style={{marginBottom:0}}>Preview only. No Google Sheet edits or roster imports are applied. Unmatched IDs require review before creation.</p>
+          </div>;}catch(e){return <p style={{color:'#FFC5A8'}}>{e.message}</p>}})()}
+
         </div>})()}
       </div>}
       {previewRows&&<div style={{marginTop:14}}><strong>Read-only preview: {previewRows.title}</strong><p style={{fontSize:12,color:'#A8C4D8'}}>First 101 rows maximum. No changes have been saved.</p><div style={{overflowX:'auto',maxHeight:340,overflowY:'auto',fontSize:12}}><table style={{borderCollapse:'collapse'}}><tbody>{previewRows.rows.map((row,i)=><tr key={i}>{row.slice(0,20).map((v,j)=><td key={j} style={{border:'1px solid #36536B',padding:6,whiteSpace:'nowrap'}}>{String(v??'')}</td>)}</tr>)}</tbody></table></div></div>}
