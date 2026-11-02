@@ -43,14 +43,33 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   const sheetMatches=proposeSheetEventPower({events,players});
   async function backupEventToCloud(){
     if(!activeEvent||cloudBackupBusy)return;
-    if(!window.confirm('Create a cloud backup of this event? If a cloud copy already exists, this action will stop to prevent overwriting it.'))return;
     setCloudBackupBusy(true);
     try{
       const cloud=await readEventCloudRows();
-      if(cloud.some(row=>row.id===activeEvent.id))throw Error('A cloud copy exists. Nothing was overwritten.');
-      await saveEventCloudIfUnchanged(activeEvent);
+      const existing=cloud.find(row=>row.id===activeEvent.id);
+      if(existing){
+        const same=JSON.stringify(existing.data)===JSON.stringify(activeEvent);
+        if(same){showToast('Cloud backup is already up to date.');return;}
+        if(!window.confirm('An existing cloud backup was found. Replace that backup with this device\'s event? The save will be rejected if another device changed the cloud copy.'))return;
+      }else if(!window.confirm('Create a cloud backup of this event?'))return;
+      await saveEventCloudIfUnchanged(activeEvent,existing?.updated_at??null);
       showToast('Event cloud backup confirmed.');
     }catch(e){showToast(e.message||'Cloud backup failed');}
+    finally{setCloudBackupBusy(false)}
+  }
+  async function restoreEventFromCloud(){
+    if(!activeEvent||cloudBackupBusy)return;
+    setCloudBackupBusy(true);
+    try{
+      const cloud=await readEventCloudRows();
+      const existing=cloud.find(row=>row.id===activeEvent.id);
+      if(!existing){showToast('No cloud backup exists for this event.');return;}
+      if(existing.data?.id!==activeEvent.id)throw Error('Cloud event identity mismatch');
+      if(JSON.stringify(existing.data)===JSON.stringify(activeEvent)){showToast('Event already matches the cloud backup.');return;}
+      if(!window.confirm('Replace this device\'s event with the cloud backup? This replaces its local attendance, snapshots and assignments.'))return;
+      onUpdateEvent({...existing.data,id:activeEvent.id});
+      showToast('Cloud event restored to this device.');
+    }catch(e){showToast(e.message||'Cloud restore failed');}
     finally{setCloudBackupBusy(false)}
   }
   function approveSheetPower(proposal){
@@ -598,7 +617,8 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
         <button type="button" disabled={cloudBackupBusy} onClick={backupEventToCloud} style={{minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>
           {cloudBackupBusy?'Checking cloud…':'Back up event to cloud'}
         </button>
-        <p style={{fontSize:12,color:'#A8C4D8'}}>Creates a backup only when no cloud copy exists. Existing cloud events are never overwritten.</p>
+        <button type="button" disabled={cloudBackupBusy} onClick={restoreEventFromCloud} style={{marginLeft:8,minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>Restore cloud backup</button>
+        <p style={{fontSize:12,color:'#A8C4D8'}}>Backup updates use cloud version checks. Restore replaces this device's event only after confirmation.</p>
       </div>}
       {(sheetMatches.proposals.length>0||sheetMatches.conflicts.length>0)&&<section style={{margin:'12px 0',padding:14,background:'#152236',borderRadius:12,border:'1px solid #36536B',color:'#A8C4D8'}}>
         <strong style={{color:'white'}}>Spreadsheet event matches</strong>
