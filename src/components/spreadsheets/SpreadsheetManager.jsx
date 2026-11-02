@@ -4,7 +4,7 @@ import { IMPORT_FIELDS, detectMapping, assessMapping } from '../../services/work
 import { planStateRosterImport } from '../../services/stateRosterImportPreview.js';
 
 /** Feature-gated setup screen. No Sheets writes and no browser OAuth secrets. */
-export function SpreadsheetManager({ onClose, players = [], stateId }) {
+export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpdated }) {
   const [status,setStatus] = useState('idle');
   const [message,setMessage] = useState('');
   const [spreadsheetId,setSpreadsheetId]=useState('');
@@ -16,6 +16,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId }) {
   const [previewRows,setPreviewRows]=useState(null);
   const [columnMapping,setColumnMapping]=useState({});
   const [previewAlliance,setPreviewAlliance]=useState('');
+  const [applyingFid,setApplyingFid]=useState(null);
   const [signedInEmail,setSignedInEmail]=useState(null);
   const [createState,setCreateState]=useState('');
   const [createdWorkbook,setCreatedWorkbook]=useState(null);
@@ -136,6 +137,28 @@ export function SpreadsheetManager({ onClose, players = [], stateId }) {
     }catch(error){setMessage(error.message||'Spreadsheet creation failed.');}
     finally{setCreatingWorkbook(false);}
   }
+  async function applySingleTierChange(candidate) {
+    if(applyingFid||!stateId||!candidate.changed||candidate.kind!=='existing')return;
+    const existing=players.find(p=>p.id===candidate.playerId&&String(p.fid)===candidate.fid);
+    if(!existing)throw new Error('Player no longer in roster. Reload preview.');
+    if(!window.confirm(`Apply verified troop-level changes for player ${candidate.fid} in State ${stateId}? This changes the app roster.`))return;
+    setApplyingFid(candidate.fid);setMessage('');
+    try{
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token)throw new Error('Please sign in.');
+      const expected=Object.fromEntries(Object.keys(candidate.manualFields).map(k=>[k,existing.troops?.[k]??'']));
+      const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-apply-troop-import`,{
+        method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({stateId:String(stateId),fid:candidate.fid,alliance:previewAlliance,troops:candidate.manualFields,expected}),
+      });
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||'Import failed.');
+      setPreviewRows(null);
+      await onRosterUpdated?.();
+      setMessage('Applied troop-level changes for '+candidate.fid+'. Roster refreshed. Re-preview the worksheet before another import.');
+    }catch(e){setMessage(e.message||'Import failed.');}
+    finally{setApplyingFid(null);}
+  }
   const button={background:'#F5A623',color:'#0A1628',border:'none',padding:'12px 16px',minHeight:48,borderRadius:12,fontSize:16,fontWeight:700,width:'100%',cursor:'pointer'};
   return <div style={{padding:20,minHeight:'60vh',color:'#fff'}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
@@ -210,8 +233,9 @@ export function SpreadsheetManager({ onClose, players = [], stateId }) {
             <strong style={{color:'white'}}>State {plan.stateId} roster comparison</strong>
             <p>{plan.matched} existing players · {plan.proposedChanges} proposed troop-level updates · {plan.newPlayers} unmatched player IDs · {plan.errors.length} conflicts</p>
             {plan.errors.length>0&&<ul style={{paddingLeft:20,color:'#FFC5A8'}}>{plan.errors.slice(0,10).map((error,i)=><li key={i}>{error}</li>)}</ul>}
-            {plan.candidates.filter(x=>x.changed).length>0&&<div style={{maxHeight:200,overflowY:'auto',marginBottom:12}}>{plan.candidates.filter(x=>x.changed).slice(0,25).map(x=><p key={x.fid} style={{fontSize:12,margin:'4px 0',color:'#A8C4D8'}}>Player {x.fid}: {Object.entries(x.manualFields).map(([type,tier])=>type+' '+tier).join(' · ')}</p>)}</div>}
-            <p style={{marginBottom:0}}>Review only. Changes are not yet applied; the shared roster, other app sections and Google Sheet remain unchanged.</p>
+            {plan.candidates.filter(x=>x.changed).length>0&&<div style={{maxHeight:200,overflowY:'auto',marginBottom:12}}>{plan.candidates.filter(x=>x.changed).slice(0,25).map(x=><div key={x.fid} style={{fontSize:12,margin:'6px 0',color:'#A8C4D8'}}>Player {x.fid}: {Object.entries(x.manualFields).map(([type,tier])=>type+' '+tier).join(' · ')}
+              <button type="button" disabled={!!applyingFid||plan.errors.length>0||report.errors.length>0||!plan.worksheetAlliance||!onRosterUpdated} onClick={()=>applySingleTierChange(x)} style={{display:'block',padding:'8px 12px',minHeight:40,borderRadius:8,marginTop:4,background:'#1E3A52',color:'white',border:'1px solid #5A7A94'}}> {applyingFid===x.fid?'Applying…':'Review & apply this player'} </button></div>)}</div>}
+            <p style={{marginBottom:0}}>Updates require approval for each existing player. New players and API-owned fields cannot be imported here. The Google Sheet remains unchanged.</p>
           </div>;}catch(e){return <p style={{color:'#FFC5A8'}}>{e.message}</p>}})()}
 
         </div>})()}
