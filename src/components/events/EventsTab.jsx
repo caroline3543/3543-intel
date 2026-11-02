@@ -1,6 +1,6 @@
 import { ImportedWorksheetIntel } from '../spreadsheets/ImportedWorksheetIntel.jsx';
 import {readEventCloudRows,saveEventCloudIfUnchanged} from '../../services/eventCloudService.js';
-import {compareEventCopies} from '../../services/eventCloudComparison.js';
+import {compareEventCopies,proposeSnapshotRestores,applySnapshotRestore} from '../../services/eventCloudComparison.js';
 import {proposeSheetEventPower,applySheetEventPowerProposal} from '../../services/sheetEventMatchService.js';
 import { useState, useEffect, useRef } from 'react';
 import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES, ALLIANCE_RANKS } from '../../utils/constants.js';
@@ -40,6 +40,7 @@ import { SquadBalancerPanel } from './SquadBalancerPanel.jsx';
 // automatically the moment someone is added here, not chosen manually.
 export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, onAddPlayers, onUpdatePlayers, plans = [] }) {
   const [cloudBackupBusy,setCloudBackupBusy]=useState(false);
+  const [snapshotRestores,setSnapshotRestores]=useState([]);
   const [filterType, setFilterType]   = useState('All');
   const sheetMatches=proposeSheetEventPower({events,players});
   async function backupEventToCloud(){
@@ -82,6 +83,29 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
       showToast('Cloud event restored to this device.');
     }catch(e){showToast(e.message||'Cloud restore failed');}
     finally{setCloudBackupBusy(false)}
+  }
+  async function reviewSnapshotRestores(){
+    if(!activeEvent||cloudBackupBusy)return;
+    setCloudBackupBusy(true);setSnapshotRestores([]);
+    try{
+      const cloud=await readEventCloudRows();
+      const backup=cloud.find(row=>row.id===activeEvent.id);
+      if(!backup){showToast('No cloud event backup found.');return;}
+      const proposals=proposeSnapshotRestores(activeEvent,backup.data);
+      setSnapshotRestores(proposals.map(p=>({...p,eventId:activeEvent.id})));
+      if(!proposals.length)showToast('No eligible participant snapshots differ.');
+    }catch(e){showToast(e.message||'Could not compare snapshots');}
+    finally{setCloudBackupBusy(false)}
+  }
+  function restoreOneSnapshot(proposal){
+    const latest=events.find(e=>e.id===proposal.eventId);
+    if(!latest)return;
+    if(!window.confirm('Restore cloud snapshot for this participant? Their RSVP, attendance and troop power may change. Event team assignments stay unchanged.'))return;
+    try{
+      onUpdateEvent(applySnapshotRestore(latest,proposal));
+      setSnapshotRestores([]);
+      showToast('Participant snapshot restored locally. Back up to cloud separately if needed.');
+    }catch(e){setSnapshotRestores([]);showToast(e.message||'Restore blocked. Review again.');}
   }
   function approveSheetPower(proposal){
     const event=events.find(e=>e.id===proposal.eventId);
@@ -629,6 +653,10 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           {cloudBackupBusy?'Checking cloud…':'Back up event to cloud'}
         </button>
         <button type="button" disabled={cloudBackupBusy} onClick={restoreEventFromCloud} style={{marginLeft:8,minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>Restore cloud backup</button>
+        <button type="button" disabled={cloudBackupBusy} onClick={reviewSnapshotRestores} style={{marginLeft:8,minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>Review participant restores</button>
+        {snapshotRestores.filter(p=>p.eventId===activeEvent.id).slice(0,30).map(p=><div key={p.playerId} style={{padding:'7px 0',fontSize:13,color:'#A8C4D8'}}>Participant: {players.find(x=>x.id===p.playerId)?.username||p.playerId}
+          <button type="button" onClick={()=>restoreOneSnapshot(p)} style={{marginLeft:8,minHeight:40,padding:'8px 12px',borderRadius:8,background:'#1E3A52',color:'white'}}>Restore snapshot</button>
+        </div>)}
         <p style={{fontSize:12,color:'#A8C4D8'}}>Backup updates use cloud version checks. Restore replaces this device's event only after confirmation.</p>
       </div>}
       {(sheetMatches.proposals.length>0||sheetMatches.conflicts.length>0)&&<section style={{margin:'12px 0',padding:14,background:'#152236',borderRadius:12,border:'1px solid #36536B',color:'#A8C4D8'}}>
