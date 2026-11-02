@@ -137,6 +137,25 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     }catch(error){setMessage(error.message||'Spreadsheet creation failed.');}
     finally{setCreatingWorkbook(false);}
   }
+  async function createReviewedPlayer(candidate) {
+    if(applyingFid||!stateId||candidate.kind!=='new'||!candidate.username||!previewAlliance)return;
+    if(!window.confirm(`Create player ${candidate.username} (${candidate.fid}) in State ${stateId}, alliance ${previewAlliance}? This adds them to the shared roster.`))return;
+    setApplyingFid(candidate.fid);setMessage('');
+    try{
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token)throw new Error('Sign in required.');
+      const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-apply-troop-import`,{
+        method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({mode:'create',stateId:String(stateId),fid:candidate.fid,username:candidate.username,alliance:previewAlliance,troops:candidate.manualFields}),
+      });
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||'Player creation failed.');
+      setPreviewRows(null);
+      await onRosterUpdated?.();
+      setMessage('Created player '+candidate.fid+'. Re-preview before further imports.');
+    }catch(e){setMessage(e.message||'Player creation failed.');}
+    finally{setApplyingFid(null);}
+  }
   async function applySingleTierChange(candidate) {
     if(applyingFid||!stateId||!candidate.changed||candidate.kind!=='existing')return;
     const existing=players.find(p=>p.id===candidate.playerId&&String(p.fid)===candidate.fid);
@@ -235,7 +254,12 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
             {plan.errors.length>0&&<ul style={{paddingLeft:20,color:'#FFC5A8'}}>{plan.errors.slice(0,10).map((error,i)=><li key={i}>{error}</li>)}</ul>}
             {plan.candidates.filter(x=>x.changed).length>0&&<div style={{maxHeight:200,overflowY:'auto',marginBottom:12}}>{plan.candidates.filter(x=>x.changed).slice(0,25).map(x=><div key={x.fid} style={{fontSize:12,margin:'6px 0',color:'#A8C4D8'}}>Player {x.fid}: {Object.entries(x.manualFields).map(([type,tier])=>type+' '+tier).join(' · ')}
               <button type="button" disabled={!!applyingFid||plan.errors.length>0||report.errors.length>0||!plan.worksheetAlliance||!onRosterUpdated} onClick={()=>applySingleTierChange(x)} style={{display:'block',padding:'8px 12px',minHeight:40,borderRadius:8,marginTop:4,background:'#1E3A52',color:'white',border:'1px solid #5A7A94'}}> {applyingFid===x.fid?'Applying…':'Review & apply this player'} </button></div>)}</div>}
-            <p style={{marginBottom:0}}>Updates require approval for each existing player. New players and API-owned fields cannot be imported here. The Google Sheet remains unchanged.</p>
+            {plan.candidates.filter(x=>x.kind==='new').slice(0,30).map(x=><div key={'new-'+x.fid} style={{margin:'8px 0',fontSize:13,color:'#A8C4D8'}}>
+              New: {x.username||'(missing username)'} · {x.fid}
+              <button type="button" disabled={!!applyingFid||!x.username||plan.errors.length>0||report.errors.length>0||!onRosterUpdated||!/^[A-Za-z0-9_-]{2,10}$/.test(previewAlliance)}
+                onClick={()=>createReviewedPlayer(x)} style={{display:'block',padding:'8px 12px',minHeight:40,marginTop:4,background:'#1E3A52',color:'white',border:'1px solid #5A7A94',borderRadius:8}}> {applyingFid===x.fid?'Creating…':'Review & add player'} </button>
+            </div>)}
+            <p style={{marginBottom:0}}>Each player requires separate approval. API-owned fields are not overwritten. Google Sheets is not modified.</p>
           </div>;}catch(e){return <p style={{color:'#FFC5A8'}}>{e.message}</p>}})()}
 
         </div>})()}
