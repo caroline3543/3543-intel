@@ -314,14 +314,15 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     finally{setApplyingFid(null);}
   }
   const button={background:'#F5A623',color:'#0A1628',border:'none',padding:'12px 16px',minHeight:48,borderRadius:12,fontSize:16,fontWeight:700,width:'100%',cursor:'pointer'};
-  return <div style={{padding:20,minHeight:'60vh',color:'#fff'}}>
+  const secondaryButton={...button,background:'#1E3A52',color:'#FFFFFF',border:'1px solid #36536B'};
+  return <div style={{padding:16,minHeight:'60vh',color:'#fff'}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-      <h2 style={{fontSize:22,margin:0}}>📋 Spreadsheet Manager</h2>
+      <h2 style={{fontSize:22,margin:0}}>Google Sheets</h2>
       <button aria-label="Close spreadsheet manager" onClick={onClose} style={{border:0,background:'transparent',color:'#A8C4D8',fontSize:25,minWidth:44,minHeight:44}}>×</button>
     </div>
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
-      <h3 style={{margin:'0 0 8px'}}>Connect Google Sheets</h3>
-      <p style={{fontSize:14,color:'#A8C4D8',lineHeight:1.6,margin:'0 0 16px'}}>Connect a Google account, then select a spreadsheet and preview its player records before importing. Existing roster data will remain unchanged until an import is explicitly approved.</p>
+      <h3 style={{margin:'0 0 8px'}}>Google account</h3>
+      <p style={{fontSize:14,color:'#A8C4D8',lineHeight:1.6,margin:'0 0 16px'}}>Sign in to access saved spreadsheet links and preview Google data. Importing changes into the app always requires your approval.</p>
       <p role="status" style={{fontSize:14,color:signedInEmail?'#A7E7C0':'#FFC5A8'}}>{signedInEmail?`Signed in as ${signedInEmail}`:'Not signed in to the app'}</p>
       {enabled && supabase && !signedInEmail && <div style={{marginBottom:14}}>
         <label htmlFor="sheet-auth-email" style={{display:'block',fontSize:14,color:'#A8C4D8',marginBottom:6}}>App account email</label>
@@ -341,9 +342,9 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       {message&&<p role="alert" style={{fontSize:14,color:'#FFC5A8'}}>{message}</p>}
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
-      <h3 style={{margin:'0 0 8px'}}>Create a state spreadsheet</h3>
+      <h3 style={{margin:'0 0 8px'}}>Create a new spreadsheet</h3>
       <p style={{color:'#A8C4D8',fontSize:14,lineHeight:1.5}}>
-        One new Google workbook per state, with one tab per alliance. The app fills player IDs, usernames, alliance, furnace and available player statistics from the selected state's roster. Unverified fields stay empty.
+        Create a new Google file from the selected state's saved roster. Includes alliance tabs, Combat and Events. This does not replace your saved default unless you choose to save it.
       </p>
       <label htmlFor="create-workbook-state" style={{display:'block',color:'#A8C4D8',fontSize:14,marginBottom:6}}>State number</label>
       <input id="create-workbook-state" inputMode="numeric" value={createState} onChange={e=>setCreateState(e.target.value)}
@@ -351,26 +352,11 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       <button type="button" style={button} disabled={!enabled||!signedInEmail||creatingWorkbook||!createState.trim()} onClick={createStateWorkbook}>
         {creatingWorkbook?'Creating spreadsheet…':'Create spreadsheet'}
       </button>
-      <p style={{color:'#A8C4D8',fontSize:12,margin:'10px 0 0'}}>Exports the currently saved Supabase roster for one state into a new Google file. Members, Events and Hive use the app roster; editing this Google file does NOT yet update that roster. State-scoped, reviewed import and conflict handling are required before two-way syncing can be enabled. Owner-only.</p>
+      <p style={{color:'#A8C4D8',fontSize:12,margin:'10px 0 0'}}>Creates a separate Google file. It will not overwrite any existing spreadsheet. Automatic two-way sync is not enabled.</p>
       {createdWorkbook?.spreadsheetUrl&&<p style={{fontSize:14,marginTop:12}}><a href={createdWorkbook.spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{color:'#F5A623'}}>Open created spreadsheet</a>{createdWorkbook.players!=null?` · ${createdWorkbook.players} players in ${createdWorkbook.alliances} alliance tabs`:''}</p>}
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
-      <h3 style={{margin:'0 0 8px'}}>Find a spreadsheet</h3>
-      <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
-        <strong style={{color:'white'}}>Refresh game API data · State {stateId}</strong>
-        <p style={{color:'#A8C4D8',fontSize:13,lineHeight:1.5,margin:'8px 0'}}>Pull the latest available alliance profiles from the Mightpulse API. Review updated players, power, kills and furnace levels before saving. This is separate from refreshing Google Sheets.</p>
-        <button type="button" style={button} onClick={onPullApiData} disabled={!onPullApiData}>Pull / refresh API player data</button>
-        <p style={{color:'#A8C4D8',fontSize:12,margin:'8px 0 0'}}>You'll enter an alliance tag, preview the API results and approve the roster update. No changes are made until approval.</p>
-      </div>
-      <label htmlFor="spreadsheet-id" style={{display:'block',fontSize:14,color:'#A8C4D8',marginBottom:8}}>Google spreadsheet ID or URL</label>
-      <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
-        const value=e.target.value;const found=value.match(new RegExp('spreadsheets/d/([A-Za-z0-9_-]+)'));
-        setSpreadsheetId(found?found[1]:value);
-        setPreviewRows(null);setSheetInfo(null);setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
-      }} placeholder="Paste a Google Sheets URL" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:12}}/>
-      <button style={{...button,opacity:!enabled||status==='loading'?0.5:1}} disabled={!enabled||status==='loading'||!spreadsheetId.trim()} onClick={previewMetadata}>
-        {status==='loading'?'Reading worksheets…':'Preview worksheets'}
-      </button>
+      <h3 style={{margin:'0 0 8px'}}>Your state spreadsheet</h3>
       <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
         <label htmlFor="sheet-state-choice" style={{display:'block',color:'#A8C4D8',fontSize:14,marginBottom:8}}>Spreadsheet state</label>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -387,17 +373,32 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       </div>
       <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
         <strong style={{color:'white'}}>State {stateId} default spreadsheet</strong>
-        <p style={{color:'#A8C4D8',fontSize:13,overflowWrap:'anywhere',margin:'8px 0'}}>{savedSpreadsheetId?`Saved: ${savedSpreadsheetId}`:'No spreadsheet saved for this state yet.'}</p>
+        <p style={{color:'#A8C4D8',fontSize:13,overflowWrap:'anywhere',margin:'8px 0'}}>{savedSpreadsheetId?`Saved link: ${savedSpreadsheetId}`:'No spreadsheet saved for this state yet.'}</p>
         <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-          <button type="button" onClick={saveDefaultSpreadsheet} disabled={!spreadsheetId.trim()||!enabled} style={button}>Save as state default</button>
+          <button type="button" onClick={saveDefaultSpreadsheet} disabled={!spreadsheetId.trim()||!enabled} style={secondaryButton}>Save link for this state</button>
           <button type="button" onClick={refreshSavedSpreadsheet} disabled={!savedSpreadsheetId||refreshingSavedSheet||!signedInEmail} style={button}>{refreshingSavedSheet?'Refreshing…':'Pull / refresh from Google'}</button>
-          {savedSpreadsheetId&&<button type="button" onClick={removeDefaultSpreadsheet} style={button}>Clear default</button>}
+          {savedSpreadsheetId&&<button type="button" onClick={removeDefaultSpreadsheet} style={{...secondaryButton,color:'#A8C4D8'}}>Remove saved link</button>}
         </div>
         <p style={{fontSize:12,color:'#A8C4D8',margin:'10px 0 0'}}>{cloudDefaultFeedback} Refresh retrieves the Google worksheet list; preview rows to review changes. App edits are not automatically written to Google yet.</p>
       </div>
+      <label htmlFor="spreadsheet-id" style={{display:'block',fontSize:14,color:'#A8C4D8',marginBottom:8}}>Spreadsheet link</label>
+      <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
+        const value=e.target.value;const found=value.match(new RegExp('spreadsheets/d/([A-Za-z0-9_-]+)'));
+        setSpreadsheetId(found?found[1]:value);
+        setPreviewRows(null);setSheetInfo(null);setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
+      }} placeholder="Paste the Google Sheets link for this state" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:12}}/>
+      <button style={{...button,opacity:!enabled||status==='loading'?0.5:1}} disabled={!enabled||status==='loading'||!spreadsheetId.trim()} onClick={previewMetadata}>
+        {status==='loading'?'Reading worksheets…':'Load worksheets'}
+      </button>
+      <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
+        <strong style={{color:'white'}}>Update player records</strong>
+        <p style={{color:'#A8C4D8',fontSize:13,lineHeight:1.5,margin:'8px 0'}}>Retrieve current player profiles from the Mightpulse API. You'll review the changes before applying them to the app roster.</p>
+        <button type="button" style={button} onClick={onPullApiData} disabled={!onPullApiData}>Refresh player data from API</button>
+        <p style={{color:'#A8C4D8',fontSize:12,margin:'8px 0 0'}}>Does not modify Google Sheets. Updates are applied to the app only after approval.</p>
+      </div>
       {sheetInfo&&<div aria-live="polite" style={{marginTop:14,color:'#A8C4D8'}}>
         <strong style={{color:'white'}}>{sheetInfo.title}</strong>
-        <p style={{fontSize:13,margin:'8px 0'}}>Worksheets (read-only)</p>
+        <p style={{fontSize:13,margin:'8px 0'}}>Choose a worksheet to inspect</p>
         {(sheetInfo.worksheets||[]).map(w=><div key={w.id} style={{padding:'10px 0',borderTop:'1px solid #2A4A64',fontSize:14}}>{w.title} · up to {w.rows} rows <button type="button" onClick={()=>previewRowsForWorksheet(w.title)} style={{border:0,borderRadius:8,padding:'8px 12px',marginLeft:8,background:'#1E3A52',color:'white'}}>Preview</button></div>)}
       </div>}
       {previewRows&&['Combat','Events'].includes(previewRows.title)&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
@@ -455,7 +456,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       {connectionFeedback&&<p role="status" aria-live="polite" style={{fontSize:14,color:'#A8C4D8',margin:'0 0 8px'}}>{connectionFeedback}</p>}
       {connectionCheckedAt&&<p style={{fontSize:12,color:'#A8C4D8',margin:'0 0 8px'}}>Last checked: {connectionCheckedAt.toLocaleTimeString()}</p>}
       {connection?.connectedAt&&<p style={{fontSize:12,color:'#A8C4D8',margin:'0 0 8px'}}>Google credentials saved: {new Date(connection.connectedAt).toLocaleString()}</p>}
-      <p style={{margin:0,fontSize:14,color:'#A8C4D8'}}>No Google spreadsheet synchronisation is active. Changes made here are not sent to Google Sheets.</p>
+      <p style={{margin:0,fontSize:14,color:'#A8C4D8'}}>Saved links and manual previews are supported. Automatic app-to-Google updates are not enabled yet.</p>
     </section>
   </div>;
 }
