@@ -18,7 +18,7 @@ Deno.serve(async req=>{
   const input=await req.json().catch(()=>null);
   const id=input?.spreadsheetId, worksheetTitle=input?.worksheetTitle;
   if(typeof id!=='string'||!/^[A-Za-z0-9_-]{15,200}$/.test(id))return reply(req,{error:'Invalid spreadsheet ID'},400);
-  if(typeof worksheetTitle!=='string'||!worksheetTitle||worksheetTitle.length>100||/[\\x00-\\x1f]/.test(worksheetTitle))return reply(req,{error:'Invalid worksheet title'},400);
+  if(typeof worksheetTitle!=='string'||!worksheetTitle||worksheetTitle.length>100||/[\x00-\x1f]/.test(worksheetTitle))return reply(req,{error:'Invalid worksheet title'},400);
   const admin=createClient(secret('SUPABASE_URL'),secret('SUPABASE_SERVICE_ROLE_KEY'),{auth:{persistSession:false}});
   const {data:credential,error:dbError}=await admin.from('spreadsheet_google_credentials').select('refresh_token_encrypted').eq('user_id',user.id).maybeSingle();
   if(dbError||!credential)return reply(req,{error:'Google account not connected'},409);
