@@ -40,7 +40,10 @@ Deno.serve(async req=>{
    const alliance=/^[A-Z0-9_-]{2,10}$/.test(raw)?raw:'UNALLIED';
    if(!groups.has(alliance))groups.set(alliance,[]);
    const d=p.data||{};
-   groups.get(alliance)!.push([String(d.fid??p.id??''),String(d.username??''),stateId,alliance,d.furnaceLevel??'',d.power??'',d.kills??'',d.gameLanguage??'','','','','','','','',p.updated_at??'']);
+   const verifiedJoiners=Array.isArray(d.joinerHeroes)?d.joinerHeroes.filter((h:any)=>Number(h?.skillLevel)===5&&typeof h?.hero==='string'&&h.hero.trim()).map((h:any)=>h.hero.trim()).join('; '):'';
+   const troopTier=(type:string)=>{const value=String(d.troops?.[type]??'').trim();return /^(T[0-9]{1,2}|FC[0-9]{1,2})$/.test(value)?value:'';};
+   groups.get(alliance)!.push([String(d.fid??p.id??''),String(d.username??''),stateId,alliance,d.furnaceLevel??'',d.power??'',d.kills??'',d.gameLanguage??'',
+    troopTier('infantry'),troopTier('lancer'),troopTier('marksman'),d.foundryTroopPower??'',d.canyonTroopPower??'',verifiedJoiners,'',p.updated_at??'']);
   }
   const tags=[...groups.keys()].sort();
   if(tags.length>90)return respond(req,{error:'State has too many alliance groups'},422);
