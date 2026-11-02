@@ -8,3 +8,5 @@ test('existing conflicting power blocks write',()=>{const changed={...event,snap
 test('player must already participate',()=>{const r=proposeSheetEventPower({events:[{...event,participantIds:[]}],players:[player]});assert.equal(r.proposals.length,0)});
 
 test('unsupported event type cannot receive spreadsheet troop power',()=>{const r=proposeSheetEventPower({events:[{...event,type:'SvS Castle Battle'}],players:[player]});assert.equal(r.proposals.length,0);assert.equal(r.conflicts.length,1)});
+
+test('duplicate participant snapshots are blocked',()=>{const duplicated={...event,snapshots:[...event.snapshots,{...event.snapshots[0],snapshotId:'s2'}]};const result=proposeSheetEventPower({events:[duplicated],players:[player]});assert.equal(result.proposals.length,0);assert.equal(result.conflicts.length,1)});
