@@ -28,3 +28,21 @@ test('Spreadsheet preview allows selecting and adding state workspaces while kee
 test('Cloud state defaults require authenticated owner and keep state association',async()=>{const {readFileSync}=await import('node:fs');const api=readFileSync(new URL('../supabase/functions/sheets-state-default/index.ts',import.meta.url),'utf8');const ui=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');assert.ok(api.includes('user?.id!==OWNER'));assert.ok(api.includes(".eq('state_id',state)"));assert.ok(ui.includes("stateDefaultRequest('GET')"));assert.ok(ui.includes("stateDefaultRequest('POST',{stateId,spreadsheetId:normalized})"));});
 
 test('Sheets UX prioritizes state link and preview with clear manual update labels',async()=>{const {readFileSync}=await import('node:fs');const s=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');assert.ok(s.indexOf('Spreadsheet state')<s.indexOf('Spreadsheet link'));assert.ok(s.indexOf('Spreadsheet link')<s.indexOf('Update player records'));assert.ok(s.includes('Refresh Google worksheets'));assert.ok(s.includes('Create a new Google spreadsheet</summary>'));assert.ok(s.includes('Automatic app-to-Google updates are not enabled yet.'));});
+
+test('Cloud default save is acknowledged before the local default changes',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');
+ const save=source.slice(source.indexOf('async function saveDefaultSpreadsheet'),source.indexOf('async function removeDefaultSpreadsheet'));
+ assert.ok(save.indexOf("await stateDefaultRequest('POST'")<save.indexOf('saveStateSheet(stateId,normalized)'));
+ assert.ok(save.includes('Existing saved link was kept.'));
+});
+test('Refreshing worksheet metadata invalidates previous approval previews',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');
+ for(const name of ['async function refreshSavedSpreadsheet','async function previewMetadata']){
+  const start=source.indexOf(name);
+  const section=source.slice(start,start+900);
+  assert.ok(section.includes('setPreviewRows(null)'),name);
+  assert.ok(section.includes('setPreviewAlliance(\'\')'),name);
+ }
+});
