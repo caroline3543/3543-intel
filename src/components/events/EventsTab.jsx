@@ -1,3 +1,4 @@
+import {WorkspaceIntro} from '../common/WorkspaceIntro.jsx';
 import { ImportedWorksheetIntel } from '../spreadsheets/ImportedWorksheetIntel.jsx';
 import {readEventCloudRows,saveEventCloudIfUnchanged} from '../../services/eventCloudService.js';
 import {compareEventCopies,proposeSnapshotRestores,applySnapshotRestore,describeSnapshotChanges} from '../../services/eventCloudComparison.js';
@@ -655,6 +656,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
   return (
     <div style={{ padding:'16px 20px 0' }}>
+      <WorkspaceIntro title="Events" description="Organise event schedules, attendance and team assignments." detail="Select an event to manage participants. Cloud backups are separate from local edits."/>
       <ImportedWorksheetIntel kind="Events" players={players} />
       {activeEvent&&<div style={{margin:'8px 0 12px'}}>
         <button type="button" disabled={cloudBackupBusy} onClick={backupEventToCloud} style={{minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>
