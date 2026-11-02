@@ -20,8 +20,8 @@ Deno.serve(async req=>{
   const x=await req.json();
   const state=String(x.stateId||''),fid=String(x.fid||'');
   if(!/^[1-9]\d{0,4}$/.test(state)||!/^\d{4,15}$/.test(fid)||typeof x.alliance!=='string'||!x.alliance.trim())return response(req,{error:'Invalid state, ID or alliance'},400);
-  const mode=x.mode==='create'?'create':x.mode==='heroes'?'heroes':'update';
-  const tiers=x.troops;
+  const mode=x.mode==='special'?'special':x.mode==='create'?'create':x.mode==='heroes'?'heroes':'update';
+  const tiers=x.troops||{};
   const extras=x.extraFields||{};
   if(typeof extras!=='object'||Array.isArray(extras)||Object.keys(extras).some(k=>!['foundryTroopPower','canyonTroopPower','gameLanguage'].includes(k)))return response(req,{error:'Unexpected manual field'},400);
   if(Object.entries(extras).some(([k,v])=>k==='gameLanguage'?(typeof v!=='string'||v.length>80):(typeof v!=='number'||!Number.isSafeInteger(v)||v<0||v>999999999999)))return response(req,{error:'Invalid manually entered value'},400);
@@ -50,6 +50,22 @@ Deno.serve(async req=>{
    if(heroError)return response(req,{error:'Could not save joiner heroes'},503);
    if(!ok)return response(req,{error:'Player changed during review; reload'},409);
    return response(req,{ok:true,stateId:state,fid,updatedFields:['joinerHeroes']});
+  }
+  if(mode==='special'){
+   const kind=x.kind,keyName=String(x.entryKey||''),entry=x.entry;
+   if(!['Combat','Events'].includes(kind)||!keyName||keyName.length>100||!entry||typeof entry!=='object'||Array.isArray(entry))return response(req,{error:'Invalid worksheet entry'},400);
+   const allowed=kind==='Combat'?['Attack %','Defence %','Health %','Lethality %','Rally Capacity','March Capacity','Battle Role','Battle Type','Battle Report Date','Evidence URL']:['Event Type','Event Date UTC','Registered','Attendance Status','Assigned Team','Assigned Role','Assigned Building','Assignment Confirmed','Event Troop Power','Contribution'];
+   if(Object.keys(entry).some(k=>!allowed.includes(k)))return response(req,{error:'Disallowed field'},400);
+   if(kind==='Combat'&&!['Infantry','Lancer','Marksman'].includes(keyName))return response(req,{error:'Invalid troop type'},400);
+   if(kind==='Events'&&(!/^[A-Za-z0-9_-]{1,64}\|[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(keyName)))return response(req,{error:'An event ID and date are required'},400);
+   if(Object.entries(entry).some(([k,v])=>typeof v==='number'?(!Number.isFinite(v)||v<0||v>1e12):(typeof v!=='string'||v.length>200)))return response(req,{error:'Invalid entry value'},400);
+   const container=kind==='Combat'?'sheetCombat':'sheetEvents';
+   const previous=player.data?.[container]?.[keyName]??null;
+   if(JSON.stringify(previous)!==JSON.stringify(x.expectedEntry??null))return response(req,{error:'Entry changed since review; refresh'},409);
+   const {data:ok,error:saveError}=await admin.rpc('apply_sheet_special_row',{p_state:state,p_record_id:player.id,p_expected_updated_at:player.updated_at,p_kind:kind,p_entry_key:keyName,p_entry:entry});
+   if(saveError)return response(req,{error:'Could not save worksheet entry'},503);
+   if(!ok)return response(req,{error:'Player changed during review; refresh'},409);
+   return response(req,{ok:true,kind,stateId:state,fid});
   }
   const expected=x.expected||{};
   if(Object.keys(extras).some(k=>String(player.data?.[k]??'')!==String((x.expectedExtras||{})[k]??'')))return response(req,{error:'Manual fields changed since preview; reload'},409);
