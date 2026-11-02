@@ -46,3 +46,10 @@ test('Refreshing worksheet metadata invalidates previous approval previews',asyn
   assert.ok(section.includes('setPreviewAlliance(\'\')'),name);
  }
 });
+
+test('Current worksheet has an explicit manual data refresh action',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');
+ assert.ok(source.includes('Refresh these rows'));
+ assert.ok(source.includes('onClick={()=>previewRowsForWorksheet(previewRows.title)}'));
+});
