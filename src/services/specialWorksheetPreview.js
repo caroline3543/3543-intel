@@ -38,7 +38,7 @@ export function previewSpecialWorksheet({type,values,players,stateId}){
   if(seen.has(key)){errors.push('Row '+row+': duplicate player/event or troop');continue}seen.add(key);
   const updates={};let invalid=false;
   for(const name of rules.numeric){const c=col(name);if(c<0)continue;const raw=String(cells[c]??'').trim();if(!raw)continue;
-   if(!/^(?:\\d+|\\d{1,3}(?:,\\d{3})+)(?:\\.\\d+)?$/.test(raw)){errors.push('Row '+row+': invalid '+name);invalid=true;break}
+   if(!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$/.test(raw)){errors.push('Row '+row+': invalid '+name);invalid=true;break}
    const n=Number(raw.replace(/,/g,''));if(!Number.isFinite(n)||n<0||n>1e12||(name.endsWith('%')&&n>100000)){errors.push('Row '+row+': invalid '+name);invalid=true;break}updates[name]=n;
   }
   if(invalid)continue;
