@@ -116,7 +116,7 @@ export function SpreadsheetManager({ onClose }) {
     setCreatingWorkbook(true);setCreatedWorkbook(null);setMessage('');
     try{
       const stateId=createState.trim();
-      if(!/^\\d{1,5}$/.test(stateId)||Number(stateId)===0)throw new Error('Enter a valid state number.');
+      if(!/^\d{1,5}$/.test(stateId)||Number(stateId)===0)throw new Error('Enter a valid state number.');
       const {data:{session}}=await supabase.auth.getSession();
       if(!session?.access_token)throw new Error('Sign in first.');
       const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-create-workbook`,{
