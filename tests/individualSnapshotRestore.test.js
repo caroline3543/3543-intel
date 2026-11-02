@@ -7,3 +7,5 @@ test('selective restore preserves squads',()=>{const proposal=proposeSnapshotRes
 
 test('restore preview identifies only changed fields', async()=>{const {describeSnapshotChanges}=await import('../src/services/eventCloudComparison.js');assert.deepEqual(describeSnapshotChanges({troopPower:100,rsvp:{participating:true}},{troopPower:200,rsvp:{participating:true}}),['Troop power']);});
 test('snapshot modified after review cannot be replaced',()=>{const proposal=proposeSnapshotRestores(local,cloud)[0];const changed={...local,snapshots:[{...local.snapshots[0],troopPower:999}]};assert.throws(()=>applySnapshotRestore(changed,proposal),/changed/);});
+
+test('release guard: production origin is allowed by spreadsheet write endpoints',async()=>{const {readFileSync}=await import('node:fs');for(const endpoint of ['sheets-create-workbook','sheets-apply-troop-import']){const source=readFileSync(new URL('../supabase/functions/'+endpoint+'/index.ts',import.meta.url),'utf8');assert.match(source,/https:\/\/3543-intel\.vercel\.app/);}});
