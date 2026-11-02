@@ -27,9 +27,12 @@ export function planSheetWrites({stateId,spreadsheetId,worksheetTitle,players,ro
  const col=name=>headers.indexOf(name),byId=new Map();
  for(const player of players){const fid=normalizeChiefId(player.fid);if(!fid)continue;if(byId.has(fid))byId.set(fid,null);else byId.set(fid,player)}
  const proposals=[],conflicts=[],seen=new Set();
+ // Reject all occurrences of a duplicate ID before proposing any write.
+ const counts=new Map();
+ for(const values of rows.slice(1)){const id=normalizeChiefId(values?.[col('Player ID')]);if(id)counts.set(id,(counts.get(id)||0)+1)}
  for(let rowIndex=1;rowIndex<rows.length;rowIndex++){
-  const values=rows[rowIndex],fid=normalizeChiefId(values[col('Player ID')]);if(!fid)continue;
-  if(seen.has(fid)){conflicts.push({row:rowIndex+1,fid,reason:'Duplicate player ID'});continue}seen.add(fid);
+  const values=rows[rowIndex]||[],fid=normalizeChiefId(values[col('Player ID')]);if(!fid)continue;
+  if((counts.get(fid)||0)>1){conflicts.push({row:rowIndex+1,fid,reason:'Duplicate player ID'});continue}seen.add(fid);
   const player=byId.get(fid);
   if(!player||String(values[col('State')]??'').trim()!==state||String(values[col('Alliance')]??'').trim().toUpperCase()!==String(player.allianceTag||'').trim().toUpperCase()){conflicts.push({row:rowIndex+1,fid,reason:'Player identity, state or alliance mismatch'});continue}
   const prior=baseline.rows?.[fid];
