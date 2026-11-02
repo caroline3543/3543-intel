@@ -5,9 +5,12 @@ export function canonicalExportReview(plan,preflight){
  if(!plan||!preflight?.readOnly||preflight.writeEnabled!==false||preflight.allMatched!==true)throw Error('Successful read-only preflight required');
  if(plan.conflicts?.length||!Array.isArray(plan.proposals)||!plan.proposals.length||plan.proposals.length>20)throw Error('Unresolved conflicts or invalid batch size');
  if(!Array.isArray(preflight.checked)||preflight.checked.length!==plan.proposals.length||preflight.checked.some(c=>c.match!==true))throw Error('Incomplete live verification');
+ const checked=new Set();
+ for(const c of preflight.checked){if(c.match!==true||!Number.isSafeInteger(c.row)||typeof c.column!=='string')throw Error('Unverified cell');const key=c.row+':'+c.column;if(checked.has(key))throw Error('Duplicate verified cell');checked.add(key)}
  const unique=new Set();
  const changes=plan.proposals.map(p=>{
   const id=[clean(p.fid),p.row,clean(p.column)].join(':');
+  if(!checked.has(p.row+':'+p.column))throw Error('Verification does not match reviewed change');
   if(unique.has(id))throw Error('Duplicate reviewed change');
   unique.add(id);
   if(!/^\d{4,15}$/.test(clean(p.fid))||!Number.isSafeInteger(p.row)||p.row<2||!p.column)throw Error('Invalid reviewed change');
