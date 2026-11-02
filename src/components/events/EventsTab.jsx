@@ -1,4 +1,5 @@
 import { ImportedWorksheetIntel } from '../spreadsheets/ImportedWorksheetIntel.jsx';
+import {proposeSheetEventPower,applySheetEventPowerProposal} from '../../services/sheetEventMatchService.js';
 import { useState, useEffect, useRef } from 'react';
 import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES, ALLIANCE_RANKS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
@@ -37,6 +38,14 @@ import { SquadBalancerPanel } from './SquadBalancerPanel.jsx';
 // automatically the moment someone is added here, not chosen manually.
 export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, onAddPlayers, onUpdatePlayers, plans = [] }) {
   const [filterType, setFilterType]   = useState('All');
+  const sheetMatches=proposeSheetEventPower({events,players});
+  function approveSheetPower(proposal){
+    const event=events.find(e=>e.id===proposal.eventId);
+    if(!event)return;
+    if(!window.confirm('Apply imported troop power '+proposal.power+' to '+proposal.playerName+' in '+event.name+'? Attendance and assignments will remain unchanged.'))return;
+    try{onUpdateEvent(applySheetEventPowerProposal(event,proposal));}
+    catch(e){window.alert(e.message||'Could not apply imported power.');}
+  }
   const [toastMsg, setToastMsg]       = useState(null);
   function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); }
   // { mode:'swap', player, sibling } — trying to add someone already in
@@ -571,6 +580,14 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   return (
     <div style={{ padding:'16px 20px 0' }}>
       <ImportedWorksheetIntel kind="Events" players={players} />
+      {(sheetMatches.proposals.length>0||sheetMatches.conflicts.length>0)&&<section style={{margin:'12px 0',padding:14,background:'#152236',borderRadius:12,border:'1px solid #36536B',color:'#A8C4D8'}}>
+        <strong style={{color:'white'}}>Spreadsheet event matches</strong>
+        <p style={{fontSize:13}}>{sheetMatches.proposals.length} safe troop-power updates · {sheetMatches.conflicts.length} conflicts needing manual review</p>
+        {sheetMatches.proposals.slice(0,20).map(x=><div key={x.eventId+':'+x.playerId} style={{padding:'6px 0',fontSize:13}}>{x.playerName} · {x.power.toLocaleString()} troop power
+          <button type="button" onClick={()=>approveSheetPower(x)} style={{marginLeft:8,minHeight:40,padding:'8px 12px',borderRadius:8,background:'#1E3A52',color:'white',border:'1px solid #5A7A94'}}>Apply to event</button>
+        </div>)}
+        {sheetMatches.conflicts.slice(0,10).map((c,i)=><p key={i} style={{fontSize:12,color:'#FFC5A8',margin:'5px 0'}}>{c.reason} · {c.key}</p>)}
+      </section>
       {toastMsg && (
         <div style={{ position:'fixed', top:20, left:'50%', transform:'translateX(-50%)', background:C.card+'ee', backdropFilter:'blur(12px)', border:`1px solid ${C.gold}44`, borderRadius:20, padding:'10px 20px', fontSize:13, fontWeight:600, color:C.gold, zIndex:800, maxWidth:'90%', textAlign:'center', pointerEvents:'none' }}>
           {toastMsg}
