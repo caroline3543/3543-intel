@@ -26,3 +26,13 @@ test('Sheets review explicitly checks the live server preflight and never writes
  assert.ok(source.includes('Automatic exports are disabled.'));
  assert.ok(source.includes('makeSheetReadBaseline('));
 });
+
+test('Export review lists concrete Google/app values and forbids silent partial checks',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');
+ assert.ok(source.includes('plan.proposals.length>20'));
+ assert.ok(source.includes('limitReached:true'));
+ assert.ok(source.includes('No partial preflight was run'));
+ assert.ok(source.includes('Google: {p.expected'));
+ assert.ok(source.includes('App: {p.value'));
+});
