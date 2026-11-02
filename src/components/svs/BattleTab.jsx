@@ -1,3 +1,4 @@
+import { ImportedWorksheetIntel } from '../spreadsheets/ImportedWorksheetIntel.jsx';
 import { useBattlePool } from '../../hooks/useBattlePool.js';
 import { mergePoolPlayers } from '../../services/battlePoolService.js';
 import { useState } from 'react';
@@ -68,6 +69,7 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
 
   return (
     <>
+    <ImportedWorksheetIntel kind="Combat" players={players} />
     <PlanList
       plans={plans}
       onSelectPlan={setActivePlanId}
