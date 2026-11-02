@@ -1,0 +1,15 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readStateSheet,saveStateSheet,clearStateSheet,normalizeSpreadsheetId} from '../src/services/stateSpreadsheetDefaults.js';
+test('State default sheets are isolated and persist as IDs',()=>{
+ const map=new Map(),storage={getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};
+ const id='1fGK_RpX6KRWXeMLza0lxhjB8uBfJ5-m-MF4FHyVcqHc';
+ saveStateSheet('3543','https://docs.google.com/spreadsheets/d/'+id+'/edit',storage);
+ assert.equal(readStateSheet('3543',storage),id);
+ assert.equal(readStateSheet('3573',storage),'');
+ clearStateSheet('3543',storage);
+ assert.equal(readStateSheet('3543',storage),'');
+});
+test('Invalid spreadsheet ID cannot be saved',()=>{
+ assert.throws(()=>normalizeSpreadsheetId('not a url'),/valid Google Sheets/);
+});
