@@ -388,6 +388,10 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         <p style={{fontSize:13,margin:'8px 0'}}>Choose a worksheet to inspect</p>
         {(sheetInfo.worksheets||[]).map(w=><div key={w.id} style={{padding:'10px 0',borderTop:'1px solid #2A4A64',fontSize:14}}>{w.title} · up to {w.rows} rows <button type="button" onClick={()=>previewRowsForWorksheet(w.title)} style={{border:0,borderRadius:8,padding:'8px 12px',marginLeft:8,background:'#1E3A52',color:'white'}}>Preview</button></div>)}
       </div>}
+      {previewRows&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,margin:'12px 0'}}>
+        <p style={{color:'#A8C4D8',fontSize:13,margin:0}}>Showing worksheet: <strong>{previewRows.title}</strong></p>
+        <button type="button" disabled={status==='loading'||!!applyingFid} onClick={()=>previewRowsForWorksheet(previewRows.title)} style={{...secondaryButton,width:'auto',minHeight:44,padding:'8px 12px'}}>Refresh these rows</button>
+      </div>}
       {previewRows&&['Combat','Events'].includes(previewRows.title)&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
         <h4 style={{margin:'0 0 8px',fontSize:18}}>{previewRows.title} import preview</h4>
         {(()=>{try{const plan=previewSpecialWorksheet({type:previewRows.title,values:previewRows.rows,players,stateId});
