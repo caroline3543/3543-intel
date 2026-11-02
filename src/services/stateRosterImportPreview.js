@@ -42,9 +42,25 @@ export function planStateRosterImport({values,mapping,players,stateId,worksheetA
    const col=mapping[field]===''?NaN:Number(mapping[field]);
    if(Number.isInteger(col)&&col>=0&&String(cells[col]??'').trim()) manualFields[property]=String(cells[col]).trim();
   }
+  const extraFields={};
+  for(const [columnName,property] of [['foundry_troop_power','foundryTroopPower'],['canyon_troop_power','canyonTroopPower'],['game_language','gameLanguage']]){
+    const column=mapping[columnName]===''?NaN:Number(mapping[columnName]);
+    if(!Number.isInteger(column)||column<0)continue;
+    const raw=String(cells[column]??'').trim();
+    if(!raw)continue;
+    if(property==='gameLanguage'){
+      if(raw.length>80){errors.push('Row '+row+': game language too long');continue;}
+      extraFields[property]=raw;
+    }else{
+      if(!/^\\d{1,12}$/.test(raw)){errors.push('Row '+row+': invalid '+columnName);continue;}
+      extraFields[property]=Number(raw);
+    }
+  }
   const username=usernameColumn===null?'':String(cells[usernameColumn]??'').trim();
-  const changed=!!match&&Object.entries(manualFields).some(([k,v])=>String(match.troops?.[k]??'')!==v);
-  candidates.push({row,fid,kind:match?'existing':'new',manualFields,username,playerId:match?.id??null,changed});
+  const changed=!!match&&(Object.entries(manualFields).some(([k,v])=>String(match.troops?.[k]??'')!==v)||Object.entries(extraFields).some(([k,v])=>String(match[k]??'')!==String(v)));
+  const changedTiers=!!match&&Object.entries(manualFields).some(([k,v])=>String(match.troops?.[k]??'')!==v);
+  const changedExtras=!!match&&Object.entries(extraFields).some(([k,v])=>String(match[k]??'')!==String(v));
+  candidates.push({row,fid,kind:match?'existing':'new',manualFields,extraFields,username,playerId:match?.id??null,changed,changedTiers,changedExtras});
  }
  return {stateId:state,worksheetAlliance,candidates,matched:candidates.filter(x=>x.kind==='existing').length,newPlayers:candidates.filter(x=>x.kind==='new').length,proposedChanges:candidates.filter(x=>x.changed).length,errors,readOnly:true,canApply:false,headers};
 }
