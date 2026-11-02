@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabaseClient.js';
+import { IMPORT_FIELDS, detectMapping, assessMapping } from '../../services/worksheetMappingPreview.js';
 
 /** Feature-gated setup screen. No Sheets writes and no browser OAuth secrets. */
 export function SpreadsheetManager({ onClose }) {
@@ -12,6 +13,7 @@ export function SpreadsheetManager({ onClose }) {
   const [otpSent,setOtpSent]=useState(false);
   const [connection,setConnection]=useState(null);
   const [previewRows,setPreviewRows]=useState(null);
+  const [columnMapping,setColumnMapping]=useState({});
   const [signedInEmail,setSignedInEmail]=useState(null);
   const enabled = import.meta.env.VITE_ENABLE_GOOGLE_SHEETS === 'true';
   async function sendLoginCode() {
@@ -93,7 +95,7 @@ export function SpreadsheetManager({ onClose }) {
     }catch(error){setStatus('error');setMessage(error.message||'Preview failed');}
   }
   async function previewRowsForWorksheet(title) {
-    setStatus('loading');setMessage('');setPreviewRows(null);
+    setStatus('loading');setMessage('');setPreviewRows(null);setColumnMapping({});
     try {
       const {data:{session}}=await supabase.auth.getSession();
       if(!session?.access_token)throw new Error('Sign in first.');
@@ -103,7 +105,7 @@ export function SpreadsheetManager({ onClose }) {
       });
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||'Could not preview rows');
-      setPreviewRows({title,rows:data.rows});setStatus('ready');
+      setPreviewRows({title,rows:data.rows});setColumnMapping(detectMapping(data.rows?.[0]||[]));setStatus('ready');
     }catch(e){setStatus('error');setMessage(e.message||'Worksheet preview failed');}
   }
   const button={background:'#F5A623',color:'#0A1628',border:'none',padding:'12px 16px',minHeight:48,borderRadius:12,fontSize:16,fontWeight:700,width:'100%',cursor:'pointer'};
@@ -147,6 +149,22 @@ export function SpreadsheetManager({ onClose }) {
         <strong style={{color:'white'}}>{sheetInfo.title}</strong>
         <p style={{fontSize:13,margin:'8px 0'}}>Worksheets (read-only)</p>
         {(sheetInfo.worksheets||[]).map(w=><div key={w.id} style={{padding:'10px 0',borderTop:'1px solid #2A4A64',fontSize:14}}>{w.title} · up to {w.rows} rows <button type="button" onClick={()=>previewRowsForWorksheet(w.title)} style={{border:0,borderRadius:8,padding:'8px 12px',marginLeft:8,background:'#1E3A52',color:'white'}}>Preview</button></div>)}
+      </div>}
+      {previewRows&&previewRows.rows.length>0&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
+        <h4 style={{margin:'0 0 8px',fontSize:18}}>Map columns (read-only)</h4>
+        <p style={{fontSize:13,color:'#A8C4D8',margin:'0 0 12px'}}>Check how the worksheet headings correspond to app fields. API-controlled fields are displayed for reference and cannot be overwritten by this preview.</p>
+        {IMPORT_FIELDS.map(field=><label key={field.key} style={{display:'block',marginBottom:10,fontSize:14,color:'#A8C4D8'}}>
+          {field.label} {field.authority==='api'?'· API-owned':field.authority==='manual'?'· Manual':'· Identity'}
+          <select value={columnMapping[field.key]??''} onChange={e=>setColumnMapping(prev=>({...prev,[field.key]:e.target.value}))} style={{display:'block',width:'100%',minHeight:44,marginTop:5,background:'#152236',color:'white',border:'1px solid #5A7A94',borderRadius:9,padding:9,fontSize:16}}>
+            <option value="">Not mapped</option>
+            {(previewRows.rows[0]||[]).map((h,i)=><option value={String(i)} key={i}>{String.fromCharCode(65+i)} · {String(h??'').trim()||'(empty header)'}</option>)}
+          </select>
+        </label>)}
+        {(()=>{const report=assessMapping(previewRows.rows,columnMapping);return <div aria-live="polite" style={{fontSize:14,color:'#A8C4D8'}}>
+          <strong style={{color:'white'}}>Import assessment: {report.totalRows} populated rows</strong>
+          {report.errors.length>0?<ul style={{paddingLeft:20}}>{report.errors.map((error,i)=><li key={i} style={{color:'#FFC5A8'}}>{error}</li>)}</ul>:<p style={{color:'#A7E7C0'}}>No structural issues detected in the previewed rows.</p>}
+          <p style={{marginBottom:0}}>This is a structural preview only. No existing player matching or roster import has been performed. Spreadsheet and database records remain unchanged.</p>
+        </div>})()}
       </div>}
       {previewRows&&<div style={{marginTop:14}}><strong>Read-only preview: {previewRows.title}</strong><p style={{fontSize:12,color:'#A8C4D8'}}>First 101 rows maximum. No changes have been saved.</p><div style={{overflowX:'auto',maxHeight:340,overflowY:'auto',fontSize:12}}><table style={{borderCollapse:'collapse'}}><tbody>{previewRows.rows.map((row,i)=><tr key={i}>{row.slice(0,20).map((v,j)=><td key={j} style={{border:'1px solid #36536B',padding:6,whiteSpace:'nowrap'}}>{String(v??'')}</td>)}</tr>)}</tbody></table></div></div>}
     </section>
