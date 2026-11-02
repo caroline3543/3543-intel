@@ -587,7 +587,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           <button type="button" onClick={()=>approveSheetPower(x)} style={{marginLeft:8,minHeight:40,padding:'8px 12px',borderRadius:8,background:'#1E3A52',color:'white',border:'1px solid #5A7A94'}}>Apply to event</button>
         </div>)}
         {sheetMatches.conflicts.slice(0,10).map((c,i)=><p key={i} style={{fontSize:12,color:'#FFC5A8',margin:'5px 0'}}>{c.reason} · {c.key}</p>)}
-      </section>
+      </section>}
       {toastMsg && (
         <div style={{ position:'fixed', top:20, left:'50%', transform:'translateX(-50%)', background:C.card+'ee', backdropFilter:'blur(12px)', border:`1px solid ${C.gold}44`, borderRadius:20, padding:'10px 20px', fontSize:13, fontWeight:600, color:C.gold, zIndex:800, maxWidth:'90%', textAlign:'center', pointerEvents:'none' }}>
           {toastMsg}
