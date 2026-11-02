@@ -6,6 +6,7 @@ export function planStateRosterImport({values,mapping,players,stateId,worksheetA
  const state=normalizeStateId(stateId);
  const idColumn=mapping.chief_id===''?NaN:Number(mapping.chief_id);
  const stateColumn=mapping.state===''?null:Number(mapping.state);
+ const allianceColumn=mapping.alliance===''?null:Number(mapping.alliance);
  if(!Number.isSafeInteger(idColumn)||idColumn<0)throw new Error('Player ID column must be mapped');
  const ids=new Map(), duplicates=new Set();
  for(const player of players){
@@ -25,10 +26,13 @@ export function planStateRosterImport({values,mapping,players,stateId,worksheetA
   const rowState=stateColumn===null?state:String(cells[stateColumn]??'').trim();
   const row=i+2;
   if(rowState!==state){errors.push('Row '+row+': wrong state '+rowState);continue;}
+  const sheetAlliance=allianceColumn===null?'':String(cells[allianceColumn]??'').trim().toUpperCase();
+  if(sheetAlliance&&worksheetAlliance&&sheetAlliance!==worksheetAlliance.toUpperCase()){errors.push('Row '+row+': worksheet alliance does not match row alliance');continue;}
   if(!fid){errors.push('Row '+row+': invalid Player ID');continue;}
   if(seen.has(fid)||duplicates.has(fid)){errors.push('Row '+row+': duplicate Player ID');continue;}
   seen.add(fid);
   const match=ids.get(fid);
+  if(match&&match.providerStats?.stateId&&String(match.providerStats.stateId)!==state){errors.push('Row '+row+': player profile belongs to another state');continue;}
   if(match&&worksheetAlliance&&match.allianceTag&&String(match.allianceTag).toUpperCase()!==worksheetAlliance.toUpperCase()){
    errors.push('Row '+row+': alliance mismatch for '+fid);continue;
   }
@@ -37,7 +41,8 @@ export function planStateRosterImport({values,mapping,players,stateId,worksheetA
    const col=mapping[field]===''?NaN:Number(mapping[field]);
    if(Number.isInteger(col)&&col>=0&&String(cells[col]??'').trim()) manualFields[property]=String(cells[col]).trim();
   }
-  candidates.push({row,fid,kind:match?'existing':'new',manualFields,playerId:match?.id??null});
+  const changed=!!match&&Object.entries(manualFields).some(([k,v])=>String(match.troops?.[k]??'')!==v);
+  candidates.push({row,fid,kind:match?'existing':'new',manualFields,playerId:match?.id??null,changed});
  }
- return {stateId:state,worksheetAlliance,candidates,matched:candidates.filter(x=>x.kind==='existing').length,newPlayers:candidates.filter(x=>x.kind==='new').length,errors,readOnly:true,canApply:false,headers};
+ return {stateId:state,worksheetAlliance,candidates,matched:candidates.filter(x=>x.kind==='existing').length,newPlayers:candidates.filter(x=>x.kind==='new').length,proposedChanges:candidates.filter(x=>x.changed).length,errors,readOnly:true,canApply:false,headers};
 }
