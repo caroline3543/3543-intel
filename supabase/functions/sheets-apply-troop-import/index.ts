@@ -20,12 +20,13 @@ Deno.serve(async req=>{
   const x=await req.json();
   const state=String(x.stateId||''),fid=String(x.fid||'');
   if(!/^[1-9]\d{0,4}$/.test(state)||!/^\d{4,15}$/.test(fid)||typeof x.alliance!=='string'||!x.alliance.trim())return response(req,{error:'Invalid state, ID or alliance'},400);
-  const mode=x.mode==='create'?'create':'update';
+  const mode=x.mode==='create'?'create':x.mode==='heroes'?'heroes':'update';
   const tiers=x.troops;
   const extras=x.extraFields||{};
   if(typeof extras!=='object'||Array.isArray(extras)||Object.keys(extras).some(k=>!['foundryTroopPower','canyonTroopPower','gameLanguage'].includes(k)))return response(req,{error:'Unexpected manual field'},400);
   if(Object.entries(extras).some(([k,v])=>k==='gameLanguage'?(typeof v!=='string'||v.length>80):(typeof v!=='number'||!Number.isSafeInteger(v)||v<0||v>999999999999)))return response(req,{error:'Invalid manually entered value'},400);
   if(!tiers||Array.isArray(tiers)||typeof tiers!=='object'||(mode==='update'&&!Object.keys(tiers).length&&!Object.keys(extras).length)||Object.keys(tiers).some(k=>!['infantry','lancer','marksman'].includes(k)||typeof tiers[k]!=='string'||!/^(T\d{1,2}|FC\d{1,2})$/.test(tiers[k])))return response(req,{error:'Invalid troop-level data'},400);
+  if(mode==='heroes'&&(!Array.isArray(x.joinerHeroes)||!x.joinerHeroes.length||x.joinerHeroes.length>30||x.joinerHeroes.some((h:any)=>!h||typeof h.hero!=='string'||h.hero.trim().length<2||h.hero.length>60||!Number.isInteger(h.skillLevel)||h.skillLevel<1||h.skillLevel>5)))return response(req,{error:'Invalid hero or expedition skill level'},400);
   const admin=createClient(url,key,{auth:{persistSession:false}});
   if(mode==='create'){
    const username=String(x.username||'').trim();
@@ -40,6 +41,16 @@ Deno.serve(async req=>{
   if(matches.length!==1)return response(req,{error:'Player missing or duplicate; no changes made'},409);
   const player=matches[0];
   if(String(player.alliance_tag||'').toUpperCase()!==x.alliance.trim().toUpperCase())return response(req,{error:'Alliance no longer matches; reload preview'},409);
+  if(mode==='heroes'){
+   const incoming=x.joinerHeroes;
+   const current=player.data?.joinerHeroes||[];
+   const compare=(arr:any[])=>JSON.stringify(arr.map(h=>[String(h.hero).toLowerCase(),Number(h.skillLevel)]).sort());
+   if(compare(current)!==compare(x.expectedHeroes||[]))return response(req,{error:'Joiner heroes changed since review; reload'},409);
+   const {data:ok,error:heroError}=await admin.rpc('apply_sheet_joiner_heroes',{p_state:state,p_record_id:player.id,p_expected_updated_at:player.updated_at,p_heroes:incoming.map((h:any)=>({hero:h.hero.trim(),skillLevel:h.skillLevel,verified:false,updatedAt:new Date().toISOString()}))});
+   if(heroError)return response(req,{error:'Could not save joiner heroes'},503);
+   if(!ok)return response(req,{error:'Player changed during review; reload'},409);
+   return response(req,{ok:true,stateId:state,fid,updatedFields:['joinerHeroes']});
+  }
   const expected=x.expected||{};
   if(Object.keys(extras).some(k=>String(player.data?.[k]??'')!==String((x.expectedExtras||{})[k]??'')))return response(req,{error:'Manual fields changed since preview; reload'},409);
   if(!Object.keys(tiers).length&&Object.keys(extras).length){
