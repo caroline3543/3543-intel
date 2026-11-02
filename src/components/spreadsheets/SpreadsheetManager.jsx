@@ -171,7 +171,7 @@ export function SpreadsheetManager({ onClose }) {
       <button type="button" style={button} disabled={!enabled||!signedInEmail||creatingWorkbook||!createState.trim()} onClick={createStateWorkbook}>
         {creatingWorkbook?'Creating spreadsheet…':'Create spreadsheet'}
       </button>
-      <p style={{color:'#A8C4D8',fontSize:12,margin:'10px 0 0'}}>Creates a new Google Sheets file in your connected Google account. Does not replace existing workbooks or change app data. Restricted to the app owner.</p>
+      <p style={{color:'#A8C4D8',fontSize:12,margin:'10px 0 0'}}>Exports the currently saved Supabase roster for one state into a new Google file. Members, Events and Hive use the app roster; editing this Google file does NOT yet update that roster. State-scoped, reviewed import and conflict handling are required before two-way syncing can be enabled. Owner-only.</p>
       {createdWorkbook?.spreadsheetUrl&&<p style={{fontSize:14,marginTop:12}}><a href={createdWorkbook.spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{color:'#F5A623'}}>Open created spreadsheet</a>{createdWorkbook.players!=null?` · ${createdWorkbook.players} players in ${createdWorkbook.alliances} alliance tabs`:''}</p>}
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
