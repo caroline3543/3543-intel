@@ -4,3 +4,6 @@ import {proposeSnapshotRestores,applySnapshotRestore} from '../src/services/even
 const local={id:'e',participantIds:['p'],squads:[{id:'s'}],snapshots:[{snapshotId:'local',playerId:'p',troopPower:100}]};
 const cloud={...local,snapshots:[{snapshotId:'cloud',playerId:'p',troopPower:200}]};
 test('selective restore preserves squads',()=>{const proposal=proposeSnapshotRestores(local,cloud)[0];const updated=applySnapshotRestore(local,proposal);assert.equal(updated.snapshots[0].troopPower,200);assert.deepEqual(updated.squads,local.squads);});
+
+test('restore preview identifies only changed fields', async()=>{const {describeSnapshotChanges}=await import('../src/services/eventCloudComparison.js');assert.deepEqual(describeSnapshotChanges({troopPower:100,rsvp:{participating:true}},{troopPower:200,rsvp:{participating:true}}),['Troop power']);});
+test('snapshot modified after review cannot be replaced',()=>{const proposal=proposeSnapshotRestores(local,cloud)[0];const changed={...local,snapshots:[{...local.snapshots[0],troopPower:999}]};assert.throws(()=>applySnapshotRestore(changed,proposal),/changed/);});
