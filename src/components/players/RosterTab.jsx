@@ -202,16 +202,16 @@ export function RosterTab({ initialPlayerId, onInitialPlayerOpened, players, eve
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search name or tag"
+          aria-label="Search players by name, alliance or player ID" placeholder="Search players, alliances or IDs"
           style={{ flex:1, height:48, background:'#152236', border:'1px solid #2A4A64', borderRadius:10, padding:'0 14px', fontSize:16, color:'#FFFFFF', fontFamily:'inherit' }}
         />
       </div>
 
       <div style={{ display:'flex', gap:8, marginBottom:10 }}>
-        <button onClick={() => setRosterView('list')} style={{ flex:1, height:36, borderRadius:20, background:rosterView==='list'?C.gold+'22':C.section, border:`1px solid ${rosterView==='list'?C.gold:C.border}`, color:rosterView==='list'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>≡ List</button>
+        <button onClick={() => setRosterView('list')} style={{ flex:1, minHeight:44, borderRadius:12, background:rosterView==='list'?C.gold+'22':C.section, border:`1px solid ${rosterView==='list'?C.gold:C.border}`, color:rosterView==='list'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>≡ List</button>
         <button onClick={() => setRosterView('roles')} style={{ flex:1, height:36, borderRadius:20, background:rosterView==='roles'?C.gold+'22':C.section, border:`1px solid ${rosterView==='roles'?C.gold:C.border}`, color:rosterView==='roles'?C.gold:C.muted, fontWeight:600, fontSize:13, cursor:'pointer' }}>⚔️ By Role</button>
         <button onClick={() => setHelpOpen(true)} aria-label="How this page works"
-          style={{ flexShrink:0, width:36, height:36, borderRadius:'50%', background:C.section, border:`1px solid ${C.border}`, color:C.gold, fontWeight:800, fontSize:14, cursor:'pointer' }}>
+          style={{ flexShrink:0, width:44, height:44, borderRadius:'50%', background:C.section, border:`1px solid ${C.border}`, color:C.gold, fontWeight:800, fontSize:14, cursor:'pointer' }}>
           ?
         </button>
       </div>
