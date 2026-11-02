@@ -26,7 +26,7 @@ Deno.serve(async req=>{
   if(typeof extras!=='object'||Array.isArray(extras)||Object.keys(extras).some(k=>!['foundryTroopPower','canyonTroopPower','gameLanguage'].includes(k)))return response(req,{error:'Unexpected manual field'},400);
   if(Object.entries(extras).some(([k,v])=>k==='gameLanguage'?(typeof v!=='string'||v.length>80):(typeof v!=='number'||!Number.isSafeInteger(v)||v<0||v>999999999999)))return response(req,{error:'Invalid manually entered value'},400);
   if(!tiers||Array.isArray(tiers)||typeof tiers!=='object'||(mode==='update'&&!Object.keys(tiers).length&&!Object.keys(extras).length)||Object.keys(tiers).some(k=>!['infantry','lancer','marksman'].includes(k)||typeof tiers[k]!=='string'||!/^(T\d{1,2}|FC\d{1,2})$/.test(tiers[k])))return response(req,{error:'Invalid troop-level data'},400);
-  if(mode==='heroes'&&(!Array.isArray(x.joinerHeroes)||!x.joinerHeroes.length||x.joinerHeroes.length>30||x.joinerHeroes.some((h:any)=>!h||typeof h.hero!=='string'||h.hero.trim().length<2||h.hero.length>60||!Number.isInteger(h.skillLevel)||h.skillLevel<1||h.skillLevel>5)))return response(req,{error:'Invalid hero or expedition skill level'},400);
+  if(mode==='heroes'&&(!Array.isArray(x.joinerHeroes)||!x.joinerHeroes.length||x.joinerHeroes.length>30||x.joinerHeroes.some((h:any)=>!h||typeof h.hero!=='string'||h.hero.trim().length<2||h.hero.length>60||!Number.isInteger(h.skillLevel)||h.skillLevel!==5)))return response(req,{error:'Invalid hero or expedition skill level'},400);
   const admin=createClient(url,key,{auth:{persistSession:false}});
   if(mode==='create'){
    const username=String(x.username||'').trim();
