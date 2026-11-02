@@ -16,3 +16,13 @@ test('Duplicate IDs block every occurrence even if the first row otherwise match
  assert.equal(p.proposals.length,0);
  assert.equal(p.conflicts.length,2);
 });
+
+test('Sheets review explicitly checks the live server preflight and never writes',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');
+ assert.ok(source.includes("'/functions/v1/sheets-write-preflight'"));
+ assert.ok(source.includes('Check proposed updates'));
+ assert.ok(source.includes('No Google cells were written.'));
+ assert.ok(source.includes('Automatic exports are disabled.'));
+ assert.ok(source.includes('makeSheetReadBaseline('));
+});
