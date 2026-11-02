@@ -11,7 +11,9 @@ export function proposeSheetEventPower({events=[],players=[]}){
   if(!event.participantIds?.includes(p.id)){conflicts.push({playerId:p.id,key,reason:'Player is not an existing event participant'});continue;}
   const power=fields['Event Troop Power'];
   if(typeof power!=='number'||!Number.isFinite(power)||power<0||power>1e12)continue;
-  const snapshot=(event.snapshots||[]).find(s=>s.playerId===p.id);
+  const snapshotsForPlayer=(event.snapshots||[]).filter(s=>s.playerId===p.id);
+  if(snapshotsForPlayer.length!==1){conflicts.push({playerId:p.id,key,reason:'Missing or duplicate participant snapshot'});continue;}
+  const snapshot=snapshotsForPlayer[0];
   if(!snapshot){conflicts.push({playerId:p.id,key,reason:'Participant snapshot missing'});continue;}
   if(snapshot.troopPower!==null&&snapshot.troopPower!==undefined&&Number(snapshot.troopPower)!==power){conflicts.push({playerId:p.id,key,reason:'Existing event troop power differs'});continue;}
   if(snapshot.troopPower!==null&&snapshot.troopPower!==undefined&&Number(snapshot.troopPower)===power)continue;
@@ -21,6 +23,7 @@ export function proposeSheetEventPower({events=[],players=[]}){
 }
 export function applySheetEventPowerProposal(event,proposal){
  if(event.id!==proposal.eventId||String(event.date).slice(0,10)!==proposal.key.slice(proposal.key.lastIndexOf('|')+1)||!event.participantIds?.includes(proposal.playerId))throw Error('Event participation changed');
+ if((event.snapshots||[]).filter(s=>s.playerId===proposal.playerId).length!==1)throw Error('Missing or duplicate event snapshot');
  const snapshots=event.snapshots.map(s=>{
   if(s.playerId!==proposal.playerId)return s;
   if(s.snapshotId!==proposal.snapshotId||s.troopPower!=null)throw Error('Event snapshot changed');
