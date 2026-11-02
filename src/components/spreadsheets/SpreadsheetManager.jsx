@@ -169,6 +169,10 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     setApplyingFid(row.fid);setMessage('');
     try{
       const {data:{session}}=await supabase.auth.getSession();if(!session?.access_token)throw Error('Sign in required');
+      const latestResponse=await fetch(import.meta.env.VITE_SUPABASE_URL+'/functions/v1/sheets-rows-preview',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({spreadsheetId:previewRows.spreadsheetId,worksheetTitle:plan.type})});
+      if(!latestResponse.ok)throw Error('Could not recheck the spreadsheet. Preview again.');
+      const latest=await latestResponse.json();
+      if(latest.truncated||JSON.stringify(latest.rows?.[0])!==JSON.stringify(previewRows.rows?.[0])||JSON.stringify(latest.rows?.[row.row-1])!==JSON.stringify(previewRows.rows?.[row.row-1]))throw Error('The worksheet changed since preview. Review it again before importing.');
       const container=plan.type==='Combat'?'sheetCombat':'sheetEvents';
       const response=await fetch(import.meta.env.VITE_SUPABASE_URL+'/functions/v1/sheets-apply-troop-import',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({mode:'special',kind:plan.type,stateId:plan.stateId,fid:row.fid,alliance:player.allianceTag,entryKey,entry:row.updates,expectedEntry:player[container]?.[entryKey]??null})});
       const result=await response.json();if(!response.ok)throw Error(result.error||'Import failed');
