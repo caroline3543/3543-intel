@@ -7,6 +7,7 @@ export function planStateRosterImport({values,mapping,players,stateId,worksheetA
  const idColumn=mapping.chief_id===''?NaN:Number(mapping.chief_id);
  const stateColumn=mapping.state===''?null:Number(mapping.state);
  const allianceColumn=mapping.alliance===''?null:Number(mapping.alliance);
+ const usernameColumn=mapping.username===''?null:Number(mapping.username);
  if(!Number.isSafeInteger(idColumn)||idColumn<0)throw new Error('Player ID column must be mapped');
  const ids=new Map(), duplicates=new Set();
  for(const player of players){
@@ -41,8 +42,9 @@ export function planStateRosterImport({values,mapping,players,stateId,worksheetA
    const col=mapping[field]===''?NaN:Number(mapping[field]);
    if(Number.isInteger(col)&&col>=0&&String(cells[col]??'').trim()) manualFields[property]=String(cells[col]).trim();
   }
+  const username=usernameColumn===null?'':String(cells[usernameColumn]??'').trim();
   const changed=!!match&&Object.entries(manualFields).some(([k,v])=>String(match.troops?.[k]??'')!==v);
-  candidates.push({row,fid,kind:match?'existing':'new',manualFields,playerId:match?.id??null,changed});
+  candidates.push({row,fid,kind:match?'existing':'new',manualFields,username,playerId:match?.id??null,changed});
  }
  return {stateId:state,worksheetAlliance,candidates,matched:candidates.filter(x=>x.kind==='existing').length,newPlayers:candidates.filter(x=>x.kind==='new').length,proposedChanges:candidates.filter(x=>x.changed).length,errors,readOnly:true,canApply:false,headers};
 }
