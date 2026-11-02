@@ -93,7 +93,7 @@ export default function App() {
 
       {tab===4 && <TabErrorBoundary><HiveTab players={players} settings={settings} onSavePlayer={savePlayer} onImportAlliance={()=>setAlliancePanel(true)} onViewPlayer={id=>{setRankingPlayerId(id);setTab(0);}} /></TabErrorBoundary>}
 
-      {tab===5 && <TabErrorBoundary><SpreadsheetManager onClose={()=>setTab(0)} players={players} stateId={settings.stateId} /></TabErrorBoundary>}
+      {tab===5 && <TabErrorBoundary><SpreadsheetManager onClose={()=>setTab(0)} players={players} stateId={settings.stateId} onRosterUpdated={syncFromCloud} /></TabErrorBoundary>}
 
       {alliancePanel && <AllianceImportPanel stateId={settings.stateId} players={players} onClose={() => setAlliancePanel(false)} onImport={importAllianceProfiles} />}
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
