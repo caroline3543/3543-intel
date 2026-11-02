@@ -21,3 +21,15 @@ test('rejects an alliance value different from the worksheet tab',()=>{
  const plan=planStateRosterImport({stateId:'3573',worksheetAlliance:'LUN',players:[],mapping:{chief_id:'0',state:'1',alliance:'2'},values:[['ID','State','Alliance'],['123456789','3573','MBT']]});
  assert.equal(plan.candidates.length,0);assert.match(plan.errors[0],/alliance/);
 });
+
+test('event power and game language are compared as user supplied fields',()=>{
+ const players=[{id:'local',fid:'123456789',allianceTag:'LUN',foundryTroopPower:100,gameLanguage:'English'}];
+ const mapping={chief_id:'0',state:'1',foundry_troop_power:'2',canyon_troop_power:'3',game_language:'4'};
+ const p=planStateRosterImport({values:[['FID','State','Foundry Troop Power','Canyon Clash Troop Power','In-game Language'],['123456789','3573','250000','123000','Korean']],mapping,players,stateId:'3573',worksheetAlliance:'LUN'});
+ assert.equal(p.proposedChanges,1);
+ assert.deepEqual(p.candidates[0].extraFields,{foundryTroopPower:250000,canyonTroopPower:123000,gameLanguage:'Korean'});
+});
+test('invalid event power blocks import review',()=>{
+ const p=planStateRosterImport({values:[['FID','State','Foundry'],['123456789','3573','garbage']],mapping:{chief_id:'0',state:'1',foundry_troop_power:'2'},players:[],stateId:'3573',worksheetAlliance:'LUN'});
+ assert.equal(p.errors.length,1);
+});
