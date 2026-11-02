@@ -53,6 +53,8 @@ Deno.serve(async req=>{
   const headers=(all[0]||[]).map((x:unknown)=>String(x??'').trim());
   if(new Set(headers.filter(Boolean)).size!==headers.filter(Boolean).length)return reply(req,{error:'Duplicate headings'},409);
   for(const col of ['Player ID','State','Alliance'])if(!headers.includes(col))return reply(req,{error:'Missing identity heading'},409);
+  const idIndex=headers.indexOf('Player ID'),counts=new Map<string,number>();
+  for(const cells of all.slice(1)){const fid=String(cells?.[idIndex]??'').trim();if(fid)counts.set(fid,(counts.get(fid)||0)+1)}
   for(const proposal of proposals){
    const row=all[proposal.row-1]||[];
    const field=headers.indexOf(proposal.column);
@@ -60,7 +62,7 @@ Deno.serve(async req=>{
    const fid=String(row[headers.indexOf('Player ID')]??'').trim(),rowState=String(row[headers.indexOf('State')]??'').trim();
    const alliance=String(row[headers.indexOf('Alliance')]??'').trim().toUpperCase();
    const current=String(row[field]??'').trim();
-   const valid= /^\d{4,15}$/.test(fid)&&fid===String(proposal.fid??'')&&rowState===state&&alliance===String(proposal.alliance??'').trim().toUpperCase();
+   const valid= (counts.get(fid)===1)&&/^\d{4,15}$/.test(fid)&&fid===String(proposal.fid??'')&&rowState===state&&alliance===String(proposal.alliance??'').trim().toUpperCase();
    const unchanged=current===proposal.expected.trim();
    checked.push({row:proposal.row,column:proposal.column,match:valid&&unchanged,reason:!valid?'Player, state or alliance changed':!unchanged?'Google cell changed':null});
   }
