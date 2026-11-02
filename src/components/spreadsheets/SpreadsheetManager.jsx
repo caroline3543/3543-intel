@@ -208,9 +208,10 @@ export function SpreadsheetManager({ onClose, players = [], stateId }) {
           <p style={{marginBottom:0}}>Structural checks only. No records have been changed.</p>
           {stateId&&(()=>{try{const plan=planStateRosterImport({values:previewRows.rows,mapping:columnMapping,players,stateId,worksheetAlliance:previewAlliance});return <div style={{marginTop:12,borderTop:'1px solid #36536B',paddingTop:12}}>
             <strong style={{color:'white'}}>State {plan.stateId} roster comparison</strong>
-            <p>{plan.matched} existing players · {plan.newPlayers} unmatched player IDs · {plan.errors.length} conflicts</p>
+            <p>{plan.matched} existing players · {plan.proposedChanges} proposed troop-level updates · {plan.newPlayers} unmatched player IDs · {plan.errors.length} conflicts</p>
             {plan.errors.length>0&&<ul style={{paddingLeft:20,color:'#FFC5A8'}}>{plan.errors.slice(0,10).map((error,i)=><li key={i}>{error}</li>)}</ul>}
-            <p style={{marginBottom:0}}>Preview only. No Google Sheet edits or roster imports are applied. Unmatched IDs require review before creation.</p>
+            {plan.candidates.filter(x=>x.changed).length>0&&<div style={{maxHeight:200,overflowY:'auto',marginBottom:12}}>{plan.candidates.filter(x=>x.changed).slice(0,25).map(x=><p key={x.fid} style={{fontSize:12,margin:'4px 0',color:'#A8C4D8'}}>Player {x.fid}: {Object.entries(x.manualFields).map(([type,tier])=>type+' '+tier).join(' · ')}</p>)}</div>}
+            <p style={{marginBottom:0}}>Review only. Changes are not yet applied; the shared roster, other app sections and Google Sheet remain unchanged.</p>
           </div>;}catch(e){return <p style={{color:'#FFC5A8'}}>{e.message}</p>}})()}
 
         </div>})()}
