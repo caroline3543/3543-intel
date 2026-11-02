@@ -3,6 +3,8 @@ import { supabase } from '../../services/supabaseClient.js';
 import { IMPORT_FIELDS, detectMapping, assessMapping } from '../../services/worksheetMappingPreview.js';
 import { planStateRosterImport } from '../../services/stateRosterImportPreview.js';
 import { previewSpecialWorksheet } from '../../services/specialWorksheetPreview.js';
+import { makeSheetReadBaseline } from '../../services/sheetReadBaselineService.js';
+import { planSheetWrites } from '../../services/sheetWritePlanService.js';
 import { readStateSheet, saveStateSheet, clearStateSheet, normalizeSpreadsheetId } from '../../services/stateSpreadsheetDefaults.js';
 import { getWorkspaces, normalizeStateId } from '../../services/stateWorkspaceService.js';
 
@@ -25,6 +27,9 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   const [connectionFeedback,setConnectionFeedback]=useState('');
   const [connectionCheckedAt,setConnectionCheckedAt]=useState(null);
   const [previewRows,setPreviewRows]=useState(null);
+  const [writeBaseline,setWriteBaseline]=useState(null);
+  const [writeReview,setWriteReview]=useState(null);
+  const [checkingWrites,setCheckingWrites]=useState(false);
   const [columnMapping,setColumnMapping]=useState({});
   const [previewAlliance,setPreviewAlliance]=useState('');
   const [applyingFid,setApplyingFid]=useState(null);
@@ -157,7 +162,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     if(!savedSpreadsheetId||refreshingSavedSheet)return;
     setRefreshingSavedSheet(true);
     setSpreadsheetId(savedSpreadsheetId);
-    setSheetInfo(null);setPreviewRows(null);setColumnMapping({});setPreviewAlliance('');
+    setSheetInfo(null);setPreviewRows(null);setWriteReview(null);setColumnMapping({});setPreviewAlliance('');
     setMessage('Refreshing worksheets from the saved Google spreadsheet…');
     try{
       const {data:{session}}=await supabase.auth.getSession();
@@ -169,6 +174,24 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       setMessage('Worksheet list refreshed from Google. Select a worksheet to preview its latest rows before approving changes.');
     }catch(error){setStatus('error');setMessage('Refresh failed: '+(error.message||'Unknown error'));}
     finally{setRefreshingSavedSheet(false);}
+  }
+  async function checkGoogleWrites(){
+    if(!previewRows||checkingWrites)return;
+    setCheckingWrites(true);setWriteReview(null);
+    try{
+      if(previewRows.truncated)throw Error('This worksheet exceeds the safe review limit.');
+      if(!writeBaseline)throw Error('No baseline. Preview this worksheet again to record the starting values.');
+      const plan=planSheetWrites({stateId:String(stateId),spreadsheetId:previewRows.spreadsheetId,worksheetTitle:previewRows.title,players,rows:previewRows.rows,baseline:writeBaseline});
+      if(plan.conflicts.length||!plan.proposals.length){setWriteReview({plan,checked:null});return;}
+      const proposals=plan.proposals.slice(0,20).map(p=>({...p,alliance:players.find(player=>String(player.fid)===p.fid)?.allianceTag||''}));
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token)throw Error('Sign in to check Google cells.');
+      const response=await fetch(import.meta.env.VITE_SUPABASE_URL+'/functions/v1/sheets-write-preflight',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({stateId:String(stateId),spreadsheetId:previewRows.spreadsheetId,worksheetTitle:previewRows.title,proposals})});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(result.error||'Google preflight failed.');
+      setWriteReview({plan,checked:result});
+    }catch(error){setMessage('Export review failed: '+(error.message||'Unknown error'));}
+    finally{setCheckingWrites(false);}
   }
   async function previewMetadata() {
     if(!enabled||!supabase)return;
@@ -199,6 +222,12 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||'Could not preview rows');
       setPreviewAlliance(title);
+      setWriteReview(null);
+      const key=String(stateId)+':'+spreadsheetId.trim()+':'+title;
+      if(!data.truncated&&(!writeBaseline||writeBaseline.stateId+':'+writeBaseline.spreadsheetId+':'+writeBaseline.worksheetTitle!==key)){
+        try{setWriteBaseline(makeSheetReadBaseline({stateId:String(stateId),spreadsheetId:spreadsheetId.trim(),worksheetTitle:title,rows:data.rows}));}
+        catch{setWriteBaseline(null);}
+      }
       setPreviewRows({title,spreadsheetId:spreadsheetId.trim(),rows:data.rows,truncated:!!data.truncated});setColumnMapping(detectMapping(data.rows?.[0]||[]));setStatus('ready');
     }catch(e){setStatus('error');setMessage(e.message||'Worksheet preview failed');}
   }
@@ -362,7 +391,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
         const value=e.target.value;const found=value.match(new RegExp('spreadsheets/d/([A-Za-z0-9_-]+)'));
         setSpreadsheetId(found?found[1]:value);
-        setPreviewRows(null);setSheetInfo(null);setPreviewAlliance('');setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
+        setPreviewRows(null);setWriteBaseline(null);setWriteReview(null);setSheetInfo(null);setPreviewAlliance('');setColumnMapping({});setMessage('Spreadsheet changed. Preview worksheets to review the new file.');
       }} placeholder="Paste the Google Sheets link for this state" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:12}}/>
       <button style={{...button,opacity:!enabled||status==='loading'?0.5:1}} disabled={!enabled||status==='loading'||!spreadsheetId.trim()} onClick={previewMetadata}>
         {status==='loading'?'Reading worksheets…':'Load worksheets'}
@@ -392,6 +421,18 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         <p style={{color:'#A8C4D8',fontSize:13,margin:0}}>Showing worksheet: <strong>{previewRows.title}</strong></p>
         <button type="button" disabled={status==='loading'||!!applyingFid} onClick={()=>previewRowsForWorksheet(previewRows.title)} style={{...secondaryButton,width:'auto',minHeight:44,padding:'8px 12px'}}>Refresh these rows</button>
       </div>}
+      {previewRows&&!['Combat','Events'].includes(previewRows.title)&&<section style={{background:'#152236',borderRadius:12,padding:14,margin:'12px 0'}}>
+        <h4 style={{margin:'0 0 6px'}}>Review app-to-Google changes</h4>
+        <p style={{fontSize:13,color:'#A8C4D8'}}>Compare your app values with this worksheet and check Google again before any future export. This is read-only and cannot save changes to Google.</p>
+        <button type="button" disabled={checkingWrites||!writeBaseline||previewRows.truncated} onClick={checkGoogleWrites} style={{...secondaryButton,minHeight:44}}>{checkingWrites?'Checking Google…':'Check proposed updates'}</button>
+        {writeReview&&<div role="status" aria-live="polite" style={{fontSize:13,color:'#A8C4D8',marginTop:12}}>
+          <p>{writeReview.plan.proposals.length} proposed changes · {writeReview.plan.conflicts.length} conflicts</p>
+          {writeReview.plan.conflicts.slice(0,10).map((x,i)=><p key={i}>Row {x.row}: {x.reason}</p>)}
+          {writeReview.checked&&<p>{writeReview.checked.allMatched?'Google values still match the reviewed proposal.':'Google values changed. Review conflicts and refresh again.'} No Google cells were written.</p>}
+          {writeReview.checked?.checked?.filter(x=>!x.match).map((x,i)=><p key={i}>Row {x.row}, {x.column}: {x.reason}</p>)}
+          <p>Automatic exports are disabled.</p>
+        </div>}
+      </section>}
       {previewRows&&['Combat','Events'].includes(previewRows.title)&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
         <h4 style={{margin:'0 0 8px',fontSize:18}}>{previewRows.title} import preview</h4>
         {(()=>{try{const plan=previewSpecialWorksheet({type:previewRows.title,values:previewRows.rows,players,stateId});
