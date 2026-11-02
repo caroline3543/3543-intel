@@ -6,7 +6,7 @@ import { previewSpecialWorksheet } from '../../services/specialWorksheetPreview.
 import { readStateSheet, saveStateSheet, clearStateSheet } from '../../services/stateSpreadsheetDefaults.js';
 
 /** Feature-gated setup screen. No Sheets writes and no browser OAuth secrets. */
-export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpdated }) {
+export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpdated, onPullApiData }) {
   const [status,setStatus] = useState('idle');
   const [message,setMessage] = useState('');
   const [spreadsheetId,setSpreadsheetId]=useState(()=>readStateSheet(stateId)||'');
@@ -322,6 +322,12 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
       <h3 style={{margin:'0 0 8px'}}>Find a spreadsheet</h3>
+      <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
+        <strong style={{color:'white'}}>Refresh game API data · State {stateId}</strong>
+        <p style={{color:'#A8C4D8',fontSize:13,lineHeight:1.5,margin:'8px 0'}}>Pull the latest available alliance profiles from the Mightpulse API. Review updated players, power, kills and furnace levels before saving. This is separate from refreshing Google Sheets.</p>
+        <button type="button" style={button} onClick={onPullApiData} disabled={!onPullApiData}>Pull / refresh API player data</button>
+        <p style={{color:'#A8C4D8',fontSize:12,margin:'8px 0 0'}}>You'll enter an alliance tag, preview the API results and approve the roster update. No changes are made until approval.</p>
+      </div>
       <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
         <strong style={{color:'white'}}>State {stateId} default spreadsheet</strong>
         <p style={{color:'#A8C4D8',fontSize:13,overflowWrap:'anywhere',margin:'8px 0'}}>{savedSpreadsheetId?`Saved: ${savedSpreadsheetId}`:'No spreadsheet saved for this state yet.'}</p>
