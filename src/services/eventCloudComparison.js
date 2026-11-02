@@ -25,13 +25,13 @@ export function proposeSnapshotRestores(local,cloud){
   if(!current||!s.snapshotId||!current.snapshotId)continue;
   if((cloud.snapshots||[]).filter(x=>x.playerId===s.playerId).length!==1)continue;
   if(JSON.stringify(current)===JSON.stringify(s))continue;
-  result.push({playerId:s.playerId,localSnapshotId:current.snapshotId,cloudSnapshot:s});
+  result.push({playerId:s.playerId,localSnapshotId:current.snapshotId,localSnapshot:current,cloudSnapshot:s});
  }
  return result;
 }
 export function applySnapshotRestore(local,proposal){
  if(!local.participantIds?.includes(proposal.playerId))throw Error('Participant was removed');
  const rows=(local.snapshots||[]).filter(s=>s.playerId===proposal.playerId);
- if(rows.length!==1||rows[0].snapshotId!==proposal.localSnapshotId)throw Error('Snapshot changed since review');
+ if(rows.length!==1||rows[0].snapshotId!==proposal.localSnapshotId||JSON.stringify(rows[0])!==JSON.stringify(proposal.localSnapshot))throw Error('Snapshot changed since review');
  return {...local,snapshots:local.snapshots.map(s=>s.playerId===proposal.playerId?{...proposal.cloudSnapshot,snapshotId:s.snapshotId}:s),updatedAt:new Date().toISOString()};
 }
