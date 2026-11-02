@@ -56,6 +56,7 @@ Deno.serve(async req=>{
   }
   const tags=[...groups.keys()].sort();
   if(tags.length>90)return respond(req,{error:'State has too many alliance groups'},422);
+  if(tags.some(tag=>['COMBAT','EVENTS'].includes(tag)))return respond(req,{error:'An alliance tag conflicts with a reserved worksheet name'},422);
   const {data:credential,error:credsError}=await admin.from('spreadsheet_google_credentials').select('refresh_token_encrypted').eq('user_id',user.id).maybeSingle();
   if(credsError||!credential)return respond(req,{error:'Connect your Google account first'},409);
   const encrypted=JSON.parse(credential.refresh_token_encrypted);
@@ -69,7 +70,7 @@ Deno.serve(async req=>{
   if(!access_token)return respond(req,{error:'Google token unavailable'},502);
   const headers={Authorization:'Bearer '+access_token,'Content-Type':'application/json'};
   const title='3543 Intel | State '+stateId+' | '+new Date().toISOString().slice(0,10);
-  const created=await fetch('https://sheets.googleapis.com/v4/spreadsheets',{method:'POST',headers,body:JSON.stringify({properties:{title},sheets:[...tags.map(tag=>({properties:{title:tag,gridProperties:{frozenRowCount:1}}})),...['Combat','Events'].map(title=>({properties:{title,gridProperties:{frozenRowCount:1}}}))]})});
+  const created=await fetch('https://sheets.googleapis.com/v4/spreadsheets',{method:'POST',headers,body:JSON.stringify({properties:{title},sheets:[...tags.map(tag=>({properties:{title:tag,gridProperties:{frozenRowCount:1,rowCount:Math.max(1000,(groups.get(tag)?.length||0)+1)}}})),...['Combat','Events'].map(title=>({properties:{title,gridProperties:{frozenRowCount:1,rowCount:Math.max(1000,title==='Combat'?combatRows.length+1:eventRows.length+1)}}}))]})});
   if(!created.ok)return respond(req,{error:'Google could not create the spreadsheet',googleStatus:created.status},502);
   const workbook=await created.json();
   const spreadsheetId=workbook.spreadsheetId;
