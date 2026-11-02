@@ -3,6 +3,8 @@ import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 const OWNER_ID='f560b117-a3db-4692-b0bf-fd372044130c'; // existing owner only; replace with admin allowlist before multi-user rollout
 const ORIGINS=['https://3543-intel-git-feat-spreadsheet-s-8ea8a3-sunfire-castle-planner.vercel.app'];
 const HEADERS=['Player ID','Username','State','Alliance','Furnace Level','Total Power','Kills','Game Language','Infantry Troop Level','Lancer Troop Level','Marksman Troop Level','Foundry Troop Power','Canyon Clash Troop Power','Joiner Heroes','Availability','Last Verified'];
+const COMBAT_HEADERS=['Player ID','Username','State','Alliance','Troop Type','Attack %','Defence %','Health %','Lethality %','Battle Role','Battle Type','Rally Capacity','March Capacity','Battle Report Date','Evidence URL','Last Verified'];
+const EVENT_HEADERS=['Event ID','Event Type','Event Date UTC','Player ID','Username','State','Alliance','Registered','Attendance Status','Assigned Team','Assigned Role','Assigned Building','Event Troop Power','Contribution','Assignment Confirmed','Last Updated'];
 const env=(k:string)=>{const v=Deno.env.get(k);if(!v)throw Error('Missing configuration '+k);return v};
 const decode=(v:string)=>Uint8Array.from(atob(v.replace(/-/g,'+').replace(/_/g,'/').padEnd(Math.ceil(v.length/4)*4,'=')),c=>c.charCodeAt(0));
 function respond(req:Request,data:unknown,status=200){const origin=req.headers.get('origin')||'';return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin',...(ORIGINS.includes(origin)?{'Access-Control-Allow-Origin':origin}:{}),'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'POST, OPTIONS'}})}
@@ -34,12 +36,19 @@ Deno.serve(async req=>{
   if(!rows.length)return respond(req,{error:'No players recorded for that state'},404);
   if(rows.length>=10000)return respond(req,{error:'State roster exceeds the export limit'},413);
   const groups=new Map<string,any[]>();
+  const combatRows:any[][]=[];
+  const eventRows:any[][]=[];
   for(const p of rows){
    if(p.state_id!==stateId)throw Error('State isolation invariant violated');
    const raw=String(p.alliance_tag??'').trim().toUpperCase();
    const alliance=/^[A-Z0-9_-]{2,10}$/.test(raw)?raw:'UNALLIED';
    if(!groups.has(alliance))groups.set(alliance,[]);
    const d=p.data||{};
+   const fid=String(d.fid??p.id??'');
+   const username=String(d.username??'');
+   for(const troopType of ['Infantry','Lancer','Marksman'])combatRows.push([fid,username,stateId,alliance,troopType,'','','','', '', '', '',d.marchCapacity??'', '', '',p.updated_at??'']);
+   // Blank event-specific columns prevent invented attendance or assignments.
+   eventRows.push(['','','',fid,username,stateId,alliance,'','','','','','','','',p.updated_at??'']);
    const verifiedJoiners=Array.isArray(d.joinerHeroes)?d.joinerHeroes.filter((h:any)=>Number(h?.skillLevel)===5&&typeof h?.hero==='string'&&h.hero.trim()).map((h:any)=>h.hero.trim()).join('; '):'';
    const troopTier=(type:string)=>{const value=String(d.troops?.[type]??'').trim();return /^(T[0-9]{1,2}|FC[0-9]{1,2})$/.test(value)?value:'';};
    groups.get(alliance)!.push([String(d.fid??p.id??''),String(d.username??''),stateId,alliance,d.furnaceLevel??'',d.power??'',d.kills??'',d.gameLanguage??'',
@@ -60,12 +69,12 @@ Deno.serve(async req=>{
   if(!access_token)return respond(req,{error:'Google token unavailable'},502);
   const headers={Authorization:'Bearer '+access_token,'Content-Type':'application/json'};
   const title='3543 Intel | State '+stateId+' | '+new Date().toISOString().slice(0,10);
-  const created=await fetch('https://sheets.googleapis.com/v4/spreadsheets',{method:'POST',headers,body:JSON.stringify({properties:{title},sheets:tags.map(tag=>({properties:{title:tag,gridProperties:{frozenRowCount:1}}}))})});
+  const created=await fetch('https://sheets.googleapis.com/v4/spreadsheets',{method:'POST',headers,body:JSON.stringify({properties:{title},sheets:[...tags.map(tag=>({properties:{title:tag,gridProperties:{frozenRowCount:1}}})),...['Combat','Events'].map(title=>({properties:{title,gridProperties:{frozenRowCount:1}}}))]})});
   if(!created.ok)return respond(req,{error:'Google could not create the spreadsheet',googleStatus:created.status},502);
   const workbook=await created.json();
   const spreadsheetId=workbook.spreadsheetId;
   if(!spreadsheetId)return respond(req,{error:'Google did not return a spreadsheet ID'},502);
-  const data=tags.map(tag=>({range:"'"+tag.replace(/'/g,"''")+"'!A1:P"+(groups.get(tag)!.length+1),values:[HEADERS,...groups.get(tag)!.sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]}));
+  const data=[...tags.map(tag=>({range:"'"+tag.replace(/'/g,"''")+"'!A1:P"+(groups.get(tag)!.length+1),values:[HEADERS,...groups.get(tag)!.sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]})),{range:"'Combat'!A1:P"+(combatRows.length+1),values:[COMBAT_HEADERS,...combatRows]},{range:"'Events'!A1:P"+(eventRows.length+1),values:[EVENT_HEADERS,...eventRows]}];
   const written=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(spreadsheetId)+'/values:batchUpdate',{method:'POST',headers,body:JSON.stringify({valueInputOption:'RAW',data})});
   if(!written.ok)return respond(req,{error:'Workbook was created but filling rows failed. Do not retry until checking the created workbook.',spreadsheetUrl:'https://docs.google.com/spreadsheets/d/'+spreadsheetId+'/edit'},502);
   return respond(req,{spreadsheetId,spreadsheetUrl:'https://docs.google.com/spreadsheets/d/'+spreadsheetId+'/edit',stateId,alliances:tags.length,players:rows.length,writeMode:'new_workbook_only'});
