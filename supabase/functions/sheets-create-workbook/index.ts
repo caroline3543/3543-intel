@@ -1,7 +1,7 @@
 // Owner-only Google workbook creation. Creates a new workbook; never mutates existing spreadsheets.
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 const OWNER_ID='f560b117-a3db-4692-b0bf-fd372044130c'; // existing owner only; replace with admin allowlist before multi-user rollout
-const ORIGINS=['https://3543-intel-git-feat-spreadsheet-s-8ea8a3-sunfire-castle-planner.vercel.app'];
+const ORIGINS=['https://3543-intel.vercel.app','https://3543-intel-git-feat-spreadsheet-s-8ea8a3-sunfire-castle-planner.vercel.app'];
 const HEADERS=['Player ID','Username','State','Alliance','Furnace Level','Total Power','Kills','Game Language','Infantry Troop Level','Lancer Troop Level','Marksman Troop Level','Foundry Troop Power','Canyon Clash Troop Power','Joiner Heroes','Availability','Last Verified'];
 const COMBAT_HEADERS=['Player ID','Username','State','Alliance','Troop Type','Attack %','Defence %','Health %','Lethality %','Battle Role','Battle Type','Rally Capacity','March Capacity','Battle Report Date','Evidence URL','Last Verified'];
 const EVENT_HEADERS=['Event ID','Event Type','Event Date UTC','Player ID','Username','State','Alliance','Registered','Attendance Status','Assigned Team','Assigned Role','Assigned Building','Event Troop Power','Contribution','Assignment Confirmed','Last Updated'];
