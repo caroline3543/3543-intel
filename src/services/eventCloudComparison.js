@@ -35,3 +35,10 @@ export function applySnapshotRestore(local,proposal){
  if(rows.length!==1||rows[0].snapshotId!==proposal.localSnapshotId||JSON.stringify(rows[0])!==JSON.stringify(proposal.localSnapshot))throw Error('Snapshot changed since review');
  return {...local,snapshots:local.snapshots.map(s=>s.playerId===proposal.playerId?{...proposal.cloudSnapshot,snapshotId:s.snapshotId}:s),updatedAt:new Date().toISOString()};
 }
+
+/** Summarise changed participant fields without exposing entire snapshot payloads. */
+export function describeSnapshotChanges(local,cloud){
+ const keys=['rsvp','attendance','troopPower','voice','notes','profileSnapshot'];
+ const labels={rsvp:'RSVP',attendance:'Attendance',troopPower:'Troop power',voice:'Voice participation',notes:'Notes',profileSnapshot:'Player profile'};
+ return keys.filter(k=>JSON.stringify(local?.[k]??null)!==JSON.stringify(cloud?.[k]??null)).map(k=>labels[k]);
+}
