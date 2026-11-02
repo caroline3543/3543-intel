@@ -20,9 +20,17 @@ Deno.serve(async req=>{
   const x=await req.json();
   const state=String(x.stateId||''),fid=String(x.fid||'');
   if(!/^[1-9]\d{0,4}$/.test(state)||!/^\d{4,15}$/.test(fid)||typeof x.alliance!=='string'||!x.alliance.trim())return response(req,{error:'Invalid state, ID or alliance'},400);
+  const mode=x.mode==='create'?'create':'update';
   const tiers=x.troops;
-  if(!tiers||Array.isArray(tiers)||typeof tiers!=='object'||!Object.keys(tiers).length||Object.keys(tiers).some(k=>!['infantry','lancer','marksman'].includes(k)||typeof tiers[k]!=='string'||!/^(T\d{1,2}|FC\d{1,2})$/.test(tiers[k])))return response(req,{error:'Invalid troop-level data'},400);
+  if(!tiers||Array.isArray(tiers)||typeof tiers!=='object'||(mode==='update'&&!Object.keys(tiers).length)||Object.keys(tiers).some(k=>!['infantry','lancer','marksman'].includes(k)||typeof tiers[k]!=='string'||!/^(T\d{1,2}|FC\d{1,2})$/.test(tiers[k])))return response(req,{error:'Invalid troop-level data'},400);
   const admin=createClient(url,key,{auth:{persistSession:false}});
+  if(mode==='create'){
+   const username=String(x.username||'').trim();
+   if(!username||username.length>80)return response(req,{error:'Username is required for new players'},400);
+   const {data:newId,error:createError}=await admin.rpc('create_sheet_roster_player',{p_state:state,p_fid:fid,p_alliance:x.alliance.trim().toUpperCase(),p_username:username,p_troops:tiers});
+   if(createError)return response(req,{error:'Cannot create player: duplicate ID or invalid roster data'},409);
+   return response(req,{ok:true,created:true,playerId:newId,stateId:state,fid});
+  }
   const {data:records,error:fetchError}=await admin.from('players').select('id,state_id,alliance_tag,data,updated_at').eq('state_id',state).limit(10000);
   if(fetchError)return response(req,{error:'Roster read failed'},503);
   const matches=(records||[]).filter(p=>String(p.data?.fid||'')===fid);
