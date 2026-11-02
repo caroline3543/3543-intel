@@ -35,6 +35,6 @@ Deno.serve(async req=>{
   const g=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(id)+'/values/'+encodeURIComponent(range)+'?valueRenderOption=UNFORMATTED_VALUE',{headers:{Authorization:'Bearer '+access.access_token}});
   if(!g.ok)return reply(req,{error:'Worksheet could not be read',providerStatus:g.status},g.status===404?404:502);
   const data=await g.json();
-  return reply(req,{range:data.range,rows:data.values||[],rowLimit:101,columnLimit:20,readOnly:true});
+  return reply(req,{range:data.range,rows:(data.values||[]).slice(0,101),truncated:(data.values||[]).length>101,rowLimit:101,columnLimit:20,readOnly:true});
  }catch(e){console.error('Sheets preview error',e instanceof Error?e.name:'unknown');return reply(req,{error:'Worksheet preview unavailable'},503)}
 });
