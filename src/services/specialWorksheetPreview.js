@@ -15,6 +15,7 @@ export function previewSpecialWorksheet({type,values,players,stateId}){
  const col=h=>headers.indexOf(h), indexed=new Map();
  for(const p of players){const id=normalizeChiefId(p.fid);if(id){if(indexed.has(id))indexed.set(id,null);else indexed.set(id,p)}}
  const errors=[],matches=[],seen=new Set();
+ if(!players.length)return {type,stateId:state,matched:0,errors:[`No players loaded in State ${state}. Load or pull the alliance roster, or select the state matching this spreadsheet, then preview again.`],matches:[],canApply:false};
  if(values.length>101&&values.slice(101).some(cells=>(cells||[]).some(v=>String(v??'').trim())))errors.push('Worksheet exceeds the 100-row review limit. Split the import into smaller worksheets; extra rows have not been reviewed.');
  for(let i=1;i<Math.min(values.length,102);i++){
   const cells=values[i]||[];if(!cells.some(v=>String(v??'').trim()))continue;
