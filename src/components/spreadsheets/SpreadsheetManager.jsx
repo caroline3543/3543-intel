@@ -14,6 +14,9 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   const [otp,setOtp]=useState('');
   const [otpSent,setOtpSent]=useState(false);
   const [connection,setConnection]=useState(null);
+  const [connectionChecking,setConnectionChecking]=useState(false);
+  const [connectionFeedback,setConnectionFeedback]=useState('');
+  const [connectionCheckedAt,setConnectionCheckedAt]=useState(null);
   const [previewRows,setPreviewRows]=useState(null);
   const [columnMapping,setColumnMapping]=useState({});
   const [previewAlliance,setPreviewAlliance]=useState('');
@@ -42,15 +45,30 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     setStatus('idle');setMessage('Signed in. You can now connect Google Sheets.');
   }
   async function refreshConnection() {
-    if(!supabase||!enabled)return;
+    if(!supabase||!enabled){setConnectionFeedback('Google Sheets integration is unavailable.');return;}
+    setConnectionChecking(true);
+    setConnectionFeedback('Checking saved Google connection…');
     try {
-      const {data:{session}}=await supabase.auth.getSession();
-      if(!session?.access_token){setConnection(null);return;}
+      const {data:{session},error:sessionError}=await supabase.auth.getSession();
+      if(sessionError||!session?.access_token){
+        setConnection(null);
+        setConnectionFeedback('Sign in first to check your Google connection.');
+        return;
+      }
       const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-status`,{headers:{
         Authorization:`Bearer ${session.access_token}`,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,
       }});
-      if(response.ok)setConnection(await response.json());
-    }catch {setConnection(null);}
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result.error||'Could not check connection status.');
+      setConnection(result);
+      setConnectionCheckedAt(new Date());
+      setConnectionFeedback(result.connected
+        ? 'Saved Google connection confirmed. This does not test Google API access.'
+        : 'No saved Google connection found. Connect your account to continue.');
+    }catch(error){
+      setConnection(null);
+      setConnectionFeedback('Status check failed: '+(error?.message||'Network error')+'. Please retry.');
+    }finally{setConnectionChecking(false);}
   }
   useEffect(()=>{
     if(!supabase)return;
@@ -335,8 +353,11 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16}}>
       <h3 style={{margin:'0 0 8px'}}>Sync status</h3>
-      {connection&&<p style={{color:'#A8C4D8',fontSize:14}}>Google account: {connection.connected?'Connected':'Not connected'}</p>}
-      <button type="button" onClick={refreshConnection} style={{background:'#1E3A52',color:'white',border:0,borderRadius:10,padding:12,minHeight:44,marginBottom:12}}>Refresh connection status</button>
+      <p style={{color:'#A8C4D8',fontSize:14}}>Google account: {connectionChecking?'Checking…':connection?(connection.connected?'Saved connection found':'Not connected'):'Not checked'}</p>
+      <button type="button" onClick={refreshConnection} disabled={connectionChecking||!enabled} aria-busy={connectionChecking} style={{background:'#1E3A52',color:'white',border:0,borderRadius:10,padding:12,minHeight:44,marginBottom:12,opacity:connectionChecking?0.65:1}}>{connectionChecking?'Checking connection…':'Refresh connection status'}</button>
+      {connectionFeedback&&<p role="status" aria-live="polite" style={{fontSize:14,color:'#A8C4D8',margin:'0 0 8px'}}>{connectionFeedback}</p>}
+      {connectionCheckedAt&&<p style={{fontSize:12,color:'#A8C4D8',margin:'0 0 8px'}}>Last checked: {connectionCheckedAt.toLocaleTimeString()}</p>}
+      {connection?.connectedAt&&<p style={{fontSize:12,color:'#A8C4D8',margin:'0 0 8px'}}>Google credentials saved: {new Date(connection.connectedAt).toLocaleString()}</p>}
       <p style={{margin:0,fontSize:14,color:'#A8C4D8'}}>No Google spreadsheet synchronisation is active. Changes made here are not sent to Google Sheets.</p>
     </section>
   </div>;
