@@ -52,7 +52,7 @@ export function planStateRosterImport({values,mapping,players,stateId,worksheetA
       if(raw.length>80){errors.push('Row '+row+': game language too long');continue;}
       extraFields[property]=raw;
     }else{
-      if(!/^\\d{1,12}$/.test(raw)){errors.push('Row '+row+': invalid '+columnName);continue;}
+      if(!/^\d{1,12}$/.test(raw)){errors.push('Row '+row+': invalid '+columnName);continue;}
       extraFields[property]=Number(raw);
     }
   }
