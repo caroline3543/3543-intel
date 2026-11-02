@@ -57,7 +57,7 @@ Deno.serve(async req=>{
    const allowed=kind==='Combat'?['Attack %','Defence %','Health %','Lethality %','Rally Capacity','March Capacity','Battle Role','Battle Type','Battle Report Date','Evidence URL']:['Event Type','Event Date UTC','Registered','Attendance Status','Assigned Team','Assigned Role','Assigned Building','Assignment Confirmed','Event Troop Power','Contribution'];
    if(Object.keys(entry).some(k=>!allowed.includes(k)))return response(req,{error:'Disallowed field'},400);
    if(kind==='Combat'&&!['Infantry','Lancer','Marksman'].includes(keyName))return response(req,{error:'Invalid troop type'},400);
-   if(kind==='Events'&&(!/^[A-Za-z0-9_-]{1,64}\|[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(keyName)))return response(req,{error:'An event ID and date are required'},400);
+   if(kind==='Events'&&(!/^[A-Za-z0-9_-]{1,64}\|[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(keyName)||!Number.isFinite(Date.parse(keyName.split('|')[1]+'T00:00:00Z'))||new Date(keyName.split('|')[1]+'T00:00:00Z').toISOString().slice(0,10)!==keyName.split('|')[1]))return response(req,{error:'An event ID and date are required'},400);
    if(Object.entries(entry).some(([k,v])=>typeof v==='number'?(!Number.isFinite(v)||v<0||v>1e12):(typeof v!=='string'||v.length>200)))return response(req,{error:'Invalid entry value'},400);
    const container=kind==='Combat'?'sheetCombat':'sheetEvents';
    const previous=player.data?.[container]?.[keyName]??null;
