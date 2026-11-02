@@ -3,12 +3,15 @@ import { supabase } from '../../services/supabaseClient.js';
 import { IMPORT_FIELDS, detectMapping, assessMapping } from '../../services/worksheetMappingPreview.js';
 import { planStateRosterImport } from '../../services/stateRosterImportPreview.js';
 import { previewSpecialWorksheet } from '../../services/specialWorksheetPreview.js';
+import { readStateSheet, saveStateSheet, clearStateSheet } from '../../services/stateSpreadsheetDefaults.js';
 
 /** Feature-gated setup screen. No Sheets writes and no browser OAuth secrets. */
 export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpdated }) {
   const [status,setStatus] = useState('idle');
   const [message,setMessage] = useState('');
-  const [spreadsheetId,setSpreadsheetId]=useState('');
+  const [spreadsheetId,setSpreadsheetId]=useState(()=>readStateSheet(stateId)||'');
+  const [savedSpreadsheetId,setSavedSpreadsheetId]=useState(()=>readStateSheet(stateId)||'');
+  const [refreshingSavedSheet,setRefreshingSavedSheet]=useState(false);
   const [sheetInfo,setSheetInfo]=useState(null);
   const [email,setEmail]=useState('');
   const [otp,setOtp]=useState('');
@@ -102,6 +105,35 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       setStatus('error');setMessage(error.message || 'Could not connect Google Sheets');
     }
   }
+  function saveDefaultSpreadsheet(){
+    try{
+      saveStateSheet(stateId,spreadsheetId);
+      setSavedSpreadsheetId(spreadsheetId.trim());
+      setMessage('Default spreadsheet saved for State '+stateId+'. It will load automatically when you return to this state.');
+    }catch(error){setMessage(error.message||'Could not save spreadsheet.');}
+  }
+  function removeDefaultSpreadsheet(){
+    clearStateSheet(stateId);
+    setSavedSpreadsheetId('');
+    setMessage('Default spreadsheet cleared for State '+stateId+'. No Google data was deleted.');
+  }
+  async function refreshSavedSpreadsheet(){
+    if(!savedSpreadsheetId||refreshingSavedSheet)return;
+    setRefreshingSavedSheet(true);
+    setSpreadsheetId(savedSpreadsheetId);
+    setSheetInfo(null);setPreviewRows(null);
+    setMessage('Refreshing worksheets from the saved Google spreadsheet…');
+    try{
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token)throw Error('Sign in before refreshing Google Sheets.');
+      const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-metadata`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({spreadsheetId:savedSpreadsheetId})});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(result.error||'Could not refresh Google Sheets.');
+      setSheetInfo(result);setStatus('ready');
+      setMessage('Worksheet list refreshed from Google. Select a worksheet to preview its latest rows before approving changes.');
+    }catch(error){setStatus('error');setMessage('Refresh failed: '+(error.message||'Unknown error'));}
+    finally{setRefreshingSavedSheet(false);}
+  }
   async function previewMetadata() {
     if(!enabled||!supabase)return;
     setStatus('loading');setMessage('');setSheetInfo(null);
@@ -153,7 +185,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         throw new Error(result.error||'Spreadsheet creation failed.');
       }
       setCreatedWorkbook(result);
-      if(result.spreadsheetId){setSpreadsheetId(result.spreadsheetId);setSheetInfo(null);setPreviewRows(null);setMessage('Workbook created. Its ID is ready below; select Preview worksheets to verify the new file.');}
+      if(result.spreadsheetId){setSpreadsheetId(result.spreadsheetId);setSheetInfo(null);setPreviewRows(null);setMessage('Workbook created. Its ID is ready below; save it as this state’s default if you want to keep using it.');}
     }catch(error){setMessage(error.message||'Spreadsheet creation failed.');}
     finally{setCreatingWorkbook(false);}
   }
@@ -289,6 +321,16 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
       <h3 style={{margin:'0 0 8px'}}>Find a spreadsheet</h3>
+      <div style={{border:'1px solid #36536B',borderRadius:12,padding:12,marginBottom:14}}>
+        <strong style={{color:'white'}}>State {stateId} default spreadsheet</strong>
+        <p style={{color:'#A8C4D8',fontSize:13,overflowWrap:'anywhere',margin:'8px 0'}}>{savedSpreadsheetId?`Saved: ${savedSpreadsheetId}`:'No spreadsheet saved for this state yet.'}</p>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+          <button type="button" onClick={saveDefaultSpreadsheet} disabled={!spreadsheetId.trim()||!enabled} style={button}>Save as state default</button>
+          <button type="button" onClick={refreshSavedSpreadsheet} disabled={!savedSpreadsheetId||refreshingSavedSheet||!signedInEmail} style={button}>{refreshingSavedSheet?'Refreshing…':'Pull / refresh from Google'}</button>
+          {savedSpreadsheetId&&<button type="button" onClick={removeDefaultSpreadsheet} style={button}>Clear default</button>}
+        </div>
+        <p style={{fontSize:12,color:'#A8C4D8',margin:'10px 0 0'}}>Saved on this device for this state. Refresh retrieves the current Google worksheet list; preview rows to review changes. App edits are not automatically written to Google yet.</p>
+      </div>
       <label htmlFor="spreadsheet-id" style={{display:'block',fontSize:14,color:'#A8C4D8',marginBottom:8}}>Google spreadsheet ID or URL</label>
       <input id="spreadsheet-id" type="text" value={spreadsheetId} onChange={e=>{
         const value=e.target.value;const found=value.match(new RegExp('spreadsheets/d/([A-Za-z0-9_-]+)'));
