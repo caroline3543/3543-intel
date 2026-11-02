@@ -15,4 +15,5 @@ test('Write preflight checks Google identity and proposed cells again',()=>{
  assert.ok(source.includes('unchanged=current===proposal.expected.trim()'));
  assert.ok(source.includes('Worksheet exceeds safe review limit'));
  assert.ok(source.includes('Duplicate proposed cell'));
+ assert.ok(source.includes('counts.get(fid)===1'));
 });
