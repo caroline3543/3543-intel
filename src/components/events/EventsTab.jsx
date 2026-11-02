@@ -658,17 +658,17 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
     <div style={{ padding:'16px 20px 0' }}>
       <WorkspaceIntro title="Events" description="Organise event schedules, attendance and team assignments." detail="Select an event to manage participants. Cloud backups are separate from local edits."/>
       <ImportedWorksheetIntel kind="Events" players={players} />
-      {activeEvent&&<div style={{margin:'8px 0 12px'}}>
+      {activeEvent&&<details style={{margin:'8px 0 12px',background:C.section,borderRadius:12,padding:12}}><summary style={{minHeight:44,fontSize:15,fontWeight:650,cursor:'pointer'}}>Cloud backup and restore options</summary><div style={{display:'flex',flexWrap:'wrap',gap:8,paddingTop:8}}> 
         <button type="button" disabled={cloudBackupBusy} onClick={backupEventToCloud} style={{minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>
           {cloudBackupBusy?'Checking cloud…':'Back up event to cloud'}
         </button>
-        <button type="button" disabled={cloudBackupBusy} onClick={restoreEventFromCloud} style={{marginLeft:8,minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>Restore cloud backup</button>
+        <button type="button" disabled={cloudBackupBusy} onClick={restoreEventFromCloud} style={{minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>Restore cloud backup</button>
         <button type="button" disabled={cloudBackupBusy} onClick={reviewSnapshotRestores} style={{marginLeft:8,minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>Review participant restores</button>
         {snapshotRestores.filter(p=>p.eventId===activeEvent.id).slice(0,30).map(p=><div key={p.playerId} style={{padding:'7px 0',fontSize:13,color:'#A8C4D8'}}>Participant: {players.find(x=>x.id===p.playerId)?.username||p.playerId} · Changes: {describeSnapshotChanges(p.localSnapshot,p.cloudSnapshot).join(', ')||'Other snapshot data'}
           <button type="button" disabled={cloudBackupBusy} onClick={()=>restoreOneSnapshot(p)} style={{marginLeft:8,minHeight:40,padding:'8px 12px',borderRadius:8,background:'#1E3A52',color:'white'}}>Restore snapshot</button>
         </div>)}
         <p style={{fontSize:12,color:'#A8C4D8'}}>Backup updates use cloud version checks. Restore replaces this device's event only after confirmation.</p>
-      </div>}
+      </div></details>}
       {(sheetMatches.proposals.length>0||sheetMatches.conflicts.length>0)&&<section style={{margin:'12px 0',padding:14,background:'#152236',borderRadius:12,border:'1px solid #36536B',color:'#A8C4D8'}}>
         <strong style={{color:'white'}}>Spreadsheet event matches</strong>
         <p style={{fontSize:12}}>Approved changes are saved in this device's event workspace. They are not backed up or synced to Supabase yet.</p>
