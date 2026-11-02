@@ -15,6 +15,9 @@ export function SpreadsheetManager({ onClose }) {
   const [previewRows,setPreviewRows]=useState(null);
   const [columnMapping,setColumnMapping]=useState({});
   const [signedInEmail,setSignedInEmail]=useState(null);
+  const [createState,setCreateState]=useState('');
+  const [createdWorkbook,setCreatedWorkbook]=useState(null);
+  const [creatingWorkbook,setCreatingWorkbook]=useState(false);
   const enabled = import.meta.env.VITE_ENABLE_GOOGLE_SHEETS === 'true';
   async function sendLoginCode() {
     if(!supabase)return;
@@ -108,6 +111,28 @@ export function SpreadsheetManager({ onClose }) {
       setPreviewRows({title,rows:data.rows});setColumnMapping(detectMapping(data.rows?.[0]||[]));setStatus('ready');
     }catch(e){setStatus('error');setMessage(e.message||'Worksheet preview failed');}
   }
+  async function createStateWorkbook() {
+    if(!supabase||!enabled||creatingWorkbook)return;
+    setCreatingWorkbook(true);setCreatedWorkbook(null);setMessage('');
+    try{
+      const stateId=createState.trim();
+      if(!/^\\d{1,5}$/.test(stateId)||Number(stateId)===0)throw new Error('Enter a valid state number.');
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token)throw new Error('Sign in first.');
+      const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-create-workbook`,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${session.access_token}`,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({stateId}),
+      });
+      const result=await response.json();
+      if(!response.ok){
+        if(result.spreadsheetUrl)setCreatedWorkbook(result);
+        throw new Error(result.error||'Spreadsheet creation failed.');
+      }
+      setCreatedWorkbook(result);
+    }catch(error){setMessage(error.message||'Spreadsheet creation failed.');}
+    finally{setCreatingWorkbook(false);}
+  }
   const button={background:'#F5A623',color:'#0A1628',border:'none',padding:'12px 16px',minHeight:48,borderRadius:12,fontSize:16,fontWeight:700,width:'100%',cursor:'pointer'};
   return <div style={{padding:20,minHeight:'60vh',color:'#fff'}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
@@ -134,6 +159,20 @@ export function SpreadsheetManager({ onClose }) {
       : <div role="status" style={{padding:12,border:'1px solid #5A7A94',borderRadius:10,color:'#A8C4D8',fontSize:14}}>Connection is not enabled in this build. Secure OAuth configuration and database migration must be completed first.</div>}
       {otpSent&&!signedInEmail&&<p style={{fontSize:13,color:'#A8C4D8'}}>If the email link opens another browser or the production app, copy the numeric code from the email and enter it here in this preview. Signing in on another domain does not share this preview’s session.</p>}
       {message&&<p role="alert" style={{fontSize:14,color:'#FFC5A8'}}>{message}</p>}
+    </section>
+    <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
+      <h3 style={{margin:'0 0 8px'}}>Create a state spreadsheet</h3>
+      <p style={{color:'#A8C4D8',fontSize:14,lineHeight:1.5}}>
+        One new Google workbook per state, with one tab per alliance. The app fills player IDs, usernames, alliance, furnace and available player statistics from the selected state's roster. Unverified fields stay empty.
+      </p>
+      <label htmlFor="create-workbook-state" style={{display:'block',color:'#A8C4D8',fontSize:14,marginBottom:6}}>State number</label>
+      <input id="create-workbook-state" inputMode="numeric" value={createState} onChange={e=>setCreateState(e.target.value)}
+        placeholder="e.g. 3573" style={{background:'#0A1628',border:'1px solid #5A7A94',borderRadius:10,padding:12,color:'white',width:'100%',fontSize:16,minHeight:48,marginBottom:10}}/>
+      <button type="button" style={button} disabled={!enabled||!signedInEmail||creatingWorkbook||!createState.trim()} onClick={createStateWorkbook}>
+        {creatingWorkbook?'Creating spreadsheet…':'Create spreadsheet'}
+      </button>
+      <p style={{color:'#A8C4D8',fontSize:12,margin:'10px 0 0'}}>Creates a new Google Sheets file in your connected Google account. Does not replace existing workbooks or change app data. Restricted to the app owner.</p>
+      {createdWorkbook?.spreadsheetUrl&&<p style={{fontSize:14,marginTop:12}}><a href={createdWorkbook.spreadsheetUrl} target="_blank" rel="noopener noreferrer" style={{color:'#F5A623'}}>Open created spreadsheet</a>{createdWorkbook.players!=null?` · ${createdWorkbook.players} players in ${createdWorkbook.alliances} alliance tabs`:''}</p>}
     </section>
     <section style={{background:'#152236',padding:18,borderRadius:16,marginBottom:14}}>
       <h3 style={{margin:'0 0 8px'}}>Find a spreadsheet</h3>
