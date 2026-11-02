@@ -7,7 +7,7 @@ export function proposeSheetEventPower({events=[],players=[]}){
   if(separator<1){conflicts.push({playerId:p.id,key,reason:'Missing event ID or date'});continue;}
   const eventId=key.slice(0,separator),date=key.slice(separator+1),event=byId.get(eventId);
   if(!event||String(event.date).slice(0,10)!==date){conflicts.push({playerId:p.id,key,reason:'Event ID/date not found'});continue;}
-  if(!['Foundry','Foundry Battle','Canyon Clash'].includes(String(event.type))){conflicts.push({playerId:p.id,key,reason:'Event type does not use troop power'});continue;}
+  if(!['Foundry','Canyon Clash'].includes(String(event.type))){conflicts.push({playerId:p.id,key,reason:'Event type does not use troop power'});continue;}
   if(!event.participantIds?.includes(p.id)){conflicts.push({playerId:p.id,key,reason:'Player is not an existing event participant'});continue;}
   const power=fields['Event Troop Power'];
   if(typeof power!=='number'||!Number.isFinite(power)||power<0||power>1e12)continue;
