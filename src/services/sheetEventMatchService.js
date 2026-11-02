@@ -13,7 +13,7 @@ export function proposeSheetEventPower({events=[],players=[]}){
   const snapshot=(event.snapshots||[]).find(s=>s.playerId===p.id);
   if(!snapshot){conflicts.push({playerId:p.id,key,reason:'Participant snapshot missing'});continue;}
   if(snapshot.troopPower!==null&&snapshot.troopPower!==undefined&&Number(snapshot.troopPower)!==power){conflicts.push({playerId:p.id,key,reason:'Existing event troop power differs'});continue;}
-  if(Number(snapshot.troopPower)===power)continue;
+  if(snapshot.troopPower!==null&&snapshot.troopPower!==undefined&&Number(snapshot.troopPower)===power)continue;
   proposals.push({eventId,playerId:p.id,playerName:p.username||p.fid,power,snapshotId:snapshot.snapshotId,key});
  }
  return {proposals,conflicts};
