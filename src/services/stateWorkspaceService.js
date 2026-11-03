@@ -1,3 +1,4 @@
+import { appStorage } from './rosterStorageService.js';
 const REGISTRY_KEY = 'svs_state_workspaces_v1';
 const LEGACY_KEYS = ['svs_rally_data', 'svs_battle_pool_v1', 'svs_live_rally_room_v2',
   'svs_castle_command_v1', 'svs_field_registry_custom_options', 'svs_field_registry_custom_hero_gens'];
@@ -28,7 +29,7 @@ export function initializeWorkspaces(storage) {
 }
 let bootRegistry;
 export function getWorkspaces() {
-  if (!bootRegistry) bootRegistry = initializeWorkspaces(localStorage);
+  if (!bootRegistry) bootRegistry = initializeWorkspaces(appStorage);
   return bootRegistry;
 }
 // Fixed for the lifetime of this page, including pending saves from old tabs.
@@ -38,7 +39,7 @@ export function stateStorageKey(base, stateId = activeStateId()) {
 }
 export function selectWorkspace(value) {
   const id = normalizeStateId(value);
-  const registry = initializeWorkspaces(localStorage);
+  const registry = initializeWorkspaces(appStorage);
   const next = { ...registry, activeStateId: id, states: [...new Set([...registry.states, id])] };
   localStorage.setItem(REGISTRY_KEY, JSON.stringify(next));
   // A complete reload clears every open player, filter, timer and pending preview.
