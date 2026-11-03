@@ -2,7 +2,7 @@ import { TalPollList } from './TalPollList.jsx';
 import { useState } from 'react';
 import { newSnapshot } from '../../data/playerSchema.js';
 import { C } from '../../utils/constants.js';
-import { talConfig, suggestTalTeams, assignTalBuildings, teamWarnings, strength, moveTalMember } from '../../services/talPlanner.js';
+import { talConfig, suggestTalTeams, assignTalBuildings, teamWarnings, strength, moveTalMember, meetsTalAvailability, talAvailabilityConflicts } from '../../services/talPlanner.js';
 const box = { background:C.section, border:`1px solid ${C.border}`, borderRadius:14, padding:16, marginBottom:12 };
 const button = { minHeight:44, borderRadius:10, border:`1px solid ${C.border}`, background:C.card, color:C.icy, padding:'8px 12px', fontSize:16, cursor:'pointer' };
 const input = { ...button, width:'100%', boxSizing:'border-box', background:C.bg };
@@ -32,7 +32,7 @@ export function TalPlanner({ event, players, onUpdate }) {
     <h2 style={{color:C.white,fontSize:24,margin:'0 0 12px'}}>{({Availability:'When can players join?',Legions:'Build your legions',Buildings:'Plan the first moves',Review:'Review your plan'})[step]}</h2>
     <div aria-label="Planning progress" style={{display:'flex',gap:6,marginBottom:20}}>{steps.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:4,background:i<=steps.indexOf(step)?C.gold:C.border}} />)}</div>
     {step==='Availability' && <>
-      <p style={{color:C.icy}}>Add players under every time they can attend. The same person can appear at several times. We’ll count them once when building legions.</p>
+      <p style={{color:C.icy}}>Add players under every time they can attend. The same person can appear at several times. Each player needs at least two available times to join a legion.</p>
       <details style={{marginBottom:16,color:C.icy}}><summary style={{minHeight:44,cursor:'pointer'}}>Change poll times</summary>
       <label style={{color:C.icy}}>Battle time options (HH:MM, separated by commas)<input disabled={config.locked} style={input} value={slotDraft} onChange={e=>setSlotDraft(e.target.value)} /></label>
       <button disabled={config.locked} style={button} onClick={()=>{
@@ -49,16 +49,17 @@ export function TalPlanner({ event, players, onUpdate }) {
       <TalPollList pollKey="interested" config={config} players={players} onSave={save} />
     </>}
     {step==='Legions' && <>
-      <p style={{color:C.icy}}>Group players by shared availability. Each legion needs three possible battle times; the game confirms the actual time later.</p>
+      <p style={{color:C.icy}}>Group players by shared availability. Players need at least two matching times. Each legion needs three possible battle times; the game confirms the actual time later.</p>
       <button disabled={config.locked || !config.hostTags.length || config.teams.length>0} style={{...button,color:C.gold}} onClick={()=>{save({teams:suggestTalTeams(config,players,event)});setMessage('Draft legions created. Review times, roles and attendance.');}}>Auto-sort into legions</button>
       {config.teams.length > 0 && <details style={{color:C.icy,marginTop:12}}><summary style={{minHeight:44,cursor:'pointer'}}>Start over</summary><p>Clear legions to run auto-sort again. Availability answers are kept.</p><button disabled={config.locked || !config.teams.length} style={button} onClick={()=>{if(clearArmed){save({teams:[]});setClearArmed(false);}else{setClearArmed(true);setMessage('Tap Clear draft legions again to remove team assignments. Poll responses are kept.');}}}>Clear legions</button></details>}
       <p style={{color:C.icy}}>{selected.size} assigned · {players.filter(p=>(config.availability[p.id]||[]).length&&!selected.has(p.id)).length} available players unassigned</p>
+      {config.teams.length>0 && players.filter(p=>!selected.has(p.id)&&(config.availability[p.id]||[]).length>0).map(p=><p key={p.id} style={{color:C.gold}}>{name(p.id)} · unassigned. {(config.availability[p.id]||[]).length<2?'Record at least two available times.':'Needs a legion with two matching times and a free place.'}</p>)}
       {config.teams.map(team=><div key={team.id} style={box}>
         <h3 style={{color:C.white}}>[{team.host}] Legion {team.legion}</h3>
         <p style={{color:C.icy}}>{team.members.filter(m=>m.role==='combatant').length}/30 combatants · {team.members.filter(m=>m.role==='substitute').length}/20 substitutes</p>
         <p style={{color:C.icy}}>Possible battle times · choose 3</p>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{config.slots.map(s=><label key={s} style={button}><input type="checkbox" disabled={config.locked} checked={team.slots.includes(s)} onChange={e=>{if(e.target.checked&&team.slots.length>=3){setMessage('Each legion can select three times. Remove one to choose another.');return;}updateTeam(team.id,{slots:e.target.checked?[...team.slots,s]:team.slots.filter(t=>t!==s)});}} /> {s}</label>)}</div>
-        {teamWarnings(team,config).map(w=><p key={w} style={{color:C.gold}}>{w}</p>)}
+        {teamWarnings(team,config,players).map(w=><p key={w} style={{color:C.gold}}>{w}</p>)}
         <details style={{color:C.icy}}><summary style={{minHeight:44,cursor:'pointer'}}>Review players · {team.members.length}</summary>
         {team.members.map(m=><div key={m.id} style={{borderTop:`1px solid ${C.border}`,padding:'10px 0'}}>
           <div style={{color:C.white}}>{name(m.id)} [{players.find(p=>p.id===m.id)?.allianceTag||'—'}]</div>
@@ -68,7 +69,7 @@ export function TalPlanner({ event, players, onUpdate }) {
           <button disabled={config.locked} style={button} onClick={()=>updateTeam(team.id,{members:team.members.filter(x=>x.id!==m.id),assignments:{}})}>Remove from legion</button>
         </div>)}
         </details>
-        <select aria-label={`Add player to ${team.id}`} style={input} value="" disabled={config.locked} onChange={e=>{const id=e.target.value;if(!id)return;const role=team.members.filter(m=>m.role==='combatant').length<30?'combatant':'substitute';if(team.members.length>=50){setMessage('Legion is full.');return;}updateTeam(team.id,{members:[...team.members,{id,role}],assignments:{}});}}><option value="">Add an unassigned player…</option>{players.filter(p=>!selected.has(p.id)).map(p=><option key={p.id} value={p.id}>{name(p.id)} [{p.allianceTag}]</option>)}</select>
+        <select aria-label={`Add player to ${team.id}`} style={input} value="" disabled={config.locked} onChange={e=>{const id=e.target.value;if(!id)return;if(!meetsTalAvailability(players.find(p=>p.id===id),team.slots,config)){setMessage('This player needs at least two matching times in this legion.');return;}const role=team.members.filter(m=>m.role==='combatant').length<30?'combatant':'substitute';if(team.members.length>=50){setMessage('Legion is full.');return;}updateTeam(team.id,{members:[...team.members,{id,role}],assignments:{}});}}><option value="">Add an unassigned player…</option>{players.filter(p=>!selected.has(p.id)).map(p=><option key={p.id} value={p.id}>{name(p.id)} [{p.allianceTag}]</option>)}</select>
       </div>)}
     </>}
     {step==='Buildings' && <>
@@ -94,22 +95,22 @@ export function TalPlanner({ event, players, onUpdate }) {
         <h3 style={{color:C.white}}>[{team.host}] Legion {team.legion}</h3>
         <p style={{color:C.icy}}>{team.members.filter(m=>m.role==='combatant').length} combatants · {team.members.filter(m=>m.role==='substitute').length} substitutes</p>
         <p style={{color:C.icy}}>Possible times: {team.slots.join(', ')} UTC</p>
-        {teamWarnings(team,config).map(w=><p key={w} style={{color:C.gold}}>{w}</p>)}
+        {teamWarnings(team,config,players).map(w=><p key={w} style={{color:C.gold}}>{w}</p>)}
         <label style={{color:C.icy}}>Confirmed match time<select disabled={config.locked} style={input} value={team.matchTime||''} onChange={e=>updateTeam(team.id,{matchTime:e.target.value})}><option value="">Not announced yet</option>{team.slots.map(t=><option key={t} value={t}>{t} UTC</option>)}</select></label>
         <p style={{color:C.icy,fontSize:14}}>Leave blank until the game announces the match time.</p>
         <button style={button} onClick={()=>exportPlan(team)}>Copy legion plan</button>
       </div>)}
-      {config.locked ? <><p style={{color:C.green}}>Plan locked</p><button style={button} onClick={()=>onUpdate({...event,tal:{...config,locked:false}})}>Unlock plan</button></> : <button style={{...button,color:C.gold}} onClick={()=>{if(!armed){setArmed(true);return;}onUpdate({...event,tal:{...config,locked:true}});setArmed(false);}}>{armed?'Confirm lock':'Lock plan'}</button>}
+      {config.locked ? <><p style={{color:C.green}}>Plan locked</p><button style={button} onClick={()=>onUpdate({...event,tal:{...config,locked:false}})}>Unlock plan</button></> : <button style={{...button,color:C.gold}} onClick={()=>{if(config.teams.some(t=>talAvailabilityConflicts(t,config,players).length)){setMessage('Resolve availability conflicts before locking the plan.');return;}if(!armed){setArmed(true);return;}onUpdate({...event,tal:{...config,locked:true}});setArmed(false);}}>{armed?'Confirm lock':'Lock plan'}</button>}
     </>}
     {movePlayer && <div role="dialog" aria-modal="true" aria-label="Move or swap player" style={{...box,position:'fixed',inset:'10% 0 auto',margin:'0 auto',width:'calc(100% - 32px)',maxWidth:448,maxHeight:'80vh',overflowY:'auto',boxSizing:'border-box',zIndex:400,boxShadow:`0 0 0 100vmax ${C.bg}ee`}}>
       <h3 style={{color:C.white}}>Move {name(movePlayer)}</h3>
       <label style={{color:C.icy}}>Destination legion<select style={input} value={moveTarget} onChange={e=>setMoveTarget(e.target.value)}><option value="">Choose a legion</option>{config.teams.filter(t=>!t.members.some(m=>m.id===movePlayer)).map(t=><option key={t.id} value={t.id}>[{t.host}] Legion {t.legion}</option>)}</select></label>
-      {moveTarget&&<><button style={button} onClick={()=>{try{save({teams:moveTalMember(config.teams,movePlayer,moveTarget)});setMovePlayer(null);setMessage('Player moved. Review their availability in the new legion.');}catch(e){setMessage(e.message);}}}>Move to this legion</button><label style={{display:'block',color:C.icy,marginTop:12}}>Or swap with<select style={input} value="" onChange={e=>{if(!e.target.value)return;try{save({teams:moveTalMember(config.teams,movePlayer,moveTarget,e.target.value)});setMovePlayer(null);setMessage('Players swapped. Review their availability.');}catch(e){setMessage(e.message);}}}><option value="">Choose a player to swap</option>{config.teams.find(t=>t.id===moveTarget)?.members.map(m=><option key={m.id} value={m.id}>{name(m.id)} · {m.role}</option>)}</select></label></>}
+      {moveTarget&&<><button style={button} onClick={()=>{try{save({teams:moveTalMember(config.teams,movePlayer,moveTarget,null,config,players)});setMovePlayer(null);setMessage('Player moved. Review their availability in the new legion.');}catch(e){setMessage(e.message);}}}>Move to this legion</button><label style={{display:'block',color:C.icy,marginTop:12}}>Or swap with<select style={input} value="" onChange={e=>{if(!e.target.value)return;try{save({teams:moveTalMember(config.teams,movePlayer,moveTarget,e.target.value,config,players)});setMovePlayer(null);setMessage('Players swapped. Review their availability.');}catch(e){setMessage(e.message);}}}><option value="">Choose a player to swap</option>{config.teams.find(t=>t.id===moveTarget)?.members.map(m=><option key={m.id} value={m.id}>{name(m.id)} · {m.role}</option>)}</select></label></>}
       <button style={button} onClick={()=>setMovePlayer(null)}>Cancel</button>
     </div>}
     <div style={{display:'flex',gap:10,marginTop:20}}>
       {step!=='Availability' && <button style={button} onClick={()=>go(steps[steps.indexOf(step)-1])}>Back</button>}
-      {step!=='Review' && <button disabled={step==='Availability'?!players.some(p=>(config.availability[p.id]||[]).length):!config.teams.some(t=>t.members.length)} style={{...button,flex:1,background:C.gold,color:C.bg,fontWeight:700}} onClick={()=>go(steps[steps.indexOf(step)+1])}>{({Availability:'Next: build legions',Legions:'Next: assign buildings',Buildings:'Next: review plan'})[step]}</button>}
+      {step!=='Review' && <button disabled={step==='Availability'?!players.some(p=>(config.availability[p.id]||[]).length>=2):!config.teams.some(t=>t.members.length)||(step==='Legions'&&config.teams.some(t=>t.members.length&&(t.slots.length!==3||talAvailabilityConflicts(t,config,players).length>0)))} style={{...button,flex:1,background:C.gold,color:C.bg,fontWeight:700}} onClick={()=>go(steps[steps.indexOf(step)+1])}>{({Availability:'Next: build legions',Legions:'Next: assign buildings',Buildings:'Next: review plan'})[step]}</button>}
     </div>
     {message&&<p role="status" style={{color:C.gold}}>{message}</p>}
     {exportText&&<textarea aria-label="Copyable message" readOnly value={exportText} style={{...input,minHeight:180,marginTop:12}} />}

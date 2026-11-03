@@ -7,6 +7,12 @@ export function strength(player, event) {
   const snap = event.snapshots?.find(s => s.playerId === player.id);
   return Number(snap?.troopPower || 0);
 }
+export function meetsTalAvailability(player, slots, config) {
+  return !!player && slots.filter(s => (config.availability[player.id] || []).includes(s)).length >= 2;
+}
+export function talAvailabilityConflicts(team, config, players = []) {
+  return team.members.filter(m => !meetsTalAvailability({id:m.id}, team.slots, config));
+}
 export function candidateTeams(config) {
   return config.hostTags.flatMap(tag => [1, 2].map(legion => ({ id: `${tag}:${legion}`, host: tag, legion, matchTime: '', slots: [], members: [], buildings: [...TAL_BUILDINGS], assignments: {} })));
 }
@@ -17,9 +23,9 @@ export function suggestTalTeams(config, players, event) {
   const remaining = new Set(pool.map(p => p.id));
   return candidateTeams(config).map(team => {
     const combos = config.slots.flatMap((a,i) => config.slots.slice(i+1).flatMap((b,j) => config.slots.slice(i+j+2).map(c => [a,b,c])));
-    const score = slots => pool.filter(p => remaining.has(p.id)).reduce((n,p) => n + (slots.every(s => config.availability[p.id].includes(s)) ? 100 : slots.filter(s => config.availability[p.id].includes(s)).length),0);
+    const score = slots => pool.filter(p => remaining.has(p.id)).reduce((n,p) => n + (!meetsTalAvailability(p,slots,config) ? 0 : slots.every(s => config.availability[p.id].includes(s)) ? 100 : slots.filter(s => config.availability[p.id].includes(s)).length),0);
     const slots = combos.sort((a,b) => score(b)-score(a))[0] || [];
-    const ranked = pool.filter(p => remaining.has(p.id) && slots.some(s => config.availability[p.id].includes(s))).sort((a,b) => {
+    const ranked = pool.filter(p => remaining.has(p.id) && meetsTalAvailability(p,slots,config) && slots.some(s => config.availability[p.id].includes(s))).sort((a,b) => {
       const overlap = p => slots.filter(s => config.availability[p.id].includes(s)).length;
       return overlap(b)-overlap(a) || strength(b,event)-strength(a,event) || a.id.localeCompare(b.id);
     }).slice(0,50);
@@ -32,7 +38,7 @@ export function assignTalBuildings(team, players, event) {
   // First eight are leaders in priority order; distribute followers evenly.
   return Object.fromEntries(team.buildings.map((building,i) => [building, [ranked[i], ...ranked.slice(8).filter((_,j) => j%8 === i)].filter(Boolean).map(p => p.id)]));
 }
-export function teamWarnings(team, config) {
+export function teamWarnings(team, config, players = []) {
   const warnings = [];
   if (team.slots.length !== 3) warnings.push('Select exactly three battle times.');
   if (team.members.length < 15) warnings.push('At least 15 registered players needed.');
@@ -40,17 +46,20 @@ export function teamWarnings(team, config) {
   if (team.members.filter(m => m.role === 'substitute').length > 20) warnings.push('Maximum 20 substitutes.');
   const conflicts = team.members.filter(m => !team.slots.every(s => (config.availability[m.id] || []).includes(s))).length;
   if (conflicts) warnings.push(`${conflicts} players cannot confirm every selected time.`);
+  const conflictCount = talAvailabilityConflicts(team,config,players).length;
+  if (conflictCount) warnings.push(`${conflictCount} players need availability at two of these three times.`);
   return warnings;
 }
 
 // Apply a move or swap in one update so neither roster can lose a player.
-export function moveTalMember(teams, playerId, targetId, swapId = null) {
+export function moveTalMember(teams, playerId, targetId, swapId = null, config = null, players = []) {
   const source = teams.find(t => t.members.some(m => m.id === playerId));
   const target = teams.find(t => t.id === targetId);
   if (!source || !target || source.id === target.id) throw new Error('Choose another legion.');
   const member = source.members.find(m => m.id === playerId);
   const swapped = swapId ? target.members.find(m => m.id === swapId) : null;
   if (swapId && !swapped) throw new Error('Choose a player in the destination legion.');
+  if (config && (!meetsTalAvailability(players.find(p=>p.id===playerId),target.slots,config) || (swapped && !meetsTalAvailability(players.find(p=>p.id===swapId),source.slots,config)))) throw new Error('Players must be available for at least two of the destination legion’s three times.');
   const role = swapped?.role || (target.members.filter(m => m.role === member.role).length < (member.role === 'combatant' ? 30 : 20) ? member.role : member.role === 'combatant' ? 'substitute' : 'combatant');
   if (!swapped && target.members.filter(m => m.role === role).length >= (role === 'combatant' ? 30 : 20)) throw new Error('This legion is full. Swap with a player instead.');
   return teams.map(t => t.id === source.id ? {...t, assignments:{}, members: swapped ? t.members.map(m => m.id === playerId ? {...swapped,role:member.role} : m) : t.members.filter(m => m.id !== playerId)} : t.id === target.id ? {...t, assignments:{}, members: swapped ? t.members.map(m => m.id === swapId ? {...member,role:swapped.role} : m) : [...t.members,{...member,role}]} : t);

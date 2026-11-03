@@ -20,9 +20,9 @@ test('strongest leaders respect building priority; followers unique in their leg
  const ids=Object.values(assignments).flat();assert.equal(ids.length,30);assert.equal(new Set(ids).size,30);
  assert.ok(!ids.some(id=>team.members.find(m=>m.id===id).role==='substitute'));
 });
-test('partial overlap produces an explicit attendance warning',()=>{
+test('one-time availability remains unassigned',()=>{
  const cfg={...config,availability:{'0':['02:00']}};const team=suggestTalTeams(cfg,players,event)[0];
- assert.ok(teamWarnings(team,cfg).some(w=>w.includes('cannot confirm')));
+ assert.equal(team.members.length,0);
 });
 test('combination search finds full overlap at later slots',()=>{
  const cfg={...config,availability:Object.fromEntries(players.slice(0,20).map(p=>[p.id,['12:00','14:00','19:00']]))};
@@ -58,4 +58,32 @@ test('full legion rejects move but supports swap preserving role capacities',()=
  const ids=result.flatMap(t=>t.members.map(m=>m.id));assert.equal(ids.length,new Set(ids).size);
  assert.equal(result[1].members.filter(m=>m.role==='combatant').length,30);
  assert.equal(result[1].members.filter(m=>m.role==='substitute').length,20);
+});
+
+import { meetsTalAvailability,talAvailabilityConflicts } from '../src/services/talPlanner.js';
+test('every auto-assigned combatant and substitute has at least two of three times',()=>{
+ const cfg={...config,availability:Object.fromEntries(players.map((p,i)=>[p.id,i%3===0?['02:00']:i%3===1?['07:00','19:00']:['02:00','12:00','14:00']]))};
+ const teams=suggestTalTeams(cfg,players,event);
+ teams.forEach(t=>t.members.forEach(m=>assert.ok(meetsTalAvailability({id:m.id},t.slots,cfg))));
+ assert.ok(teams.flatMap(t=>t.members).every(m=>Number(m.id)%3!==0));
+});
+test('exactly two matches are accepted and one is rejected for every rank',()=>{
+ for(const rank of [1,50,51,null]){
+ const p={id:'x',providerRankings:{labyrinth:{rank}}};
+ assert.equal(meetsTalAvailability(p,['02:00','07:00','12:00'],{availability:{x:['02:00','07:00']}}),true);
+ assert.equal(meetsTalAvailability(p,['02:00','07:00','12:00'],{availability:{x:['02:00']}}),false);
+ }
+});
+test('manual moves and both sides of swaps obey the two-time rule',()=>{
+ const teams=[{id:'a',slots:['02:00','07:00','12:00'],members:[{id:'x',role:'combatant'}]},{id:'b',slots:['12:00','14:00','19:00'],members:[{id:'y',role:'combatant'}]}];
+ const people=[{id:'x'},{id:'y'}];
+ const cfg={availability:{x:['02:00','07:00','12:00'],y:['12:00','14:00','19:00']}};
+ assert.throws(()=>moveTalMember(teams,'x','b',null,cfg,people),/at least two/);
+ cfg.availability.x.push('14:00');
+ assert.throws(()=>moveTalMember(teams,'x','b','y',cfg,people),/at least two/);
+ cfg.availability.y.push('07:00');
+ assert.equal(moveTalMember(teams,'x','b','y',cfg,people)[1].members[0].id,'x');
+});
+test('existing invalid plans surface conflicts without requiring rank data',()=>{
+ assert.equal(talAvailabilityConflicts({slots:['02:00','07:00','12:00'],members:[{id:'x'}]},{availability:{x:['02:00']}}).length,1);
 });
