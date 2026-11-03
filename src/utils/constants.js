@@ -75,6 +75,7 @@ export const FC_BADGE_IMAGES = {
 // created by the alliance itself and stored in app data, not here.
 
 export const EVENT_ICONS = {
+  'Tundra Arms League':        '⚔️',
   'Foundry':                  '🔥',
   'Canyon Clash':              '🏔️',
   'Bear Trap':                 '🐻',
@@ -140,7 +141,7 @@ export const TEAM_ROLES = [
 
 export const EVENT_TYPES = [
   'SvS Castle Battle', 'Internal Sunfire Castle',
-  'Foundry', 'Canyon Clash', 'Bear Trap',
+  'Foundry', 'Canyon Clash', 'Tundra Arms League', 'Bear Trap',
   'Transfer Season', 'Custom',
 ];
 
