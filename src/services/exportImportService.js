@@ -1,6 +1,8 @@
 import { mergeAllianceWatches } from "./allianceWatchService.js";
 import { mergeObservationHistory } from './playerObservationService.js';
 import { activeStateId, stateStorageKey } from './stateWorkspaceService.js';
+import { appStorage, flushRosterStorage } from './rosterStorageService.js';
+export { flushRosterStorage };
 const CURRENT_VERSION = '3.1.0';
 const STORAGE_KEY = () => stateStorageKey('svs_rally_data');
 
@@ -9,12 +11,7 @@ export function saveToStorage(data, throwOnError = false) {
     const toSave = { ...data, lastUpdated: new Date().toISOString() };
     const serialized = JSON.stringify(toSave);
 
-    // Warn if approaching 4MB (browser limit is ~5MB)
-    if (serialized.length > 4_000_000) {
-      console.warn(`[App] localStorage approaching limit: ${(serialized.length / 1_000_000).toFixed(1)}MB`);
-    }
-
-    localStorage.setItem(STORAGE_KEY(), serialized);
+    appStorage.setItem(STORAGE_KEY(), serialized);
     return toSave;
   } catch (e) {
     if (e.name === 'QuotaExceededError' || e.code === 22) {
@@ -31,7 +28,7 @@ export function saveToStorage(data, throwOnError = false) {
 
 export function loadFromStorage(defaultData) {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY());
+    const stored = appStorage.getItem(STORAGE_KEY());
     if (stored) { const data = migrateIfNeeded(JSON.parse(stored)); return { ...data, settings: { ...data.settings, stateId: activeStateId() } }; }
   } catch (e) {
     console.warn('Failed to load from localStorage', e);
