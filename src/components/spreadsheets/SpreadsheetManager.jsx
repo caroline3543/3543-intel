@@ -512,7 +512,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         <p style={{fontSize:12,color:'#A8C4D8',overflowWrap:'anywhere'}}>Review fingerprint: {exportReceipt.hash.slice(0,16)}</p>
         <p style={{fontSize:12,color:'#A8C4D8'}}>Checked at {new Date(exportReceipt.reviewedAt).toLocaleString()}. Recheck Google before any future write.</p>
         <button type="button" onClick={recordVerifiedExportReview} disabled={recordingExportReview||!!recordedExportReview} style={{...secondaryButton,minHeight:44}}>{recordingExportReview?'Rechecking and recording…':recordedExportReview?'Review recorded':'Save read-only review record'}</button>
-        {recordedExportReview&&<p role="status" style={{fontSize:13,color:'#A8C4D8'}}>Recorded in Supabase · {recordedExportReview.id}. This is an audit record, not approval to write.</p>
+        {recordedExportReview&&<p role="status" style={{fontSize:13,color:'#A8C4D8'}}>Recorded in Supabase · {recordedExportReview.id}. This is an audit record, not approval to write.</p>}
         {recordedExportReview&&<button type="button" disabled={approvingExportReview||!!exportApproval} onClick={approveReadOnlyReview} style={{...secondaryButton,minHeight:44,marginTop:8}}>{approvingExportReview?'Rechecking Google and approving…':exportApproval?'Approval recorded':'Approve reviewed changes (no Google write)'}</button>}
         {exportApproval&&<p role="status" style={{fontSize:13,color:'#A8C4D8'}}>Approval recorded. Expires {new Date(exportApproval.expires_at).toLocaleString()}. No Google changes were made.</p>}}
       </section>}
