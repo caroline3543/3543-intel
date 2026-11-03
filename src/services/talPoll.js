@@ -36,3 +36,14 @@ export function removePollPlayer(config,key,id) {
   const times=(config.availability[id]||[]).filter(t=>t!==key);
   return {availability:{...config.availability,[id]:times},interestedIds:times.length?(config.interestedIds||[]):[...new Set([...(config.interestedIds||[]),id])]};
 }
+
+export function talPollResultsText(config,players) {
+  const label=p=>`${p.username||p.alias||p.fid||p.id}${p.fid?` · ${p.fid}`:''}${p.allianceTag?` [${p.allianceTag}]`:''}`;
+  const sorted=[...players].sort((a,b)=>label(a).localeCompare(label(b)));
+  const available=sorted.filter(p=>(config.availability[p.id]||[]).length);
+  const pending=sorted.filter(p=>(config.interestedIds||[]).includes(p.id)&&!(config.availability[p.id]||[]).length);
+  const lines=['TUNDRA ARMS LEAGUE · POLL RESULTS',`${available.length} players with availability · ${pending.length} interested, awaiting times`,'Players may appear under more than one time.',''];
+  for(const slot of config.slots){const list=sorted.filter(p=>(config.availability[p.id]||[]).includes(slot));lines.push(`${slot} UTC · ${list.length}`,list.length?list.map(label).join('\n'):'No responses yet','');}
+  lines.push(`INTERESTED · AVAILABILITY PENDING · ${pending.length}`,pending.length?pending.map(label).join('\n'):'None');
+  return lines.join('\n');
+}

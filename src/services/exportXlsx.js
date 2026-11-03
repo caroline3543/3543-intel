@@ -14,6 +14,7 @@
  */
 
 import * as XLSX from 'xlsx';
+import { ROSTER_HEADERS, rosterExportRow } from './rosterExportRows.js';
 import { JOINER_COVERAGE_EVENTS, SHOWS_RSVP_TYPES } from '../utils/constants.js';
 import { buildEarlyHeliosSummary } from './heliosSummary.js';
 import { buildRosterDataSheet, buildEventsDataSheet, buildPlansDataSheet, buildRolesDataSheet } from './xlsxDataSheets.js';
@@ -219,76 +220,14 @@ function leaderHeroesText(p) {
 // rest. Everything not shown here (country, languages, full role list,
 // player ID, last-updated) still lives in the hidden Roster Data sheet
 // for re-import; this pretty sheet is just for reading.
-function buildRosterSheet(players) {
-  const groups = groupByAllianceStrongest(players);
-
-  const allJoiners = [...new Set(
-    players.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
-  )].sort();
-
-  const headers = ['State', 'FID', 'Power (API)', 'Kills (API)', 'Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
-  const rows = [headers.map(hdr)];
-
-  // Alternates across the WHOLE sheet, not reset per alliance group —
-  // a group boundary landing on an even/odd row shouldn't cause two
-  // same-styled rows to sit next to each other right after a subheader.
-  let rowIndex = 0;
-
-  groups.forEach(group => {
-    rows.push([
-      cell(`⚑ ${group.label} (${group.players.length})`, SUBHEADER_STYLE),
-      ...Array(headers.length - 1).fill(null).map(() => cell('', SUBHEADER_STYLE)),
-    ]);
-
-    group.players.forEach(p => {
-      const style = rowIndex % 2 === 0 ? ROW_STYLE : ALT_ROW_STYLE;
-      rowIndex++;
-      const isLead = p.roles?.includes('Rally Lead');
-      const flags = `${isLead ? '👑' : ''}${heliosFlag(p)}`;
-      const displayName = p.username || p.alias || '';
-      const nameCell = flags ? `${flags} ${displayName}` : displayName;
-      const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
-
-      rows.push([
-        cell(nameCell, style),
-        cell(p.furnaceLevel || '', style),
-        cell(p.allianceTag || '', style),
-        cell(p.troops?.infantry || '', style),
-        cell(p.troops?.lancer || '', style),
-        cell(p.troops?.marksman || '', style),
-        cell(isLead ? leaderHeroesText(p) : '', style),
-        ...allJoiners.map(h => owned.has(h) ? cell('✓', YES_STYLE) : cell('', style)),
-        cell(owned.size, owned.size >= 3 ? YES_STYLE : owned.size >= 1 ? GOLD_STYLE : NO_STYLE),
-      ]);
-    });
-  });
-
-  // Coverage totals row — same "how many people have this hero"
-  // summary the old standalone Joiner Coverage sheet had.
-  if (allJoiners.length > 0) {
-    rows.push([]);
-    rows.push([
-      cell('COVERAGE', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      cell('', SUBHEADER_STYLE),
-      ...allJoiners.map(h => {
-        const count = players.filter(p => (p.joinerHeroes || []).some(jh => jh.hero === h && jh.skillLevel >= 5)).length;
-        return cell(count, count === 0 ? NO_STYLE : count < 3 ? GOLD_STYLE : YES_STYLE);
-      }),
-      cell('', SUBHEADER_STYLE),
-    ]);
-  }
-
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  const baseWidths = [22, 9, 10, 9, 9, 9, 30];
-  const heroWidths = allJoiners.map(() => 10);
-  setColWidths(ws, [...baseWidths, ...heroWidths, 14]);
-  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
-  autoFilter(ws, `A1:${XLSX.utils.encode_col(headers.length - 1)}1`);
+export function buildRosterSheet(players, data = {}) {
+  const ordered=groupByAllianceStrongest(players).flatMap(g=>g.players);
+  const rows=[ROSTER_HEADERS.map(hdr),...ordered.map((p,i)=>rosterExportRow(p,data).map(value=>cell(value,i%2?ALT_ROW_STYLE:ROW_STYLE)))];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  setColWidths(ws,[10,14,24,18,24,18,14,16,18,20,20,20,24,24,24,24,28,24,28,24,48,48]);
+  ws['!freeze']={xSplit:0,ySplit:1};
+  autoFilter(ws,`A1:${XLSX.utils.encode_col(ROSTER_HEADERS.length-1)}${rows.length}`);
+  for(let r=1;r<rows.length;r++) for(const c of [5,7,8,12,14,16,18]) {const address=XLSX.utils.encode_cell({r,c});if(ws[address]?.t==='n') ws[address].z='#,##0';}
   return ws;
 }
 
@@ -545,7 +484,7 @@ function buildCoverSheet(data, rosterCount = null, authorNote = '') {
     [cell('Questions about this file? Contact Caroline.', { font: { bold: true, sz: 11, name: 'Arial', color: { rgb: 'F5A623' } } })],
     [],
     [cell('Sheets in this file:', SUBHEADER_STYLE)],
-    [cell('• Roster', ROW_STYLE), cell('Name, furnace, alliance, troop tiers, Rally Leader preset heroes, and joiner hero coverage (✓ per hero)', ROW_STYLE)],
+    [cell('• Roster', ROW_STYLE), cell('Player identity, roles, power, Labyrinth, troop levels, latest event troop power with recorded dates, and heroes', ROW_STYLE)],
     [cell('• [Event sheets]', ROW_STYLE), cell('One sheet per event — attendance, Discord, performance', ROW_STYLE)],
     [],
     [cell('Name flags:', SUBHEADER_STYLE)],
@@ -587,55 +526,11 @@ export function exportRosterCsv(data, options = {}) {
     : (data.players || []);
   const groups = groupByAllianceStrongest(scopedPlayers);
 
-  const allJoiners = [...new Set(
-    scopedPlayers.flatMap(p => (p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero))
-  )].sort();
-
-  const headers = ['State', 'FID', 'Power (API)', 'Kills (API)', 'Name', 'Furnace', 'Alliance', 'Infantry', 'Lancer', 'Marksman', 'Rally Leader Heroes', ...allJoiners, 'Total Joiner Heroes'];
-
   function escapeCsv(value) {
-    const s = String(value ?? '');
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    const text=String(value??'');
+    return /[",\n\r]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;
   }
-
-  const rows = [];
-  // CSV has no cover sheet to hold this, so it goes as leading rows
-  // above the header instead — still the first thing anyone sees when
-  // they open the file.
-  const trimmedNote = (authorNote || '').trim();
-  if (trimmedNote) {
-    rows.push(['A note from the officer:']);
-    rows.push([trimmedNote]);
-    rows.push([]);
-  }
-  rows.push(headers);
-  groups.forEach(group => {
-    // CSV can't carry cell styling like the xlsx subheader row does,
-    // so a plain row with just the alliance name in the Name column
-    // stands in as the visible section break instead.
-    rows.push([`⚑ ${group.label} (${group.players.length})`, ...Array(headers.length - 1).fill('')]);
-
-    group.players.forEach(p => {
-      const isLead = p.roles?.includes('Rally Lead');
-      const flags = `${isLead ? '👑' : ''}${heliosFlag(p)}`;
-      const displayName = p.username || p.alias || '';
-      const nameCell = flags ? `${flags} ${displayName}` : displayName;
-      const owned = new Set((p.joinerHeroes || []).filter(jh => jh.skillLevel >= 5).map(jh => jh.hero));
-
-      rows.push([
-        data.settings?.stateId || '', p.fid || '', p.power ?? p.providerStats?.power ?? '', p.kills ?? p.providerStats?.kills ?? '',
-        nameCell,
-        p.furnaceLevel || '',
-        p.allianceTag || '',
-        p.troops?.infantry || '',
-        p.troops?.lancer || '',
-        p.troops?.marksman || '',
-        isLead ? leaderHeroesText(p) : '',
-        ...allJoiners.map(h => owned.has(h) ? '✓' : ''),
-        owned.size,
-      ]);
-    });
-  });
+  const rows=[ROSTER_HEADERS,...groups.flatMap(group=>group.players.map(p=>rosterExportRow(p,data)))];
 
   const csvBody = rows.map(r => r.map(escapeCsv).join(',')).join('\r\n');
   const blob = new Blob(['\uFEFF' + csvBody], { type: 'text/csv;charset=utf-8;' });
@@ -694,7 +589,7 @@ export function exportWorkbook(data, options = {}) {
 
   // 2. Roster (alliance-scoped) — includes the merged joiner coverage tick-grid
   if (includeRoster) {
-    const rosterWs = buildRosterSheet(scopedPlayers);
+    const rosterWs = buildRosterSheet(scopedPlayers,data);
     XLSX.utils.book_append_sheet(wb, rosterWs, 'Roster');
   }
 
