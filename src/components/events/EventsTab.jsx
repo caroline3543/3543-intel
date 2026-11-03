@@ -19,6 +19,7 @@ import { ParticipantRow } from './ParticipantRow.jsx';
 import { VerifyRosterPanel } from './VerifyRosterPanel.jsx';
 import { LegionConflictModal } from './LegionConflictModal.jsx';
 import { AddParticipantPanel } from './AddParticipantPanel.jsx';
+import { TalPlanner } from './TalPlanner.jsx';
 import { SquadBalancerPanel } from './SquadBalancerPanel.jsx';
 
 // ── EventsTab ──────────────────────────────────────────────────
@@ -91,7 +92,9 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
   // roster. No alliance selected on the event means no restriction
   // (open to everyone), matching how the field already behaves as
   // optional everywhere else.
-  const eventEligiblePlayers = (activeEvent?.allianceTags?.length > 0)
+  const eventEligiblePlayers = activeEvent?.type === 'Tundra Arms League'
+    ? players.filter(p => activeEvent.tal?.mode !== 'solo' || p.allianceTag === activeEvent.tal?.hostTags?.[0])
+    : (activeEvent?.allianceTags?.length > 0)
     ? players.filter(p => activeEvent.allianceTags.includes(p.allianceTag))
     : players;
 
@@ -705,6 +708,8 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
               );
             })()}
           </div>
+
+          {activeEvent.type === 'Tundra Arms League' && <TalPlanner key={activeEvent.id} event={activeEvent} players={eventEligiblePlayers} onUpdate={onUpdateEvent} />}
 
           {tracksTroopPower && (activeEvent.participantIds || []).length > 0 && (
             <SquadBalancerPanel

@@ -3,6 +3,7 @@ import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS } from '../../utils/con
 import { vibe } from '../../utils/vibe.js';
 import { newEvent } from '../../data/playerSchema.js';
 import { Field, Inp, SheetHandle } from '../common/Primitives.jsx';
+import { TalSetup } from './TalSetup.jsx';
 import { AlliancePicker } from '../common/AlliancePicker.jsx';
 
 // Builds "Type — Mon D, YYYY" from the event's current type + date, so
@@ -97,6 +98,7 @@ export function EventSheet({ event, open, onClose, onSave, players }) {
             </div>
           </Field>
         )}
+        {ev.type === 'Tundra Arms League' ? <TalSetup ev={ev} onChange={setEv} tags={allTags} /> : (
         <Field label="Alliance(s)" hint="Select every alliance running this event together — participant search will only offer players from these alliances.">
           <AlliancePicker
             multi
@@ -105,6 +107,7 @@ export function EventSheet({ event, open, onClose, onSave, players }) {
             existingTags={allTags}
           />
         </Field>
+        )}
         <Field label="Event Name" hint="Auto-suggested from type + date — edit if you want something different">
           <Inp value={ev.name} onChange={v => { upd('name', v); setNameTouched(true); }} placeholder="e.g. SvS Week 3 — May 2026"/>
         </Field>
@@ -118,7 +121,7 @@ export function EventSheet({ event, open, onClose, onSave, players }) {
         <div style={{ fontSize:12, color:C.muted, marginBottom:16 }}>Add participants and substitutes after creating the event.</div>
         <div style={{ display:'flex', gap:10 }}>
           <button onClick={onClose} style={{ flex:1, height:54, borderRadius:12, background:C.section, border:`1px solid ${C.border}`, color:C.icy, fontWeight:600, fontSize:16, cursor:'pointer' }}>Cancel</button>
-          <button onClick={() => { onSave(ev); onClose(); vibe(8); }} style={{ flex:2, height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>Save Event</button>
+          <button disabled={ev.type === 'Tundra Arms League' && !ev.tal?.hostTags?.length} onClick={() => { onSave(ev.type === 'Tundra Arms League' ? { ...ev, allianceTags: ev.tal?.hostTags || [] } : ev); onClose(); vibe(8); }} style={{ flex:2, height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>Save Event</button>
         </div>
       </div>
     </div>

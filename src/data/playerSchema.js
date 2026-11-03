@@ -129,6 +129,7 @@ export function newEvent(overrides = {}) {
     // on the snapshot; moved here since the events are the thing that's
     // actually split, not the people in them).
     legion:         null,
+    tal: { mode: 'state', hostTags: [], slots: ['02:00', '07:00', '12:00', '14:00', '19:00'], availability: {}, teams: [], locked: false },
     participantIds: [],
     // Squad Balancer output — only meaningful for Foundry/Canyon Clash
     // (see TROOP_POWER_EVENTS in constants.js), where an alliance's own
