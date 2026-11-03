@@ -33,6 +33,8 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   const [exportReceipt,setExportReceipt]=useState(null);
   const [recordingExportReview,setRecordingExportReview]=useState(false);
   const [recordedExportReview,setRecordedExportReview]=useState(null);
+  const [approvingExportReview,setApprovingExportReview]=useState(false);
+  const [exportApproval,setExportApproval]=useState(null);
   const [reviewHistory,setReviewHistory]=useState(null);
   const [reviewHistoryLoading,setReviewHistoryLoading]=useState(false);
   const [reviewHistoryError,setReviewHistoryError]=useState('');
@@ -169,7 +171,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     if(!savedSpreadsheetId||refreshingSavedSheet)return;
     setRefreshingSavedSheet(true);
     setSpreadsheetId(savedSpreadsheetId);
-    setSheetInfo(null);setPreviewRows(null);setWriteReview(null);setExportReceipt(null);setRecordedExportReview(null);setColumnMapping({});setPreviewAlliance('');
+    setSheetInfo(null);setPreviewRows(null);setWriteReview(null);setExportReceipt(null);setRecordedExportReview(null);setExportApproval(null);setColumnMapping({});setPreviewAlliance('');
     setMessage('Refreshing worksheets from the saved Google spreadsheet…');
     try{
       const {data:{session}}=await supabase.auth.getSession();
@@ -181,6 +183,28 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       setMessage('Worksheet list refreshed from Google. Select a worksheet to preview its latest rows before approving changes.');
     }catch(error){setStatus('error');setMessage('Refresh failed: '+(error.message||'Unknown error'));}
     finally{setRefreshingSavedSheet(false);}
+  }
+  async function approveReadOnlyReview(){
+    if(!recordedExportReview||!exportReceipt||!writeReview?.checked?.allMatched||approvingExportReview||exportApproval)return;
+    if(!window.confirm('Record your approval of this exact review? This will NOT change Google Sheets. Approvals expire in 10 minutes.'))return;
+    setApprovingExportReview(true);setMessage('');
+    try{
+      const byCell=new Map(writeReview.plan.proposals.map(p=>[p.row+':'+p.column,p]));
+      const proposals=exportReceipt.review.changes.map(c=>{
+        const p=byCell.get(c.row+':'+c.column);
+        if(!p||p.fid!==c.fid)throw Error('Review no longer matches the proposed changes.');
+        return {...p,alliance:players.find(x=>String(x.fid)===p.fid)?.allianceTag||''};
+      });
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token)throw Error('Sign in to approve.');
+      const response=await fetch(import.meta.env.VITE_SUPABASE_URL+'/functions/v1/sheets-approve-review',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:import.meta.env.VITE_SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({reviewId:recordedExportReview.id,confirmation:'APPROVE READ-ONLY REVIEW',proposals})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(data.error||'Approval unavailable.');
+      if(data.writeEnabled!==false||data.googleModified!==false||data.approval?.status!=='approved_not_executed')throw Error('Unexpected approval result.');
+      setExportApproval(data.approval);
+      setReviewHistory(null);
+    }catch(error){setMessage('Approval could not be recorded: '+(error.message||'Unknown error'));}
+    finally{setApprovingExportReview(false);}
   }
   async function loadReviewHistory(){
     if(!supabase||reviewHistoryLoading)return;
@@ -488,7 +512,9 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         <p style={{fontSize:12,color:'#A8C4D8',overflowWrap:'anywhere'}}>Review fingerprint: {exportReceipt.hash.slice(0,16)}</p>
         <p style={{fontSize:12,color:'#A8C4D8'}}>Checked at {new Date(exportReceipt.reviewedAt).toLocaleString()}. Recheck Google before any future write.</p>
         <button type="button" onClick={recordVerifiedExportReview} disabled={recordingExportReview||!!recordedExportReview} style={{...secondaryButton,minHeight:44}}>{recordingExportReview?'Rechecking and recording…':recordedExportReview?'Review recorded':'Save read-only review record'}</button>
-        {recordedExportReview&&<p role="status" style={{fontSize:13,color:'#A8C4D8'}}>Recorded in Supabase · {recordedExportReview.id}. This is an audit record, not approval to write.</p>}
+        {recordedExportReview&&<p role="status" style={{fontSize:13,color:'#A8C4D8'}}>Recorded in Supabase · {recordedExportReview.id}. This is an audit record, not approval to write.</p>
+        {recordedExportReview&&<button type="button" disabled={approvingExportReview||!!exportApproval} onClick={approveReadOnlyReview} style={{...secondaryButton,minHeight:44,marginTop:8}}>{approvingExportReview?'Rechecking Google and approving…':exportApproval?'Approval recorded':'Approve reviewed changes (no Google write)'}</button>}
+        {exportApproval&&<p role="status" style={{fontSize:13,color:'#A8C4D8'}}>Approval recorded. Expires {new Date(exportApproval.expires_at).toLocaleString()}. No Google changes were made.</p>}}
       </section>}
       <details style={{background:'#152236',borderRadius:12,padding:14,marginBottom:14}}>
         <summary style={{cursor:'pointer',minHeight:44,fontWeight:650,fontSize:15}}>Saved review history · State {stateId}</summary>
