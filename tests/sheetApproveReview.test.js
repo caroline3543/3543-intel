@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const edge=readFileSync(new URL('../supabase/functions/sheets-approve-review/index.ts',import.meta.url),'utf8');
 const sheet=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');
-const sql=readFileSync(new URL('../supabase/migrations/20261104013000_spreadsheet_export_approval_audit_only.sql',import.meta.url),'utf8');
+const sql=readFileSync(new URL('../supabase/migrations/20261103124140_spreadsheet_export_approval_audit_only.sql',import.meta.url),'utf8');
 test('Approval requires explicit confirmation and owner identity, but never writes to Google',()=>{
  assert.ok(edge.includes("user?.id!==OWNER"));
  assert.ok(edge.includes("input.confirmation!=='APPROVE READ-ONLY REVIEW'"));
