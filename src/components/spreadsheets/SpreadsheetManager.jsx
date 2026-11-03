@@ -502,7 +502,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
             <div style={{color:'#A8C4D8',overflowWrap:'anywhere'}}>Fingerprint: {item.review_hash.slice(0,16)}</div>
           </div>)}
         </div>}
-      </details>}
+      </details>
       {previewRows&&['Combat','Events'].includes(previewRows.title)&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
         <h4 style={{margin:'0 0 8px',fontSize:18}}>{previewRows.title} import preview</h4>
         {(()=>{try{const plan=previewSpecialWorksheet({type:previewRows.title,values:previewRows.rows,players,stateId});
