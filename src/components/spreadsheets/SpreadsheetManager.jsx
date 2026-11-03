@@ -223,7 +223,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   }
   async function previewMetadata() {
     if(!enabled||!supabase)return;
-    setStatus('loading');setMessage('');setSheetInfo(null);setPreviewRows(null);setWriteReview(null);setColumnMapping({});setPreviewAlliance('');
+    setStatus('loading');setMessage('');setSheetInfo(null);setPreviewRows(null);setWriteReview(null);setExportReceipt(null);setRecordedExportReview(null);setColumnMapping({});setPreviewAlliance('');
     try {
       const {data:{session}}=await supabase.auth.getSession();
       if(!session?.access_token)throw new Error('Sign in first.');
@@ -239,7 +239,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     }catch(error){setStatus('error');setMessage(error.message||'Preview failed');}
   }
   async function previewRowsForWorksheet(title) {
-    setStatus('loading');setMessage('');setPreviewRows(null);setColumnMapping({});setPreviewAlliance('');
+    setStatus('loading');setMessage('');setPreviewRows(null);setWriteReview(null);setExportReceipt(null);setRecordedExportReview(null);setColumnMapping({});setPreviewAlliance('');
     try {
       const {data:{session}}=await supabase.auth.getSession();
       if(!session?.access_token)throw new Error('Sign in first.');
