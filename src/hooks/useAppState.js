@@ -50,7 +50,7 @@ export function useAppState() {
   // Warn user if localStorage is full
   useEffect(() => {
     function handler() {
-      showToast('⚠️ Storage full — export your data now to avoid losing changes', 'error');
+      showToast('Unable to save on this device. Keep this page open and export a backup before retrying.', 'error');
     }
     window.addEventListener('app:storage-full', handler);
     return () => window.removeEventListener('app:storage-full', handler);
