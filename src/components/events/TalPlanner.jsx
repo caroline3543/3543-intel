@@ -1,3 +1,4 @@
+import { TalPollList } from './TalPollList.jsx';
 import { useState } from 'react';
 import { newSnapshot } from '../../data/playerSchema.js';
 import { C } from '../../utils/constants.js';
@@ -12,7 +13,6 @@ export function TalPlanner({ event, players, onUpdate }) {
   const go = next => { setMessage(''); setExportText(''); setMovePlayer(null); onUpdate({...event,tal:{...config,step:next}}); window.scrollTo({top:0,behavior:'smooth'}); };
   const [movePlayer,setMovePlayer] = useState(null);
   const [moveTarget,setMoveTarget] = useState('');
-  const [query,setQuery] = useState('');
   const [message,setMessage] = useState('');
   const [armed,setArmed] = useState(false);
   const [clearArmed,setClearArmed] = useState(false);
@@ -21,7 +21,6 @@ export function TalPlanner({ event, players, onUpdate }) {
   const updateTeam = (id,patch) => save({ teams:config.teams.map(t => t.id===id?{...t,...patch}:t) });
   const name = id => players.find(p => p.id===id)?.username || players.find(p => p.id===id)?.alias || id;
   const selected = new Set(config.teams.flatMap(t => t.members.map(m => m.id)));
-  const candidates = players.filter(p => `${p.username} ${p.alias} ${p.id} ${p.allianceTag}`.toLowerCase().includes(query.toLowerCase()));
   async function copy(text) { try { await navigator.clipboard.writeText(text); setMessage('Copied.'); } catch { setMessage('Copy unavailable. Select the text below to copy it.'); } }
   const [exportText,setExportText] = useState('');
   function exportPlan(team) {
@@ -33,7 +32,7 @@ export function TalPlanner({ event, players, onUpdate }) {
     <h2 style={{color:C.white,fontSize:24,margin:'0 0 12px'}}>{({Availability:'When can players join?',Legions:'Build your legions',Buildings:'Plan the first moves',Review:'Review your plan'})[step]}</h2>
     <div aria-label="Planning progress" style={{display:'flex',gap:6,marginBottom:20}}>{steps.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:4,background:i<=steps.indexOf(step)?C.gold:C.border}} />)}</div>
     {step==='Availability' && <>
-      <p style={{color:C.icy}}>Select every time each player can attend. We’ll use their answers to build legions. All times are UTC.</p>
+      <p style={{color:C.icy}}>Add players under every time they can attend. The same person can appear at several times. We’ll count them once when building legions.</p>
       <details style={{marginBottom:16,color:C.icy}}><summary style={{minHeight:44,cursor:'pointer'}}>Change poll times</summary>
       <label style={{color:C.icy}}>Battle time options (HH:MM, separated by commas)<input disabled={config.locked} style={input} value={slotDraft} onChange={e=>setSlotDraft(e.target.value)} /></label>
       <button disabled={config.locked} style={button} onClick={()=>{
@@ -44,15 +43,10 @@ export function TalPlanner({ event, players, onUpdate }) {
       }}>Save poll times</button>
       <p style={{color:C.icy,fontSize:14}}>Use the time options shown in your in-game event.</p></details>
       <button style={button} onClick={()=>{const text=`TUNDRA ARMS LEAGUE AVAILABILITY\nReply with your username, player ID, home alliance and ALL times you can attend for the season:\n${config.slots.map(s=>s+' UTC').join(', ')}\nOr reply: Not participating.\nYour team may be scheduled at any of its three registered times.`;setExportText(text);copy(text);}}>Copy availability poll message</button>
-      <input aria-label="Search players" placeholder="Search name, ID or home alliance" style={{...input,marginTop:12}} value={query} onChange={e=>setQuery(e.target.value)} />
-      <p style={{color:C.icy}}>{players.filter(p=>config.availability[p.id]).length} / {players.length} responses recorded</p><p style={{color:C.icy,fontSize:14}}>No answer yet? Leave the player untouched. Choose ‘Not participating’ only when they decline.</p>
-      <p style={{color:C.icy,fontSize:14}}>Showing {Math.min(candidates.length,30)} of {candidates.length} matching players. Search to find someone quickly.</p>
-      {candidates.slice(0,30).map(p=><div key={p.id} style={box}>
-        <strong style={{color:C.white}}>{name(p.id)} [{p.allianceTag||'No alliance'}]</strong>
-        <div style={{color:C.icy,fontSize:14}}>{p.id}</div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>{config.slots.map(slot=><label key={slot} style={{...button,display:'flex',alignItems:'center',gap:6}}><input type="checkbox" disabled={config.locked} checked={(config.availability[p.id]||[]).includes(slot)} onChange={e=>save({availability:{...config.availability,[p.id]:e.target.checked?[...(config.availability[p.id]||[]),slot]:(config.availability[p.id]||[]).filter(s=>s!==slot)}})} />{slot}</label>)}</div>
-        <button disabled={config.locked} style={button} onClick={()=>save({availability:{...config.availability,[p.id]:[]}})}>Not participating</button>
-      </div>)}
+      <p style={{color:C.icy}}>{players.filter(p=>(config.availability[p.id]||[]).length).length} players with availability · {(config.interestedIds||[]).filter(id=>players.some(p=>p.id===id)&&!(config.availability[id]||[]).length).length} awaiting times</p>
+      {!players.length&&<p style={{color:C.gold}}>No players loaded. Use Pull alliance above to add players to this state's roster first.</p>}
+      {config.slots.map(slot=><TalPollList key={slot} pollKey={slot} config={config} players={players} onSave={save} />)}
+      <TalPollList pollKey="interested" config={config} players={players} onSave={save} />
     </>}
     {step==='Legions' && <>
       <p style={{color:C.icy}}>Group players by shared availability. Each legion needs three possible battle times; the game confirms the actual time later.</p>

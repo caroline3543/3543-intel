@@ -1,7 +1,7 @@
 export const TAL_BUILDINGS = ['Proto I', 'Proto II', 'Repair I', 'Repair II', 'Repair III', 'Repair IV', 'Boiler', 'Transit'];
 export const TAL_SLOTS = ['02:00', '07:00', '12:00', '14:00', '19:00'];
 export function talConfig(event) {
-  return { mode: 'state', hostTags: [], slots: TAL_SLOTS, availability: {}, teams: [], step: 'Availability', locked: false, ...event.tal };
+  return { mode: 'state', hostTags: [], slots: TAL_SLOTS, availability: {}, interestedIds: [], teams: [], step: 'Availability', locked: false, ...event.tal };
 }
 export function strength(player, event) {
   const snap = event.snapshots?.find(s => s.playerId === player.id);
