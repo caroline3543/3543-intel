@@ -33,6 +33,9 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
   const [exportReceipt,setExportReceipt]=useState(null);
   const [recordingExportReview,setRecordingExportReview]=useState(false);
   const [recordedExportReview,setRecordedExportReview]=useState(null);
+  const [reviewHistory,setReviewHistory]=useState(null);
+  const [reviewHistoryLoading,setReviewHistoryLoading]=useState(false);
+  const [reviewHistoryError,setReviewHistoryError]=useState('');
   const [checkingWrites,setCheckingWrites]=useState(false);
   const [columnMapping,setColumnMapping]=useState({});
   const [previewAlliance,setPreviewAlliance]=useState('');
@@ -179,6 +182,20 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
     }catch(error){setStatus('error');setMessage('Refresh failed: '+(error.message||'Unknown error'));}
     finally{setRefreshingSavedSheet(false);}
   }
+  async function loadReviewHistory(){
+    if(!supabase||reviewHistoryLoading)return;
+    setReviewHistoryLoading(true);setReviewHistoryError('');
+    try{
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token)throw Error('Sign in to view saved reviews.');
+      const {data,error}=await supabase.from('spreadsheet_export_reviews')
+        .select('id,worksheet_title,review_hash,created_at,status')
+        .eq('state_id',String(stateId)).order('created_at',{ascending:false}).limit(8);
+      if(error)throw Error('Review history is unavailable. '+error.message);
+      setReviewHistory(data||[]);
+    }catch(error){setReviewHistoryError(error.message||'Could not load reviews.');}
+    finally{setReviewHistoryLoading(false);}
+  }
   async function recordVerifiedExportReview(){
     if(!exportReceipt||!writeReview?.checked?.allMatched||recordingExportReview||recordedExportReview)return;
     setRecordingExportReview(true);setMessage('');
@@ -198,6 +215,7 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
       if(!res.ok)throw Error(data.error||'Review could not be recorded.');
       if(!data.recorded||data.writeEnabled!==false||data.hash!==exportReceipt.hash)throw Error('Saved record did not match this review. Check again.');
       setRecordedExportReview(data);
+      setReviewHistory(null);
     }catch(error){setMessage('Could not record review: '+(error.message||'Unknown error'));}
     finally{setRecordingExportReview(false);}
   }
@@ -472,6 +490,19 @@ export function SpreadsheetManager({ onClose, players = [], stateId, onRosterUpd
         <button type="button" onClick={recordVerifiedExportReview} disabled={recordingExportReview||!!recordedExportReview} style={{...secondaryButton,minHeight:44}}>{recordingExportReview?'Rechecking and recording…':recordedExportReview?'Review recorded':'Save read-only review record'}</button>
         {recordedExportReview&&<p role="status" style={{fontSize:13,color:'#A8C4D8'}}>Recorded in Supabase · {recordedExportReview.id}. This is an audit record, not approval to write.</p>}
       </section>}
+      <details style={{background:'#152236',borderRadius:12,padding:14,marginBottom:14}}>
+        <summary style={{cursor:'pointer',minHeight:44,fontWeight:650,fontSize:15}}>Saved review history · State {stateId}</summary>
+        <p style={{fontSize:13,color:'#A8C4D8'}}>Read-only checks recorded in Supabase. These records are not approvals and do not modify Google Sheets.</p>
+        <button type="button" style={{...secondaryButton,minHeight:44}} onClick={loadReviewHistory} disabled={reviewHistoryLoading}>{reviewHistoryLoading?'Loading reviews…':'Load recent reviews'}</button>
+        {reviewHistoryError&&<p role="alert" style={{color:'#FFC5A8',fontSize:13}}>{reviewHistoryError}</p>}
+        {reviewHistory&&<div aria-live="polite" style={{marginTop:10}}>
+          {reviewHistory.length===0?<p style={{color:'#A8C4D8',fontSize:13}}>No recorded reviews for this state.</p>:reviewHistory.map(item=><div key={item.id} style={{borderTop:'1px solid #36536B',padding:'10px 0',fontSize:13}}>
+            <strong>{item.worksheet_title}</strong>
+            <div style={{color:'#A8C4D8'}}>{new Date(item.created_at).toLocaleString()} · Read-only review</div>
+            <div style={{color:'#A8C4D8',overflowWrap:'anywhere'}}>Fingerprint: {item.review_hash.slice(0,16)}</div>
+          </div>)}
+        </div>}
+      </details>}
       {previewRows&&['Combat','Events'].includes(previewRows.title)&&<div style={{marginTop:18,padding:14,background:'#0A1628',borderRadius:12}}>
         <h4 style={{margin:'0 0 8px',fontSize:18}}>{previewRows.title} import preview</h4>
         {(()=>{try{const plan=previewSpecialWorksheet({type:previewRows.title,values:previewRows.rows,players,stateId});
