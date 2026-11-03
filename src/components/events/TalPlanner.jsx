@@ -1,3 +1,4 @@
+import { talPollResultsText } from '../../services/talPoll.js';
 import { TalPollList } from './TalPollList.jsx';
 import { useState } from 'react';
 import { newSnapshot } from '../../data/playerSchema.js';
@@ -43,6 +44,7 @@ export function TalPlanner({ event, players, onUpdate }) {
       }}>Save poll times</button>
       <p style={{color:C.icy,fontSize:14}}>Use the time options shown in your in-game event.</p></details>
       <button style={button} onClick={()=>{const text=`TUNDRA ARMS LEAGUE AVAILABILITY\nReply with your username, player ID, home alliance and ALL times you can attend for the season:\n${config.slots.map(s=>s+' UTC').join(', ')}\nOr reply: Not participating.\nYour team may be scheduled at any of its three registered times.`;setExportText(text);copy(text);}}>Copy availability poll message</button>
+      <button style={{...button,marginTop:12}} onClick={()=>{const text=talPollResultsText(config,players);setExportText(text);copy(text);}}>Copy poll results</button>
       <p style={{color:C.icy}}>{players.filter(p=>(config.availability[p.id]||[]).length).length} players with availability · {(config.interestedIds||[]).filter(id=>players.some(p=>p.id===id)&&!(config.availability[id]||[]).length).length} awaiting times</p>
       {!players.length&&<p style={{color:C.gold}}>No players loaded. Use Pull alliance above to add players to this state's roster first.</p>}
       {config.slots.map(slot=><TalPollList key={slot} pollKey={slot} config={config} players={players} onSave={save} />)}
