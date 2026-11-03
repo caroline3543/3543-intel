@@ -15,8 +15,8 @@ export function EventListCard({ ev, onOpen, onDelete }) {
             {ev.legion && <span style={{ fontSize:10, fontWeight:800, color:lc, padding:'1px 7px', borderRadius:8, background:lc+'22', flexShrink:0 }}>L{ev.legion}</span>}
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginTop:3 }}>
-            <span style={{ fontSize:12, color:C.muted }}>{fmtDateShort(ev.date)}</span>
-            {ev.time && <span style={{ fontSize:13, fontWeight:800, color:C.gold, padding:'0 7px', borderRadius:8, background:C.gold+'18' }}>🕐 {ev.time} UTC</span>}
+            <span style={{ fontSize:12, color:C.muted }}>{ev.type === 'Tundra Arms League' ? 'Season plan · match times confirmed later' : fmtDateShort(ev.date)}</span>
+            {ev.type !== 'Tundra Arms League' && ev.time && <span style={{ fontSize:13, fontWeight:800, color:C.gold, padding:'0 7px', borderRadius:8, background:C.gold+'18' }}>🕐 {ev.time} UTC</span>}
             {ev.allianceTags?.length > 0 && <span style={{ fontSize:12, color:C.muted }}>{ev.allianceTags.map(t=>`[${t}]`).join(' ')}</span>}
           </div>
         </div>

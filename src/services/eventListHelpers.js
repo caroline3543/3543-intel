@@ -25,7 +25,7 @@ export function groupByRank(list) {
 // plain string comparison against today sorts correctly with no
 // timezone math involved.
 export function isArchived(ev, todayStr) {
-  return ev.status === 'completed' || ev.date < todayStr;
+  return ev.status === 'completed' || (ev.type !== 'Tundra Arms League' && ev.date < todayStr);
 }
 
 // Legion 1 and Legion 2 events on the same date are the SAME real

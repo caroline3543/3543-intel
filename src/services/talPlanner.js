@@ -1,14 +1,14 @@
 export const TAL_BUILDINGS = ['Proto I', 'Proto II', 'Repair I', 'Repair II', 'Repair III', 'Repair IV', 'Boiler', 'Transit'];
 export const TAL_SLOTS = ['02:00', '07:00', '12:00', '14:00', '19:00'];
 export function talConfig(event) {
-  return { mode: 'state', hostTags: [], slots: TAL_SLOTS, availability: {}, teams: [], locked: false, ...event.tal };
+  return { mode: 'state', hostTags: [], slots: TAL_SLOTS, availability: {}, teams: [], step: 'Availability', locked: false, ...event.tal };
 }
 export function strength(player, event) {
   const snap = event.snapshots?.find(s => s.playerId === player.id);
   return Number(snap?.troopPower || 0);
 }
 export function candidateTeams(config) {
-  return config.hostTags.flatMap(tag => [1, 2].map(legion => ({ id: `${tag}:${legion}`, host: tag, legion, slots: [], members: [], buildings: [...TAL_BUILDINGS], assignments: {} })));
+  return config.hostTags.flatMap(tag => [1, 2].map(legion => ({ id: `${tag}:${legion}`, host: tag, legion, matchTime: '', slots: [], members: [], buildings: [...TAL_BUILDINGS], assignments: {} })));
 }
 // Greedy suggestion: keep players available at all three times together first.
 // Never invent availability, duplicate a player, or exceed 30 + 20 places.
@@ -41,4 +41,17 @@ export function teamWarnings(team, config) {
   const conflicts = team.members.filter(m => !team.slots.every(s => (config.availability[m.id] || []).includes(s))).length;
   if (conflicts) warnings.push(`${conflicts} players cannot confirm every selected time.`);
   return warnings;
+}
+
+// Apply a move or swap in one update so neither roster can lose a player.
+export function moveTalMember(teams, playerId, targetId, swapId = null) {
+  const source = teams.find(t => t.members.some(m => m.id === playerId));
+  const target = teams.find(t => t.id === targetId);
+  if (!source || !target || source.id === target.id) throw new Error('Choose another legion.');
+  const member = source.members.find(m => m.id === playerId);
+  const swapped = swapId ? target.members.find(m => m.id === swapId) : null;
+  if (swapId && !swapped) throw new Error('Choose a player in the destination legion.');
+  const role = swapped?.role || (target.members.filter(m => m.role === member.role).length < (member.role === 'combatant' ? 30 : 20) ? member.role : member.role === 'combatant' ? 'substitute' : 'combatant');
+  if (!swapped && target.members.filter(m => m.role === role).length >= (role === 'combatant' ? 30 : 20)) throw new Error('This legion is full. Swap with a player instead.');
+  return teams.map(t => t.id === source.id ? {...t, assignments:{}, members: swapped ? t.members.map(m => m.id === playerId ? {...swapped,role:member.role} : m) : t.members.filter(m => m.id !== playerId)} : t.id === target.id ? {...t, assignments:{}, members: swapped ? t.members.map(m => m.id === swapId ? {...member,role:swapped.role} : m) : [...t.members,{...member,role}]} : t);
 }

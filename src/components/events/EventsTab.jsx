@@ -586,7 +586,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
         onClose={() => setLegionModal(null)}
       />
 
-      {stickyVisible && activeEvent && (() => {
+      {stickyVisible && activeEvent && activeEvent.type !== 'Tundra Arms League' && (() => {
         const stickyLc = legionColor(activeEvent.type, activeEvent.legion);
         return (
           <div style={{ position:'fixed', top:60, left:0, right:0, zIndex:150, maxWidth:480, margin:'0 auto', background:C.card+'f2', backdropFilter:'blur(10px)', borderBottom:`1px solid ${stickyLc?stickyLc+'66':C.border}`, padding:'10px 20px', display:'flex', alignItems:'center', gap:8 }}>
@@ -600,7 +600,13 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
         );
       })()}
 
-      {activeEvent ? (() => {
+      {activeEvent?.type === 'Tundra Arms League' ? <>
+        <div style={{display:'flex',justifyContent:'space-between',gap:12,marginBottom:16}}>
+          <button style={{minHeight:44,background:C.section,color:C.gold,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:16}} onClick={()=>setActiveEventId(null)}>← Events</button>
+          <button style={{minHeight:44,background:C.section,color:C.icy,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',fontSize:16}} onClick={()=>{setEditingEvent(activeEvent);setEventSheetOpen(true);}}>Plan settings</button>
+        </div>
+        <TalPlanner key={activeEvent.id} event={activeEvent} players={eventEligiblePlayers} onUpdate={onUpdateEvent} />
+      </> : activeEvent ? (() => {
         const lc = legionColor(activeEvent.type, activeEvent.legion);
         const swipeIdx = activeSwipeList.findIndex(ev => ev.id === activeEvent.id);
         const canSwipeNext = swipeIdx !== -1 && swipeIdx < activeSwipeList.length - 1;
@@ -1082,7 +1088,7 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
           })()}
         </>
       )}
-      <EventSheet event={editingEvent} open={eventSheetOpen} onClose={() => setEventSheetOpen(false)} onSave={ev => { if (editingEvent) onUpdateEvent(ev); else onCreateEvent(ev); }} players={players}/>
+      <EventSheet event={editingEvent} open={eventSheetOpen} onClose={() => setEventSheetOpen(false)} onSave={ev => { if (editingEvent) onUpdateEvent(ev); else { onCreateEvent(ev); if (ev.type === 'Tundra Arms League') setActiveEventId(ev.id); } }} players={players}/>
       <SnapshotEditor snapshot={snapEditing?.snapshot} playerName={snapEditing?.playerName} eventType={activeEvent?.type} eventStatus={activeEvent?.status} open={snapOpen} onClose={() => setSnapOpen(false)} onSave={saveSnap} player={players.find(p => p.id === snapEditing?.playerId)} canEditTiers={!!onUpdatePlayers} missed={missedFor(snapEditing?.playerId)}/>
       {deleteConfirmId && (
         <DeleteConfirmModal
