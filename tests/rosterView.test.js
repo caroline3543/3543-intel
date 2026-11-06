@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, latestRosterFetch } from '../src/services/rosterViewService.js';
-const player={id:'1',fid:123,username:'New name',pastUsernames:['Old name'],allianceTag:'HOT',roles:['Translator'],gameLanguage:'ko',troops:{infantry:'Helios FC6',lancer:'FC6',marksman:'FC6'},joinerHeroes:[{hero:'Jessie',skillLevel:5,verified:true}]};
+const player={id:'1',fid:123,username:'New name',alias:'Caroline',pastUsernames:['Old name'],allianceTag:'HOT',roles:['Translator'],gameLanguage:'ko',troops:{infantry:'Helios FC6',lancer:'FC6',marksman:'FC6'},joinerHeroes:[{hero:'Jessie',skillLevel:5,verified:true}]};
 const matches=(p,patch={},search='')=>matchesRosterFilters(p,search,{...EMPTY_FILTERS,...patch});
 test('combined filters intersect alliance, joiner role, troop type, verified skill and game language',()=>{
   const filters={alliance:'HOT',role:'joiner',tier:'helios-infantry',hero:'Jessie',verified:true,language:'Korean'};
@@ -17,9 +17,12 @@ test('review filter finds gaps without treating optional fields as requirements'
   assert.equal(matches({...player,troops:{infantry:'FC6'}},{review:true}),true);
   assert.equal(matches({...player,fid:null},{review:true}),true);
 });
-test('search accepts numeric IDs and previous names without throwing',()=>{
+test('search accepts numeric IDs and nicknames but excludes alliance tags and former names',()=>{
   assert.equal(matches(player,{},' 123 '),true);
-  assert.equal(matches(player,{},'old NAME'),true);
+  assert.equal(matches(player,{},'Caroline'),true);
+  assert.equal(matches(player,{},'new NAME'),true);
+  assert.equal(matches(player,{},'HOT'),false);
+  assert.equal(matches(player,{},'old NAME'),false);
   assert.equal(matches(player,{},'unrelated'),false);
 });
 test('latest fetch ignores manual edits and invalid dates; verified modifier only counts with a hero',()=>{

@@ -42,6 +42,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     return (a.username||a.alias||'').localeCompare(b.username||b.alias||'');
   });
   const filterCount=rosterFilterCount(filters);
+  const allianceTags=[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].sort();
   const lastFetch=latestRosterFetch(players);
   function toggle(id){setSelected(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);return next;});}
   function stopSelection(){setSelecting(false);setSelected(new Set());setEditingSelection(false);}
@@ -62,7 +63,10 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   return <div style={{padding:'16px 20px 0'}}>
     {players.length>0 && <>
       <p style={{fontSize:13,color:C.icy,margin:'0 0 12px'}}>Latest roster fetch: {lastFetch?new Date(lastFetch).toISOString().slice(0,16).replace('T',' ')+' UTC':'Not recorded'}</p>
-      <input aria-label="Search roster" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, ID or alliance" style={{...button,width:'100%',boxSizing:'border-box',height:48,fontSize:16,color:C.white,marginBottom:10}}/>
+      <input aria-label="Search roster" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search username, nickname or ID" style={{...button,width:'100%',boxSizing:'border-box',height:48,fontSize:16,color:C.white,marginBottom:10}}/>
+      <div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:6,marginBottom:10}}>
+        {[['','All alliances'],...allianceTags.map(tag=>[tag,`[${tag}]`])].map(([tag,label])=><button key={tag||'all'} aria-pressed={filters.alliance===tag} onClick={()=>setFilters({...filters,alliance:filters.alliance===tag?'':tag})} style={{...button,flexShrink:0,color:filters.alliance===tag?C.gold:C.icy,borderColor:filters.alliance===tag?C.gold:C.border}}>{label}{tag?` · ${players.filter(p=>p.allianceTag===tag).length}`:''}</button>)}
+      </div>
       <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
         <button style={button} aria-expanded={filtersOpen} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button>
         <label style={{flex:1,minWidth:0}}><span style={{position:'absolute',width:1,height:1,overflow:'hidden'}}>Sort roster</span><select aria-label="Sort roster" value={sort} onChange={e=>setSort(e.target.value)} style={{...button,width:'100%',fontSize:14}}><option value="name">Name A–Z</option><option value="progression">Troop progression</option><option value="troopPower">Troop power</option><option value="review">Needs review</option></select></label>
