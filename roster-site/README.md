@@ -38,3 +38,5 @@ The second tab is a guided state-legion planner: Setup, Times, Legions, Review. 
 - Roster refreshes preserve the separate plan. Home alliance is captured when planning information is first entered; last known game alliance remains visible separately.
 
 See `TAL_DESIGN_REVIEW.md` for concept selection, research and review evidence.
+
+Legions support per-legion player entry: one-player suggestions or bulk pasted usernames/IDs with explicit match review. Duplicate names require selection; repeated entries are skipped. Cross-legion bulk moves require an explicit option. Manual entries with unconfirmed times require an explicit override and remain flagged in Review. Direct removal keeps the member profile and availability. The Members Help button is removed, and the alliance setup card hides once all four default alliances are present.

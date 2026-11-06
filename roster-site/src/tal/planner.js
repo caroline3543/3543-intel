@@ -26,19 +26,22 @@ export function teamIssues(plan,team,players){
  if(duplicate)issues.push('A player is assigned more than once.');
  return issues;
 }
-function validateDestination(plan,player,team,role,leavingId=null){
+function validateDestination(plan,player,team,role,leavingId=null,allowAvailabilityConflict=false){
  if(!['combatant','substitute'].includes(role))throw new Error('Choose a player role.');
- if(!eligible(plan,player,team))throw new Error('This player needs more matching times for that legion.');
+ if(!player)throw new Error('This player is no longer in Members.');
+ if(player.blacklisted)throw new Error('This player is excluded from battle plans. Update their member profile first.');
+ if(record(plan,player).status==='declined')throw new Error('This player is marked not participating. Update their availability first.');
+ if(!allowAvailabilityConflict&&!eligible(plan,player,team))throw new Error('This player needs more matching times for that legion.');
  const cap=role==='combatant'?30:20;
  if(team.members.filter(m=>m.role===role&&m.id!==leavingId&&m.id!==player.id).length>=cap)throw new Error(`No ${role} places left. Choose another role or swap a player.`);
 }
-export function placePlayer(plan,players,id,targetId,role='combatant',swapId=''){
+export function placePlayer(plan,players,id,targetId,role='combatant',swapId='',{allowAvailabilityConflict=false}={}){
  if(plan.locked)throw new Error('Unlock this plan before changing it.');
  const target=plan.teams.find(t=>t.id===targetId),player=players.find(p=>p.id===id),source=assignedTeam(plan,id);
  if(!target||!player)throw new Error('Choose a player and a legion.');
  const existing=source?.members.find(m=>m.id===id),swapped=swapId?target.members.find(m=>m.id===swapId):null;
  if(swapId&&(!swapped||!source||source.id===target.id))throw new Error('Choose a player in a different legion to swap.');
- validateDestination(plan,player,target,swapped?.role||role,swapped?.id);
+ validateDestination(plan,player,target,swapped?.role||role,swapped?.id,allowAvailabilityConflict);
  if(swapped)validateDestination(plan,players.find(p=>p.id===swapped.id),source,existing.role,id);
  let next=setRecord(plan,player,{});
  next={...next,teams:next.teams.map(team=>{
