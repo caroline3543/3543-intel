@@ -1,3 +1,5 @@
+import {pastPlayerNames} from '../../services/playerNames.js';
+import {CopyPlayerId} from './CopyPlayerId.jsx';
 import { useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { gameLanguageName, providerField } from '../../services/gameLanguageService.js';
@@ -12,15 +14,17 @@ export function ProfileIdentity({player,onSave}) {
     const username=draft.username.trim();
     if(!username)return;
     const at=new Date().toISOString();
-    const history=player.username&&player.username!==username&&!(player.pastUsernames||[]).includes(player.username)?[...(player.pastUsernames||[]),player.username]:player.pastUsernames||[];
+    const history=pastPlayerNames({...player,username,pastUsernames:[...pastPlayerNames(player),player.username]});
     onSave({...player,username,alias:draft.alias.trim(),country:draft.country.trim(),languages:[...new Set(draft.languages.split(',').map(v=>v.trim()).filter(Boolean))],pastUsernames:history,profileLastUpdated:at});
     setDraft(null);setMessage('Identity saved');
   }
   if(!draft)return <section style={profileCard}>
     <button onClick={start} aria-label="Edit identity" style={{width:'100%',background:'none',border:0,padding:0,color:C.white,textAlign:'left',cursor:'pointer',fontFamily:'inherit'}}>
       <span style={{display:'flex',justifyContent:'space-between',alignItems:'center',minHeight:44,marginBottom:8}}><span style={{fontSize:16,fontWeight:700}}>Identity</span><span style={{...profileButton,display:'flex',alignItems:'center',justifyContent:'center',boxSizing:'border-box',color:C.icy}}><PencilIcon/></span></span>
-      <ProfileRow label="Username" value={player.username||'Unknown'}/><ProfileRow label="Nickname" value={player.alias}/><ProfileRow label="Player ID" value={player.fid||'Unknown'}/><ProfileRow label="Country" value={player.country||'Not recorded'}/><ProfileRow label="Game language" value={gameLanguage||'Unknown'}/><ProfileRow label="Languages" value={player.languages?.join(', ')||'Not recorded'}/>
+      <ProfileRow label="Username" value={player.username||'Unknown'}/><ProfileRow label="Nickname" value={player.alias}/><ProfileRow label="Past names" value={pastPlayerNames(player).join(', ')}/><ProfileRow label="Country" value={player.country||'Not recorded'}/><ProfileRow label="Game language" value={gameLanguage||'Unknown'}/><ProfileRow label="Languages" value={player.languages?.join(', ')||'Not recorded'}/>
     </button>
+    <CopyPlayerId fid={player.fid}/>
+    {pastPlayerNames(player).length>0&&<p style={{fontSize:13,color:C.icy,marginBottom:0}}>You can search by past names.</p>}
     {message&&<p role="status" style={{fontSize:14,color:C.green,marginBottom:0}}>{message}</p>}
   </section>;
   return <ProfileSection title="Edit identity"><form onSubmit={save}>

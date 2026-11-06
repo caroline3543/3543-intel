@@ -1,3 +1,4 @@
+import {playerSearchFields} from '../../../src/services/playerNames.js';
 import {useEffect,useRef,useState} from 'react';
 import {Card,Hint,TimeButtons,button,field,C} from './ui.jsx';
 import {LegionIntake} from './LegionIntake.jsx';
@@ -11,7 +12,7 @@ export function Legions({plan,players,onChange,onMessage}){
  useEffect(()=>{if(showPool)poolAnchor.current?.scrollIntoView?.({block:'start'});},[showPool]);
  const assigned=new Set(plan.teams.flatMap(t=>t.members.map(m=>m.id))),unplaced=players.filter(p=>record(plan,p).status==='available'&&!assigned.has(p.id));
  function update(id,patch){setDraft(null);onChange({...plan,teams:plan.teams.map(t=>t.id===id?{...t,...patch}:t)});}
- const pool=unplaced.filter(p=>[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(query.trim().toLowerCase())));
+ const pool=unplaced.filter(p=>playerSearchFields(p).some(v=>String(v||'').toLowerCase().includes(query.trim().toLowerCase())));
  function createPreview(){if(!plan.teams.length){onMessage('Choose host alliances in Setup first.');return;}setDraft(suggest(plan,players));}
  return <>
   <Card title="Build your legions"><Hint>Suggestions fill empty places. Your existing assignments stay in place. Availability comes first; recorded troop power breaks ties.</Hint><button style={{...button,color:C.gold,width:'100%'}} disabled={plan.locked||!plan.teams.length} onClick={createPreview}>Preview suggested teams</button><Hint>{assigned.size} assigned · {unplaced.length} taking part and unassigned</Hint></Card>

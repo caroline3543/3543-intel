@@ -1,3 +1,4 @@
+import {CopyPlayerId} from './CopyPlayerId.jsx';
 import { useEffect, useRef } from 'react';
 import { C, ALLIANCE_RANKS, TROOP_POWER_EVENTS } from '../../utils/constants.js';
 import { roleColor } from '../../utils/roles.js';
@@ -45,7 +46,7 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
     <section ref={panel} role="dialog" aria-modal="true" aria-label={`Player profile: ${name}`} onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:480,maxHeight:'94dvh',overflowY:'auto',boxSizing:'border-box',padding:'0 16px 24px',overscrollBehavior:'contain'}}>
       <header style={{position:'sticky',top:0,zIndex:1,background:C.card,padding:'16px 0 12px',display:'flex',gap:12,alignItems:'center',borderBottom:`1px solid ${C.border}`,marginBottom:16}}>
         <PlayerAvatar player={player} size={48} color={roleColor(player.roles?.[0],roles)} bordered/>
-        <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel,player.fid?`ID ${player.fid}`:null].filter(Boolean).join(' · ')}</div></div>
+        <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel].filter(Boolean).join(' · ')}</div><CopyPlayerId fid={player.fid}/></div>
         <button style={profileButton} aria-label="Close profile" onClick={onClose}>✕</button>
       </header>
       {player.blacklisted&&<p style={{fontSize:14,color:C.red}}>Excluded from battle plans{player.blacklistReason?`: ${player.blacklistReason}`:''}</p>}

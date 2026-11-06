@@ -1,7 +1,8 @@
+import { playerSearchFields } from './playerNames.js';
 import { normalizeName } from '../utils/normalize.js';
 
 /**
- * Search players by partial name, FID, alias, or alliance tag.
+ * Search players by partial name, FID, nickname, or past name.
  * Returns up to `limit` results sorted by relevance.
  */
 export function searchPlayers(players, query, limit = 8) {
@@ -10,12 +11,7 @@ export function searchPlayers(players, query, limit = 8) {
 
   return players
     .filter(p => {
-      const fields = [
-        p.username,
-        p.alias,
-        p.fid ? String(p.fid) : '',
-        p.allianceTag,
-      ].map(f => normalizeName(f || ''));
+      const fields = playerSearchFields(p).map(f => normalizeName(String(f || '')));
       return fields.some(f => f.includes(q));
     })
     .slice(0, limit);

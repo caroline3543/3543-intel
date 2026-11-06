@@ -1,3 +1,4 @@
+import {playerSearchFields} from '../../../src/services/playerNames.js';
 import {useState} from 'react';
 import {matchPollEntries} from '../../../src/services/talPoll.js';
 import {Card,Hint,TimeButtons,button,field,C} from './ui.jsx';
@@ -9,7 +10,7 @@ export function Availability({plan,players,onChange,onMessage,onCopy}){
  const tags=[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].sort();
  const shown=players.filter(p=>{
   const r=record(plan,p),q=query.trim().toLowerCase();
-  return (!q||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(q)))&&(!tag||p.allianceTag===tag)&&(filter==='all'||filter==='pending'&&r.status==='pending'||filter==='one'&&r.status==='available'&&r.times.length===1||filter==='available'&&r.status==='available'||filter==='unassigned'&&r.status==='available'&&!assignedTeam(plan,p.id));
+  return (!q||playerSearchFields(p).some(v=>String(v||'').toLowerCase().includes(q)))&&(!tag||p.allianceTag===tag)&&(filter==='all'||filter==='pending'&&r.status==='pending'||filter==='one'&&r.status==='available'&&r.times.length===1||filter==='available'&&r.status==='available'||filter==='unassigned'&&r.status==='available'&&!assignedTeam(plan,p.id));
  });
  return <>
   <Card title="Collect availability"><Hint>Record every time each player can attend across the season. Blank means no reply; it does not mean unavailable.</Hint><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={button} onClick={()=>onCopy(`TUNDRA ARMS LEAGUE · STATE 3573\nReply with your username or player ID and ALL times you can attend throughout the season:\n${plan.times.map(t=>t+' UTC').join(', ')}\nOr reply: Not participating.\nPlease mention any days you cannot attend. Your legion may be scheduled at any of its three registered times.`)}>Copy poll message</button></div><Hint>{counts.available} taking part · {counts.pending} no reply · {counts.one} with one time</Hint></Card>

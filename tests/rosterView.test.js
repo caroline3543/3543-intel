@@ -17,12 +17,12 @@ test('review filter finds gaps without treating optional fields as requirements'
   assert.equal(matches({...player,troops:{infantry:'FC6'}},{review:true}),true);
   assert.equal(matches({...player,fid:null},{review:true}),true);
 });
-test('search accepts numeric IDs and nicknames but excludes alliance tags and former names',()=>{
+test('search accepts numeric IDs and nicknames and past names but excludes alliance tags',()=>{
   assert.equal(matches(player,{},' 123 '),true);
   assert.equal(matches(player,{},'Caroline'),true);
   assert.equal(matches(player,{},'new NAME'),true);
   assert.equal(matches(player,{},'HOT'),false);
-  assert.equal(matches(player,{},'old NAME'),false);
+  assert.equal(matches(player,{},'old NAME'),true);
   assert.equal(matches(player,{},'unrelated'),false);
 });
 test('latest fetch ignores manual edits and invalid dates; verified modifier only counts with a hero',()=>{

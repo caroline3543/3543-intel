@@ -1,3 +1,4 @@
+import { playerSearchFields } from './playerNames.js';
 import { gameLanguageName } from './gameLanguageService.js';
 export const EMPTY_FILTERS = { alliance:'', role:'', tier:'', hero:'', language:'', review:false, verified:false };
 export const TIER_FILTERS = [
@@ -9,7 +10,7 @@ export function troopGaps(player) {
 }
 export function matchesRosterFilters(player, search, filters) {
   const query=search.trim().toLocaleLowerCase();
-  if (query && ![player.username,player.alias,player.fid].some(value => String(value??'').toLocaleLowerCase().includes(query))) return false;
+  if (query && !playerSearchFields(player).some(value => String(value??'').toLocaleLowerCase().includes(query))) return false;
   if (filters.alliance && player.allianceTag!==filters.alliance) return false;
   const leader=player.roles?.includes('Rally Lead');
   if (filters.role==='joiner' ? leader || player.blacklisted : filters.role && !player.roles?.includes(filters.role)) return false;
