@@ -1,3 +1,7 @@
+import {BottomNav} from './components/BottomNav.jsx';
+import {NameChanges} from './components/NameChanges.jsx';
+import {mightpulseRequest} from '../../src/services/mightpulseService.js';
+import {applyPlayerDetails} from '../../src/services/playerDetailsService.js';
 import {useEffect,useRef,useState} from 'react';
 import {TalTab} from './tal/TalTab.jsx';
 import {newPlan} from './tal/planner.js';
@@ -32,6 +36,11 @@ export function SiteApp(){
 }
 function Members({onLogout,error,preferences,onPreferencesChange}){
   const [tab,setTab]=useState('members');
+  const [initialPlayerId,setInitialPlayerId]=useState(null);
+  const [legionRefresh,setLegionRefresh]=useState(null);
+  const refreshing=useRef(false),stopRefresh=useRef(false);
+  function navigate(id){setTab(id);window.scrollTo?.({top:0,behavior:'instant'});}
+  useEffect(()=>()=>{stopRefresh.current=true;},[]);
   const [tourOpen,setTourOpen]=useState(!preferences.tutorialSeen);
   const [exporting,setExporting]=useState(false);
   const [data,setData]=useState(()=>loadFromStorage(empty)),[importing,setImporting]=useState(false),[deleting,setDeleting]=useState(null),[message,setMessage]=useState('');
@@ -42,6 +51,31 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   function save(player){const next=withGameLanguage({...player,profileLastUpdated:new Date().toISOString()});setData(prev=>({...prev,players:prev.players.map(p=>p.id===next.id?next:p)}));setMessage('Player saved');}
   function update(updated){const byId=new Map(updated.map(p=>[p.id,p]));setData(prev=>({...prev,players:prev.players.map(p=>byId.get(p.id)||p)}));}
   function importRoster(rows){const result=mergeAllianceProfiles(latest.current.players||[],rows,'3573');latest.current={...latest.current,players:result.players};setData(prev=>({...prev,players:result.players}));return {updated:result.updated.length,added:result.added.length};}
+  async function refreshLegion(team){
+    if(refreshing.current)return;
+    const ids=[...new Set(team.members.map(m=>m.id))];
+    const members=ids.map(id=>latest.current.players.find(p=>p.id===id)).filter(Boolean);
+    refreshing.current=true;stopRefresh.current=false;
+    let done=0,failed=0,skipped=0,reason='';
+    setLegionRefresh({done:0,total:members.length});
+    try{
+      for(const member of members){
+        if(stopRefresh.current)break;
+        if(!/^[1-9]\d{3,14}$/.test(String(member.fid||''))){skipped++;done++;setLegionRefresh({done,total:members.length});continue;}
+        try{
+          const response=await mightpulseRequest('player_details',{state:3573,fid:String(member.fid)});
+          const current=latest.current.players.find(p=>p.id===member.id);
+          if(current){
+            const updated=applyPlayerDetails(current,response,'3573');
+            latest.current={...latest.current,players:latest.current.players.map(p=>p.id===updated.id?updated:p)};
+            setData(latest.current);
+          }
+        }catch(error){failed++;if([401,403,429].includes(error.status)||[401,403,429].includes(error.providerStatus)){done++;setLegionRefresh({done,total:members.length});reason=error.status===429||error.providerStatus===429?'API limit reached. Try again later.':error.message;break;}}
+        done++;setLegionRefresh({done,total:members.length});
+      }
+      setMessage(`${done-failed-skipped} refreshed${failed?` · ${failed} failed`:''}${skipped?` · ${skipped} need a valid player ID`:''}${stopRefresh.current?' · Stopped':''}. ${reason||'Names and alliance checks updated.'}`);
+    }finally{refreshing.current=false;setLegionRefresh(null);}
+  }
   async function backup(){
     if(exporting)return;
     setExporting(true);
@@ -52,12 +86,14 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     }catch{setMessage('Couldn’t download the roster. Try again.');}
     finally{setExporting(false);}
   }
-  return <main style={{maxWidth:480,margin:'0 auto',paddingBottom:24}}>
-    <header style={{padding:20,borderBottom:`1px solid ${C.border}`}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><h1 style={{fontSize:22,margin:0}}>3573 · Caroline</h1><p style={{fontSize:14,color:C.icy,margin:'5px 0 0'}}>{tab==='tal'?'TAL planner':`Members · ${players.length} players`}</p></div><button style={button} onClick={onLogout}>Sign out</button></div><div style={{display:'flex',gap:8,marginTop:14}}><button style={{...button,flex:1,color:C.gold}} onClick={()=>setImporting(true)}>Other alliance</button><button style={{...button,minWidth:44,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={backup} disabled={exporting} aria-label={tab==='tal'?'Download TAL plan as Excel':'Download roster as Excel'} title={tab==='tal'?'Download TAL plan (.xlsx)':'Download roster as Excel (.xlsx)'}>{exporting?<span aria-hidden="true">…</span>:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>}</button></div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginTop:8}}><span style={{fontSize:13,color:C.icy}}>Saved on this device.</span>{tab!=='members'&&<button style={button} onClick={()=>setTourOpen(true)}>Help</button>}</div>{error&&<p role="alert" style={{color:C.red}}>{error}</p>}</header>
+  return <main style={{maxWidth:480,margin:'0 auto',paddingBottom:'calc(140px + env(safe-area-inset-bottom, 0px))'}}>
+    <header style={{padding:20,borderBottom:`1px solid ${C.border}`}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><h1 style={{fontSize:22,margin:0}}>3573 · Caroline</h1><p style={{fontSize:14,color:C.icy,margin:'5px 0 0'}}>{tab==='tal'?'TAL planner':tab==='changes'?'Name changes':`Members · ${players.length} players`}</p></div><button style={button} onClick={onLogout}>Sign out</button></div><div style={{display:'flex',gap:8,marginTop:14}}><button style={{...button,flex:1,color:C.gold}} onClick={()=>setImporting(true)}>Other alliance</button><button style={{...button,minWidth:44,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={backup} disabled={exporting} aria-label={tab==='tal'?'Download TAL plan as Excel':'Download roster as Excel'} title={tab==='tal'?'Download TAL plan (.xlsx)':'Download roster as Excel (.xlsx)'}>{exporting?<span aria-hidden="true">…</span>:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>}</button></div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginTop:8}}><span style={{fontSize:13,color:C.icy}}>Saved on this device.</span>{tab==='tal'&&<button style={button} onClick={()=>setTourOpen(true)}>Help</button>}</div>{error&&<p role="alert" style={{color:C.red}}>{error}</p>}</header>
     {message&&<div role="status" style={{margin:'12px 20px 0',padding:10,color:C.icy,background:C.section,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>{message}<button style={button} onClick={()=>setMessage('')} aria-label="Dismiss message">✕</button></div>}
-    <nav aria-label="Main tabs" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,padding:'12px 20px 0'}}>{[['members','Members'],['tal','TAL planner']].map(([id,label])=><button key={id} style={{...button,color:tab===id?C.gold:C.icy,borderColor:tab===id?C.gold:C.border}} aria-pressed={tab===id} onClick={()=>setTab(id)}>{label}</button>)}</nav>
+    <BottomNav tab={tab} onChange={navigate}/>
+    {legionRefresh&&<div role="status" style={{padding:'12px 20px',color:C.icy}}>Refreshing players: {legionRefresh.done} of {legionRefresh.total}<button style={{...button,marginLeft:8}} onClick={()=>{stopRefresh.current=true;}}>Stop after this player</button></div>}
     {tab==='members'&&!DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag))&&<AllianceSetup players={players} onLoad={importRoster}/>}
-    {tab==='members'&&players.length>0&&<RosterTab players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
+    {tab==='members'&&players.length>0&&<RosterTab initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} legionPlan={data.talPlan||newPlan()} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
+    {tab==='changes'&&<NameChanges players={players} plan={data.talPlan||newPlan()} onOpen={id=>{setInitialPlayerId(id);navigate('members');}}/>}
     {tab==='tal'&&<TalTab value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onMembers={()=>setTab('members')} onExport={backup}/>}
     {tourOpen&&<QuickTour haptics={preferences.haptics} onHapticsChange={haptics=>onPreferencesChange({haptics})} onClose={()=>{onPreferencesChange({tutorialSeen:true});setTourOpen(false);}}/>}
     {importing&&<AllianceImportPanel stateId="3573" players={players} onImport={importRoster} onClose={()=>setImporting(false)}/>}

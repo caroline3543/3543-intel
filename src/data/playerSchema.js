@@ -10,7 +10,7 @@ export function newPlayer(overrides = {}) {
     avatarUrl:          null,
     power:              null,
     kills:              null,
-    providerStats:      null, // Complete fetched member data plus retrieval/source information; locationObservation stores independent state/FID/x/y/retrievedAt/cachedAt.
+    providerStats:      null, // Complete fetched member data plus retrieval/source information; allianceObservation is {tag,at,noAlliance} or null and dates alliance evidence independently; locationObservation stores independent state/FID/x/y/retrievedAt/cachedAt.
     username:           '',
     alias:              '',
     pastUsernames:      [], // history of previous usernames, oldest first — see BulkNameAdd.jsx, which appends here on a detected FID-matched rename rather than silently overwriting

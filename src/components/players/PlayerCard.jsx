@@ -54,7 +54,7 @@ export function comparePriority(a, b) {
 
 const compact=value=>Number(value).toLocaleString('en-US',{notation:'compact',maximumFractionDigits:1});
 const control={minHeight:44,minWidth:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,padding:10,fontSize:14,cursor:'pointer'};
-export function PlayerCard({player,onClick,onDelete,missingCount,onToggleRallyLead,onOpenFields,bulkMode,isSelected}) {
+export function PlayerCard({player,onClick,onDelete,missingCount,onToggleRallyLead,onOpenFields,bulkMode,isSelected,detail}) {
   const [menu,setMenu]=useState(false);
   const name=player.username||player.alias||'Unknown';
   const leader=player.roles?.includes('Rally Lead');
@@ -77,6 +77,7 @@ export function PlayerCard({player,onClick,onDelete,missingCount,onToggleRallyLe
       {heroes.length>0&&<span style={{fontSize:13,color:C.icy}}>{heroes.length} Skill 5 joiner {heroes.length===1?'hero':'heroes'}</span>}
       {missingCount>0&&<button style={{...control,color:C.gold}} onClick={onOpenFields}>Review {missingCount} {missingCount===1?'field':'fields'}</button>}
     </div>
+    {detail}
     {menu&&!bulkMode && <div style={{display:'grid',gap:8,marginTop:10}}>
       <button style={control} onClick={()=>{onToggleRallyLead?.();setMenu(false);}}>{leader?'Remove rally leader role':'Set as rally leader'}</button>
       <button style={{...control,color:C.red}} onClick={()=>{setMenu(false);onDelete(player.id);}}>Remove from roster…</button>

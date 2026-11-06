@@ -1,3 +1,4 @@
+import {allianceEvidence} from './allianceEvidenceService.js';
 import {normalizeStateId} from './stateWorkspaceService.js';
 import {mergeAllianceProfiles,allianceRows} from './allianceImportService.js';
 import {rankingProfileUpdates} from './stateRankingsService.js';
@@ -25,11 +26,18 @@ export function normalizePlayerDetails(response,player,state){
 export function applyPlayerDetails(player,response,state){
   const {details,base,ranks,at}=normalizePlayerDetails(response,player,state);
   const member={...base,chief_id:player.fid,alliance_rank_label:base.alliance?.rank_label ?? base.alliance_rank_label,alliance_rank:base.alliance?.rank ?? base.alliance_rank};
-  const tag=typeof base.alliance?.abbr==='string'?base.alliance.abbr:player.allianceTag || '';
+  const tag=typeof base.alliance?.abbr==='string'?base.alliance.abbr:'';
   const rows=allianceRows({retrieved_at:at,data:{members:[member]}},String(state),tag);
   let updated=mergeAllianceProfiles([player],rows,String(state)).updated[0];
   if(!updated)throw new Error('Unable to match this player. Nothing was changed.');
-  updated={...updated,providerDetails:details};
+  const explicitAlliance=base.alliance===null||typeof base.alliance?.abbr==='string';
+  const prior=allianceEvidence(player);
+  const evidence=explicitAlliance?{tag:tag.trim(),at,noAlliance:!tag.trim()}:prior.at?prior:null;
+  updated={...updated,providerDetails:details,providerStats:{...updated.providerStats,allianceObservation:evidence}};
+  if(explicitAlliance&&!tag.trim()){
+    updated.allianceTag='';updated.allianceRank=null;updated.providerStats.allianceTag='';
+    if(player.allianceTag)updated.allianceHistory=[...(player.allianceHistory||[]),{from:player.allianceTag,to:'',at}];
+  }
   for(const [board,scoreKey,rankKey] of [['personal_power','power','power_rank'],['kills','kills','kills_rank'],['furnace','furnace_level','furnace_rank'],['state_transfer','state_transfer_score','state_transfer_rank'],['labyrinth','labyrinth','labyrinth_rank']]){
     const rank=ranks?.[rankKey],score=ranks?.[scoreKey];
     if(score==null || score==='' || !Number.isInteger(Number(rank)) || Number(rank)<1)continue;
