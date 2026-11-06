@@ -23,3 +23,18 @@ The login attempt counter is per function instance; the generated high-entropy p
 First-run setup offers ARC, RKG and LUN individually or together; no game API requests happen automatically on page open. The three-step tour can be replayed from Help. Preferences are stored per device under `caroline3573_preferences_v1`. Button vibration uses the supported Vibration API with a visual pressed state on all devices; unsupported vibration calls do not block actions.
 
 The header download icon exports the roster using the existing Excel exporter. The `.xlsx` file opens in Excel, Numbers, or Google Sheets; the export includes readable roster sheets and the existing structured data sheets.
+
+## TAL planner
+
+The second tab is a guided state-legion planner: Setup, Times, Legions, Review. It uses the loaded roster without changing game alliance records. `talPlan` is saved alongside the existing device roster in the state-scoped IndexedDB record.
+
+- Choose up to three hosts for this plan and explicitly confirm a host’s second legion is unlocked in game.
+- Record each player’s status, season-wide times, notes and optional event troop power. Paste replies by unique name or ID.
+- Choose three times per legion. Confirm the available time options against the current in-game event; published sources disagree on one of the five options.
+- Two-of-three availability and minimum combatants per time are adjustable planning preferences, not claimed game eligibility rules.
+- Suggested teams use confirmed availability and preserve existing assignments. Preview, per-time coverage, unassigned-player lists and conflict messages remain visible; suggestions are heuristics.
+- Move, swap, change roles, assign initial buildings and choose captains. Missing roster players can be unassigned.
+- Review home-to-host transfers, manually confirm actual game registration, copy the plan, or export an Excel workbook with Assignments, Legions, Availability and Alliance moves.
+- Roster refreshes preserve the separate plan. Home alliance is captured when planning information is first entered; last known game alliance remains visible separately.
+
+See `TAL_DESIGN_REVIEW.md` for concept selection, research and review evidence.

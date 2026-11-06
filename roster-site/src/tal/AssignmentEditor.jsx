@@ -1,0 +1,15 @@
+import {useEffect,useRef,useState} from 'react';
+import {Card,Hint,button,field,C} from './ui.jsx';
+import {assignedTeam,eligible,placePlayer,playerLabel,unassign} from './planner.js';
+export function AssignmentEditor({plan,players,player,onChange,onClose,onMessage}){
+ const source=assignedTeam(plan,player.id),member=source?.members.find(m=>m.id===player.id);
+ const [target,setTarget]=useState(source?.id||plan.teams[0]?.id||''),[role,setRole]=useState(member?.role||'combatant'),[swap,setSwap]=useState('');
+ const panel=useRef(null),[error,setError]=useState('');
+ useEffect(()=>{const previous=document.activeElement;panel.current?.scrollIntoView?.({block:'start'});panel.current?.querySelector('select')?.focus();return()=>{if(previous?.isConnected)previous.focus();};},[]);
+ const destination=plan.teams.find(t=>t.id===target);
+ return <div ref={panel}><Card title={playerLabel(player)}><Hint>Home alliance stays unchanged. This only changes your TAL plan.</Hint><label>Destination legion<select style={{...field,margin:'6px 0 12px'}} value={target} onChange={e=>{setTarget(e.target.value);setSwap('');}}>{plan.teams.map(t=><option key={t.id} value={t.id}>[{t.host}] Legion {t.number}{eligible(plan,player,t)?'':' · availability conflict'}</option>)}</select></label><label>Role<select style={{...field,margin:'6px 0 12px'}} value={role} onChange={e=>setRole(e.target.value)}><option value="combatant">Combatant</option><option value="substitute">Substitute</option></select></label>
+ {source&&target!==source.id&&<label>Swap with · optional<select style={{...field,margin:'6px 0 12px'}} value={swap} onChange={e=>setSwap(e.target.value)}><option value="">Move without swapping</option>{destination?.members.map(m=><option key={m.id} value={m.id}>{playerLabel(players.find(p=>p.id===m.id))} · {m.role}</option>)}</select></label>}
+ {error&&<p role="alert" style={{fontSize:14,color:C.red,lineHeight:1.5}}>{error}</p>}
+ <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={button} onClick={onClose}>Cancel</button>{source&&<button style={button} disabled={plan.locked} onClick={()=>{onChange(unassign(plan,player.id));onClose();}}>Unassign</button>}<button style={{...button,color:C.gold}} disabled={plan.locked||!target} onClick={()=>{try{onChange(placePlayer(plan,players,player.id,target,role,swap));onClose();onMessage(swap?'Players swapped. Check captain and building assignments.':'Assignment saved.');}catch(e){setError(e.message);}}}>{swap?'Swap players':'Save assignment'}</button></div>
+ </Card></div>;
+}
