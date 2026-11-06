@@ -3,7 +3,7 @@ import {C} from '../../../src/utils/constants.js';
 const steps=[
   {title:'Load your alliances',body:'Tap Load all three to add ARC, RKG and LUN. Or load one alliance at a time.'},
   {title:'Find a player',body:'Tap an alliance chip or search a username, nickname or player ID. Use Filters to narrow the list.'},
-  {title:'Make an update',body:'Open a player. Tap a troop tier or the Identity pencil to edit. Use Export backup to keep a copy of this device’s roster.'},
+  {title:'Make an update',body:'Open a player. Tap a troop tier or the Identity pencil to edit. Tap the download icon to save an Excel copy of your roster.'},
 ];
 const button={minHeight:44,padding:'10px 14px',fontSize:14,fontWeight:600,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,cursor:'pointer'};
 export function QuickTour({onClose,haptics,onHapticsChange}){
