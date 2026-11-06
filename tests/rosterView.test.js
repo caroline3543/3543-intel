@@ -29,3 +29,11 @@ test('latest fetch ignores manual edits and invalid dates; verified modifier onl
   assert.equal(latestRosterFetch([{profileLastUpdated:'2099-01-01'},{providerStats:{retrievedAt:'bad'}}, {providerStats:{retrievedAt:'2026-11-01T00:00:00Z'}},{providerStats:{retrievedAt:'2026-11-02T00:00:00Z'}}]),'2026-11-02T00:00:00Z');
   assert.equal(rosterFilterCount({...EMPTY_FILTERS,verified:true}),0);
 });
+test('full FC7 and FC8 filters include matching Helios and exclude lower or incomplete troops',()=>{
+ for(const tier of [7,8]){
+  const troops={infantry:`FC${tier}`,lancer:`Helios FC${tier}`,marksman:`FC${tier}`};
+  assert.equal(matches({...player,troops},{tier:`full-fc${tier}`}),true);
+  assert.equal(matches({...player,troops:{...troops,marksman:'FC6'}},{tier:`full-fc${tier}`}),false);
+  assert.equal(matches({...player,troops:{infantry:`FC${tier}`}},{tier:`full-fc${tier}`}),false);
+ }
+});

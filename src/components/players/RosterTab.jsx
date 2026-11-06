@@ -69,7 +69,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       </div>
       <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
         <button style={button} aria-expanded={filtersOpen} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button>
-        <label style={{flex:1,minWidth:0}}><span style={{position:'absolute',width:1,height:1,overflow:'hidden'}}>Sort roster</span><select aria-label="Sort roster" value={sort} onChange={e=>setSort(e.target.value)} style={{...button,width:'100%',fontSize:14}}><option value="name">Name A–Z</option><option value="progression">Troop progression</option><option value="troopPower">Troop power</option><option value="review">Needs review</option></select></label>
+        <label style={{flex:1,minWidth:0}}><span style={{position:'absolute',width:1,height:1,overflow:'hidden'}}>Sort roster</span><select aria-label="Sort roster" value={sort} onChange={e=>setSort(e.target.value)} style={{...button,width:'100%',fontSize:14}}><option value="name">Name A–Z</option><option value="progression">Troop strength</option><option value="troopPower">Troop power</option><option value="review">Needs review</option></select></label>
         <button style={button} onClick={()=>{if(selecting)stopSelection();else setSelecting(true);}}>{selecting?'Done':'Select'}</button>
       </div>
       <button style={{...button,width:'100%',marginBottom:10}} aria-expanded={optionsOpen} onClick={()=>setOptionsOpen(!optionsOpen)}>Roster options {optionsOpen?'▴':'▾'}</button>

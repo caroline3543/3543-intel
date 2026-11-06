@@ -30,7 +30,7 @@ export function RosterFilters({players,roles,filters,onChange,onClose,count}) {
       <div style={{display:'grid',gap:14}}>
         {select('alliance','Alliance',unique(players.map(p=>p.allianceTag)).map(v=>[v,v]))}
         {select('role','Role',[['joiner','Joiners'],...roles.map(r=>[r.name,r.name==='Rally Lead'?'Rally leaders':r.name])])}
-        {select('tier','Troop progression',TIER_FILTERS)}
+        {select('tier','Troop strength',TIER_FILTERS)}
         {select('hero','Joiner hero · Skill 5',unique(players.flatMap(p=>(p.joinerHeroes||[]).filter(h=>h.skillLevel>=5).map(h=>h.hero))).map(v=>[v,v]))}
         {filters.hero && <label style={{minHeight:44,display:'flex',gap:10,alignItems:'center',color:C.icy}}><input type="checkbox" checked={filters.verified} onChange={e=>onChange({...filters,verified:e.target.checked})}/>Verified heroes only</label>}
         {select('language','Game language',unique(players.map(p=>gameLanguageName(p.gameLanguage))).map(v=>[v,v]))}

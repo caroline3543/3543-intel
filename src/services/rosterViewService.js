@@ -2,7 +2,7 @@ import { gameLanguageName } from './gameLanguageService.js';
 export const EMPTY_FILTERS = { alliance:'', role:'', tier:'', hero:'', language:'', review:false, verified:false };
 export const TIER_FILTERS = [
   ['helios-infantry','Helios infantry'], ['helios-lancer','Helios lancer'], ['helios-marksman','Helios marksman'],
-  ['full-fc5','All troops FC5'], ['full-fc6','All troops FC6 or Helios FC6'],
+  ['full-fc5','Full FC5'], ['full-fc6','Full FC6'], ['full-fc7','Full FC7'], ['full-fc8','Full FC8'],
 ];
 export function troopGaps(player) {
   return ['infantry','lancer','marksman'].filter(key => !player.troops?.[key]);
@@ -18,7 +18,8 @@ export function matchesRosterFilters(player, search, filters) {
   if (filters.review && !troopGaps(player).length && player.allianceTag && player.fid) return false;
   if (filters.tier?.startsWith('helios-') && !player.troops?.[filters.tier.slice(7)]?.startsWith('Helios')) return false;
   if (filters.tier==='full-fc5' && !['infantry','lancer','marksman'].every(key=>player.troops?.[key]==='FC5')) return false;
-  if (filters.tier==='full-fc6' && !['infantry','lancer','marksman'].every(key=>['FC6','Helios FC6'].includes(player.troops?.[key]))) return false;
+  const fullTier=filters.tier?.match(/^full-fc([678])$/)?.[1];
+  if(fullTier && !['infantry','lancer','marksman'].every(key=>[`FC${fullTier}`,`Helios FC${fullTier}`].includes(player.troops?.[key])))return false;
   return true;
 }
 export function rosterFilterCount(filters) {

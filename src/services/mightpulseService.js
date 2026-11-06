@@ -5,6 +5,12 @@ import { supabase } from './supabaseClient.js';
  * The Edge Function must enforce request validation and durable rate limits before enabling anonymous calls.
  */
 export async function mightpulseRequest(action, params = {}) {
+  if (import.meta.env.VITE_ROSTER_API === 'true') {
+    const response=await fetch('/api/lookup',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({action,...params})});
+    const payload=await response.json().catch(()=>({error:'Unable to read the server response.'}));
+    if(!response.ok){if(response.status===401)window.dispatchEvent(new Event('roster:locked'));const error=new Error(payload.error||'Unable to refresh game data.');error.status=response.status;error.providerStatus=payload.provider_status;throw error;}
+    return payload;
+  }
   if (!supabase) throw new Error('Supabase is not configured');
   const { data, error } = await supabase.functions.invoke('whiteoutstats', {
     body: { action, ...params },
