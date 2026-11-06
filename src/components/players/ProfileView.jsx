@@ -180,7 +180,7 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
                       const widgets = team.widgets?.[h];
                       return (
                         <span key={h} style={{ padding:'6px 12px', borderRadius:16, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:13 }}>
-                          {h}{skill != null ? ` • ★${skill}` : ''}{widgets != null ? ` • ${widgets}w` : ''}
+                          {h}{skill != null ? ` · Skill ${skill}` : ''}{widgets != null ? ` • ${widgets}w` : ''}
                         </span>
                       );
                     })}
@@ -211,7 +211,7 @@ export function ProfileView({ player, roles = [], open, onClose, onEdit, events,
             <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:12 }}>
               {joiners.map(jh=>(
                 <span key={jh.hero} style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 12px 8px 16px', borderRadius:20, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:14 }}>
-                  {jh.hero}{jh.skillLevel!=null?` · ★${jh.skillLevel}`:''}
+                  {jh.hero}{jh.skillLevel!=null?` · Skill ${jh.skillLevel}`:''}
                   <button onClick={() => removeHero(jh.hero)} aria-label={`Remove ${jh.hero}`}
                     style={{ width:20, height:20, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', color:C.gold+'99', fontSize:13, cursor:'pointer', padding:0 }}>✕</button>
                 </span>

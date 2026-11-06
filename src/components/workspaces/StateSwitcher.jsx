@@ -4,6 +4,7 @@ import { saveToStorage, flushRosterStorage } from '../../services/exportImportSe
 import { C } from '../../utils/constants.js';
 const control = { minHeight:44, borderRadius:10, border:`1px solid ${C.border}`, background:C.section, color:C.white, padding:'8px 10px', fontSize:14 };
 export function StateSwitcher({ data, onPull }) {
+  const [managing, setManaging] = useState(false);
   const [adding, setAdding] = useState(false);
   const [number, setNumber] = useState('');
   const [error, setError] = useState('');
@@ -23,16 +24,17 @@ export function StateSwitcher({ data, onPull }) {
     catch (e) { setSaving(false); setConfirmDelete(false); setError(e.message || 'Unable to remove the state.'); }
   }
   return <section style={{ marginTop:12 }} aria-label="State workspace">
-    <label htmlFor="active-state" style={{ display:'block', color:C.gold, fontSize:12, marginBottom:5 }}>Showing one state only</label>
+    <label htmlFor="active-state" style={{ display:'block', color:C.gold, fontSize:12, marginBottom:5 }}>State</label>
     <div style={{ display:'flex', gap:6 }}>
       <select id="active-state" disabled={saving} value={activeStateId()} onChange={e => switchTo(e.target.value)} style={{ ...control, flex:1, minWidth:0 }}>
         {getWorkspaces().states.map(id => <option key={id} value={id}>State {id}</option>)}
       </select>
-      <button style={control} onClick={() => setAdding(!adding)} aria-label="Add another state">+ State</button>
-      <button style={{ ...control, color:C.gold }} onClick={onPull}>Pull alliance</button>
+      <button style={control} onClick={() => setManaging(!managing)} aria-label="Manage states" aria-expanded={managing}>•••</button>
+      <button style={{ ...control, color:C.gold }} onClick={onPull}>{data.players?.length ? 'Refresh roster' : 'Load alliance'}</button>
     </div>
     {saving && <p role="status" style={{color:C.icy,fontSize:14}}>Saving before switching…</p>}
-    <button style={{...control, background:'none', border:0, color:C.muted, fontSize:12, padding:'4px 0'}} onClick={() => {setError('');setConfirmDelete(true);setAdding(false);}} aria-label={`Delete State ${activeStateId()}`}>Delete state</button>
+    {managing && <div style={{marginTop:8}}><button style={control} onClick={() => setAdding(!adding)}>Add state</button>
+    <button style={{...control, background:'none', border:0, color:C.muted, fontSize:12, padding:'4px 0'}} onClick={() => {setError('');setConfirmDelete(true);setAdding(false);}} aria-label={`Delete State ${activeStateId()}`}>Remove state</button></div>}
     {confirmDelete && <div role="alertdialog" aria-label={`Delete State ${activeStateId()}`} style={{padding:12,border:`1px solid ${C.red}`,borderRadius:10,marginBottom:8}}>
       <div style={{color:C.white,fontWeight:700}}>Remove State {activeStateId()} from your list?</div>
       <p style={{color:C.icy,fontSize:12,lineHeight:1.5}}>Saved records are kept. You can restore this state by adding its number again. Other states are unaffected.</p>
