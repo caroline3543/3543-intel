@@ -44,3 +44,5 @@ Legions support per-legion player entry: one-player suggestions or bulk pasted u
 ### UI change review
 
 For future requested UI changes, compare three concepts, have an independent AI reviewer score ease of use, functionality, accessibility, copy and accuracy, then refine the chosen design to at least 90/100 before publishing. Validate the implemented flows; do not describe this score as Apple approval or a real-device test.
+
+TAL suggestions prioritize availability, then saved State 3573 Labyrinth rank (lower is better) and score. The first preview fetches the Labyrinth leaderboard if no ranks are saved; manual refresh updates only returned player IDs. Discord move/stay blocks group original home alliance by TAL host and legion, with alphabetized names and primary UTC times. Top-20 markers always use recorded TAL troop power, independently of the chosen list order.

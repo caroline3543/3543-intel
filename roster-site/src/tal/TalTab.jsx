@@ -6,13 +6,13 @@ import {Availability} from './Availability.jsx';
 import {Legions} from './Legions.jsx';
 import {Review} from './Review.jsx';
 const steps=[['setup','Setup'],['times','Times'],['legions','Legions'],['review','Review']];
-export function TalTab({value,players,onChange,onMembers,onExport}){
+export function TalTab({value,players,onChange,onMembers,onExport,onRefreshLab,refreshingLab}){
  const plan={...newPlan(),...value};
  const [message,setMessage]=useState(''),[copyText,setCopyText]=useState('');
  function save(next){onChange(next);setMessage('');}
  function step(next){onChange({...plan,step:next});setMessage('');}
  async function copy(text){setCopyText(text);try{await navigator.clipboard.writeText(text);setMessage('Copied.');}catch{setMessage('Copy unavailable. Select the text below.');}}
- const props={plan,players,onChange:save,onMessage:setMessage,onCopy:copy};
+ const props={plan,players,onChange:save,onMessage:setMessage,onCopy:copy,onRefreshLab,refreshingLab};
  return <section style={{padding:'16px 20px 32px'}}>
   <h2 style={{fontSize:24,margin:'0 0 8px'}}>Tundra Arms League</h2><Hint>Build a state team from any loaded alliance. Plan here; register in game.</Hint>
   <nav aria-label="TAL planning steps" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6,marginBottom:14}}>{steps.map(([id,label])=><button key={id} aria-current={plan.step===id?'step':undefined} style={{...button,padding:'10px 3px',fontSize:13,color:plan.step===id?C.gold:C.icy,borderColor:plan.step===id?C.gold:C.border}} onClick={()=>step(id)}>{label}</button>)}</nav>

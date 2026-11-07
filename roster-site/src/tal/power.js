@@ -1,3 +1,4 @@
+import {compareLabyrinth} from './labyrinth.js';
 import {record,playerLabel} from './planner.js';
 import {matchPollEntries} from '../../../src/services/talPoll.js';
 export function parsePower(value){
@@ -11,8 +12,9 @@ export const fmtPower=value=>value==null?'Not entered':Number(value).toLocaleStr
 export function troopPower(plan,p){try{return parsePower(record(plan,p).troopPower);}catch{return null;}}
 export function comparePlayers(plan,mode='troop'){
  return (a,b)=>{
+  if(mode==='labyrinth'){const diff=compareLabyrinth(a,b);if(diff)return diff;}
   if(mode==='game'){const rank=p=>Number(p.allianceRank?.match(/^R([1-5])$/)?.[1])||0;const diff=rank(b)-rank(a);if(diff)return diff;}
-  if(mode==='game'||mode==='troop'){const av=troopPower(plan,a),bv=troopPower(plan,b);if(av==null||bv==null){if(av!==bv)return av==null?1:-1;}else if(av!==bv)return bv-av;}
+  if(mode==='game'||mode==='troop'||mode==='labyrinth'){const av=troopPower(plan,a),bv=troopPower(plan,b);if(av==null||bv==null){if(av!==bv)return av==null?1:-1;}else if(av!==bv)return bv-av;}
   if(mode==='city'){const av=a.power??a.providerStats?.power,bv=b.power??b.providerStats?.power;if(av==null||bv==null){if(av!==bv)return av==null?1:-1;}else if(Number(av)!==Number(bv))return Number(bv)-Number(av);}
   return playerLabel(a).localeCompare(playerLabel(b))||String(a.id).localeCompare(String(b.id));
  };
@@ -37,4 +39,9 @@ export function powerPastePreview(text,players,plan){
  });
  const counts=new Map();for(const r of rows)if(r.player)counts.set(r.player.id,(counts.get(r.player.id)||0)+1);
  return rows.map(r=>r.player&&counts.get(r.player.id)>1?{...r,error:'Player appears twice. Keep one row.'}:r);
+}
+
+export function top20Ids(plan,team,players){
+ const ids=new Set(team.members.map(m=>m.id));
+ return new Set(players.filter(p=>ids.has(p.id)&&troopPower(plan,p)!=null).sort(comparePlayers(plan,'troop')).slice(0,20).map(p=>p.id));
 }

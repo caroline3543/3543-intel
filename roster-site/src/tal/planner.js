@@ -1,3 +1,4 @@
+import {compareLabyrinth} from './labyrinth.js';
 export const DEFAULT_TIMES=['02:00','07:00','12:00','14:00','19:00'];
 export function newPlan(){return {name:'State 3573 TAL',step:'setup',deadline:'',times:[...DEFAULT_TIMES],timesConfirmed:false,minOverlap:2,targetCombatants:15,records:{},teams:[],locked:false};}
 export function record(plan,player){return {status:'pending',times:[],homeAlliance:player.allianceTag||'',note:'',troopPower:'',...plan.records?.[player.id]};}
@@ -80,7 +81,7 @@ export function suggest(plan,players){
    const candidates=pool.filter(p=>!selected.has(p.id)&&eligible(plan,p,team));
    const counts=coverage(plan,team,players);
    const score=p=>overlap(plan,p,team)*1000+counts.reduce((n,c)=>n+(record(plan,p).times.includes(c.time)?100/(1+c.combatants+c.substitutes):0),0);
-   candidates.sort((a,b)=>score(b)-score(a)||(Number(record(plan,b).troopPower)||0)-(Number(record(plan,a).troopPower)||0)||playerLabel(a).localeCompare(playerLabel(b)));
+   candidates.sort((a,b)=>score(b)-score(a)||compareLabyrinth(a,b)||(Number(record(plan,b).troopPower)||0)-(Number(record(plan,a).troopPower)||0)||playerLabel(a).localeCompare(playerLabel(b)));
    if(candidates.length){team.members.push({id:candidates[0].id,role,registered:false});selected.add(candidates[0].id);added=true;}
   }}
  }

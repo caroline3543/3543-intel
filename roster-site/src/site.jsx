@@ -1,3 +1,4 @@
+import {normalizeRankings,rankingProfileUpdates} from '../../src/services/stateRankingsService.js';
 import {BottomNav} from './components/BottomNav.jsx';
 import {NameChanges} from './components/NameChanges.jsx';
 import {mightpulseRequest} from '../../src/services/mightpulseService.js';
@@ -38,6 +39,8 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const [tab,setTab]=useState('members');
   const [initialPlayerId,setInitialPlayerId]=useState(null);
   const [legionRefresh,setLegionRefresh]=useState(null);
+  const [refreshingLab,setRefreshingLab]=useState(false);
+  const labBusy=useRef(false);
   const refreshing=useRef(false),stopRefresh=useRef(false);
   function navigate(id){setTab(id);window.scrollTo?.({top:0,behavior:'instant'});}
   useEffect(()=>()=>{stopRefresh.current=true;},[]);
@@ -51,6 +54,18 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   function save(player){const next=withGameLanguage({...player,profileLastUpdated:new Date().toISOString()});setData(prev=>({...prev,players:prev.players.map(p=>p.id===next.id?next:p)}));setMessage('Player saved');}
   function update(updated){const byId=new Map(updated.map(p=>[p.id,p]));setData(prev=>({...prev,players:prev.players.map(p=>byId.get(p.id)||p)}));}
   function importRoster(rows){const result=mergeAllianceProfiles(latest.current.players||[],rows,'3573');latest.current={...latest.current,players:result.players};setData(prev=>({...prev,players:result.players}));return {updated:result.updated.length,added:result.added.length};}
+  async function refreshLab(){
+    if(labBusy.current)return;labBusy.current=true;setRefreshingLab(true);
+    try{
+      const response=await mightpulseRequest('rankings',{state:3573,board:'labyrinth',limit:100});
+      const result=normalizeRankings(response,'3573','labyrinth');
+      const updates=rankingProfileUpdates(latest.current.players,result,'3573'),byId=new Map(updates.map(p=>[p.id,p]));
+      latest.current={...latest.current,players:latest.current.players.map(p=>byId.get(p.id)||p)};setData(latest.current);
+      setMessage(`Labyrinth updated for ${updates.length} players. Only returned leaderboard entries were updated; other saved ranks were kept.`);
+      return latest.current.players;
+    }catch(e){setMessage(e.message||'Unable to refresh Labyrinth. Try again.');return null;}
+    finally{labBusy.current=false;setRefreshingLab(false);}
+  }
   async function refreshLegion(team){
     if(refreshing.current)return;
     const ids=[...new Set(team.members.map(m=>m.id))];
@@ -94,7 +109,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='members'&&!DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag))&&<AllianceSetup players={players} onLoad={importRoster}/>}
     {tab==='members'&&players.length>0&&<RosterTab initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} legionPlan={data.talPlan||newPlan()} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
     {tab==='changes'&&<NameChanges players={players} plan={data.talPlan||newPlan()} onOpen={id=>{setInitialPlayerId(id);navigate('members');}}/>}
-    {tab==='tal'&&<TalTab value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onMembers={()=>setTab('members')} onExport={backup}/>}
+    {tab==='tal'&&<TalTab onRefreshLab={refreshLab} refreshingLab={refreshingLab} value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onMembers={()=>setTab('members')} onExport={backup}/>}
     {tourOpen&&<QuickTour haptics={preferences.haptics} onHapticsChange={haptics=>onPreferencesChange({haptics})} onClose={()=>{onPreferencesChange({tutorialSeen:true});setTourOpen(false);}}/>}
     {importing&&<AllianceImportPanel stateId="3573" players={players} onImport={importRoster} onClose={()=>setImporting(false)}/>}
     {deleting&&<DeleteConfirmModal message="Remove this player from this device’s roster? Their game account is unaffected." onCancel={()=>setDeleting(null)} onConfirm={()=>{setData(prev=>({...prev,players:prev.players.filter(p=>p.id!==deleting)}));setDeleting(null);}}/>}
