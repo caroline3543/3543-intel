@@ -9,5 +9,5 @@ export function useSharedWorkspace(initial){
   const timer=setInterval(refresh,5000);window.addEventListener('focus',refresh);window.addEventListener('online',refresh);document.addEventListener('visibilitychange',refresh);
   return()=>{client.dispose();clearInterval(timer);window.removeEventListener('focus',refresh);window.removeEventListener('online',refresh);document.removeEventListener('visibilitychange',refresh);};
  },[]);
- return {data,setData:value=>controller.current?.update(value),sync,publish:()=>controller.current?.publish(),join:()=>controller.current?.join(),retry:()=>controller.current?.sync(),resolve:side=>controller.current?.resolve(side)};
+ return {data,setData:value=>controller.current?.update(value),sync,publish:()=>controller.current?.publish(),join:()=>controller.current?.join(),retry:async()=>{await controller.current?.sync();return controller.current?.getState();},resolve:side=>controller.current?.resolve(side)};
 }

@@ -8,7 +8,7 @@ export function WorkspaceAttention({sync,onReview}){
  if(!text)return null;
  return <div role="status" aria-label="Workspace needs attention" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'6px 20px',borderBottom:`1px solid ${C.border}`,fontSize:14,color:C.gold}}><span>{text}</span><button style={button} onClick={onReview}>Review</button></div>;
 }
-export function WorkspaceOptions({sync,data,onPublish,onJoin,onRetry,onResolve,onClose,onLogout,onHelp}){
+export function WorkspaceOptions({sync,data,onPublish,onJoin,onRetry,onResolve,onClose,onLogout,onHelp,onAlliance}){
  const panel=useRef(null),close=useRef(onClose);close.current=onClose;
  useEffect(()=>{
   const previous=document.activeElement===document.body?document.querySelector('[aria-label="Workspace options"]'):document.activeElement,section=panel.current,overflow=document.body.style.overflow;
@@ -26,6 +26,6 @@ export function WorkspaceOptions({sync,data,onPublish,onJoin,onRetry,onResolve,o
   <header style={{position:'sticky',top:0,zIndex:1,padding:'calc(12px + env(safe-area-inset-top, 0px)) 20px 12px',background:C.bg,borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}><h2 id="workspace-title" style={{fontSize:22,margin:0}}>Workspace</h2><button style={button} onClick={onClose}>Close</button></header>
   <WorkspaceSync sync={sync} data={data} onPublish={onPublish} onJoin={onJoin} onRetry={onRetry} onResolve={onResolve}/>
   <SheetImportSummary data={data}/>
-  <div style={{display:'grid',gap:10,margin:'16px 20px'}}><button style={button} onClick={onHelp}>Help</button><button style={button} onClick={onLogout}>Sign out</button></div>
+  <div style={{display:'grid',gap:10,margin:'16px 20px'}}><button style={button} onClick={onAlliance}>Add or refresh an alliance</button><button style={button} onClick={onHelp}>Help</button><button style={button} onClick={onLogout}>Sign out</button></div>
  </section></div>;
 }

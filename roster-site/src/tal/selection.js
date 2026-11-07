@@ -10,7 +10,7 @@ export function setLegionSelected(plan,players,id,teamId,selected,{confirmRegist
   if(player.blacklisted)throw Error('This player is excluded from battle plans.');
   if(record(plan,player).status==='declined')throw Error('Marked not participating. Update availability first.');
   if(team.members.length>=50)throw Error('50 players selected. Deselect someone first.');
-  const role=['combatant','substitute'].includes(candidate?.previousRole)?candidate.previousRole:'pending';
+  const role=!plan.autoRoles&&['combatant','substitute'].includes(candidate?.previousRole)?candidate.previousRole:'pending';
   if(role!=='pending'&&team.members.filter(m=>m.role===role).length>=(role==='combatant'?30:20))throw Error(`No ${role} places left. Choose a role first.`);
   const next=setRecord(plan,player,{excludeFromSuggestions:false});
   return {...next,teams:next.teams.map(t=>({...t,members:t.id===teamId?[...t.members,{id,role,registered:false}]:t.members,candidates:(t.candidates||[]).filter(c=>c.id!==id)}))};

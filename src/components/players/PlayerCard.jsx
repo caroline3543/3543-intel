@@ -1,4 +1,4 @@
-import { C, FC_BADGE_IMAGES } from '../../utils/constants.js';
+import { C } from '../../utils/constants.js';
 import { FC_OPTIONS } from '../../utils/constants.js';
 import { PlayerAvatar } from './PlayerAvatar.jsx';
 import { useState } from 'react';
@@ -65,7 +65,7 @@ export function PlayerCard({player,onClick,onDelete,missingCount,onToggleRallyLe
       <button onClick={onClick} aria-label={bulkMode?`${isSelected?'Deselect':'Select'} ${name}`:`Open ${name}`} aria-pressed={bulkMode?isSelected:undefined} style={{display:'flex',alignItems:'center',gap:10,flex:1,minWidth:0,textAlign:'left',border:0,background:'none',padding:0,minHeight:48,color:C.white,cursor:'pointer'}}>
         {bulkMode?<span aria-hidden="true" style={{fontSize:22,color:isSelected?C.gold:C.icy}}>{isSelected?'☑':'☐'}</span>:<PlayerAvatar player={player} size={44}/>}
         <span style={{flex:1,minWidth:0}}>
-          <span style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:16,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</span>{player.furnaceLevel && (FC_BADGE_IMAGES[player.furnaceLevel]?<img src={FC_BADGE_IMAGES[player.furnaceLevel]} alt={player.furnaceLevel} style={{width:24,height:24,flexShrink:0}}/>:<span style={{fontSize:13,color:C.gold,flexShrink:0}}>{player.furnaceLevel}</span>)}</span>
+          <span style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}><span style={{fontSize:16,fontWeight:700,minWidth:0,overflowWrap:'anywhere',lineHeight:1.4}}>{name}</span>{player.furnaceLevel&&<span style={{fontSize:13,color:C.gold,flexShrink:0}}>{player.furnaceLevel}</span>}</span>
           <span style={{display:'block',fontSize:14,color:C.icy,marginTop:4}}>{player.allianceTag?`[${player.allianceTag}]`:'Alliance unknown'}{power!=null?` · Power ${compact(power)}`:''}</span>
         </span>
       </button>

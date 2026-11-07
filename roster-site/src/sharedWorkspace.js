@@ -2,7 +2,7 @@ import {sharedData,mergeWorkspace,resolveConflicts,validateWorkspace,sameWorkspa
 const equal=sameWorkspaceValue;
 const meaningful=data=>Boolean(data?.players?.length||data?.events?.length||data?.customRoles?.length||data?.talPlan);
 export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onStatus=()=>{}}){
- let state={local:sharedData(initial),base:null,revision:0,joined:false,updatedAt:null,conflicts:[],mode:'connecting',issue:null,status:'Opening shared workspace…',ready:false,deviceBackup:null};
+ let state={local:sharedData(initial),base:null,revision:0,joined:false,updatedAt:null,conflicts:[],mode:'connecting',issue:null,status:'Opening shared workspace…',ready:false,deviceBackup:null,syncing:false,checkedAt:null};
  let running=false,disposed=false,timer=null,persisting=Promise.resolve();
  function emit(){if(!disposed){onChange(state.local);onStatus({...state,dirty:!equal(state.local,state.base)});}}
  function persist(){const value=structuredClone(state);persisting=persisting.catch(()=>{}).then(()=>cache.write(value));return persisting;}
@@ -31,7 +31,7 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
   state.ready=true;emit();await sync();
  }
  async function sync(){
-  if(disposed||running||state.conflicts.length)return;running=true;
+  if(disposed||running||state.conflicts.length)return;running=true;state.syncing=true;state.status='Syncing…';emit();
   try{
    const remote=await request('GET',state.joined&&state.base?{revision:state.revision}:undefined);if(!remote.unchanged){integrate(remote);await persist();}else{state.status=equal(state.local,state.base)?'Shared · all changes saved':'Syncing changes…';if(equal(state.local,state.base))state.issue=null;}emit();
    if(!state.joined||state.conflicts.length||equal(state.local,state.base))return;
@@ -45,8 +45,9 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
    state.base=structuredClone(result.data);state.local=merged.data;state.revision=result.revision;state.updatedAt=result.updatedAt;state.conflicts=merged.conflicts;state.issue=null;
    state.status=state.conflicts.length?'Conflicting edits · review below':equal(state.local,state.base)?'Shared · all changes saved':'Syncing changes…';await persist();emit();
    if(!equal(state.local,state.base)&&!state.conflicts.length)schedule();
+   state.checkedAt=new Date().toISOString();
   }catch(e){error(e);}
-  finally{running=false;}
+  finally{running=false;state.syncing=false;if(!state.issue)state.checkedAt=new Date().toISOString();emit();}
  }
  function update(value){state.local=sharedData(typeof value==='function'?value(state.local):value);state.status='Saving on this device…';emit();persist().then(()=>{state.status=state.joined?'Saved on this device · waiting to sync':'Saved on this device · not shared yet';emit();if(state.joined)schedule();}).catch(()=>error(Error('Device storage is full. Download a backup before closing.')));}
  async function publish(){
