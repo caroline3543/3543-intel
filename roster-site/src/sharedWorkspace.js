@@ -2,26 +2,27 @@ import {sharedData,mergeWorkspace,resolveConflicts,validateWorkspace,sameWorkspa
 const equal=sameWorkspaceValue;
 const meaningful=data=>Boolean(data?.players?.length||data?.events?.length||data?.customRoles?.length||data?.talPlan);
 export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onStatus=()=>{}}){
- let state={local:sharedData(initial),base:null,revision:0,joined:false,updatedAt:null,conflicts:[],mode:'connecting',status:'Opening shared workspace…',ready:false,deviceBackup:null};
+ let state={local:sharedData(initial),base:null,revision:0,joined:false,updatedAt:null,conflicts:[],mode:'connecting',issue:null,status:'Opening shared workspace…',ready:false,deviceBackup:null};
  let running=false,disposed=false,timer=null,persisting=Promise.resolve();
  function emit(){if(!disposed){onChange(state.local);onStatus({...state,dirty:!equal(state.local,state.base)});}}
  function persist(){const value=structuredClone(state);persisting=persisting.catch(()=>{}).then(()=>cache.write(value));return persisting;}
  function schedule(){clearTimeout(timer);if(!disposed)timer=setTimeout(()=>{sync();},600);}
- function error(error){state.status=error?.message||'Offline · changes waiting on this device';emit();}
+ function error(error){state.status=error?.message||'Offline · changes waiting on this device';state.issue=state.status;emit();}
  function integrate(remote){
   if(!Number.isSafeInteger(remote.revision)||remote.revision<state.revision)throw Error('Unable to verify shared data. Retry sync.');
   if(remote.data==null){
    if(state.joined){if(state.revision===0&&state.base==null){state.mode='active';return;}throw Error('Shared data is unavailable. Your device copy is kept.');}
-   state.mode='unpublished';state.status='Saved on this device · not shared yet';state.remote=remote;return;
+   state.mode='unpublished';state.issue=null;state.status='Saved on this device · not shared yet';state.remote=remote;return;
   }
   validateWorkspace(remote.data);
   if(!state.joined){
-   if(meaningful(state.local)){state.mode='join';state.remote=remote;state.status='A shared roster is ready. Choose which copy to open.';return;}
+   if(meaningful(state.local)){state.mode='join';state.issue=null;state.remote=remote;state.status='A shared roster is ready. Choose which copy to open.';return;}
    state.local=structuredClone(remote.data);state.joined=true;
   }else{
    const merged=mergeWorkspace(state.base,state.local,remote.data);state.local=merged.data;state.conflicts=merged.conflicts;
   }
   state.base=structuredClone(remote.data);state.revision=remote.revision;state.updatedAt=remote.updatedAt;state.mode='active';
+  if(state.conflicts.length||equal(state.local,state.base))state.issue=null;
   state.status=state.conflicts.length?'Conflicting edits · review below':equal(state.local,state.base)?'Shared · all changes saved':'Syncing changes…';
  }
  async function initialize(){
@@ -32,7 +33,7 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
  async function sync(){
   if(disposed||running||state.conflicts.length)return;running=true;
   try{
-   const remote=await request('GET',state.joined&&state.base?{revision:state.revision}:undefined);if(!remote.unchanged){integrate(remote);await persist();}else state.status=equal(state.local,state.base)?'Shared · all changes saved':'Syncing changes…';emit();
+   const remote=await request('GET',state.joined&&state.base?{revision:state.revision}:undefined);if(!remote.unchanged){integrate(remote);await persist();}else{state.status=equal(state.local,state.base)?'Shared · all changes saved':'Syncing changes…';if(equal(state.local,state.base))state.issue=null;}emit();
    if(!state.joined||state.conflicts.length||equal(state.local,state.base))return;
    validateWorkspace(state.local);state.status='Syncing changes…';emit();
    const snapshot=structuredClone(state.local),revision=state.revision;
@@ -41,7 +42,7 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
    if(result.conflict){integrate(result);await persist();emit();if(!state.conflicts.length)schedule();return;}
    if(!Number.isSafeInteger(result.revision)||result.revision<revision||!equal(result.data,snapshot))throw Error('Save could not be verified. Your edits are waiting on this device.');
    const merged=mergeWorkspace(snapshot,state.local,result.data);
-   state.base=structuredClone(result.data);state.local=merged.data;state.revision=result.revision;state.updatedAt=result.updatedAt;state.conflicts=merged.conflicts;
+   state.base=structuredClone(result.data);state.local=merged.data;state.revision=result.revision;state.updatedAt=result.updatedAt;state.conflicts=merged.conflicts;state.issue=null;
    state.status=state.conflicts.length?'Conflicting edits · review below':equal(state.local,state.base)?'Shared · all changes saved':'Syncing changes…';await persist();emit();
    if(!equal(state.local,state.base)&&!state.conflicts.length)schedule();
   }catch(e){error(e);}
@@ -55,7 +56,7 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
    validateWorkspace(state.local);await persist();running=true;
    const snapshot=structuredClone(state.local),result=await request('POST',{revision:0,data:snapshot});
    if(result.conflict){state.joined=false;state.mode='join';state.remote=result;state.status='Another leader started sharing first. Open the shared roster below.';}
-   else{if(!Number.isSafeInteger(result.revision)||result.revision<1||!equal(result.data,snapshot))throw Error('Shared save could not be verified. Your device copy is kept.');const merged=mergeWorkspace(snapshot,state.local,result.data);state.base=result.data;state.local=merged.data;state.revision=result.revision;state.updatedAt=result.updatedAt;state.status='Shared · all changes saved';}
+   else{if(!Number.isSafeInteger(result.revision)||result.revision<1||!equal(result.data,snapshot))throw Error('Shared save could not be verified. Your device copy is kept.');const merged=mergeWorkspace(snapshot,state.local,result.data);state.base=result.data;state.local=merged.data;state.revision=result.revision;state.updatedAt=result.updatedAt;state.issue=null;state.status='Shared · all changes saved';}
    await persist();emit();
   }catch(e){state.mode='active';error(e);await persist();}
   finally{running=false;}
@@ -63,7 +64,7 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
  async function join(){
   if(!state.remote?.data||running)return;const previous=structuredClone(state);
   try{
-   state.deviceBackup=structuredClone(state.local);state.local=structuredClone(state.remote.data);state.base=structuredClone(state.remote.data);state.revision=state.remote.revision;state.updatedAt=state.remote.updatedAt;state.joined=true;state.conflicts=[];delete state.remote;state.mode='active';state.status='Shared · all changes saved';await persist();emit();schedule();
+   state.deviceBackup=structuredClone(state.local);state.local=structuredClone(state.remote.data);state.base=structuredClone(state.remote.data);state.revision=state.remote.revision;state.updatedAt=state.remote.updatedAt;state.joined=true;state.conflicts=[];delete state.remote;state.mode='active';state.issue=null;state.status='Shared · all changes saved';await persist();emit();schedule();
   }catch(e){state=previous;error(Error('Device backup could not be saved. Download your copy before trying again.'));}
  }
  async function resolve(side){

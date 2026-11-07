@@ -1,7 +1,6 @@
-import {SheetImportSummary} from './components/SheetImportSummary.jsx';
+import {WorkspaceOptions,WorkspaceAttention} from './components/WorkspaceOptions.jsx';
 import {plannedMemberIds} from '../../src/services/talRosterService.js';
 import {useSharedWorkspace} from './useSharedWorkspace.js';
-import {WorkspaceSync} from './components/WorkspaceSync.jsx';
 import {normalizeRankings,rankingProfileUpdates} from '../../src/services/stateRankingsService.js';
 import {BottomNav} from './components/BottomNav.jsx';
 import {NameChanges} from './components/NameChanges.jsx';
@@ -41,6 +40,8 @@ export function SiteApp(){
 }
 function Members({onLogout,error,preferences,onPreferencesChange}){
   const [tab,setTab]=useState('members');
+  const [workspaceOpen,setWorkspaceOpen]=useState(false);
+  const lastAttention=useRef(null);
   const [initialPlayerId,setInitialPlayerId]=useState(null);
   const [legionRefresh,setLegionRefresh]=useState(null);
   const [refreshingLab,setRefreshingLab]=useState(false);
@@ -54,6 +55,8 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const {data,setData,sync,publish,join,retry,resolve}=useSharedWorkspace(localInitial.current);
   const [importing,setImporting]=useState(false),[deleting,setDeleting]=useState(null),[message,setMessage]=useState('');
   const latest=useRef(data);latest.current=data;
+  const requiredAction=sync.conflicts?.length?'conflict':['join','unpublished'].includes(sync.mode)?sync.mode:null;
+  useEffect(()=>{if(requiredAction&&requiredAction!==lastAttention.current)setWorkspaceOpen(true);else if(!requiredAction&&lastAttention.current)setWorkspaceOpen(false);lastAttention.current=requiredAction;},[requiredAction]);
   const players=data.players||[];
   useEffect(()=>{saveToStorage(data);},[data]);
   useEffect(()=>{const fail=()=>setMessage('Unable to save. Export a backup before closing this page.');window.addEventListener('app:storage-full',fail);return()=>window.removeEventListener('app:storage-full',fail);},[]);
@@ -109,9 +112,9 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   }
   if(!sync.ready)return <p role="status" style={{padding:24,color:C.icy}}>Opening shared workspace…</p>;
   return <main style={{maxWidth:480,margin:'0 auto',paddingBottom:'calc(140px + env(safe-area-inset-bottom, 0px))'}}>
-    <header style={{padding:20,borderBottom:`1px solid ${C.border}`}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><h1 style={{fontSize:22,margin:0}}>3573 · Caroline</h1><p style={{fontSize:14,color:C.icy,margin:'5px 0 0'}}>{tab==='tal'?'TAL planner':tab==='changes'?'Name changes':`Members · ${players.length} players`}</p></div><button style={button} onClick={onLogout}>Sign out</button></div><div style={{display:'flex',gap:8,marginTop:14}}><button style={{...button,flex:1,color:C.gold}} disabled={sync.mode==='join'||!!sync.conflicts?.length} onClick={()=>setImporting(true)}>Other alliance</button><button style={{...button,minWidth:44,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={backup} disabled={exporting} aria-label={tab==='tal'?'Download TAL plan as Excel':'Download roster as Excel'} title={tab==='tal'?'Download TAL plan (.xlsx)':'Download roster as Excel (.xlsx)'}>{exporting?<span aria-hidden="true">…</span>:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>}</button></div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginTop:8}}><span style={{fontSize:13,color:C.icy}}>Leader workspace</span>{tab==='tal'&&<button style={button} onClick={()=>setTourOpen(true)}>Help</button>}</div>{error&&<p role="alert" style={{color:C.red}}>{error}</p>}</header>
-    <WorkspaceSync sync={sync} data={data} onPublish={publish} onJoin={join} onRetry={retry} onResolve={resolve}/>
-    <SheetImportSummary data={data}/>
+    <div data-workspace-content="" inert={workspaceOpen?'':undefined} aria-hidden={workspaceOpen?'true':undefined}>
+    <header style={{padding:20,borderBottom:`1px solid ${C.border}`}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><h1 style={{fontSize:22,margin:0}}>3573 · Caroline</h1><p style={{fontSize:14,color:C.icy,margin:'5px 0 0'}}>{tab==='tal'?'TAL planner':tab==='changes'?'Name changes':`Members · ${players.length} players`}</p></div><button style={{...button,minWidth:44,padding:10}} aria-label="Workspace options" title="Workspace" onClick={()=>setWorkspaceOpen(true)}><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div><div style={{display:'flex',gap:8,marginTop:14}}><button style={{...button,flex:1,color:C.gold}} disabled={sync.mode==='join'||!!sync.conflicts?.length} onClick={()=>setImporting(true)}>Other alliance</button><button style={{...button,minWidth:44,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={backup} disabled={exporting} aria-label={tab==='tal'?'Download TAL plan as Excel':'Download roster as Excel'} title={tab==='tal'?'Download TAL plan (.xlsx)':'Download roster as Excel (.xlsx)'}>{exporting?<span aria-hidden="true">…</span>:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>}</button></div>{error&&<p role="alert" style={{color:C.red}}>{error}</p>}</header>
+    <WorkspaceAttention sync={sync} onReview={()=>setWorkspaceOpen(true)}/>
     {message&&<div role="status" style={{margin:'12px 20px 0',padding:10,color:C.icy,background:C.section,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>{message}<button style={button} onClick={()=>setMessage('')} aria-label="Dismiss message">✕</button></div>}
     <BottomNav tab={tab} onChange={navigate}/>
     {legionRefresh&&<div role="status" style={{padding:'12px 20px',color:C.icy}}>Refreshing players: {legionRefresh.done} of {legionRefresh.total}<button style={{...button,marginLeft:8}} onClick={()=>{stopRefresh.current=true;}}>Stop after this player</button></div>}
@@ -121,7 +124,9 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='changes'&&<NameChanges players={players} plan={data.talPlan||newPlan()} onOpen={id=>{setInitialPlayerId(id);navigate('members');}}/>}
     {tab==='tal'&&<TalTab onRefreshLab={refreshLab} refreshingLab={refreshingLab} value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onMembers={()=>setTab('members')} onExport={backup}/>}
     </div>}
-    {tourOpen&&<QuickTour haptics={preferences.haptics} onHapticsChange={haptics=>onPreferencesChange({haptics})} onClose={()=>{onPreferencesChange({tutorialSeen:true});setTourOpen(false);}}/>}
+    </div>
+    {workspaceOpen&&<WorkspaceOptions sync={sync} data={data} onPublish={publish} onJoin={join} onRetry={retry} onResolve={resolve} onClose={()=>setWorkspaceOpen(false)} onLogout={onLogout} onHelp={()=>{setWorkspaceOpen(false);setTourOpen(true);}}/>}
+    {tourOpen&&!workspaceOpen&&<QuickTour haptics={preferences.haptics} onHapticsChange={haptics=>onPreferencesChange({haptics})} onClose={()=>{onPreferencesChange({tutorialSeen:true});setTourOpen(false);}}/>}
     {importing&&<AllianceImportPanel stateId="3573" players={players} onImport={importRoster} onClose={()=>setImporting(false)}/>}
     {deleting&&<DeleteConfirmModal message="Remove this player from the roster? Their game account is unaffected." onCancel={()=>setDeleting(null)} onConfirm={()=>{setData(prev=>({...prev,players:prev.players.filter(p=>p.id!==deleting)}));setDeleting(null);}}/>}
   </main>;

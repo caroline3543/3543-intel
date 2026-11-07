@@ -46,3 +46,7 @@ test('same-player edits to different fields merge, and different registration ch
 test('site and Edge Function validate with the same shared module',async()=>{
  const {readFile}=await import('node:fs/promises');const [site,edge]=await Promise.all([readFile(new URL('../roster-site/shared/workspace.js',import.meta.url),'utf8'),readFile(new URL('../supabase/functions/caroline3573-workspace/workspace.js',import.meta.url),'utf8')]);assert.equal(edge,site);
 });
+test('sync failures expose an actionable issue which clears only after verified recovery',async()=>{
+ const s=server(),a=client(s);await a.c.initialize();await a.c.publish();const saved=a.c.getState();a.c.dispose();let online=false;
+ const remote={request:(...args)=>online?s.request(...args):Promise.reject(Error('Network unavailable'))};const b=client(remote,initial(),saved);await b.c.initialize();assert.equal(b.c.getState().issue,'Network unavailable');edit(b.c,'a',{notes:'Queued'});assert.equal(b.c.getState().issue,'Network unavailable');online=true;await b.c.sync();assert.equal(b.c.getState().issue,null);assert.equal(s.data.players[0].notes,'Queued');b.c.dispose();
+});

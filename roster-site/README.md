@@ -66,3 +66,7 @@ The import utility supplements API records by stable FID and retains the origina
 Selected players with unspecified combatant/substitute roles use `member.role = 'pending'`, count toward the total 50 places and must choose a role before registration is confirmed. They do not count as combatants or substitutes. Source registration flags remain separately visible. Proposed, under-review and withdrawn entries live in `team.candidates`; they are not automatically suggested or silently promoted. Manual promotion chooses a real role and removes the candidate atomically. Planning labels such as RKG Legion 3 are preserved with an explicit in-game-number warning.
 
 Raw user data and source snapshots are not committed to this repository. The one-time shared import is validated and published using the workspace revision CAS function; existing shared data must be reviewed if the expected revision changes.
+
+### Workspace controls
+
+Routine sync and spreadsheet-import cards are not rendered in Members, TAL planner or Name changes. The header’s Workspace options (•••) opens a separate dialog containing manual sync, sharing, device backups, import details, Help and Sign out. The sync controller stays mounted independently of the dialog. Only failed syncs and required first-share/join/conflict decisions show a compact page notice. The dialog locks background interaction with inert/aria-hidden and restores focus and scroll when closed.
