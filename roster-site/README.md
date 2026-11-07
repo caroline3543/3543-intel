@@ -33,10 +33,14 @@ The second tab is a guided state-legion planner: Setup, Times, Legions, Review. 
 - Choose three times per legion. Confirm the available time options against the current in-game event; published sources disagree on one of the five options.
 - Two-of-three availability and minimum combatants per time are adjustable planning preferences, not claimed game eligibility rules.
 - Suggested teams use confirmed availability and preserve existing assignments. Preview, per-time coverage, unassigned-player lists and conflict messages remain visible; suggestions are heuristics.
-- Move, swap, change roles, assign initial buildings and choose captains. Missing roster players can be unassigned.
+- Move, swap, change roles, enter troop powers and choose captains. Missing roster players can be unassigned.
 - Review home-to-host transfers, manually confirm actual game registration, copy the plan, or export an Excel workbook with Assignments, Legions, Availability and Alliance moves.
 - Roster refreshes preserve the separate plan. Home alliance is captured when planning information is first entered; last known game alliance remains visible separately.
 
 See `TAL_DESIGN_REVIEW.md` for concept selection, research and review evidence.
 
 Legions support per-legion player entry: one-player suggestions or bulk pasted usernames/IDs with explicit match review. Duplicate names require selection; repeated entries are skipped. Cross-legion bulk moves require an explicit option. Manual entries with unconfirmed times require an explicit override and remain flagged in Review. Direct removal keeps the member profile and availability. The Members Help button is removed, and the alliance setup card hides once all four default alliances are present.
+
+### UI change review
+
+For future requested UI changes, compare three concepts, have an independent AI reviewer score ease of use, functionality, accessibility, copy and accuracy, then refine the chosen design to at least 90/100 before publishing. Validate the implemented flows; do not describe this score as Apple approval or a real-device test.

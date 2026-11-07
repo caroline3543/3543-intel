@@ -27,7 +27,7 @@ export function Availability({plan,players,onChange,onMessage,onCopy}){
     <TimeButtons times={plan.times} selected={r.status==='available'?r.times:[]} disabled={plan.locked} onToggle={time=>onChange(toggleTime(plan,p,time))}/>
     <Hint>{r.times.length<plan.minOverlap?'Add more times before assigning this player.':'Legion suggestions use these confirmed times.'}</Hint>
     <label>Availability note<input style={{...field,margin:'6px 0 12px'}} disabled={plan.locked} value={r.note} placeholder="For example: unavailable on Fridays" onChange={e=>onChange(setRecord(plan,p,{note:e.target.value}))}/></label>
-    <details><summary style={{minHeight:44,paddingTop:12,color:C.icy,cursor:'pointer'}}>Recorded event troop power · optional</summary><input aria-label={`Troop power for ${playerLabel(p)}`} type="number" min="0" style={field} disabled={plan.locked} value={r.troopPower} onChange={e=>onChange(setRecord(plan,p,{troopPower:e.target.value===''?'':Math.max(0,Number(e.target.value))}))}/><Hint>Use the troop-power value from Foundry or TAL registration. City power is different.</Hint></details>
+    <details><summary style={{minHeight:44,paddingTop:12,color:C.icy,cursor:'pointer'}}>TAL troop power · optional</summary><input aria-label={`Troop power for ${playerLabel(p)}`} type="number" min="0" style={field} disabled={plan.locked} value={r.troopPower} onChange={e=>onChange(setRecord(plan,p,{troopPower:e.target.value===''?'':Math.max(0,Number(e.target.value))}))}/><Hint>Use the value shown in TAL registration, in leaderboard units. City power is different.</Hint></details>
    </div>}</Card>;
   })}
   {shown.length>limit&&<button style={{...button,width:'100%'}} onClick={()=>setLimit(limit+20)}>Show 20 more</button>}

@@ -1,5 +1,4 @@
 export const DEFAULT_TIMES=['02:00','07:00','12:00','14:00','19:00'];
-export const BUILDINGS=['Prototype I','Prototype II','Repair I','Repair II','Repair III','Repair IV','Boiler Room','Transit Station','Mobile / attack'];
 export function newPlan(){return {name:'State 3573 TAL',step:'setup',deadline:'',times:[...DEFAULT_TIMES],timesConfirmed:false,minOverlap:2,targetCombatants:15,records:{},teams:[],locked:false};}
 export function record(plan,player){return {status:'pending',times:[],homeAlliance:player.allianceTag||'',note:'',troopPower:'',...plan.records?.[player.id]};}
 export function overlap(plan,player,team){const r=record(plan,player);return r.status==='available'?team.slots.filter(t=>r.times.includes(t)).length:0;}
@@ -8,7 +7,7 @@ export function assignedTeam(plan,id){return plan.teams.find(t=>t.members.some(m
 export function playerLabel(p){return p?.username||p?.alias||p?.fid||'Unknown player';}
 export function setRecord(plan,player,patch){return {...plan,records:{...plan.records,[player.id]:{...record(plan,player),...patch}}};}
 export function toggleTime(plan,player,time){const r=record(plan,player);return setRecord(plan,player,{status:'available',times:r.times.includes(time)?r.times.filter(t=>t!==time):[...r.times,time]});}
-export function createTeam(host,number=1){return {id:`${host}:${number}`,host,number,slots:[],matchTime:'',captain:'',officer:'',members:[],secondConfirmed:false};}
+export function createTeam(host,number=1){return {id:`${host}:${number}`,host,number,targetPower:'',slots:[],matchTime:'',captain:'',officer:'',members:[],secondConfirmed:false};}
 export function coverage(plan,team,players){return team.slots.map(time=>({time,combatants:team.members.filter(m=>m.role==='combatant'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).status==='available'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).times.includes(time)).length,substitutes:team.members.filter(m=>m.role==='substitute'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).status==='available'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).times.includes(time)).length}));}
 export function teamIssues(plan,team,players){
  const issues=[];
@@ -46,8 +45,8 @@ export function placePlayer(plan,players,id,targetId,role='combatant',swapId='',
  let next=setRecord(plan,player,{});
  next={...next,teams:next.teams.map(team=>{
   let members=team.members.filter(m=>m.id!==id&&(!swapped||m.id!==swapId));
-  if(team.id===target.id)members=[...members,{id,role:swapped?.role||role,building:source?.id===target.id?existing?.building||'':'',registered:source?.id===target.id&&existing?.role===(swapped?.role||role)?existing?.registered||false:false}];
-  if(swapped&&team.id===source.id)members=[...members,{id:swapId,role:existing.role,building:'',registered:false}];
+  if(team.id===target.id)members=[...members,{id,role:swapped?.role||role,registered:source?.id===target.id&&existing?.role===(swapped?.role||role)?existing?.registered||false:false}];
+  if(swapped&&team.id===source.id)members=[...members,{id:swapId,role:existing.role,registered:false}];
   return {...team,members,captain:members.some(m=>m.id===team.captain)?team.captain:''};
  })};
  return next;
@@ -82,7 +81,7 @@ export function suggest(plan,players){
    const counts=coverage(plan,team,players);
    const score=p=>overlap(plan,p,team)*1000+counts.reduce((n,c)=>n+(record(plan,p).times.includes(c.time)?100/(1+c.combatants+c.substitutes):0),0);
    candidates.sort((a,b)=>score(b)-score(a)||(Number(record(plan,b).troopPower)||0)-(Number(record(plan,a).troopPower)||0)||playerLabel(a).localeCompare(playerLabel(b)));
-   if(candidates.length){team.members.push({id:candidates[0].id,role,building:'',registered:false});selected.add(candidates[0].id);added=true;}
+   if(candidates.length){team.members.push({id:candidates[0].id,role,registered:false});selected.add(candidates[0].id);added=true;}
   }}
  }
  return {...plan,teams};
@@ -99,4 +98,4 @@ export function readyIssues(plan,players){
  return issues;
 }
 export function transferRows(plan,players){return plan.teams.flatMap(t=>t.members.map(m=>{const p=players.find(p=>p.id===m.id);return {player:p,member:m,team:t,home:record(plan,p||{id:m.id}).homeAlliance,needsMove:p?.allianceTag!==t.host};}));}
-export function planText(plan,players){return [`${plan.name} · STATE 3573`,`Registration deadline: ${plan.deadline?plan.deadline.replace('T',' ')+' UTC':'Not recorded'}`,'Planning only. R4/R5 must register players in game.','',...plan.teams.flatMap(t=>[`[${t.host}] Legion ${t.number}`,`Times: ${t.slots.map(s=>s+' UTC').join(', ')}`,`Captain: ${(t.captain?playerLabel(players.find(p=>p.id===t.captain)):'Not chosen')}`,`Confirmed match: ${t.matchTime||'Not announced'}`, ...t.members.map(m=>{const p=players.find(p=>p.id===m.id);return `${playerLabel(p)} · ${p?.fid||'ID unknown'} · ${record(plan,p||{id:m.id}).homeAlliance||'?'} → ${t.host} · ${m.role}${m.building?' · '+m.building:''}${m.registered?' · Registered':' · Needs registration'}`;}),''])].join('\n');}
+export function planText(plan,players){return [`${plan.name} · STATE 3573`,`Registration deadline: ${plan.deadline?plan.deadline.replace('T',' ')+' UTC':'Not recorded'}`,'Planning only. R4/R5 must register players in game.','',...plan.teams.flatMap(t=>[`[${t.host}] Legion ${t.number}`,`Times: ${t.slots.map(s=>s+' UTC').join(', ')}`,`Captain: ${(t.captain?playerLabel(players.find(p=>p.id===t.captain)):'Not chosen')}`,`Confirmed match: ${t.matchTime||'Not announced'}`, ...t.members.map(m=>{const p=players.find(p=>p.id===m.id);return `${playerLabel(p)} · ${p?.fid||'ID unknown'} · ${record(plan,p||{id:m.id}).homeAlliance||'?'} → ${t.host} · ${m.role}${m.registered?' · Registered':' · Needs registration'}`;}),''])].join('\n');}
