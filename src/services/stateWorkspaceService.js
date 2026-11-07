@@ -7,7 +7,7 @@ export function normalizeStateId(value) {
   if (!/^[1-9]\d{0,4}$/.test(id)) throw new Error('Enter a valid state number.');
   return id;
 }
-export function initializeWorkspaces(storage) {
+export function initializeWorkspaces(storage, defaultState = '3543') {
   const saved = storage.getItem(REGISTRY_KEY);
   if (saved) {
     const registry = JSON.parse(saved);
@@ -16,7 +16,7 @@ export function initializeWorkspaces(storage) {
     return registry;
   }
   const legacy = JSON.parse(storage.getItem('svs_rally_data') || 'null');
-  const primary = legacy?.settings?.stateId ? normalizeStateId(legacy.settings.stateId) : '3543';
+  const primary = legacy?.settings?.stateId ? normalizeStateId(legacy.settings.stateId) : normalizeStateId(defaultState);
   const registry = { version: 1, activeStateId: primary, states: [primary, primary === '3573' ? '3543' : '3573'] };
   // Copy before publishing the registry. Originals remain untouched as a backup.
   for (const key of LEGACY_KEYS) {

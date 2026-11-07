@@ -1,6 +1,7 @@
+import { playerNameFields, playerSearchFields } from './playerNames.js';
 import { normalizeName, nameSimilarity } from '../utils/normalize.js';
 
-const fields = p => [p.username, p.alias, String(p.fid || ''), String(p.id || '')].filter(Boolean);
+const fields = p => [...playerSearchFields(p), String(p.id || '')].filter(Boolean).map(String);
 export function pollSuggestions(players, query, limit = 5) {
   const q = normalizeName(query);
   if (!q) return [];
@@ -18,7 +19,7 @@ export function matchPollEntries(players, text) {
   return text.split(/[\n\r,;\t]+/).map(s=>s.trim()).filter(Boolean).map(entry => {
     const query = normalizeName(entry);
     const byId = players.filter(p => [String(p.fid||''),String(p.id||'')].includes(entry));
-    const matches = byId.length ? byId : players.filter(p => [p.username,p.alias].filter(Boolean).some(v=>normalizeName(v)===query));
+    const matches = byId.length ? byId : players.filter(p => playerNameFields(p).some(v=>normalizeName(v)===query));
     return {entry,player:matches.length===1?matches[0]:null,suggestions:matches.length>1?matches:pollSuggestions(players,entry),ambiguous:matches.length>1};
   });
 }
