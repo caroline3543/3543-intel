@@ -26,7 +26,7 @@ export function teamPower(plan,team,players){
  const known=entries.filter(r=>r.value!=null).sort((a,b)=>b.value-a.value);
  const confirmed=known.filter(r=>r.m.registered);
  const sum=rows=>rows.reduce((n,r)=>n+r.value,0);
- return {total:sum(known),planned:sum(known.slice(0,20)),confirmed:sum(confirmed.slice(0,20)),known:known.length,count:entries.length,missing:entries.filter(r=>r.value==null).length,registeredMissing:entries.filter(r=>r.m.registered&&r.value==null).length};
+ return {total:sum(known),planned:sum(known.slice(0,20)),confirmed:sum(confirmed.slice(0,20)),known:known.length,registeredKnown:confirmed.length,count:entries.length,missing:entries.filter(r=>r.value==null).length,registeredMissing:entries.filter(r=>r.m.registered&&r.value==null).length};
 }
 export function targetGap(value,target){return value<target?`${fmtPower(target-value)} below target`:value===target?'Target reached':`${fmtPower(value-target)} above target`;}
 export function powerPastePreview(text,players,plan){

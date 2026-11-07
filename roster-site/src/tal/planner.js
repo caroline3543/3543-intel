@@ -12,9 +12,9 @@ export function createTeam(host,number=1){return {id:`${host}:${number}`,host,nu
 export function coverage(plan,team,players){return team.slots.map(time=>({time,combatants:team.members.filter(m=>m.role==='combatant'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).status==='available'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).times.includes(time)).length,pending:team.members.filter(m=>m.role==='pending'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).status==='available'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).times.includes(time)).length,substitutes:team.members.filter(m=>m.role==='substitute'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).status==='available'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).times.includes(time)).length}));}
 export function teamIssues(plan,team,players){
  const issues=[];
- const pendingRoles=team.members.filter(m=>m.role==='pending').length;if(pendingRoles)issues.push(`${pendingRoles} player roles need confirmation.`);
+ const pendingRoles=team.members.filter(m=>m.role==='pending').length;if(pendingRoles)issues.push(`${pendingRoles} ${pendingRoles===1?'role is':'roles are'} not set.`);
  if(team.importedSource?.confirmGameLegion)issues.push('Confirm the in-game legion number; this is the spreadsheet label.');
- if(team.candidates?.length)issues.push(`${team.candidates.length} proposed players need review.`);
+ if(team.candidates?.length)issues.push(`${team.candidates.length} ${team.candidates.length===1?'proposal needs':'proposals need'} review.`);
  if(team.slots.length!==3||new Set(team.slots).size!==3||team.slots.some(t=>!plan.times.includes(t)))issues.push('Choose three valid battle times.');
  if(team.number===2&&!team.secondConfirmed)issues.push('Confirm Legion 2 is unlocked in game.');
  if(team.members.length<15)issues.push(`${15-team.members.length} more players needed to reach 15.`);
@@ -23,7 +23,7 @@ export function teamIssues(plan,team,players){
  const invalid=team.members.filter(m=>!ids.has(m.id)||!eligible(plan,players.find(p=>p.id===m.id),team)).length;
  if(invalid)issues.push(`${invalid} players do not meet this legion’s availability preference.`);
  if(team.matchTime&&!team.slots.includes(team.matchTime))issues.push('Confirmed match time is outside this legion’s three choices.');
- if(team.slots.length===3){for(const c of coverage(plan,team,players))if(c.combatants<plan.targetCombatants)issues.push(`${c.time} has ${c.combatants} available combatants; your target is ${plan.targetCombatants}.`);}
+ if(team.slots.length===3){for(const c of coverage(plan,team,players))if(c.combatants+c.pending<plan.targetCombatants)issues.push(`${c.time}: ${c.combatants+c.pending} available for combatant places; target ${plan.targetCombatants}.`);}
  if(!team.captain||!team.members.some(m=>m.id===team.captain))issues.push('Choose a captain.');
  const duplicate=team.members.some(m=>plan.teams.flatMap(t=>t.members).filter(x=>x.id===m.id).length>1);
  if(duplicate)issues.push('A player is assigned more than once.');

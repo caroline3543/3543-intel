@@ -16,7 +16,7 @@ test('proposals and withdrawals remain visible and excluded from automatic selec
 });
 test('pending roles count toward overall capacity and are flagged until explicitly chosen',()=>{
  const players=Array.from({length:51},(_,i)=>({id:String(i),fid:String(10000+i),username:String(i)}));const plan={...newPlan(),records:Object.fromEntries(players.map(p=>[p.id,{status:'available',times:['02:00','07:00','12:00']}])),teams:[{...createTeam('HOT'),slots:['02:00','07:00','12:00'],members:players.slice(0,50).map(p=>({id:p.id,role:'pending',registered:false}))}]};
- assert.ok(teamIssues(plan,plan.teams[0],players).some(s=>s.includes('roles need confirmation')));assert.throws(()=>placePlayer(plan,players,'50','HOT:1'),/50 players/);const data={players,events:[],customRoles:[],settings:{stateId:'3573'},talPlan:plan};validateWorkspace(data);plan.teams[0].members[0].registered=true;assert.throws(()=>validateWorkspace(data),/Confirm the player role/);
+ assert.ok(teamIssues(plan,plan.teams[0],players).some(s=>s.includes('roles are not set')));assert.throws(()=>placePlayer(plan,players,'50','HOT:1'),/50 players/);const data={players,events:[],customRoles:[],settings:{stateId:'3573'},talPlan:plan};validateWorkspace(data);plan.teams[0].members[0].registered=true;assert.throws(()=>validateWorkspace(data),/Confirm the player role/);
 });
 test('existing API profile data and chosen nicknames survive manual sheet supplementation',()=>{
  const existing={players:[{id:'stable',fid:'12345',username:'Current API name',alias:'Chosen',notes:'Existing',troops:{infantry:'FC7'},providerDetails:{stateId:'3573',raw:{keep:true}},providerRankings:{},pastUsernames:[],joinerHeroes:[]}],events:[],customRoles:[],settings:{stateId:'3573'}};
