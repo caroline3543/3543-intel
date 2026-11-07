@@ -1,5 +1,7 @@
+import {saveBattleTeams,updateBattleTeam,moveBattleTeamMember,activeTeamMembers} from './teams.js';
+import {battlePower} from './eventPower.js';
+export {battlePower} from './eventPower.js';
 import {compareLegionStrength} from '../tal/autoRoles.js';
-import {parsePower} from '../tal/power.js';
 import {playerLabel} from '../tal/planner.js';
 export const BUILDINGS=['Prototype Site I','Prototype Site II','Repair Facility I','Repair Facility II','Repair Facility III','Repair Facility IV','Boiler Room','Transit Station','Imperial Foundry','Munitions Warehouse','Mercenary Camp','Weapon Workshops','Roaming / supplies'];
 export const battleEvents=events=>(events||[]).filter(e=>e.kind==='battle-plan');
@@ -20,20 +22,22 @@ export function patchParticipant(event,id,patch){
  if(patch.role&&patch.role!==member.role){const cap=patch.role==='combatant'?30:patch.role==='substitute'?(event.type==='foundry'?10:20):Infinity;if(event.participants.filter(p=>p.role===patch.role).length>=cap)throw Error(`No ${patch.role} places left. Move someone to reserve first.`);}
  return {...event,participants:event.participants.map(p=>p.id===id?{...p,...patch}:p)};
 }
-export function battlePower(member){try{return parsePower(member.power);}catch{return null;}}
 export function battleStats(event){const selected=event.participants.filter(p=>p.role!=='reserve'),available=selected.filter(p=>p.attendance==='available'),known=available.map(battlePower).filter(p=>p!=null).sort((a,b)=>b-a);return {selected:selected.length,available:available.length,unknown:selected.filter(p=>p.attendance==='unknown').length,unassigned:available.filter(p=>!p.building).length,known:known.length,total:known.reduce((a,b)=>a+b,0),top20:known.slice(0,20).reduce((a,b)=>a+b,0)};}
 export function battleText(event,players){
  const byId=new Map(players.map(p=>[p.id,p]));
  const label=m=>`${playerLabel(byId.get(m.id))} · ${byId.get(m.id)?.fid||'ID missing'} · ${m.role} · ${m.attendance}${battlePower(m)!=null?` · Power ${battlePower(m).toLocaleString('en-US')}`:' · Power not entered'}${m.note?` · ${m.note}`:''}`;
  const rows=event.participants.filter(p=>p.role!=='reserve').sort((a,b)=>playerLabel(byId.get(a.id)).localeCompare(playerLabel(byId.get(b.id))));
  const buildings=[...new Set([...BUILDINGS,...rows.map(p=>p.building).filter(Boolean)])];
- return [event.title,`${event.date} · ${event.time} UTC`,event.opponent?`Opponent: ${event.opponent}`:'',event.officer?`Lead: ${event.officer}`:'',event.notes,'',...buildings.flatMap(b=>{const assigned=rows.filter(p=>p.building===b&&p.attendance!=='unavailable');return assigned.length?[b,...assigned.map(p=>`${label(p)} · ${p.task}`),'']:[];}),'Unassigned / attendance to check',...rows.filter(p=>!p.building||p.attendance==='unavailable').map(label),'','Reserve',...event.participants.filter(p=>p.role==='reserve').sort((a,b)=>playerLabel(byId.get(a.id)).localeCompare(playerLabel(byId.get(b.id)))).map(label)].filter(v=>v!==undefined).join('\n');
+ return [event.title,`${event.date} · ${event.time} UTC`,event.opponent?`Opponent: ${event.opponent}`:'',event.officer?`Lead: ${event.officer}`:'',event.notes,'',...(event.battleTeams||[]).flatMap(t=>{const members=activeTeamMembers(event,t);return [t.name+(t.building?` · ${t.building}`:''),...members.sort((a,b)=>playerLabel(byId.get(a.id)).localeCompare(playerLabel(byId.get(b.id)))).map(m=>`${label(m)}${t.leaderId===m.id?' · Team lead':''}`),t.note||'',''];}),'Building assignments','',...buildings.flatMap(b=>{const assigned=rows.filter(p=>p.building===b&&p.attendance!=='unavailable');return assigned.length?[b,...assigned.map(p=>`${label(p)} · ${p.task}`),'']:[];}),'Unassigned / attendance to check',...rows.filter(p=>!p.building||p.attendance==='unavailable').map(label),'','Reserve',...event.participants.filter(p=>p.role==='reserve').sort((a,b)=>playerLabel(byId.get(a.id)).localeCompare(playerLabel(byId.get(b.id)))).map(label)].filter(v=>v!==undefined).join('\n');
 }
 export function applyBattleAction(events,action){
  if(action.type==='add'){if(events.some(e=>e.id===action.event.id))return events;return [...events,action.event];}
  return events.map(e=>{
   if(e.id!==action.id||e.kind!=='battle-plan')return e;
   if(action.type==='patch'){if('date' in action.patch||'time' in action.patch)validateBattleTime(action.patch.date??e.date,action.patch.time??e.time);return {...e,...action.patch};}
+  if(action.type==='balanceTeams')return saveBattleTeams(e,action.preview);
+  if(action.type==='team')return updateBattleTeam(e,action.teamId,action.patch);
+  if(action.type==='moveTeamMember')return moveBattleTeamMember(e,action.playerId,action.teamId);
   if(action.type==='member')return patchParticipant(e,action.playerId,action.patch);
   if(action.type==='addMember')return e.participants.some(m=>m.id===action.playerId)?e:{...e,participants:[...e.participants,{id:action.playerId,role:'reserve',attendance:'unknown',building:'',task:'Joiner',power:'',note:''}]};
   if(action.type==='powers'){if(action.rows.some(r=>r.beforeRaw!==undefined&&e.participants.find(m=>m.id===r.player.id)?.power!==r.beforeRaw))throw Error('Event powers changed. Review them again before saving.');const byId=new Map(action.rows.filter(r=>!r.error).map(r=>[r.player.id,r.value]));return {...e,participants:e.participants.map(m=>byId.has(m.id)?{...m,power:String(byId.get(m.id)),powerUpdatedAt:new Date().toISOString()}:m)};}

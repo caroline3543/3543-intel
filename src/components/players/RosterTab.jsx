@@ -1,3 +1,4 @@
+import {PlayerSearch} from './PlayerSearch.jsx';
 import {RosterLegions,LegionPlayerStatus} from './RosterLegions.jsx';
 import {plannedMemberIds,legionForPlayer,allianceCheck,recentNameChanges} from '../../services/talRosterService.js';
 import { useState, useEffect } from 'react';
@@ -69,7 +70,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   return <div style={{padding:'16px 20px 0'}}>
     {players.length>0 && <>
       <p style={{fontSize:13,color:C.icy,margin:'0 0 12px'}}>Latest roster fetch: {lastFetch?new Date(lastFetch).toISOString().slice(0,16).replace('T',' ')+' UTC':'Not recorded'}</p>
-      <input aria-label="Search roster" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search username, nickname or ID" style={{...button,width:'100%',boxSizing:'border-box',height:48,fontSize:16,color:C.white,marginBottom:10}}/>
+      <PlayerSearch label="Search roster" players={players} value={search} onChange={setSearch} onSelect={p=>{setSearch(p.fid||p.username||p.alias);openProfile(p);}}/>
       <div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:6,marginBottom:10}}>
         {[['','All alliances'],...allianceTags.map(tag=>[tag,`[${tag}]`])].map(([tag,label])=><button key={tag||'all'} aria-pressed={filters.alliance===tag} onClick={()=>{setFilters({...filters,alliance:filters.alliance===tag?'':tag});setLegion('');setAllianceStatus('all');}} style={{...button,flexShrink:0,color:filters.alliance===tag?C.gold:C.icy,borderColor:filters.alliance===tag?C.gold:C.border}}>{label}{tag?` · ${players.filter(p=>p.allianceTag===tag).length}`:''}</button>)}
       </div>
