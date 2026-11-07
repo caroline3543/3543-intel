@@ -58,3 +58,11 @@ Visible pages check for updates every five seconds and on focus/reconnection. Ed
 `api/workspace.js` authenticates the leader session and same-origin writes, validates the State 3573 payload, and uses the existing server-only bridge token to reach `caroline3573-workspace`. The server-only Supabase tables have RLS and no anon/authenticated grants or policies; only the service role can reach their CAS RPC. No new provider key or service role key is exposed to the browser. Compressed transfer supports full profile snapshots while respecting Vercel payload limits; uncompressed workspace data is capped at 24 MiB and oversized saves stay on the device with an explicit error.
 
 Schema source: `supabase/schema/caroline_shared_workspace.sql`. It is applied as the `caroline_shared_workspace` migration through the connected database tool. The local CLI was unavailable in this environment. Keep the Edge Function copy of `shared/workspace.js` identical to the site version.
+
+## Planning-sheet import
+
+The import utility supplements API records by stable FID and retains the original Players row and provenance in `importedSheet`. Exact State Roster matches can recover blank IDs; duplicated source IDs require independent name, home alliance and rank corroboration. Unknown IDs stay blank. FCxT11 is stored as Helios FCx, while original tier strings stay in Spreadsheet details. Hero stars never imply expedition skill 5.
+
+Selected players with unspecified combatant/substitute roles use `member.role = 'pending'`, count toward the total 50 places and must choose a role before registration is confirmed. They do not count as combatants or substitutes. Source registration flags remain separately visible. Proposed, under-review and withdrawn entries live in `team.candidates`; they are not automatically suggested or silently promoted. Manual promotion chooses a real role and removes the candidate atomically. Planning labels such as RKG Legion 3 are preserved with an explicit in-game-number warning.
+
+Raw user data and source snapshots are not committed to this repository. The one-time shared import is validated and published using the workspace revision CAS function; existing shared data must be reviewed if the expected revision changes.

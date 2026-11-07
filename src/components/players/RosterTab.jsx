@@ -1,5 +1,5 @@
 import {RosterLegions,LegionPlayerStatus} from './RosterLegions.jsx';
-import {legionForPlayer,allianceCheck,recentNameChanges} from '../../services/talRosterService.js';
+import {plannedMemberIds,legionForPlayer,allianceCheck,recentNameChanges} from '../../services/talRosterService.js';
 import { useState, useEffect } from 'react';
 import { C } from '../../utils/constants.js';
 import { PlayerCard, comparePriority } from './PlayerCard.jsx';
@@ -41,7 +41,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   },[initialPlayerId,players,onInitialPlayerOpened]);
   // Keep open profiles current after API refreshes and manual edits.
   const currentPlayer=players.find(p=>p.id===viewingPlayer?.id)||viewingPlayer;
-  const visible=players.filter(p=>matchesRosterFilters(p,search,filters)&&(!activeLegion||activeLegion.members.some(m=>m.id===p.id))&&(!activeLegion||allianceStatus==='all'||allianceCheck(p,activeLegion).status===allianceStatus)).sort((a,b)=>{
+  const visible=players.filter(p=>matchesRosterFilters(p,search,filters)&&(!activeLegion||plannedMemberIds(activeLegion).has(p.id))&&(!activeLegion||allianceStatus==='all'||allianceCheck(p,activeLegion).status===allianceStatus)).sort((a,b)=>{
     if(sort==='progression')return comparePriority(a,b);
     if(sort==='troopPower')return (getCurrentTroopPower(b,events)??-1)-(getCurrentTroopPower(a,events)??-1);
     if(sort==='review')return (troopGaps(b).length+!b.fid+!b.allianceTag)-(troopGaps(a).length+!a.fid+!a.allianceTag);

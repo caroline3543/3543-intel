@@ -1,3 +1,5 @@
+import {SheetImportSummary} from './components/SheetImportSummary.jsx';
+import {plannedMemberIds} from '../../src/services/talRosterService.js';
 import {useSharedWorkspace} from './useSharedWorkspace.js';
 import {WorkspaceSync} from './components/WorkspaceSync.jsx';
 import {normalizeRankings,rankingProfileUpdates} from '../../src/services/stateRankingsService.js';
@@ -72,7 +74,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   }
   async function refreshLegion(team){
     if(refreshing.current)return;
-    const ids=[...new Set(team.members.map(m=>m.id))];
+    const ids=[...plannedMemberIds(team)];
     const members=ids.map(id=>latest.current.players.find(p=>p.id===id)).filter(Boolean);
     refreshing.current=true;stopRefresh.current=false;
     let done=0,failed=0,skipped=0,reason='';
@@ -109,6 +111,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   return <main style={{maxWidth:480,margin:'0 auto',paddingBottom:'calc(140px + env(safe-area-inset-bottom, 0px))'}}>
     <header style={{padding:20,borderBottom:`1px solid ${C.border}`}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><h1 style={{fontSize:22,margin:0}}>3573 · Caroline</h1><p style={{fontSize:14,color:C.icy,margin:'5px 0 0'}}>{tab==='tal'?'TAL planner':tab==='changes'?'Name changes':`Members · ${players.length} players`}</p></div><button style={button} onClick={onLogout}>Sign out</button></div><div style={{display:'flex',gap:8,marginTop:14}}><button style={{...button,flex:1,color:C.gold}} disabled={sync.mode==='join'||!!sync.conflicts?.length} onClick={()=>setImporting(true)}>Other alliance</button><button style={{...button,minWidth:44,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={backup} disabled={exporting} aria-label={tab==='tal'?'Download TAL plan as Excel':'Download roster as Excel'} title={tab==='tal'?'Download TAL plan (.xlsx)':'Download roster as Excel (.xlsx)'}>{exporting?<span aria-hidden="true">…</span>:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>}</button></div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginTop:8}}><span style={{fontSize:13,color:C.icy}}>Leader workspace</span>{tab==='tal'&&<button style={button} onClick={()=>setTourOpen(true)}>Help</button>}</div>{error&&<p role="alert" style={{color:C.red}}>{error}</p>}</header>
     <WorkspaceSync sync={sync} data={data} onPublish={publish} onJoin={join} onRetry={retry} onResolve={resolve}/>
+    <SheetImportSummary data={data}/>
     {message&&<div role="status" style={{margin:'12px 20px 0',padding:10,color:C.icy,background:C.section,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>{message}<button style={button} onClick={()=>setMessage('')} aria-label="Dismiss message">✕</button></div>}
     <BottomNav tab={tab} onChange={navigate}/>
     {legionRefresh&&<div role="status" style={{padding:'12px 20px',color:C.icy}}>Refreshing players: {legionRefresh.done} of {legionRefresh.total}<button style={{...button,marginLeft:8}} onClick={()=>{stopRefresh.current=true;}}>Stop after this player</button></div>}

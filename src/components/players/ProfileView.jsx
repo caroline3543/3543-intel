@@ -1,3 +1,4 @@
+import {ProfileSheetImport} from './ProfileSheetImport.jsx';
 import {CopyPlayerId} from './CopyPlayerId.jsx';
 import { useEffect, useRef } from 'react';
 import { C, ALLIANCE_RANKS, TROOP_POWER_EVENTS } from '../../utils/constants.js';
@@ -86,7 +87,7 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
 
 
       <button onClick={onOpenLeaderProfile} style={{...profileButton,width:'100%',color:C.gold,marginBottom:12}}>Edit rally setup</button>
-      <ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/>
+      <ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/><ProfileSheetImport player={player}/>
       <ProfileNotes key={`notes:${player.id}`} player={player} onSave={onSave}/>
       <ProfileDetails title="Game stats"><ProviderStatsSection player={player}/></ProfileDetails>
       <ProfileDetails title="Heroes & equipment"><PlayerEquipmentSection player={player} onSave={onSave}/></ProfileDetails>

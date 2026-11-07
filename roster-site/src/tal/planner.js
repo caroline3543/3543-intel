@@ -8,10 +8,13 @@ export function assignedTeam(plan,id){return plan.teams.find(t=>t.members.some(m
 export function playerLabel(p){return p?.username||p?.alias||p?.fid||'Unknown player';}
 export function setRecord(plan,player,patch){return {...plan,records:{...plan.records,[player.id]:{...record(plan,player),...patch}}};}
 export function toggleTime(plan,player,time){const r=record(plan,player);return setRecord(plan,player,{status:'available',times:r.times.includes(time)?r.times.filter(t=>t!==time):[...r.times,time]});}
-export function createTeam(host,number=1){return {id:`${host}:${number}`,host,number,targetPower:'',slots:[],matchTime:'',captain:'',officer:'',members:[],secondConfirmed:false};}
-export function coverage(plan,team,players){return team.slots.map(time=>({time,combatants:team.members.filter(m=>m.role==='combatant'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).status==='available'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).times.includes(time)).length,substitutes:team.members.filter(m=>m.role==='substitute'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).status==='available'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).times.includes(time)).length}));}
+export function createTeam(host,number=1){return {id:`${host}:${number}`,host,number,targetPower:'',slots:[],matchTime:'',captain:'',officer:'',members:[],candidates:[],secondConfirmed:false};}
+export function coverage(plan,team,players){return team.slots.map(time=>({time,combatants:team.members.filter(m=>m.role==='combatant'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).status==='available'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).times.includes(time)).length,pending:team.members.filter(m=>m.role==='pending'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).status==='available'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).times.includes(time)).length,substitutes:team.members.filter(m=>m.role==='substitute'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).status==='available'&&record(plan,players.find(p=>p.id===m.id)||{id:m.id}).times.includes(time)).length}));}
 export function teamIssues(plan,team,players){
  const issues=[];
+ const pendingRoles=team.members.filter(m=>m.role==='pending').length;if(pendingRoles)issues.push(`${pendingRoles} player roles need confirmation.`);
+ if(team.importedSource?.confirmGameLegion)issues.push('Confirm the in-game legion number; this is the spreadsheet label.');
+ if(team.candidates?.length)issues.push(`${team.candidates.length} proposed players need review.`);
  if(team.slots.length!==3||new Set(team.slots).size!==3||team.slots.some(t=>!plan.times.includes(t)))issues.push('Choose three valid battle times.');
  if(team.number===2&&!team.secondConfirmed)issues.push('Confirm Legion 2 is unlocked in game.');
  if(team.members.length<15)issues.push(`${15-team.members.length} more players needed to reach 15.`);
@@ -32,6 +35,7 @@ function validateDestination(plan,player,team,role,leavingId=null,allowAvailabil
  if(player.blacklisted)throw new Error('This player is excluded from battle plans. Update their member profile first.');
  if(record(plan,player).status==='declined')throw new Error('This player is marked not participating. Update their availability first.');
  if(!allowAvailabilityConflict&&!eligible(plan,player,team))throw new Error('This player needs more matching times for that legion.');
+ if(team.members.filter(m=>m.id!==player.id&&m.id!==leavingId).length>=50)throw new Error('This legion has 50 players. Remove or swap a player first.');
  const cap=role==='combatant'?30:20;
  if(team.members.filter(m=>m.role===role&&m.id!==leavingId&&m.id!==player.id).length>=cap)throw new Error(`No ${role} places left. Choose another role or swap a player.`);
 }
@@ -43,12 +47,12 @@ export function placePlayer(plan,players,id,targetId,role='combatant',swapId='',
  if(swapId&&(!swapped||!source||source.id===target.id))throw new Error('Choose a player in a different legion to swap.');
  validateDestination(plan,player,target,swapped?.role||role,swapped?.id,allowAvailabilityConflict);
  if(swapped)validateDestination(plan,players.find(p=>p.id===swapped.id),source,existing.role,id);
- let next=setRecord(plan,player,{});
+ let next=setRecord(plan,player,record(plan,player).excludeFromSuggestions?{excludeFromSuggestions:false}:{});
  next={...next,teams:next.teams.map(team=>{
   let members=team.members.filter(m=>m.id!==id&&(!swapped||m.id!==swapId));
   if(team.id===target.id)members=[...members,{id,role:swapped?.role||role,registered:source?.id===target.id&&existing?.role===(swapped?.role||role)?existing?.registered||false:false}];
   if(swapped&&team.id===source.id)members=[...members,{id:swapId,role:existing.role,registered:false}];
-  return {...team,members,captain:members.some(m=>m.id===team.captain)?team.captain:''};
+  return {...team,members,candidates:(team.candidates||[]).filter(m=>m.id!==id&&(!swapped||m.id!==swapId)),captain:members.some(m=>m.id===team.captain)?team.captain:''};
  })};
  return next;
 }
@@ -56,7 +60,7 @@ export function unassign(plan,id){return {...plan,teams:plan.teams.map(t=>({...t
 function triples(times){return times.flatMap((a,i)=>times.slice(i+1).flatMap((b,j)=>times.slice(i+j+2).map(c=>[a,b,c])));}
 export function suggest(plan,players){
  const selected=new Set(plan.teams.flatMap(t=>t.members.map(m=>m.id)));
- const pool=players.filter(p=>!selected.has(p.id)&&record(plan,p).status==='available'&&!p.blacklisted);
+ const pool=players.filter(p=>!selected.has(p.id)&&record(plan,p).status==='available'&&!record(plan,p).excludeFromSuggestions&&!p.blacklisted);
  const teams=plan.teams.map(t=>({...t,members:t.members.map(m=>({...m})),slots:[...t.slots]}));
  let timingPool=[...pool];
  for(let index=0;index<teams.length;index++){
@@ -77,7 +81,7 @@ export function suggest(plan,players){
  for(const [role,cap] of [['combatant',30],['substitute',20]]){
   let added=true;
   while(added){added=false;for(const team of teams){
-   if(team.members.filter(m=>m.role===role).length>=cap)continue;
+   if(team.members.length>=50||team.members.filter(m=>m.role===role).length>=cap)continue;
    const candidates=pool.filter(p=>!selected.has(p.id)&&eligible(plan,p,team));
    const counts=coverage(plan,team,players);
    const score=p=>overlap(plan,p,team)*1000+counts.reduce((n,c)=>n+(record(plan,p).times.includes(c.time)?100/(1+c.combatants+c.substitutes):0),0);

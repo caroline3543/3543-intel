@@ -1,6 +1,7 @@
 import {allianceEvidence} from './allianceEvidenceService.js';
 export const legionLabel = team => `${team.host} Legion ${team.number}`;
-export function legionForPlayer(plan, id) { return plan?.teams?.find(team => team.members.some(member => member.id === id)); }
+export function plannedMemberIds(team){return new Set([...team.members,...(team.candidates||[]).filter(c=>String(c.status).toLowerCase()!=='withdrawn')].map(m=>m.id));}
+export function legionForPlayer(plan,id){const selected=plan?.teams?.find(t=>t.members.some(m=>m.id===id));if(selected)return selected;const proposed=plan?.teams?.find(t=>(t.candidates||[]).some(c=>c.id===id&&String(c.status).toLowerCase()!=='withdrawn'));return proposed?{...proposed,proposalStatus:proposed.candidates.find(c=>c.id===id).status||'Needs review'}:undefined;}
 export function allianceCheck(player, team) {
   const {tag,at,noAlliance}=allianceEvidence(player);
   const matches=tag&&tag.toLowerCase()===team.host.trim().toLowerCase();

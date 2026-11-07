@@ -16,7 +16,9 @@ export function validateWorkspace(data){
   const assigned=new Set(),teams=new Set();
   for(const t of data.talPlan.teams||[]){
    if(!plain(t)||typeof t.id!=='string'||teams.has(t.id)||!Array.isArray(t.members)||!Array.isArray(t.slots))throw Error('Invalid legion.');teams.add(t.id);
-   for(const m of t.members){if(!plain(m)||typeof m.id!=='string'||assigned.has(m.id)||!['combatant','substitute'].includes(m.role))throw Error('A player cannot be assigned to two legions.');assigned.add(m.id);}
+   for(const m of t.members){if(!plain(m)||typeof m.id!=='string'||assigned.has(m.id)||!['combatant','substitute','pending'].includes(m.role))throw Error('A player cannot be assigned to two legions.');if(m.role==='pending'&&m.registered)throw Error('Confirm the player role before registration.');assigned.add(m.id);}
+   const proposed=new Set();for(const c of t.candidates||[]){if(!plain(c)||typeof c.id!=='string'||proposed.has(c.id))throw Error('Invalid proposed player.');proposed.add(c.id);}
+   if(t.members.length>50)throw Error('A legion has more than 50 selected players.');
    if(t.members.filter(m=>m.role==='combatant').length>30||t.members.filter(m=>m.role==='substitute').length>20)throw Error('A legion has too many players.');
   }
  }

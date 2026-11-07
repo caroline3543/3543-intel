@@ -26,7 +26,7 @@ return (        <ProfileSection title="Joiner heroes"><p style={{fontSize:14,col
             <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:12 }}>
               {joiners.map(jh=>(
                 <span key={jh.hero} style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 12px 8px 16px', borderRadius:20, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:14 }}>
-                  {jh.hero}{jh.skillLevel!=null?` · Skill ${jh.skillLevel}`:''}{jh.verified?' · Verified':' · Unverified'}
+                  {jh.hero}{jh.stars!=null?` · ${jh.stars}★`:''}{jh.skillLevel==null?' · Skill not recorded':''}{jh.skillLevel!=null?` · Skill ${jh.skillLevel}`:''}{jh.verified?' · Verified':' · Unverified'}
                   <button onClick={() => removeHero(jh.hero)} aria-label={`Remove ${jh.hero}`}
                     style={{ width:44, height:44, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', color:C.gold+'99', fontSize:13, cursor:'pointer', padding:0 }}>✕</button>
                 </span>

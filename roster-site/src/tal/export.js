@@ -18,6 +18,10 @@ export function buildTalWorkbook(plan,players){
   ['Username','Player ID','Home alliance','Participation',...plan.times.map(t=>t+' UTC'),'TAL troop power','Note'],
   ...players.map(p=>{const r=record(plan,p);return [playerLabel(p),String(p.fid||''),r.homeAlliance,({pending:'No reply',available:'Taking part',declined:'Not participating'})[r.status],...plan.times.map(t=>r.status==='pending'?'Pending':r.status==='declined'?'Not participating':r.times.includes(t)?'Yes':'No'),safeNumber(r.troopPower),r.note];})
  ],[24,20,16,20,...plan.times.map(()=>16),28,40]);
+ if(plan.teams.some(t=>t.candidates?.length))append('Proposed players',[
+  ['Username','Player ID','Home alliance','Proposed host','Spreadsheet legion','Selection status','Sheet registration','Notes'],
+  ...plan.teams.flatMap(t=>(t.candidates||[]).map(c=>{const p=players.find(p=>p.id===c.id),r=record(plan,p||{id:c.id});return [playerLabel(p),String(p?.fid||''),r.homeAlliance,t.host,t.number,c.status||'Needs review',r.sheetRegistration||'',r.note];}))
+ ],[24,20,16,18,18,20,24,40]);
  append('Alliance moves',[
   ['Username','Player ID','Home alliance','Last game alliance','Join alliance','Legion','Role','Registration'],
   ...rows.filter(r=>r.needsMove).map(r=>[playerLabel(r.player),String(r.player?.fid||''),r.home,r.player?.allianceTag||'',r.team.host,r.team.number,r.member.role,r.member.registered?'Confirmed':'Not confirmed'])
