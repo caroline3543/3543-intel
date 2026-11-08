@@ -64,7 +64,7 @@ export function SvsComparison({players=[]}){
  const lc=fleft?countFurnace(fleft.rows):null,rc=fright?countFurnace(fright.rows):null;
  const furnaceLines=lc&&rc?['Furnace tier counts (published top 100 only)',...levels.map(t=>t+': '+lc[t]+' vs '+rc[t]),'FC7+: '+['FC10','FC9','FC8','FC7'].reduce((n,t)=>n+lc[t],0)+' vs '+['FC10','FC9','FC8','FC7'].reduce((n,t)=>n+rc[t],0)]:[];
  const lines=[mode==='state'?'SvS State Comparison':'SvS Alliance Comparison',mode==='state'?ourState+' vs '+enemyState:'['+ourTag+'] '+ourState+' vs ['+enemyTag+'] '+enemyState,'Top-100 published leaderboard sample only',...furnaceLines,'',boards.find(v=>v[0]===board)?.[1]||board,'Our top 10: '+(isFurnace?furnaceHighest(a?.rows):format(a?.top10)),'Opponent top 10: '+(isFurnace?furnaceHighest(b?.rows):format(b?.top10)),'Difference: '+(isFurnace?'Levels are not additive':delta(a?.top10,b?.top10))];
- try{await navigator.clipboard.writeText(lines.join('\\n'));setCopyStatus('Summary copied');}
+ try{await navigator.clipboard.writeText(lines.join('\n'));setCopyStatus('Summary copied');}
  catch{setCopyStatus('Copy unavailable on this device');}
 }
  const label=mode==='state'?'Top-100 entries':'Matching alliance entries in top 100';
