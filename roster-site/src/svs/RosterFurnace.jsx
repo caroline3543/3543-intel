@@ -32,11 +32,11 @@ export function RosterFurnace({ours,theirs,ourLabel,theirLabel}){
  const high=c=>['FC10','FC9','FC8','FC7'].reduce((n,t)=>n+c[t],0);
  return <section style={{background:C.card,borderRadius:16,padding:16,marginTop:16}}>
   <h3 style={{fontSize:18,margin:'0 0 5px'}}>Furnace distribution</h3>
-  <p style={{color:C.icy,fontSize:13,lineHeight:1.5,margin:'0 0 14px'}}>Count players across the loaded alliance rosters. Tap a tier to see who is included.</p>
+  <p style={{color:C.icy,fontSize:13,lineHeight:1.5,margin:'0 0 14px'}}>Tap a tier to view players.</p>
   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
    {columns.map((side,i)=><div key={i} style={{background:C.section,padding:12,borderRadius:12,minWidth:0}}>
     <div style={{fontSize:12,fontWeight:700,color:side.color,overflowWrap:'anywhere'}}>{side.name}</div>
-    <div style={{fontWeight:800,fontSize:29,marginTop:6}}>{side.players.length}</div><div style={{fontSize:12,color:C.icy}}>Players tracked</div>
+    <div style={{fontWeight:800,fontSize:29,marginTop:6}}>{side.players.length}</div><div style={{fontSize:12,color:C.icy}}>Players</div>
     <div style={{borderTop:'1px solid '+C.border,marginTop:10,paddingTop:10,fontSize:13}}><strong>{high(counts[i])}</strong> <span style={{color:C.icy}}>FC7+</span></div>
    </div>)}
   </div>
@@ -48,9 +48,9 @@ export function RosterFurnace({ours,theirs,ourLabel,theirLabel}){
   {selected&&<div style={{background:C.section,borderRadius:12,padding:12,marginTop:10}}>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><strong style={{fontSize:14}}>{selected} players</strong><button type="button" onClick={()=>setSelected(null)} style={{background:'none',border:0,color:C.icy,minHeight:36}}>Close</button></div>
    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-    {columns.map((side,i)=><div key={i}><strong style={{fontSize:12,color:side.color}}>{side.name}</strong>{side.players.filter(p=>p.tier===selected).length?side.players.filter(p=>p.tier===selected).map(p=><div key={p.fid} style={{padding:'8px 0',borderBottom:'1px solid '+C.border,fontSize:12,overflowWrap:'anywhere'}}>{p.name}<div style={{color:C.muted}}>[{p.tag}] · {p.level}</div></div>):<p style={{fontSize:12,color:C.muted}}>No players tracked</p>}</div>)}
+    {columns.map((side,i)=><div key={i}><strong style={{fontSize:12,color:side.color}}>{side.name}</strong>{side.players.filter(p=>p.tier===selected).length?side.players.filter(p=>p.tier===selected).map(p=><div key={p.fid} style={{padding:'8px 0',borderBottom:'1px solid '+C.border,fontSize:12,overflowWrap:'anywhere'}}>{p.name}<div style={{color:C.muted}}>[{p.tag}] · {p.level}</div></div>):<p style={{fontSize:12,color:C.muted}}>None</p>}</div>)}
    </div>
   </div>}
-  <p style={{fontSize:12,color:C.muted,lineHeight:1.55,margin:'14px 0 0'}}>Coverage includes only successfully loaded alliances. Unallied players and other alliances are excluded. Each player is counted once by game ID.</p>
+  <p style={{fontSize:12,color:C.muted,lineHeight:1.55,margin:'14px 0 0'}}>Only loaded alliances are counted. Players are deduplicated by ID.</p>
  </section>;
 }
