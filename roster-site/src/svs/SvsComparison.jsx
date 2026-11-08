@@ -3,6 +3,7 @@ import {C} from '../../../src/utils/constants.js';
 import {mightpulseRequest} from '../../../src/services/mightpulseService.js';
 import {normalizeRankings,rankingScore} from '../../../src/services/stateRankingsService.js';
 import {FurnaceDistribution,countFurnace} from './FurnaceDistribution.jsx';
+import {RosterFurnace,normalizeRosterResponse,aggregateRoster} from './RosterFurnace.jsx';
 const style={width:'100%',boxSizing:'border-box',border:'1px solid '+C.border,background:C.section,color:C.white,padding:'11px 12px',minHeight:44,borderRadius:10,fontSize:15};
 const btn={...style,width:'auto',fontWeight:650,cursor:'pointer'};
 const groups=[
@@ -23,10 +24,28 @@ const delta=(a,b)=>a==null||b==null||!b?'—':((a-b)/b*100>=0?'+':'')+((a-b)/b*1
 function CompareBar({a,b}){const max=Math.max(a||0,b||0,1);return <div style={{display:'grid',gap:5,marginTop:10}}><div style={{height:9,background:C.section,borderRadius:9,overflow:'hidden'}}><div style={{height:'100%',width:(Math.max(0,a||0)/max*100)+'%',background:C.gold,borderRadius:9}}/></div><div style={{height:9,background:C.section,borderRadius:9,overflow:'hidden'}}><div style={{height:'100%',width:(Math.max(0,b||0)/max*100)+'%',background:C.blue,borderRadius:9}}/></div></div>;}
 export function SvsComparison({players=[]}){
  const [mode,setMode]=useState('state'),[ourState,setOurState]=useState('3573'),[enemyState,setEnemyState]=useState(''),[ourTag,setOurTag]=useState('HOT'),[enemyTag,setEnemyTag]=useState(''),[board,setBoard]=useState('furnace');
+ const [ourTags,setOurTags]=useState('HOT'),[enemyTags,setEnemyTags]=useState(''),[rosterData,setRosterData]=useState(null),[rosterBusy,setRosterBusy]=useState(false),[rosterErrors,setRosterErrors]=useState([]);
  const [snapshots,setSnapshots]=useState(null),[errors,setErrors]=useState([]),[busy,setBusy]=useState(false),[detailsOpen,setDetailsOpen]=useState(false),[copyStatus,setCopyStatus]=useState('');
  const valid=id=>/^[1-9]\d{0,4}$/.test(String(id));
  const ready=valid(ourState)&&valid(enemyState)&&(mode==='state'||(ourTag.trim()&&enemyTag.trim()));
- useEffect(()=>{setSnapshots(null);setErrors([]);},[mode,ourState,enemyState,ourTag,enemyTag]);
+ useEffect(()=>{setSnapshots(null);setErrors([]);setRosterData(null);setRosterErrors([]);},[mode,ourState,enemyState,ourTag,enemyTag,ourTags,enemyTags]);
+ const tagsOf=value=>[...new Set(value.split(/[\\s,;]+/).map(t=>t.trim()).filter(Boolean))].slice(0,5);
+ async function loadRosters(){
+  if(!valid(ourState)||!valid(enemyState))return;
+  const sides=[{state:ourState,tags:tagsOf(mode==='alliance'?ourTag:ourTags)},{state:enemyState,tags:tagsOf(mode==='alliance'?enemyTag:enemyTags)}];
+  if(sides.some(side=>!side.tags.length))return;
+  setRosterBusy(true);setRosterErrors([]);
+  // A maximum of five alliances per side is intentional: avoid large bursts
+  // against the protected, rate-limited game provider.
+  const jobs=sides.flatMap((side,i)=>side.tags.map(tag=>({side:i,state:side.state,tag})));
+  const settled=await Promise.allSettled(jobs.map(job=>mightpulseRequest('alliance',{state:Number(job.state),tag:job.tag})
+   .then(response=>({job,players:normalizeRosterResponse(response,job.state,job.tag)}))));
+  const grouped=[[],[]],failed=[];
+  settled.forEach((item,i)=>{if(item.status==='fulfilled')grouped[item.value.job.side].push(item.value);
+    else failed.push(jobs[i].state+' ['+jobs[i].tag+']: '+(item.reason?.message||'Unavailable'));});
+  setRosterData({sides:grouped.map(aggregateRoster),loaded:grouped.map(x=>x.map(y=>y.job.tag)),at:new Date().toISOString()});
+  setRosterErrors(failed);setRosterBusy(false);
+ }
  async function loadBoard(key,targets,previous=null){
   setBusy(true);setErrors([]);
   const results=previous?.results?.map(v=>({...v}))||[{},{}];
@@ -81,6 +100,19 @@ export function SvsComparison({players=[]}){
  </div>
  <button disabled={busy||!ready} onClick={compare} style={{...btn,width:'100%',marginTop:14,background:ready?C.gold:C.section,color:ready?C.bg:C.muted,fontSize:16}}>{busy?'Loading comparison…':snapshots?'Refresh data':'Compare states'}</button>
  {!ready&&<p style={{fontSize:13,color:C.muted}}>Enter both state numbers{mode==='alliance'?' and alliance tags':''} to compare.</p>}
+ <div style={{background:C.section,padding:14,borderRadius:14,marginTop:16}}>
+ <h3 style={{fontSize:16,margin:'0 0 6px'}}>Full alliance rosters</h3>
+ <p style={{fontSize:13,color:C.icy,lineHeight:1.5,margin:'0 0 12px'}}>Load each alliance's members to count FC levels beyond the top-100 rankings.</p>
+ {mode==='state'&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+ <label style={{fontSize:12,color:C.icy}}>Our alliance tags<input aria-label="Our state alliance tags" placeholder="HOT ARC RKG" style={{...style,marginTop:6}} value={ourTags} onChange={e=>setOurTags(e.target.value)}/></label>
+ <label style={{fontSize:12,color:C.icy}}>Opponent tags<input aria-label="Opponent state alliance tags" placeholder="Enter tags" style={{...style,marginTop:6}} value={enemyTags} onChange={e=>setEnemyTags(e.target.value)}/></label>
+ </div>}
+ <p style={{fontSize:12,color:C.muted,lineHeight:1.5,margin:'10px 0'}}>Up to 5 alliance tags per state, separated by spaces or commas. In alliance mode, the tags entered above are used.</p>
+ <button type="button" onClick={loadRosters} disabled={rosterBusy||!valid(ourState)||!valid(enemyState)||!(mode==='alliance'?ourTag&&enemyTag:ourTags.trim()&&enemyTags.trim())} style={{...btn,width:'100%',background:C.card}}>{rosterBusy?'Loading alliance rosters…':'Load furnace distribution'}</button>
+ {rosterErrors.length>0&&<p role="alert" style={{fontSize:12,color:C.red,lineHeight:1.5}}>Could not load {rosterErrors.length} alliance(s): {rosterErrors.join(' · ')}</p>}
+ {rosterData&&<><p style={{fontSize:12,color:C.icy,marginBottom:0}}>Loaded {rosterData.loaded[0].length} of {mode==='state'?tagsOf(ourTags).length:1} our alliances and {rosterData.loaded[1].length} of {mode==='state'?tagsOf(enemyTags).length:1} opponent alliances.</p>
+ <RosterFurnace ours={rosterData.sides[0]} theirs={rosterData.sides[1]} ourLabel={mode==='state'?ourState:ourTag} theirLabel={mode==='state'?enemyState:enemyTag}/></>}
+ </div>
  {errors.length>0&&<div role="alert" style={{padding:12,border:'1px solid '+C.border,borderRadius:12,marginTop:12,color:C.icy,fontSize:13}}><strong>Some rankings could not be loaded.</strong><p style={{marginBottom:0}}>{errors.length} of 2 requests failed for this leaderboard. Missing values are not treated as zero.</p><details><summary>Show issues</summary>{errors.map((e,i)=><p key={i}>{e}</p>)}</details></div>}
  {snapshots&&<>
  <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'baseline',margin:'22px 0 8px'}}><h3 style={{fontSize:18,margin:0}}>2. Compare strength</h3><span style={{fontSize:11,color:C.muted}}>Updated {new Date(snapshots.at).toLocaleTimeString()}</span></div>
