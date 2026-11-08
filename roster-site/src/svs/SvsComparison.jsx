@@ -62,6 +62,13 @@ export function SvsComparison({players=[]}){
  <h3 style={{margin:'0 0 10px',fontSize:16}}>Leaderboard detail</h3>
  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>{ranks.map((rows,i)=><div key={i} style={{minWidth:0}}><strong style={{fontSize:13,color:i?C.blue:C.gold}}>{i?'Opponent':'Our side'}</strong>{rows.length?rows.map(row=><div key={row.key} style={{padding:'9px 0',borderBottom:'1px solid '+C.border,overflowWrap:'anywhere'}}><div style={{fontSize:13}}>#{row.rank} {row.username}</div><div style={{fontSize:12,color:C.icy}}>{row.allianceTag?'['+row.allianceTag+'] · ':''}{rankingScore(row,board)}</div></div>):<p style={{fontSize:13,color:C.muted}}>No matching published entries</p>}</div>)}</div>
  </article>
+ <article style={{background:C.card,borderRadius:14,padding:14,marginTop:12}}>
+ <h3 style={{fontSize:16,margin:'0 0 8px'}}>What this means for the battle</h3>
+ <div style={{fontSize:13,color:C.icy,lineHeight:1.65}}>
+ {(!a?.rows?.length||!b?.rows?.length)?<p>There is not enough matching ranking data to assess the two sides. Check the state numbers or alliance tags before planning.</p>:
+ isFurnace?<p>Compare your highest-furnace players against theirs, then verify rally stats and troop tiers individually. Furnace level alone does not determine who wins a rally.</p>:
+ <><p>{a.top10!=null&&b.top10!=null?(a.top10>b.top10?'Your listed top 10 score is higher. Do not assume an automatic battle advantage; compare buffs and rally composition next.':a.top10<b.top10?'Their listed top 10 score is higher. Prioritise coordinated garrisons, rally timing and identifying viable counters.':'The two sides have similar top-10 scores. Look to activity, heroes, troop matchups and execution for differences.'):'The score comparison is incomplete. Avoid assigning an advantage.'}</p><p>Before lock-in: confirm rally leaders, defensive leads, battle attendance, march speeds and replacement teams. A ranking snapshot is reconnaissance, not a prediction.</p></>}
+ </div></article>
  <button style={{...btn,width:'100%',marginTop:12}} onClick={copy}>Copy comparison summary</button>
  <p style={{fontSize:12,lineHeight:1.6,color:C.muted}}>Interpretation: Top 10 measures only the strongest recorded leaderboard entries. A missing alliance or player may fall outside the published top 100. These scores do not predict an SvS result: rally coordination, attendance, buffs, hero skills and troop composition matter. Furnace leaderboard scores may be non-numeric and are best inspected in the player list rather than added together.</p>
  </>}
