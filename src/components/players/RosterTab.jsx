@@ -14,6 +14,50 @@ import { RosterBulkEditor } from './RosterBulkEditor.jsx';
 import { getCurrentTroopPower } from '../../data/metrics.js';
 import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch } from '../../services/rosterViewService.js';
 const button={minHeight:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,padding:'10px 12px',fontSize:14,fontWeight:600,cursor:'pointer'};
+
+const SORT_FIELDS = [
+  ['name','Name'],['labyrinth','Labyrinth rank'],['labyrinthScore','Labyrinth score'],
+  ['furnace','Furnace level'],['power','Player power'],['kills','Kills'],
+  ['troopPower','Troop power'],['progression','Troop strength'],['review','Needs review']
+];
+const playerName = p => p.username || p.alias || '';
+const numeric = value => {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const number = Number(String(value).replace(/,/g,''));
+  return Number.isFinite(number) ? number : null;
+};
+const furnaceValue = value => {
+  if(!value)return null;
+  const match=String(value).match(/(?:FC|F)\s*(\d+)/i);
+  return match ? Number(match[1]) : null;
+};
+function rosterSortValue(player, field, events) {
+  switch(field){
+    case 'labyrinth': return numeric(player.providerRankings?.labyrinth?.rank);
+    case 'labyrinthScore': return numeric(player.providerRankings?.labyrinth?.score);
+    case 'furnace': return furnaceValue(player.furnaceLevel);
+    case 'power': return numeric(player.power ?? player.providerStats?.power);
+    case 'kills': return numeric(player.kills ?? player.providerStats?.kills);
+    case 'troopPower': return numeric(getCurrentTroopPower(player,events));
+    case 'review': return troopGaps(player).length + Number(!player.fid) + Number(!player.allianceTag);
+    default: return null;
+  }
+}
+function compareRosterPlayers(a,b,field,direction,events) {
+  const order=direction==='asc'?1:-1;
+  const fallback=()=>playerName(a).localeCompare(playerName(b),undefined,{numeric:true,sensitivity:'base'}) || String(a.fid||a.id).localeCompare(String(b.fid||b.id));
+  if(field==='name')return fallback()*order;
+  if(field==='progression'){
+    // Existing progression comparator ranks strongest first. Reverse it only for ascending.
+    return comparePriority(a,b)*(direction==='asc'?-1:1) || fallback();
+  }
+  const av=rosterSortValue(a,field,events), bv=rosterSortValue(b,field,events);
+  if(av===null && bv===null)return fallback();
+  if(av===null)return 1; // Keep unknown rankings and stats at the bottom in both directions.
+  if(bv===null)return -1;
+  return (av-bv)*order || fallback();
+}
+
 export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,roles,onSaveCustomRoles,onSavePlayer,onUpdatePlayers,onDeletePlayer,onGoToIntel,showToast,onLoadAlliance,legionPlan,onRefreshLegion,legionRefresh}) {
   const [legion,setLegion]=useState('');
   const [allianceStatus,setAllianceStatus]=useState('all');
@@ -25,6 +69,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const [optionsOpen,setOptionsOpen]=useState(false);
   const [grouped,setGrouped]=useState(false);
   const [sort,setSort]=useState('name');
+  const [sortDirection,setSortDirection]=useState('asc');
   const [viewingPlayer,setViewingPlayer]=useState(null);
   const [profileOpen,setProfileOpen]=useState(false);
   const [editingPlayer,setEditingPlayer]=useState(null);
@@ -42,12 +87,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   },[initialPlayerId,players,onInitialPlayerOpened]);
   // Keep open profiles current after API refreshes and manual edits.
   const currentPlayer=players.find(p=>p.id===viewingPlayer?.id)||viewingPlayer;
-  const visible=players.filter(p=>matchesRosterFilters(p,search,filters)&&(!activeLegion||plannedMemberIds(activeLegion).has(p.id))&&(!activeLegion||allianceStatus==='all'||allianceCheck(p,activeLegion).status===allianceStatus)).sort((a,b)=>{
-    if(sort==='progression')return comparePriority(a,b);
-    if(sort==='troopPower')return (getCurrentTroopPower(b,events)??-1)-(getCurrentTroopPower(a,events)??-1);
-    if(sort==='review')return (troopGaps(b).length+!b.fid+!b.allianceTag)-(troopGaps(a).length+!a.fid+!a.allianceTag);
-    return (a.username||a.alias||'').localeCompare(b.username||b.alias||'');
-  });
+  const visible=players.filter(p=>matchesRosterFilters(p,search,filters)&&(!activeLegion||plannedMemberIds(activeLegion).has(p.id))&&(!activeLegion||allianceStatus==='all'||allianceCheck(p,activeLegion).status===allianceStatus)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
   const filterCount=rosterFilterCount(filters);
   const allianceTags=[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].sort();
   const lastFetch=latestRosterFetch(players);
@@ -77,7 +117,8 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       {!!legionPlan?.teams?.length&&<RosterLegions teams={legionPlan.teams} selected={activeLegion?.id||''} onSelect={id=>{setLegion(id);setAllianceStatus('all');setSearch('');setFilters({...EMPTY_FILTERS});}} players={players} check={allianceStatus} onCheck={setAllianceStatus} onRefresh={onRefreshLegion} refresh={legionRefresh}/>}
       <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
         <button style={button} aria-expanded={filtersOpen} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button>
-        <label style={{flex:1,minWidth:0}}><span style={{position:'absolute',width:1,height:1,overflow:'hidden'}}>Sort roster</span><select aria-label="Sort roster" value={sort} onChange={e=>setSort(e.target.value)} style={{...button,width:'100%',fontSize:14}}><option value="name">Name A–Z</option><option value="progression">Troop strength</option><option value="troopPower">Troop power</option><option value="review">Needs review</option></select></label>
+        <label style={{flex:1,minWidth:0}}><span style={{position:'absolute',width:1,height:1,overflow:'hidden'}}>Sort by</span><select aria-label="Sort by" value={sort} onChange={e=>{const field=e.target.value;setSort(field);setSortDirection(field==='name'||field==='labyrinth'?'asc':'desc');}} style={{...button,width:'100%',fontSize:14}}>{SORT_FIELDS.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+        <button style={{...button,minWidth:44,padding:'10px 8px',flexShrink:0}} aria-label={sortDirection==='asc'?'Sort ascending. Tap for descending':'Sort descending. Tap for ascending'} title={sortDirection==='asc'?'Ascending · switch to descending':'Descending · switch to ascending'} onClick={()=>setSortDirection(d=>d==='asc'?'desc':'asc')}>{sortDirection==='asc'?'↑':'↓'} <span style={{fontSize:12}}>{sortDirection==='asc'?'Asc':'Desc'}</span></button>
         <button style={button} onClick={()=>{if(selecting)stopSelection();else setSelecting(true);}}>{selecting?'Done':'Select'}</button>
       </div>
       <button style={{...button,width:'100%',marginBottom:10}} aria-expanded={optionsOpen} onClick={()=>setOptionsOpen(!optionsOpen)}>Roster options {optionsOpen?'▴':'▾'}</button>
@@ -88,6 +129,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       </div>}
       {sort==='progression' && <p style={{fontSize:13,color:C.icy}}>Sorts by Helios troops and furnace level. Gear, stats and heroes are not included.</p>}
       {sort==='troopPower' && <p style={{fontSize:13,color:C.icy}}>Uses recorded event troop power. Players without a record appear last.</p>}
+      {(sort==='labyrinth'||sort==='labyrinthScore') && <p style={{fontSize:13,color:C.icy}}>State Labyrinth {sort==='labyrinth'?'rank':'score'} from Whiteout Stats. Players without a recorded value appear last.</p>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}><span role="status" style={{color:C.icy,fontSize:14}}>{visible.length} of {players.length} players</span>{(filterCount>0||search||activeLegion) && <button style={button} onClick={()=>{setSearch('');setFilters({...EMPTY_FILTERS});setLegion('');setAllianceStatus('all');}}>Clear filters</button>}</div>
       {selecting && <section style={{padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
         <div role="status" style={{fontSize:14,marginBottom:8}}>{selected.size} selected across this roster</div>
