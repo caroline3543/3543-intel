@@ -83,7 +83,6 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       <button style={{...button,width:'100%',marginBottom:10}} aria-expanded={optionsOpen} onClick={()=>setOptionsOpen(!optionsOpen)}>Roster options {optionsOpen?'▴':'▾'}</button>
       {optionsOpen && <div style={{display:'grid',gap:8,padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
         <button style={button} onClick={()=>{setGrouped(!grouped);setOptionsOpen(false);}}>{grouped?'Show list':'Group by role'}</button>
-        <button style={button} onClick={()=>{setRolesOpen(true);setOptionsOpen(false);}}>Manage roles</button>
         <button style={button} onClick={()=>{setFieldsOpen(true);setOptionsOpen(false);}}>Update player details</button>
         <button style={button} onClick={copyRoster} disabled={!visible.length}>Copy filtered roster ({visible.length})</button>
       </div>}
