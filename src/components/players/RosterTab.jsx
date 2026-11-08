@@ -3,7 +3,7 @@ import {RosterLegions,LegionPlayerStatus} from './RosterLegions.jsx';
 import {plannedMemberIds,legionForPlayer,allianceCheck,recentNameChanges} from '../../services/talRosterService.js';
 import { useState, useEffect } from 'react';
 import { C } from '../../utils/constants.js';
-import { PlayerCard, comparePriority } from './PlayerCard.jsx';
+import { PlayerCard, comparePriority, getPriorityTier } from './PlayerCard.jsx';
 import { ProfileView } from './ProfileView.jsx';
 import { PlayerSheet } from './PlayerSheet.jsx';
 import { RoleManagerSheet } from './RoleManagerSheet.jsx';
@@ -11,14 +11,13 @@ import { RallyLeaderProfileSheet } from './RallyLeaderProfileSheet.jsx';
 import FieldRegistry from './FieldRegistry.jsx';
 import { RosterFilters } from './RosterFilters.jsx';
 import { RosterBulkEditor } from './RosterBulkEditor.jsx';
-import { getCurrentTroopPower } from '../../data/metrics.js';
 import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch } from '../../services/rosterViewService.js';
 const button={minHeight:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,padding:'10px 12px',fontSize:14,fontWeight:600,cursor:'pointer'};
 
 const SORT_FIELDS = [
   ['name','Name'],['labyrinth','Labyrinth rank'],['labyrinthScore','Labyrinth score'],
-  ['furnace','Furnace level'],['power','Player power'],['kills','Kills'],
-  ['troopPower','Troop power'],['progression','Troop strength'],['review','Needs review']
+  ['furnace','Furnace level'],['power','City power'],['kills','Kills'],
+  ['progression','Troop strength'],['review','Needs review']
 ];
 const playerName = p => p.username || p.alias || '';
 const numeric = value => {
@@ -31,17 +30,28 @@ const furnaceValue = value => {
   const match=String(value).match(/(?:FC|F)\s*(\d+)/i);
   return match ? Number(match[1]) : null;
 };
-function rosterSortValue(player, field, events) {
+function rosterSortValue(player, field) {
   switch(field){
     case 'labyrinth': return numeric(player.providerRankings?.labyrinth?.rank);
     case 'labyrinthScore': return numeric(player.providerRankings?.labyrinth?.score);
     case 'furnace': return furnaceValue(player.furnaceLevel);
     case 'power': return numeric(player.power ?? player.providerStats?.power);
     case 'kills': return numeric(player.kills ?? player.providerStats?.kills);
-    case 'troopPower': return numeric(getCurrentTroopPower(player,events));
     case 'review': return troopGaps(player).length + Number(!player.fid) + Number(!player.allianceTag);
     default: return null;
   }
+}
+function sortDetail(player,field) {
+  if(field==='name')return null;
+  if(field==='progression'){
+    const tier=getPriorityTier(player);
+    return {label:'Troop strength',value:tier===1?'Full Helios':tier===2?'Partial Helios':'Other troops'};
+  }
+  const value=rosterSortValue(player,field);
+  if(field==='furnace')return {label:'Furnace level',value:player.furnaceLevel||'Not recorded'};
+  const label=({labyrinth:'Labyrinth rank',labyrinthScore:'Labyrinth score',power:'City power',kills:'Kills',review:'Fields to review'})[field];
+  if(!label)return null;
+  return {label,value:value===null?'Not recorded':field==='labyrinth'?('#'+value.toLocaleString('en-US')):value.toLocaleString('en-US')};
 }
 function compareRosterPlayers(a,b,field,direction,events) {
   const order=direction==='asc'?1:-1;
@@ -51,7 +61,7 @@ function compareRosterPlayers(a,b,field,direction,events) {
     // Existing progression comparator ranks strongest first. Reverse it only for ascending.
     return comparePriority(a,b)*(direction==='asc'?-1:1) || fallback();
   }
-  const av=rosterSortValue(a,field,events), bv=rosterSortValue(b,field,events);
+  const av=rosterSortValue(a,field), bv=rosterSortValue(b,field);
   if(av===null && bv===null)return fallback();
   if(av===null)return 1; // Keep unknown rankings and stats at the bottom in both directions.
   if(bv===null)return -1;
@@ -101,7 +111,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       showToast?.(`Copied ${visible.length} players`);
     }catch{showToast?.('Unable to copy. Try again.','error');}
   }
-  function card(player){return <PlayerCard key={player.id} player={player} detail={legionPlan?<LegionPlayerStatus player={player} team={legionForPlayer(legionPlan,player.id)} previousName={nameChanges.find(c=>c.playerId===player.id)?.before}/>:null} roles={roles} onClick={()=>selecting?toggle(player.id):openProfile(player)} onDelete={onDeletePlayer} missingCount={(filters.review||sort==='review')?troopGaps(player).length+!player.fid+!player.allianceTag:0} onOpenFields={()=>openProfile(player)} bulkMode={selecting} isSelected={selected.has(player.id)} onToggleRallyLead={()=>onSavePlayer({...player,roles:player.roles?.includes('Rally Lead')?(player.roles||[]).filter(r=>r!=='Rally Lead'):[...(player.roles||[]),'Rally Lead']})}/>;}
+  function card(player){return <PlayerCard key={player.id} player={player} sortDetail={sortDetail(player,sort)} sortField={sort} detail={legionPlan?<LegionPlayerStatus player={player} team={legionForPlayer(legionPlan,player.id)} previousName={nameChanges.find(c=>c.playerId===player.id)?.before}/>:null} roles={roles} onClick={()=>selecting?toggle(player.id):openProfile(player)} onDelete={onDeletePlayer} missingCount={(filters.review||sort==='review')?troopGaps(player).length+!player.fid+!player.allianceTag:0} onOpenFields={()=>openProfile(player)} bulkMode={selecting} isSelected={selected.has(player.id)} onToggleRallyLead={()=>onSavePlayer({...player,roles:player.roles?.includes('Rally Lead')?(player.roles||[]).filter(r=>r!=='Rally Lead'):[...(player.roles||[]),'Rally Lead']})}/>;}
   const groups=[
     {name:'Rally leaders',members:visible.filter(p=>p.roles?.includes('Rally Lead')&&!p.blacklisted)},
     {name:'Joiners',members:visible.filter(p=>!p.roles?.includes('Rally Lead')&&!p.blacklisted)},
@@ -128,8 +138,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
         <button style={button} onClick={copyRoster} disabled={!visible.length}>Copy filtered roster ({visible.length})</button>
       </div>}
       {sort==='progression' && <p style={{fontSize:13,color:C.icy}}>Sorts by Helios troops and furnace level. Gear, stats and heroes are not included.</p>}
-      {sort==='troopPower' && <p style={{fontSize:13,color:C.icy}}>Uses recorded event troop power. Players without a record appear last.</p>}
-      {(sort==='labyrinth'||sort==='labyrinthScore') && <p style={{fontSize:13,color:C.icy}}>State Labyrinth {sort==='labyrinth'?'rank':'score'} from Whiteout Stats. Players without a recorded value appear last.</p>}
+      {(sort==='labyrinth'||sort==='labyrinthScore') && <p style={{fontSize:13,color:C.icy}}>State Labyrinth {sort==='labyrinth'?'rank':'score'} from Whiteout Stats. Missing values appear last.</p>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}><span role="status" style={{color:C.icy,fontSize:14}}>{visible.length} of {players.length} players</span>{(filterCount>0||search||activeLegion) && <button style={button} onClick={()=>{setSearch('');setFilters({...EMPTY_FILTERS});setLegion('');setAllianceStatus('all');}}>Clear filters</button>}</div>
       {selecting && <section style={{padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
         <div role="status" style={{fontSize:14,marginBottom:8}}>{selected.size} selected across this roster</div>
