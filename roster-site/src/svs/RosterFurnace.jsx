@@ -11,7 +11,7 @@ export function normalizeRosterResponse(response,expectedState,tag){
  return data.members.flatMap(m=>{
   if(m.kid!=null&&Number(m.kid)!==Number(expectedState))return [];
   const id=String(m.chief_id??m.fid??'');
-  if(!/^[1-9]\\d+$/.test(id)||seen.has(id))return [];
+  if(!/^[1-9]\d+$/.test(id)||seen.has(id))return [];
   seen.add(id);
   const raw=m.furnace_level_label??m.furnace_level??m.stove_lv??m.town_center_level;
   const level=providerFurnaceLevel(raw);
