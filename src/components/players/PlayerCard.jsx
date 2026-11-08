@@ -66,15 +66,11 @@ export function PlayerCard({player,onClick,onDelete,missingCount,onToggleRallyLe
         {bulkMode?<span aria-hidden="true" style={{fontSize:22,color:isSelected?C.gold:C.icy}}>{isSelected?'☑':'☐'}</span>:<PlayerAvatar player={player} size={44}/>}
         <span style={{flex:1,minWidth:0}}>
           <span style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}><span style={{fontSize:16,fontWeight:700,minWidth:0,overflowWrap:'anywhere',lineHeight:1.4}}>{name}</span>{player.furnaceLevel&&<span style={{fontSize:13,color:C.gold,flexShrink:0}}>{player.furnaceLevel}</span>}</span>
-          <span style={{display:'block',fontSize:14,color:C.icy,marginTop:4}}>{player.allianceTag?`[${player.allianceTag}]`:'Alliance unknown'}{sortField==='power'?'':power!=null?` · City power ${compact(power)}`:''}</span>
+          <span style={{display:'block',fontSize:14,color:C.icy,marginTop:4}}>{player.allianceTag?`[${player.allianceTag}]`:'Alliance unknown'}{' · '}{sortDetail && sortField!=='furnace' ? `${sortDetail.label} ${sortDetail.value}` : power!=null ? `City power ${compact(power)}` : 'City power not recorded'}</span>
         </span>
       </button>
       {!bulkMode && <button style={control} aria-label={`Options for ${name}`} aria-expanded={menu} onClick={()=>setMenu(!menu)}>•••</button>}
     </div>
-    {sortDetail && <div aria-label={sortDetail.label+': '+sortDetail.value} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,background:C.section,borderRadius:8,padding:'9px 11px',marginTop:10}}>
-      <span style={{fontSize:13,color:C.icy}}>{sortDetail.label}</span>
-      <strong style={{fontSize:16,color:C.gold,textAlign:'right',overflowWrap:'anywhere'}}>{sortDetail.value}</strong>
-    </div>}
     <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{[['Inf','infantry',C.inf],['Lan','lancer',C.lan],['Mar','marksman',C.mar]].map(([label,key,color])=><span key={key} style={{fontSize:13,color:C.icy,background:C.section,borderRadius:6,padding:'5px 7px'}}><span style={{color}}>{label}</span> {player.troops?.[key]||'Unknown'}</span>)}</div>
     <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginTop:8}}>
       {player.blacklisted?<span style={{fontSize:13,color:C.red}}>Excluded from battle plans</span>:leader?<span style={{fontSize:13,color:C.gold}}>Rally leader</span>:null}
