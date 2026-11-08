@@ -17,7 +17,7 @@ function CompareBar({a,b}){const max=Math.max(a||0,b||0,1);return <div style={{d
 export function SvsComparison({players=[]}){
  const [mode,setMode]=useState('state'),[ourState,setOurState]=useState('3573'),[enemyState,setEnemyState]=useState(''),[ourTag,setOurTag]=useState('HOT'),[enemyTag,setEnemyTag]=useState(''),[board,setBoard]=useState('personal_power');
  const [snapshots,setSnapshots]=useState(null),[errors,setErrors]=useState([]),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
- const valid=id=>/^[1-9]\\d{0,4}$/.test(String(id));
+ const valid=id=>/^[1-9]\d{0,4}$/.test(String(id));
  const ready=valid(ourState)&&valid(enemyState)&&(mode==='state'||(ourTag.trim()&&enemyTag.trim()));
  useEffect(()=>{setSnapshots(null);setErrors([]);},[mode,ourState,enemyState,ourTag,enemyTag]);
  async function compare(){
@@ -31,8 +31,10 @@ export function SvsComparison({players=[]}){
  }
  const left=snapshots?.results?.[0]?.[board],right=snapshots?.results?.[1]?.[board];
  const a=left?summary(left.rows,mode,ourTag):null,b=right?summary(right.rows,mode,enemyTag):null;
+ const isFurnace=board==='furnace';
+ const furnaceHighest=rows=>rows?.length?rankingScore(rows[0],'furnace'):'No data';
  const ranks=useMemo(()=>[a?.rows||[],b?.rows||[]].map(rows=>rows.slice(0,10)),[a?.rows,b?.rows]);
- function copy(){const text=[mode==='state'?'SvS State Comparison':'SvS Alliance Comparison',mode==='state'?ourState+' vs '+enemyState:'['+ourTag+'] '+ourState+' vs ['+enemyTag+'] '+enemyState,boards.find(v=>v[0]===board)?.[1]||board,'Top 100 leaderboard sample, not full state totals', 'Our top 10: '+format(a?.top10),'Opponent top 10: '+format(b?.top10),'Difference: '+delta(a?.top10,b?.top10)].join('\\n');navigator.clipboard?.writeText(text);}
+ function copy(){const text=[mode==='state'?'SvS State Comparison':'SvS Alliance Comparison',mode==='state'?ourState+' vs '+enemyState:'['+ourTag+'] '+ourState+' vs ['+enemyTag+'] '+enemyState,boards.find(v=>v[0]===board)?.[1]||board,'Top 100 leaderboard sample, not full state totals', 'Our top 10: '+(isFurnace?furnaceHighest(a?.rows):format(a?.top10)),'Opponent top 10: '+(isFurnace?furnaceHighest(b?.rows):format(b?.top10)),'Difference: '+(isFurnace?'Furnace rankings shown individually':delta(a?.top10,b?.top10))].join('\n');navigator.clipboard?.writeText(text);}
  const label=mode==='state'?'Top-100 entries':'Matching alliance entries in top 100';
  return <section style={{padding:'20px',color:C.white,minWidth:0}}>
  <h2 style={{fontSize:24,margin:'0 0 7px'}}>SvS comparison</h2><p style={{fontSize:14,color:C.icy,lineHeight:1.55,marginTop:0}}>Compare leaderboard strength before choosing rally leaders, garrisons and battle priorities.</p>
@@ -50,9 +52,9 @@ export function SvsComparison({players=[]}){
  <label style={{display:'block',color:C.icy,fontSize:13,marginBottom:12}}>Compare metric<select aria-label="Comparison metric" style={{...style,marginTop:6}} value={board} onChange={e=>setBoard(e.target.value)}>{boards.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
  <article style={{background:C.card,borderRadius:14,padding:16,marginBottom:12}}>
  <h3 style={{fontSize:16,margin:'0 0 12px'}}>{boards.find(x=>x[0]===board)?.[1]}</h3>
- <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>{[a,b].map((item,i)=><div key={i} style={{minWidth:0}}><div style={{color:i?C.blue:C.gold,fontSize:12,fontWeight:700}}>{i?'OPPONENT':'OUR SIDE'}</div><div style={{fontSize:23,fontWeight:750,overflowWrap:'anywhere',margin:'6px 0'}}>{format(item?.top10)}</div><div style={{color:C.icy,fontSize:12}}>Top 10 recorded score</div><div style={{fontSize:12,color:C.muted,marginTop:5}}>{item?.count??'—'} {label.toLowerCase()}</div></div>)}</div>
- <CompareBar a={a?.top10} b={b?.top10}/>
- <p style={{fontSize:13,color:C.icy,marginBottom:0}}>Top 10 gap: <strong style={{color:C.white}}>{delta(a?.top10,b?.top10)}</strong></p>
+ <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>{[a,b].map((item,i)=><div key={i} style={{minWidth:0}}><div style={{color:i?C.blue:C.gold,fontSize:12,fontWeight:700}}>{i?'OPPONENT':'OUR SIDE'}</div><div style={{fontSize:23,fontWeight:750,overflowWrap:'anywhere',margin:'6px 0'}}>{isFurnace?furnaceHighest(item?.rows):format(item?.top10)}</div><div style={{color:C.icy,fontSize:12}}>{isFurnace?'Highest listed furnace':'Top 10 recorded score'}</div><div style={{fontSize:12,color:C.muted,marginTop:5}}>{item?.count??'—'} {label.toLowerCase()}</div></div>)}</div>
+ {!isFurnace&&<><CompareBar a={a?.top10} b={b?.top10}/><p style={{fontSize:13,color:C.icy,marginBottom:0}}>Top 10 gap: <strong style={{color:C.white}}>{delta(a?.top10,b?.top10)}</strong></p></>}
+ {isFurnace&&<p style={{fontSize:13,color:C.icy,marginBottom:0}}>Furnace rankings are levels, not additive power. Compare individual leaders below.</p>}
  </article>
  <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10,marginBottom:12}}>
  {[a,b].map((item,i)=><article key={i} style={{background:C.section,padding:13,borderRadius:12}}><div style={{fontSize:12,color:C.icy}}>{i?'Opponent':'Our side'} · {label}</div><strong style={{fontSize:21}}>{item?.count??'—'}</strong><div style={{fontSize:12,color:C.muted,marginTop:5}}>Recorded in this leaderboard</div></article>)}</div>
