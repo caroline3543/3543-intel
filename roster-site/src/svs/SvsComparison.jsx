@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
 import {mightpulseRequest} from '../../../src/services/mightpulseService.js';
 import {normalizeRankings,rankingScore} from '../../../src/services/stateRankingsService.js';
-import {FurnaceDistribution} from './FurnaceDistribution.jsx';
+import {FurnaceDistribution,countFurnace} from './FurnaceDistribution.jsx';
 const style={width:'100%',boxSizing:'border-box',border:'1px solid '+C.border,background:C.section,color:C.white,padding:'11px 12px',minHeight:44,borderRadius:10,fontSize:15};
 const btn={...style,width:'auto',fontWeight:650,cursor:'pointer'};
 const groups=[
@@ -58,7 +58,15 @@ export function SvsComparison({players=[]}){
  const furnaceData=(result,tag)=>result?{...result,rows:mode==='alliance'?result.rows.filter(r=>r.allianceTag.toLowerCase()===tag.trim().toLowerCase()):result.rows}:null;
  const furnaceHighest=rows=>rows?.length?rankingScore(rows[0],'furnace'):'No data';
  const ranks=useMemo(()=>[a?.rows||[],b?.rows||[]].map(rows=>rows.slice(0,10)),[a?.rows,b?.rows]);
- async function copy(){const text=[mode==='state'?'SvS State Comparison':'SvS Alliance Comparison',mode==='state'?ourState+' vs '+enemyState:'['+ourTag+'] '+ourState+' vs ['+enemyTag+'] '+enemyState,boards.find(v=>v[0]===board)?.[1]||board,'Top 100 leaderboard sample, not full state totals', 'Our top 10: '+(isFurnace?furnaceHighest(a?.rows):format(a?.top10)),'Opponent top 10: '+(isFurnace?furnaceHighest(b?.rows):format(b?.top10)),'Difference: '+(isFurnace?'Furnace rankings shown individually':delta(a?.top10,b?.top10))].join('\n');try{await navigator.clipboard.writeText(text);setCopyStatus('Summary copied');}catch{setCopyStatus('Copy unavailable on this device');}}
+ async function copy(){
+ const levels=['FC10','FC9','FC8','FC7','FC6','FC5'];
+ const fleft=furnaceData(furnaceLeft,ourTag),fright=furnaceData(furnaceRight,enemyTag);
+ const lc=fleft?countFurnace(fleft.rows):null,rc=fright?countFurnace(fright.rows):null;
+ const furnaceLines=lc&&rc?['Furnace tier counts (published top 100 only)',...levels.map(t=>t+': '+lc[t]+' vs '+rc[t]),'FC7+: '+['FC10','FC9','FC8','FC7'].reduce((n,t)=>n+lc[t],0)+' vs '+['FC10','FC9','FC8','FC7'].reduce((n,t)=>n+rc[t],0)]:[];
+ const lines=[mode==='state'?'SvS State Comparison':'SvS Alliance Comparison',mode==='state'?ourState+' vs '+enemyState:'['+ourTag+'] '+ourState+' vs ['+enemyTag+'] '+enemyState,'Top-100 published leaderboard sample only',...furnaceLines,'',boards.find(v=>v[0]===board)?.[1]||board,'Our top 10: '+(isFurnace?furnaceHighest(a?.rows):format(a?.top10)),'Opponent top 10: '+(isFurnace?furnaceHighest(b?.rows):format(b?.top10)),'Difference: '+(isFurnace?'Levels are not additive':delta(a?.top10,b?.top10))];
+ try{await navigator.clipboard.writeText(lines.join('\\n'));setCopyStatus('Summary copied');}
+ catch{setCopyStatus('Copy unavailable on this device');}
+}
  const label=mode==='state'?'Top-100 entries':'Matching alliance entries in top 100';
  return <section style={{padding:'20px',color:C.white,minWidth:0}}>
  <div style={{fontSize:12,color:C.gold,fontWeight:800,letterSpacing:1.2,marginBottom:6}}>BATTLE INTELLIGENCE</div>
@@ -78,14 +86,14 @@ export function SvsComparison({players=[]}){
  <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'baseline',margin:'22px 0 8px'}}><h3 style={{fontSize:18,margin:0}}>2. Compare strength</h3><span style={{fontSize:11,color:C.muted}}>Updated {new Date(snapshots.at).toLocaleTimeString()}</span></div>
  <p style={{fontSize:12,color:C.icy,lineHeight:1.5,margin:'0 0 8px'}}>Based on published top-100 rankings. Missing players are not counted.</p>
  {furnaceLeft&&furnaceRight&&<FurnaceDistribution left={furnaceData(furnaceLeft,ourTag)} right={furnaceData(furnaceRight,enemyTag)} leftName={mode==='state'?ourState:ourTag} rightName={mode==='state'?enemyState:enemyTag} scope={furnaceScope}/>}
- <label style={{display:'block',color:C.icy,fontSize:13,margin:'20px 0 12px'}}>Leaderboard<select aria-label="Comparison metric" style={{...style,marginTop:6}} value={board} onChange={e=>chooseBoard(e.target.value)}>{groups.map(group=><optgroup key={group.label} label={group.label}>{group.items.map(([key,label])=><option key={key} value={key}>{label}</option>)}</optgroup>)}</select></label>
- <article style={{background:C.card,borderRadius:14,padding:16,marginBottom:12}}>
+ <label style={{display:'block',color:C.icy,fontSize:13,margin:'20px 0 12px'}}>Explore another leaderboard<select aria-label="Comparison metric" style={{...style,marginTop:6}} value={board} onChange={e=>chooseBoard(e.target.value)}>{groups.map(group=><optgroup key={group.label} label={group.label}>{group.items.map(([key,label])=><option key={key} value={key}>{label}</option>)}</optgroup>)}</select></label>
+ {!isFurnace&&<article style={{background:C.card,borderRadius:14,padding:16,marginBottom:12}}>
  <h3 style={{fontSize:16,margin:'0 0 12px'}}>{boards.find(x=>x[0]===board)?.[1]}</h3>
  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>{[a,b].map((item,i)=><div key={i} style={{minWidth:0}}><div style={{color:i?C.blue:C.gold,fontSize:12,fontWeight:700}}>{i?'OPPONENT':'OUR SIDE'}</div><div style={{fontSize:23,fontWeight:750,overflowWrap:'anywhere',margin:'6px 0'}}>{isFurnace?furnaceHighest(item?.rows):format(item?.top10)}</div><div style={{color:C.icy,fontSize:12}}>{isFurnace?'Highest listed furnace':'Top 10 recorded score'}</div><div style={{fontSize:12,color:C.muted,marginTop:5}}>{item?.count??'—'} {label.toLowerCase()}</div></div>)}</div>
  {!isFurnace&&<><CompareBar a={a?.top10} b={b?.top10}/><p style={{fontSize:13,color:C.icy,marginBottom:0}}>Top 10 gap: <strong style={{color:C.white}}>{delta(a?.top10,b?.top10)}</strong></p></>}
  {isFurnace&&<p style={{fontSize:13,color:C.icy,marginBottom:0}}>Furnace rankings are levels, not additive power. Compare individual leaders below.</p>}
- </article>
- <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10,marginBottom:12}}>
+ </article>}
+ {!isFurnace&&<div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10,marginBottom:12}}>
  {[a,b].map((item,i)=><article key={i} style={{background:C.section,padding:13,borderRadius:12}}><div style={{fontSize:12,color:C.icy}}>{i?'Opponent':'Our side'} · {label}</div><strong style={{fontSize:21}}>{item?.count??'—'}</strong><div style={{fontSize:12,color:C.muted,marginTop:5}}>Recorded in this leaderboard</div></article>)}</div>
  <details open={detailsOpen} onToggle={e=>setDetailsOpen(e.currentTarget.open)} style={{background:C.card,borderRadius:14,padding:14}}>
  <summary style={{minHeight:44,cursor:'pointer',fontSize:15,fontWeight:700,padding:'12px 0'}}>View top 10 players</summary>
