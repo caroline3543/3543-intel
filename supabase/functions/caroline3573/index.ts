@@ -63,14 +63,14 @@ Deno.serve(async req => {
   const state = Number(input.state);
   const fid = String(input.fid || "");
   const tag = String(input.tag || "");
-  if (!Number.isSafeInteger(state) || state < 1 || state > 99999 || (action !== "rankings" && state !== 3573)) return respond({error:"Invalid state for requested action"},400);
+  if (!Number.isSafeInteger(state) || state < 1 || state > 99999 || (action === "player_details" && state !== 3573)) return respond({error:"Invalid state for requested action"},400);
   const validState = state === 3573;
   let path = "";
   if (action === "usage") path = "/usage";
   if (action === "player_details") path = playerDetailsPath(input.state, input.fid) || "";
   if (action === "rankings") path = rankingsPath(input.state, input.board, input.limit ?? 100) || "";
   if (action === "kingdom" && validState) path = `/states/${state}`;
-  if (action === "alliance" && validState && /^[\p{L}\p{N}_-]{1,16}$/u.test(tag)) {
+  if (action === "alliance" && /^[\p{L}\p{N}_-]{1,16}$/u.test(tag)) {
     path = `/alliances/${state}/${encodeURIComponent(tag)}?include=info,roster`;
   }
   if (action === "player" && /^\d{4,15}$/.test(fid)) {
