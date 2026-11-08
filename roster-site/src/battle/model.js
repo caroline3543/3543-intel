@@ -2,7 +2,7 @@ import {saveBattleTeams,updateBattleTeam,moveBattleTeamMember,activeTeamMembers}
 import {battlePower} from './eventPower.js';
 export {battlePower} from './eventPower.js';
 import {compareLegionStrength} from '../tal/autoRoles.js';
-import {playerLabel} from '../tal/planner.js';
+import {playerLabel,record} from '../tal/planner.js';
 export const BUILDINGS=['Prototype Site I','Prototype Site II','Repair Facility I','Repair Facility II','Repair Facility III','Repair Facility IV','Boiler Room','Transit Station','Imperial Foundry','Munitions Warehouse','Mercenary Camp','Weapon Workshops','Roaming / supplies'];
 export const battleEvents=events=>(events||[]).filter(e=>e.kind==='battle-plan');
 export function validateBattleTime(date,time){
@@ -14,7 +14,7 @@ export function createBattle({id,type='tal',date,time,team,alliance,players,plan
  const ids=team?new Set(team.members.map(m=>m.id)):new Set(players.filter(p=>p.allianceTag===alliance).map(p=>p.id));
  const sorted=players.filter(p=>ids.has(p.id)).sort((a,b)=>compareLegionStrength(plan,a,b));
  const subCap=type==='foundry'?10:20;
- return {id,kind:'battle-plan',type,date,time,title:`${team?`${team.host} Legion ${team.number}`:alliance} · ${type==='tal'?'TAL':'Foundry'}`,sourceTeamId:team?.id||'',sourceLabel:team?`${team.host} Legion ${team.number}`:alliance,officer:'',opponent:'',notes:'',createdAt:new Date().toISOString(),participants:sorted.map((p,i)=>({id:p.id,role:i<30?'combatant':i<30+subCap?'substitute':'reserve',attendance:'unknown',building:'',task:'Joiner',power:'',note:''}))};
+ return {id,kind:'battle-plan',type,date,time,title:`${team?`${team.host} Legion ${team.number}`:alliance} · ${type==='tal'?'TAL':'Foundry'}`,sourceTeamId:team?.id||'',sourceLabel:team?`${team.host} Legion ${team.number}`:alliance,officer:'',opponent:'',notes:'',createdAt:new Date().toISOString(),participants:sorted.map((p,i)=>({id:p.id,role:i<30?'combatant':i<30+subCap?'substitute':'reserve',attendance:record(plan,p).status==='available'&&record(plan,p).times.includes(time)?'available':'unknown',building:'',task:'Joiner',power:'',note:''}))};
 }
 export function patchBattle(events,id,patch){return events.map(e=>e.id===id?{...e,...patch}:e);}
 export function patchParticipant(event,id,patch){
