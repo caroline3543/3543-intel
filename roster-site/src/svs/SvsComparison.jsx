@@ -29,7 +29,7 @@ export function SvsComparison({players=[]}){
  const valid=id=>/^[1-9]\d{0,4}$/.test(String(id));
  const ready=valid(ourState)&&valid(enemyState)&&(mode==='state'||(ourTag.trim()&&enemyTag.trim()));
  useEffect(()=>{setSnapshots(null);setErrors([]);setRosterData(null);setRosterErrors([]);},[mode,ourState,enemyState,ourTag,enemyTag,ourTags,enemyTags]);
- const tagsOf=value=>[...new Set(value.split(/[\\s,;]+/).map(t=>t.trim()).filter(Boolean))].slice(0,5);
+ const tagsOf=value=>[...new Set(value.split(/[\s,;]+/).map(t=>t.trim()).filter(Boolean))].slice(0,5);
  async function loadRosters(){
   if(!valid(ourState)||!valid(enemyState))return;
   const sides=[{state:ourState,tags:tagsOf(mode==='alliance'?ourTag:ourTags)},{state:enemyState,tags:tagsOf(mode==='alliance'?enemyTag:enemyTags)}];
