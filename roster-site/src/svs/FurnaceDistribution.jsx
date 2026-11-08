@@ -20,13 +20,13 @@ export function FurnaceDistribution({left,right,leftName='Our side',rightName='O
  const cap=Math.max(1,...levels.map(level=>Math.max(lc[level],rc[level])));
  return <section style={{background:C.card,borderRadius:16,padding:16,marginTop:14}}>
   <h3 style={{fontSize:18,margin:'0 0 5px'}}>Furnace levels</h3>
-  <p style={{fontSize:13,color:C.icy,lineHeight:1.5,margin:'0 0 14px'}}>How many ranked players reached each furnace tier?</p>
+  <p style={{fontSize:13,color:C.icy,lineHeight:1.5,margin:'0 0 14px'}}>Top-100 leaderboard sample</p>
   <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10,marginBottom:12}}>
    {[[lc,left,leftName,C.gold],[rc,right,rightName,C.blue]].map(([counts,data,name,color])=><div key={name} style={{background:C.section,padding:12,borderRadius:12,minWidth:0}}>
     <div style={{fontSize:12,color,marginBottom:6,fontWeight:700,overflowWrap:'anywhere'}}>{name}</div>
     <div style={{fontSize:27,fontWeight:800}}>{data?high(counts):'—'}</div>
     <div style={{fontSize:12,color:C.icy,marginTop:2}}>FC7 or higher</div>
-    <div style={{fontSize:11,color:C.muted,marginTop:8}}>{data?`${data.rows.length} ranked entries examined`:'Data unavailable'}</div>
+    <div style={{fontSize:11,color:C.muted,marginTop:8}}>{data?`${data.rows.length} ranked players`:'Data unavailable'}</div>
    </div>)}
   </div>
   <div style={{display:'grid',gridTemplateColumns:'minmax(65px,.8fr) 1fr 1fr',gap:10,alignItems:'center',paddingBottom:8,borderBottom:'1px solid '+C.border}}>
@@ -40,6 +40,6 @@ export function FurnaceDistribution({left,right,leftName='Our side',rightName='O
    </div>)}
   </div>)}
   {!available&&<p style={{fontSize:13,color:C.icy}}>Load the furnace leaderboard for both sides to compare these counts.</p>}
-  <p style={{fontSize:12,color:C.muted,lineHeight:1.55,margin:'14px 0 0'}}>Counts cover only players returned by the published top-100 furnace leaderboard{scope==='alliance'?' who match each alliance tag':''}. They are not the total number of FC7+ players in the state. Players outside the leaderboard cannot be counted here.</p>
+  <p style={{fontSize:12,color:C.muted,lineHeight:1.55,margin:'14px 0 0'}}>Counts reflect up to 100 ranked players{scope==='alliance'?' filtered to each alliance':''}, not the full state.</p>
  </section>;
 }
