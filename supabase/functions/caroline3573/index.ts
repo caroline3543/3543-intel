@@ -63,7 +63,7 @@ Deno.serve(async req => {
   const state = Number(input.state);
   const fid = String(input.fid || "");
   const tag = String(input.tag || "");
-  if (state !== 3573) return respond({error:"State 3573 only"},400);
+  if (!Number.isSafeInteger(state) || state < 1 || state > 99999 || (action !== "rankings" && state !== 3573)) return respond({error:"Invalid state for requested action"},400);
   const validState = state === 3573;
   let path = "";
   if (action === "usage") path = "/usage";
