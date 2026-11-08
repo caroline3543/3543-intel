@@ -5,7 +5,7 @@ export default async function handler(req,res){
   if(!authorized(req))return respond(res,401,{error:'Enter the site password to refresh game data.'});
   if(!sameOrigin(req))return respond(res,403,{error:'Open this website directly to refresh.'});
   const input=req.body;
-  if(!input||!actions.has(input.action)||!Number.isSafeInteger(Number(input.state))||Number(input.state)<1||Number(input.state)>99999||(input.action!=='rankings'&&Number(input.state)!==3573))return respond(res,400,{error:'Invalid state. Roster and profile lookups are limited to State 3573.'});
+  if(!input||!actions.has(input.action)||!Number.isSafeInteger(Number(input.state))||Number(input.state)<1||Number(input.state)>99999||(input.action==='player_details'&&Number(input.state)!==3573))return respond(res,400,{error:'Invalid state. Profile lookups are limited to State 3573.'});
   const base=process.env.GAME_API_URL,key=process.env.GAME_API_PUBLIC_KEY;
   if(!base||!key||!process.env.GAME_SITE_TOKEN)return respond(res,503,{error:'Game data access is not configured yet.'});
   const body={action:input.action,state:Number(input.state)};
