@@ -88,37 +88,20 @@ export function SvsComparison({players=[]}){
 }
  const label=mode==='state'?'Top-100 entries':'Matching alliance entries in top 100';
  return <section style={{padding:'20px',color:C.white,minWidth:0}}>
- <div style={{fontSize:12,color:C.gold,fontWeight:800,letterSpacing:1.2,marginBottom:6}}>BATTLE INTELLIGENCE</div>
- <h2 style={{fontSize:27,letterSpacing:-.5,margin:'0 0 8px'}}>SvS comparison</h2>
- <p style={{fontSize:14,color:C.icy,lineHeight:1.55,margin:'0 0 20px'}}>See where each side is strongest before planning rallies and garrisons.</p>
- <h3 style={{fontSize:16,margin:'0 0 10px'}}>1. Choose your opponents</h3>
+ <h2 style={{fontSize:27,letterSpacing:-.5,margin:'0 0 16px'}}>SvS comparison</h2>
  <div role="group" aria-label="Comparison type" style={{display:'flex',gap:8,marginBottom:16}}>{[['state','State vs state'],['alliance','Alliance vs alliance']].map(([key,label])=><button key={key} aria-pressed={mode===key} onClick={()=>setMode(key)} style={{...btn,flex:1,background:mode===key?C.gold:C.section,color:mode===key?C.bg:C.white,fontSize:13}}>{label}</button>)}</div>
  <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10}}>
  <label style={{fontSize:13,color:C.icy}}>Our state<input aria-label="Our state" inputMode="numeric" style={{...style,marginTop:6}} value={ourState} onChange={e=>setOurState(e.target.value.trim())}/></label>
  <label style={{fontSize:13,color:C.icy}}>Opponent state<input aria-label="Opponent state" inputMode="numeric" placeholder="e.g. 3556" style={{...style,marginTop:6}} value={enemyState} onChange={e=>setEnemyState(e.target.value.trim())}/></label>
  {mode==='alliance'&&<><label style={{fontSize:13,color:C.icy}}>Our alliance<input aria-label="Our alliance tag" style={{...style,marginTop:6}} value={ourTag} onChange={e=>setOurTag(e.target.value.toUpperCase())}/></label><label style={{fontSize:13,color:C.icy}}>Opponent alliance<input aria-label="Opponent alliance tag" style={{...style,marginTop:6}} value={enemyTag} onChange={e=>setEnemyTag(e.target.value.toUpperCase())}/></label></>}
  </div>
- <button disabled={busy||!ready} onClick={compare} style={{...btn,width:'100%',marginTop:14,background:ready?C.gold:C.section,color:ready?C.bg:C.muted,fontSize:16}}>{busy?'Loading comparison…':snapshots?'Refresh data':'Compare states'}</button>
- {!ready&&<p style={{fontSize:13,color:C.muted}}>Enter both state numbers{mode==='alliance'?' and alliance tags':''} to compare.</p>}
- <div style={{background:C.section,padding:14,borderRadius:14,marginTop:16}}>
- <h3 style={{fontSize:16,margin:'0 0 6px'}}>Full alliance rosters</h3>
- <p style={{fontSize:13,color:C.icy,lineHeight:1.5,margin:'0 0 12px'}}>Load each alliance's members to count FC levels beyond the top-100 rankings.</p>
- {mode==='state'&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
- <label style={{fontSize:12,color:C.icy}}>Our alliance tags<input aria-label="Our state alliance tags" placeholder="HOT ARC RKG" style={{...style,marginTop:6}} value={ourTags} onChange={e=>setOurTags(e.target.value)}/></label>
- <label style={{fontSize:12,color:C.icy}}>Opponent tags<input aria-label="Opponent state alliance tags" placeholder="Enter tags" style={{...style,marginTop:6}} value={enemyTags} onChange={e=>setEnemyTags(e.target.value)}/></label>
- </div>}
- <p style={{fontSize:12,color:C.muted,lineHeight:1.5,margin:'10px 0'}}>Up to 5 alliance tags per state, separated by spaces or commas. In alliance mode, the tags entered above are used.</p>
- <button type="button" onClick={loadRosters} disabled={rosterBusy||!valid(ourState)||!valid(enemyState)||!(mode==='alliance'?ourTag&&enemyTag:ourTags.trim()&&enemyTags.trim())} style={{...btn,width:'100%',background:C.card}}>{rosterBusy?'Loading alliance rosters…':'Load furnace distribution'}</button>
- {rosterErrors.length>0&&<p role="alert" style={{fontSize:12,color:C.red,lineHeight:1.5}}>Could not load {rosterErrors.length} alliance(s): {rosterErrors.join(' · ')}</p>}
- {rosterData&&<><p style={{fontSize:12,color:C.icy,marginBottom:0}}>Loaded {rosterData.loaded[0].length} of {mode==='state'?tagsOf(ourTags).length:1} our alliances and {rosterData.loaded[1].length} of {mode==='state'?tagsOf(enemyTags).length:1} opponent alliances.</p>
- <RosterFurnace ours={rosterData.sides[0]} theirs={rosterData.sides[1]} ourLabel={mode==='state'?ourState:ourTag} theirLabel={mode==='state'?enemyState:enemyTag}/></>}
- </div>
+ <button disabled={busy||!ready} onClick={compare} style={{...btn,width:'100%',marginTop:14,background:ready?C.gold:C.section,color:ready?C.bg:C.muted,fontSize:16}}>{busy?'Loading leaderboard…':snapshots?'Refresh leaderboard':'Compare leaderboards'}</button>
  {errors.length>0&&<div role="alert" style={{padding:12,border:'1px solid '+C.border,borderRadius:12,marginTop:12,color:C.icy,fontSize:13}}><strong>Some rankings could not be loaded.</strong><p style={{marginBottom:0}}>{errors.length} of 2 requests failed for this leaderboard. Missing values are not treated as zero.</p><details><summary>Show issues</summary>{errors.map((e,i)=><p key={i}>{e}</p>)}</details></div>}
  {snapshots&&<>
- <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'baseline',margin:'22px 0 8px'}}><h3 style={{fontSize:18,margin:0}}>2. Compare strength</h3><span style={{fontSize:11,color:C.muted}}>Updated {new Date(snapshots.at).toLocaleTimeString()}</span></div>
- <p style={{fontSize:12,color:C.icy,lineHeight:1.5,margin:'0 0 8px'}}>Based on published top-100 rankings. Missing players are not counted.</p>
+ <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'baseline',margin:'22px 0 8px'}}><h3 style={{fontSize:18,margin:0}}>Leaderboards</h3><span style={{fontSize:11,color:C.muted}}>Updated {new Date(snapshots.at).toLocaleTimeString()}</span></div>
+
  {furnaceLeft&&furnaceRight&&<FurnaceDistribution left={furnaceData(furnaceLeft,ourTag)} right={furnaceData(furnaceRight,enemyTag)} leftName={mode==='state'?ourState:ourTag} rightName={mode==='state'?enemyState:enemyTag} scope={furnaceScope}/>}
- <label style={{display:'block',color:C.icy,fontSize:13,margin:'20px 0 12px'}}>Explore another leaderboard<select aria-label="Comparison metric" style={{...style,marginTop:6}} value={board} onChange={e=>chooseBoard(e.target.value)}>{groups.map(group=><optgroup key={group.label} label={group.label}>{group.items.map(([key,label])=><option key={key} value={key}>{label}</option>)}</optgroup>)}</select></label>
+ <label style={{display:'block',color:C.icy,fontSize:13,margin:'20px 0 12px'}}>Metric<select aria-label="Comparison metric" style={{...style,marginTop:6}} value={board} onChange={e=>chooseBoard(e.target.value)}>{groups.map(group=><optgroup key={group.label} label={group.label}>{group.items.map(([key,label])=><option key={key} value={key}>{label}</option>)}</optgroup>)}</select></label>
  {!isFurnace&&<article style={{background:C.card,borderRadius:14,padding:16,marginBottom:12}}>
  <h3 style={{fontSize:16,margin:'0 0 12px'}}>{boards.find(x=>x[0]===board)?.[1]}</h3>
  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>{[a,b].map((item,i)=><div key={i} style={{minWidth:0}}><div style={{color:i?C.blue:C.gold,fontSize:12,fontWeight:700}}>{i?'OPPONENT':'OUR SIDE'}</div><div style={{fontSize:23,fontWeight:750,overflowWrap:'anywhere',margin:'6px 0'}}>{isFurnace?furnaceHighest(item?.rows):format(item?.top10)}</div><div style={{color:C.icy,fontSize:12}}>{isFurnace?'Highest listed furnace':'Top 10 recorded score'}</div><div style={{fontSize:12,color:C.muted,marginTop:5}}>{item?.count??'—'} {label.toLowerCase()}</div></div>)}</div>
@@ -128,18 +111,32 @@ export function SvsComparison({players=[]}){
  {!isFurnace&&<div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10,marginBottom:12}}>
  {[a,b].map((item,i)=><article key={i} style={{background:C.section,padding:13,borderRadius:12}}><div style={{fontSize:12,color:C.icy}}>{i?'Opponent':'Our side'} · {label}</div><strong style={{fontSize:21}}>{item?.count??'—'}</strong><div style={{fontSize:12,color:C.muted,marginTop:5}}>Recorded in this leaderboard</div></article>)}</div>}
  <details open={detailsOpen} onToggle={e=>setDetailsOpen(e.currentTarget.open)} style={{background:C.card,borderRadius:14,padding:14}}>
- <summary style={{minHeight:44,cursor:'pointer',fontSize:15,fontWeight:700,padding:'12px 0'}}>View top 10 players</summary>
+ <summary style={{minHeight:44,cursor:'pointer',fontSize:15,fontWeight:700,padding:'12px 0'}}>Top 10 players</summary>
  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>{ranks.map((rows,i)=><div key={i} style={{minWidth:0}}><strong style={{fontSize:13,color:i?C.blue:C.gold}}>{i?'Opponent':'Our side'}</strong>{rows.length?rows.map(row=><div key={row.key} style={{padding:'9px 0',borderBottom:'1px solid '+C.border,overflowWrap:'anywhere'}}><div style={{fontSize:13}}>#{row.rank} {row.username}</div><div style={{fontSize:12,color:C.icy}}>{row.allianceTag?'['+row.allianceTag+'] · ':''}{rankingScore(row,board)}</div></div>):<p style={{fontSize:13,color:C.muted}}>No matching published entries</p>}</div>)}</div>
  </details>
  <article style={{background:C.card,borderRadius:14,padding:14,marginTop:12}}>
- <h3 style={{fontSize:16,margin:'0 0 8px'}}>3. Planning notes</h3>
+ <h3 style={{fontSize:16,margin:'0 0 8px'}}>Battle considerations</h3>
  <div style={{fontSize:13,color:C.icy,lineHeight:1.65}}>
  {(!a?.rows?.length||!b?.rows?.length)?<p>There is not enough matching ranking data to assess the two sides. Check the state numbers or alliance tags before planning.</p>:
- isFurnace?<p>Compare your highest-furnace players against theirs, then verify rally stats and troop tiers individually. Furnace level alone does not determine who wins a rally.</p>:
- <><p>{a.top10!=null&&b.top10!=null?(a.top10>b.top10?'Your listed top 10 score is higher. Do not assume an automatic battle advantage; compare buffs and rally composition next.':a.top10<b.top10?'Their listed top 10 score is higher. Prioritise coordinated garrisons, rally timing and identifying viable counters.':'The two sides have similar top-10 scores. Look to activity, heroes, troop matchups and execution for differences.'):'The score comparison is incomplete. Avoid assigning an advantage.'}</p><p>Before lock-in: confirm rally leaders, defensive leads, battle attendance, march speeds and replacement teams. A ranking snapshot is reconnaissance, not a prediction.</p></>}
+ isFurnace?<p>Compare individual rally leaders' stats and troop tiers. Furnace level is only one factor.</p>:
+ <><p>{a.top10!=null&&b.top10!=null?(a.top10>b.top10?'Our top 10 scores higher. Check buffs and rally composition before committing.':a.top10<b.top10?'Their top 10 scores higher. Prioritise garrison coordination and counter-rally planning.':'Top 10 scores are similar. Compare heroes, troops and attendance.'):'Insufficient scores to compare.'}</p><p>Confirm attendance, rally leads and backup teams before battle.</p></>}
  </div></article>
  <button style={{...btn,width:'100%',marginTop:12}} onClick={copy}>Copy comparison</button>{copyStatus&&<p role="status" style={{fontSize:13,color:C.icy}}>{copyStatus}</p>}
- <p style={{fontSize:12,lineHeight:1.6,color:C.muted}}>Top-100 coverage only. A player missing from a board is not necessarily unranked. Published rankings do not measure rally buffs, availability or coordination, so they cannot predict a battle result.</p>
+ <p style={{fontSize:12,lineHeight:1.5,color:C.muted}}>Leaderboard data covers up to 100 ranked entries per state. Missing players are not necessarily unranked.</p>
  </>}
+ <div style={{background:C.section,padding:14,borderRadius:14,marginTop:16}}>
+ <h3 style={{fontSize:17,margin:'0 0 6px'}}>Furnace by alliance</h3>
+ <p style={{fontSize:13,color:C.icy,lineHeight:1.45,margin:'0 0 12px'}}>Count players from complete alliance rosters.</p>
+ {mode==='state'&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+ <label style={{fontSize:12,color:C.icy}}>Our alliances<input aria-label="Our state alliance tags" placeholder="HOT ARC RKG" style={{...style,marginTop:6}} value={ourTags} onChange={e=>setOurTags(e.target.value)}/></label>
+ <label style={{fontSize:12,color:C.icy}}>Their alliances<input aria-label="Opponent state alliance tags" placeholder="Enter tags" style={{...style,marginTop:6}} value={enemyTags} onChange={e=>setEnemyTags(e.target.value)}/></label>
+ </div>}
+ {mode==='state'&&<p style={{fontSize:12,color:C.muted,margin:'8px 0'}}>Up to 5 tags per side, separated by commas.</p>}
+ <button type="button" onClick={loadRosters} disabled={rosterBusy||!valid(ourState)||!valid(enemyState)||!(mode==='alliance'?ourTag&&enemyTag:ourTags.trim()&&enemyTags.trim())} style={{...btn,width:'100%',background:C.card}}>{rosterBusy?'Loading rosters…':'Compare furnace levels'}</button>
+ {rosterErrors.length>0&&<p role="alert" style={{fontSize:12,color:C.red,lineHeight:1.5}}>Unavailable: {rosterErrors.join(' · ')}</p>}
+ {rosterData&&<><p style={{fontSize:12,color:C.icy,marginBottom:0}}>Coverage: {rosterData.loaded[0].length}/{mode==='state'?tagsOf(ourTags).length:1} ours · {rosterData.loaded[1].length}/{mode==='state'?tagsOf(enemyTags).length:1} theirs</p>
+ <RosterFurnace ours={rosterData.sides[0]} theirs={rosterData.sides[1]} ourLabel={mode==='state'?ourState:ourTag} theirLabel={mode==='state'?enemyState:enemyTag}/></>}
+ </div>
+
  </section>;
 }
