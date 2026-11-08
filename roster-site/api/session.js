@@ -12,5 +12,5 @@ export default function handler(req,res){
   if(attempts.size>10000)for(const [key,value] of attempts)if(value.until<now)attempts.delete(key);
   const entry=bucket&&bucket.until>now?bucket:{count:0,until:now+15*60*1000};entry.count++;attempts.set(ip,entry);
   if(!passwordMatches(req.body?.password,process.env.ACCESS_PASSWORD_HASH))return respond(res,401,{error:'Incorrect password.'});
-  attempts.delete(ip);res.setHeader('Set-Cookie',cookie(sessionToken()));return respond(res,200,{authenticated:true,role:'leader'});
+  attempts.delete(ip);const remember=req.body?.remember===true;res.setHeader('Set-Cookie',cookie(sessionToken(process.env,Date.now(),remember),false,remember));return respond(res,200,{authenticated:true,role:'leader'});
 }
