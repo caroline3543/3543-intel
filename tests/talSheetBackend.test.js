@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync} from 'node:crypto';
-import {serviceAccountToken,readTalSheet} from '../roster-site/api/tal-sheet.js';
+import {serviceAccountToken,readTalSheet,readTalSheetViaAppsScript} from '../roster-site/api/tal-sheet.js';
 const email='tal-reader@example.iam.gserviceaccount.com';
 test('Google Sheets rejects missing server credentials without exposing a token',async()=>{
  await assert.rejects(()=>serviceAccountToken(null),/not configured/);
@@ -37,4 +37,28 @@ test('incorrect sheet headers cannot be imported as live data',async()=>{
    ? {ok:true,json:async()=>({access_token:'another-token',expires_in:300})}
    : {ok:true,json:async()=>({valueRanges:[{values:[['Username','No Player ID']]}]})};
  await assert.rejects(()=>readTalSheet({credential,fetcher:fake}),/headers have changed/);
+});
+
+test('card-free Apps Script path requires a long private secret and trusted Google URL',async()=>{
+  await assert.rejects(()=>readTalSheetViaAppsScript({scriptUrl:'https://attacker.example/exec',secret:'x'.repeat(40),fetcher:()=>{throw Error('network must not execute');}}),/configuration is invalid/);
+  await assert.rejects(()=>readTalSheetViaAppsScript({scriptUrl:'https://script.google.com/macros/s/abc/exec',secret:'weak',fetcher:()=>{throw Error('network must not execute');}}),/configuration is invalid/);
+});
+test('Apps Script response is validated and returns no secret to browser',async()=>{
+ const secret='n'.repeat(40);
+ const calls=[];
+ const fetcher=async(url,opts)=>{
+   calls.push({url,opts});
+   return {ok:true,json:async()=>({spreadsheetId:'1iHHBMYDu2FF3HjNTzas8VoyzUQz7_3L__ZS48EDXMdY',sheets:{Players:{values:[['Player ID','Selection','Registration'],['12345','Selected','Verified']]}}})};
+ };
+ const result=await readTalSheetViaAppsScript({scriptUrl:'https://script.google.com/macros/s/abc/exec',secret,fetcher});
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].opts.method,'POST');
+ assert.equal(JSON.parse(calls[0].opts.body).token,secret);
+ assert.equal(result.sheets.Players.values[1][0],'12345');
+ assert.ok(!JSON.stringify(result).includes(secret));
+});
+test('Apps Script refuses unexpected spreadsheet and unauthorized responses',async()=>{
+ const args={scriptUrl:'https://script.google.com/macros/s/abc/exec',secret:'p'.repeat(40)};
+ await assert.rejects(()=>readTalSheetViaAppsScript({...args,fetcher:async()=>({ok:true,json:async()=>({error:'unauthorized'})})}),/does not match/);
+ await assert.rejects(()=>readTalSheetViaAppsScript({...args,fetcher:async()=>({ok:true,json:async()=>({spreadsheetId:'wrong',sheets:{Players:{values:[]}}})})}),/did not match/);
 });
