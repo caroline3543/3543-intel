@@ -36,6 +36,8 @@ export function newPlayer(overrides = {}) {
     allianceRank:       null, // 'R5'|'R4'|'R3'|'R2'|'R1'|null — mutually exclusive, unlike roles (which are multi-select)
     availableTroops:     null, // optional counts at each recorded troop tier; battle overrides remain isolated
     marchCapacity:       null,
+    talTroopInventory:    null, // Reusable T11/T10 counts by infantry/lancer/marksman; null = unknown
+    talTroopInventoryRecordedAt: null, // UTC date of last manual inventory save
     leadershipRank:      null, // explicit commander rank; smaller is stronger
     teamAssignment:     null,
     blacklisted:        false, // excludes from Battle Plan leader/joiner selection — roster entry and history are kept, not hidden
@@ -63,6 +65,7 @@ export function newLeaderProfile(overrides = {}) {
   return {
     role:      'none', // 'leader' | 'substitute' | 'both' | 'none'
     teams:     [],      // newLeaderTeam()[]
+    rallyCapacity: null, // Saved base rally size; TAL match overrides remain event-specific
     marchTime: null,    // seconds — same "last 2 digits = seconds" input convention as Live Rally Room. Belongs at the profile level, not per-team: it's a property of this player's city, not of a specific offense/defense loadout.
     updatedAt: new Date().toISOString(),
     ...overrides,
