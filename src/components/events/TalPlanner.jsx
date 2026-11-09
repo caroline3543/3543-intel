@@ -29,7 +29,7 @@ export function TalPlanner({ event, players, onUpdate }) {
   async function copy(text) { try { await navigator.clipboard.writeText(text); setMessage('Copied.'); } catch { setMessage('Copy unavailable. Select the text below to copy it.'); } }
   const [exportText,setExportText] = useState('');
   function exportPlan(team) {
-    const text = `[${team.host}] Legion ${team.legion}\nPossible times: ${team.slots.map(s=>s+' UTC').join(', ')}\nMatch time: ${team.matchTime ? team.matchTime+' UTC' : 'Not announced yet'}\n\nINITIAL ASSIGNMENTS\n\n` + team.buildings.map(b => `» ${b}: ${(team.assignments[b]||[]).map(name).join(', ')}`).join('\n') + '\n\nSubstitutes: ' + team.members.filter(m=>m.role==='substitute').map(m=>name(m.id)).join(', ');
+    const text = `[${team.host}] Legion ${team.legion}\nPossible times: ${team.slots.map(s=>s+' UTC').join(', ')}\nMatch time: ${team.matchTime ? team.matchTime+' UTC' : 'Not announced yet'}\n\nINITIAL ASSIGNMENTS\n\n` + team.buildings.map(b => `» ${b}: ${(team.assignments[b]||[]).map(name).join(', ')}`).join('\n') + '\n\nSubstitutes: ' + team.members.filter(m=>m.role==='substitute' && (!team.matchTime || battleStatus(team,config,m.id)==='attending')).map(m=>name(m.id)).join(', ');
     setExportText(text); copy(text);
   }
   function confirmDelete(){
@@ -107,6 +107,7 @@ export function TalPlanner({ event, players, onUpdate }) {
           <p style={{color:C.icy,fontSize:14}}>{(team.assignments[b]||[]).map((id,j)=>`${j===0?'Leader: ':'Follow: '}${name(id)}`).join(' · ')||'No assignment yet'}</p>
         </div>)}
         <button disabled={config.locked} style={{...button,width:'100%',background:C.gold,color:C.bg,fontWeight:700}} onClick={()=>updateTeam(team.id,{assignments:assignTalBuildings(team,players,event,config)})}>Auto-assign buildings</button>
+        <button type="button" style={{...button,width:'100%',marginTop:8}} onClick={()=>exportPlan(team)}>Copy building plan</button>
         <details style={{color:C.icy,margin:'12px 0'}}><summary style={{minHeight:44,cursor:'pointer'}}>Adjust player assignments</summary><p style={{fontSize:13}}>The first player at each building is the leader.</p>
         {team.members.filter(m=>m.role==='combatant' && (!team.matchTime || battleStatus(team,config,m.id)==='attending')).map(m=><label key={m.id} style={{display:'block',color:C.white,marginBottom:8}}>{name(m.id)}<select disabled={config.locked} aria-label={`Building for ${name(m.id)}`} style={input} value={team.buildings.find(b=>(team.assignments[b]||[]).includes(m.id))||''} onChange={e=>{const assignments=Object.fromEntries(team.buildings.map(b=>[b,(team.assignments[b]||[]).filter(id=>id!==m.id)]));if(e.target.value)assignments[e.target.value].push(m.id);updateTeam(team.id,{assignments});}}><option value="">Unassigned</option>{team.buildings.map(b=><option key={b}>{b}</option>)}</select></label>)}
         </details>
