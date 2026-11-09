@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {normaliseRallyPreferences,joinerPreferenceScore,relationshipMatches} from '../src/services/talTeamPreferences.js';
+import {normaliseRallyPreferences,joinerPreferenceScore,relationshipMatches,mergeRallyPreferences,withBattlePairOverride} from '../src/services/talTeamPreferences.js';
 import {generateTalRallyDraft} from '../src/services/talRallyTeamGenerator.js';
 
 const player=(id,lead=false,inventory={infantry:{t11:100,t10:0},lancer:{t11:0,t10:0},marksman:{t11:100,t10:0}})=>({
@@ -53,4 +53,37 @@ test('priority preferences never modify source player profiles',()=>{
   const original=structuredClone(roster);
   draft(roster,{players:{joiner:{priority:true,voice:true}},pairs:[['leader','joiner']]});
   assert.deepEqual(roster,original);
+});
+
+test('shared preferences apply to a new battle without storing them on player profiles',()=>{
+ const shared={players:{b:{priority:true,voice:true,reliable:true}},pairs:[['leader','b']]};
+ const roster=[player('leader',true),player('a'),player('b')];
+ const effective=mergeRallyPreferences(shared,{});
+ const result=draft(roster,effective);
+ assert.equal(result.players.find(p=>!p.leader).id,'b');
+ assert.deepEqual(roster[2].joinerHeroes,undefined);
+});
+test('match-day overrides can explicitly negate a default and inherit other criteria',()=>{
+ const shared={players:{b:{priority:true,voice:true,reliable:true}},pairs:[['leader','b']]};
+ const override={players:{b:{priority:false,voice:false}}};
+ const result=mergeRallyPreferences(shared,override);
+ assert.equal(result.players.b.priority,false);
+ assert.equal(result.players.b.voice,false);
+ assert.equal(result.players.b.reliable,true);
+ assert.deepEqual(shared.players.b,{priority:true,voice:true,reliable:true});
+});
+test('match-day pair exclusion does not delete reusable pairing',()=>{
+ const shared={players:{},pairs:[['leader','b']]};
+ const battle=withBattlePairOverride({},shared,'leader','b',false);
+ assert.deepEqual(mergeRallyPreferences(shared,battle).pairs,[]);
+ assert.deepEqual(shared.pairs,[['leader','b']]);
+ const restored=withBattlePairOverride(battle,shared,'leader','b',true);
+ assert.deepEqual(mergeRallyPreferences(shared,restored).pairs,[['leader','b']]);
+});
+test('battle additions do not leak into reusable defaults',()=>{
+ const shared={players:{},pairs:[]};
+ const battle=withBattlePairOverride({},shared,'leader','b',true);
+ assert.deepEqual(mergeRallyPreferences(shared,battle).pairs,[['leader','b']]);
+ assert.deepEqual(shared.pairs,[]);
+ assert.deepEqual(mergeRallyPreferences(shared,withBattlePairOverride(battle,shared,'leader','b',false)).pairs,[]);
 });
