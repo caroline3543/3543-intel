@@ -1,6 +1,6 @@
 import { playerSearchFields } from './playerNames.js';
 import { gameLanguageName } from './gameLanguageService.js';
-export const EMPTY_FILTERS = { alliance:'', role:'', tier:'', infantry:'', lancer:'', marksman:'', hero:'', language:'', review:false };
+export const EMPTY_FILTERS = { alliance:'', role:'', tier:'', infantry:'', lancer:'', marksman:'', hero:'', verified:false, language:'', review:false };
 export const TIER_FILTERS = [
   ['helios-infantry','Helios infantry'], ['helios-lancer','Helios lancer'], ['helios-marksman','Helios marksman'],
   ['full-fc5','Full FC5'], ['full-fc6','Full FC6'], ['full-fc7','Full FC7'], ['full-fc8','Full FC8'],
@@ -29,7 +29,7 @@ export function matchesRosterFilters(player, search, filters) {
   const leader=player.roles?.includes('Rally Lead');
   if (filters.role==='joiner' ? leader || player.blacklisted : filters.role && !player.roles?.includes(filters.role)) return false;
   if (filters.language && gameLanguageName(player.gameLanguage)!==filters.language) return false;
-  if (filters.hero && !(player.joinerHeroes||[]).some(hero=>hero.hero===filters.hero && hero.skillLevel>=5)) return false;
+  if (filters.hero && !(player.joinerHeroes||[]).some(hero=>hero.hero===filters.hero && hero.skillLevel>=5 && (!filters.verified || hero.verified === true))) return false;
   if (['infantry','lancer','marksman'].some(type=>!matchesTroopThreshold(player.troops?.[type],filters[type]))) return false;
   if (filters.review && !troopGaps(player).length && player.allianceTag && player.fid) return false;
   if (filters.tier?.startsWith('helios-') && !player.troops?.[filters.tier.slice(7)]?.startsWith('Helios')) return false;
@@ -39,7 +39,7 @@ export function matchesRosterFilters(player, search, filters) {
   return true;
 }
 export function rosterFilterCount(filters) {
-  return Object.entries(filters).filter(([,value])=>Boolean(value)).length;
+  return Object.entries(filters).filter(([key,value])=>Boolean(value) && (key!=='verified' || Boolean(filters.hero))).length;
 }
 export function latestRosterFetch(players) {
   const dates=players.map(p=>p.providerStats?.retrievedAt).filter(value=>Number.isFinite(Date.parse(value)));
