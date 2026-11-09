@@ -115,13 +115,6 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
  return <section style={{padding:'12px 20px 32px'}}>
   <h2 style={{fontSize:22,margin:'0 0 12px'}}>TAL planner</h2>
   {!teams.length?<div style={{padding:16,background:C.section,borderRadius:12}}><strong>No legions assigned</strong><p style={{fontSize:14,color:C.icy,lineHeight:1.5}}>Saved TAL legion assignments will appear when available. Existing plan data is retained.</p></div>:<>
-   <section aria-label="Tournament overview" style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:12}}>
-    <strong style={{fontSize:15}}>Tournament</strong>
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
-     <div style={{background:C.section,borderRadius:9,padding:10}}><div style={{fontSize:22,fontWeight:700,color:C.green}}>{activeCount}</div><span style={muted}>Active</span></div>
-     <div style={{background:C.section,borderRadius:9,padding:10}}><div style={{fontSize:22,fontWeight:700,color:C.icy}}>{eliminatedCount}</div><span style={muted}>Eliminated</span></div>
-    </div>
-   </section>
    <section aria-label="Choose TAL legion" style={{marginBottom:12}}>
     <div style={{fontSize:12,fontWeight:700,color:C.icy,marginBottom:8}}>LEGIONS</div>
     <div role="group" aria-label="Select a legion to view its data" style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:6,scrollSnapType:'x proximity'}}>
@@ -154,12 +147,8 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
       <p style={{...muted,margin:'0 0 8px'}}>Preview exactly what will be copied. Players are grouped by their current and destination alliances.</p>
       {movePreview?<><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:13,lineHeight:1.6,padding:12,borderRadius:10,background:C.section,maxHeight:300,overflowY:'auto',margin:'0 0 8px'}}>{movePreview}</pre><button type="button" style={{...button,width:'100%',color:C.gold}} disabled={copying} onClick={copyMovePreview}>{copying?'Copying…':'Copy reviewed list ('+move+')'}</button></>:<p style={muted}>No players need to move in this view.</p>}
      </div>}
-    <details style={{marginTop:10}}>
-     <summary style={{fontSize:13,color:C.icy,cursor:'pointer',padding:'8px 0'}}>More alliance tools</summary>
-     {team&&onRefreshLegion&&<button type="button" style={{...button,width:'100%',marginTop:8}} disabled={!!legionRefresh} onClick={()=>onRefreshLegion(team)}>{legionRefresh?'Refreshing '+legionRefresh.done+' of '+legionRefresh.total:'Refresh this legion'}</button>}
-     <p style={muted}>Based on last recorded alliances. Refresh before sending transfer instructions.</p>
-    </details>
    </section>
+   {team&&<section   </section>
    {team&&<section style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:14}}>
     <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}><strong style={{fontSize:15}}>{legionLabel(team)} · {tournamentStatus(team)==='eliminated'?'Eliminated':'Active'}</strong><button type="button" style={{...button,fontSize:12,padding:'7px 9px',minHeight:36}} onClick={()=>setTournamentConfirm(tournamentConfirm?'':'open')}>{tournamentStatus(team)==='eliminated'?'Correct result':'Record a loss'}</button></div>
     {tournamentStatus(team)==='eliminated'&&<p style={{...muted,margin:'8px 0 0'}}>This legion is eliminated. Its roster and match history remain visible. Player assignments are read-only.</p>}
@@ -171,16 +160,19 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
    <section ref={playersAnchor} id="tal-players" aria-label="TAL players" style={{scrollMarginTop:16}}>
     <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:10}}><h3 style={{fontSize:18,margin:0}}>Players</h3><span role="status" style={{fontSize:13,color:C.icy}}>{roster.length} of {entries.length} players</span></div>
     <input aria-label="Search players" placeholder="Search name or player ID" value={search} onChange={e=>{setSearch(e.target.value);setListLimit(40);}} style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:10}}/>
-    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-     <details style={{flex:'0 0 auto',position:'relative'}}><summary style={{...button,listStyle:'none',minHeight:40,padding:'8px 11px'}}>Filters{check!=='all'||timeFilters.length||registrationFilter!=='all'?' · Active':''}</summary>
-      <div style={{padding:12,background:C.card,border:'1px solid '+C.border,borderRadius:10,marginTop:6,display:'grid',gap:12}}>
-       <div><strong style={{fontSize:13}}>Available times · UTC</strong><div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>{times.map(t=><button key={t} type="button" aria-pressed={timeFilters.includes(t)} style={{...button,minHeight:36,padding:'6px 8px',fontSize:12,color:timeFilters.includes(t)?C.gold:C.icy,borderColor:timeFilters.includes(t)?C.gold:C.border}} onClick={()=>changeTime(t)}>{t}</button>)}</div></div>
-       {timeFilters.length>1&&<label style={{fontSize:13}}>Matching<select aria-label="Availability match" style={{...button,width:'100%',marginTop:6}} value={timeMode} onChange={e=>setTimeMode(e.target.value)}><option value="any">Any selected time</option><option value="all">Every selected time</option></select></label>}
-       <label style={{fontSize:13}}>Registration<select aria-label="Registration filter" style={{...button,width:'100%',marginTop:6}} value={registrationFilter} onChange={e=>{setRegistrationFilter(e.target.value);setListLimit(40);}}><option value="all">All players</option><option value="unregistered">Needs registration</option><option value="registered">Registered</option></select></label>
-       <button style={{...button,color:C.gold}} onClick={resetFilters}>Clear all filters</button>
-      </div>
-     </details>
-     <label style={{flex:1,minWidth:0}}><span style={{position:'absolute',width:1,height:1,overflow:'hidden'}}>Sort players</span><select aria-label="Sort players" style={{...button,width:'100%',minHeight:40,padding:'8px 6px'}} value={sort} onChange={e=>setSort(e.target.value)}><option value="name">Name</option><option value="troop">TAL troop power</option><option value="city">City power</option><option value="labyrinth">Labyrinth rank</option><option value="joiner">Joiner strength</option></select></label>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:7,gap:8}}>
+     <strong style={{fontSize:12,color:C.icy}}>AVAILABLE · UTC</strong>
+     {!!timeFilters.length&&<button type="button" style={{border:0,background:'transparent',color:C.gold,fontSize:12,minHeight:32,cursor:'pointer'}} onClick={()=>{setTimeFilters([]);setListLimit(40);}}>Clear</button>}
+    </div>
+    <div role="group" aria-label="Filter available UTC times" style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:5,marginBottom:timeFilters.length>1?8:12}}>
+     {times.map(t=><button key={t} type="button" aria-pressed={timeFilters.includes(t)} onClick={()=>changeTime(t)} style={{...button,minWidth:0,minHeight:44,padding:'8px 1px',fontSize:11,color:timeFilters.includes(t)?C.green:C.icy,borderColor:timeFilters.includes(t)?C.green:C.border,background:timeFilters.includes(t)?C.green+'1b':C.section}}>{t}</button>)}
+    </div>
+    {timeFilters.length>1&&<div role="group" aria-label="Availability matching" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:12}}>
+     {[['any','Any selected time'],['all','Every selected time']].map(([id,label])=><button key={id} type="button" aria-pressed={timeMode===id} style={{...button,minWidth:0,minHeight:40,fontSize:12,padding:6,color:timeMode===id?C.gold:C.icy,borderColor:timeMode===id?C.gold:C.border}} onClick={()=>setTimeMode(id)}>{label}</button>)}
+    </div>}
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+     <label style={{minWidth:0,fontSize:12,color:C.icy}}>Registration<select aria-label="Filter registration" value={registrationFilter} onChange={e=>{setRegistrationFilter(e.target.value);setListLimit(40);}} style={{...button,width:'100%',minWidth:0,marginTop:5,padding:'8px 6px',fontSize:13}}><option value="all">All registrations</option><option value="unregistered">Needs registration</option><option value="registered">Registered</option></select></label>
+     <label style={{minWidth:0,fontSize:12,color:C.icy}}>Sort by<select aria-label="Sort players" style={{...button,width:'100%',minWidth:0,marginTop:5,padding:'8px 6px',fontSize:13}} value={sort} onChange={e=>setSort(e.target.value)}><option value="name">Name A–Z</option><option value="troop">TAL troop power</option><option value="city">City power</option><option value="labyrinth">Labyrinth rank</option><option value="joiner">Joiner strength</option></select></label>
     </div>
     {anyFilter&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
       {check!=='all'&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12,color:C.gold}} onClick={()=>setCheck('all')}>{check==='move'?'Need to move':check==='in-host'?'In alliance':'Unverified'} ×</button>}
