@@ -30,7 +30,7 @@ export function buildRosterDataSheet(players) {
     'id','fid','username','alias','allianceTag','country','timezone','languages',
     'furnaceLevel','infantryCampLevel','lancerCampLevel','marksmanCampLevel','troops',
     'joinerHeroes','roles','teamAssignment','notes',
-    'profileLastUpdated','createdAt','eventHistory','providerStats','power','kills','avatarUrl','providerRankings','observationHistory','providerDetails','gameLanguage',
+    'profileLastUpdated','createdAt','eventHistory','providerStats','power','kills','avatarUrl','providerRankings','observationHistory','providerDetails','gameLanguage','marchCapacity','leaderProfile','talTroopInventory','talTroopInventoryRecordedAt','leadershipRank','talTroopPower','importedSheet',
   ];
   const rows = [headers.map(cell)];
   (players || []).forEach(p => {
@@ -40,7 +40,7 @@ export function buildRosterDataSheet(players) {
       cell(p.furnaceLevel), cell(p.infantryCampLevel), cell(p.lancerCampLevel), cell(p.marksmanCampLevel),
       jsonCell(p.troops), jsonCell(p.joinerHeroes), jsonCell(p.roles),
       cell(p.teamAssignment), cell(p.notes),
-      cell(p.profileLastUpdated), cell(p.createdAt), jsonCell(p.eventHistory), jsonCell(p.providerStats), cell(p.power), cell(p.kills), cell(p.avatarUrl), jsonCell(p.providerRankings), jsonCell(p.observationHistory), jsonCell(p.providerDetails), cell(p.gameLanguage),
+      cell(p.profileLastUpdated), cell(p.createdAt), jsonCell(p.eventHistory), jsonCell(p.providerStats), cell(p.power), cell(p.kills), cell(p.avatarUrl), jsonCell(p.providerRankings), jsonCell(p.observationHistory), jsonCell(p.providerDetails), cell(p.gameLanguage), cell(p.marchCapacity), jsonCell(p.leaderProfile), jsonCell(p.talTroopInventory), cell(p.talTroopInventoryRecordedAt), cell(p.leadershipRank), cell(p.talTroopPower), jsonCell(p.importedSheet),
     ]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -51,13 +51,13 @@ export function buildRosterDataSheet(players) {
 export function buildEventsDataSheet(events) {
   const headers = [
     'id','type','name','allianceTag','date','time','status',
-    'participantIds','notes','createdAt','updatedAt','snapshots',
+    'participantIds','notes','createdAt','updatedAt','snapshots','tal',
   ];
   const rows = [headers.map(cell)];
   (events || []).forEach(e => {
     rows.push([
       cell(e.id), cell(e.type), cell(e.name), cell(e.allianceTag), cell(e.date), cell(e.time), cell(e.status),
-      jsonCell(e.participantIds), cell(e.notes), cell(e.createdAt), cell(e.updatedAt), jsonCell(e.snapshots),
+      jsonCell(e.participantIds), cell(e.notes), cell(e.createdAt), cell(e.updatedAt), jsonCell(e.snapshots), jsonCell(e.tal),
     ]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
