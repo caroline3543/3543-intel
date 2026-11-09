@@ -103,7 +103,7 @@ export function TalPlanner({ event, players, onUpdate }) {
       {config.teams.filter(t=>t.members.length).map(team=><div key={team.id} style={box}>
         <h3 style={{color:C.white}}>[{team.host}] Legion {team.legion}</h3>
         <TalBattleAttendance team={team} config={config} players={players} locked={config.locked} onChange={patch=>updateTeam(team.id,patch)} />
-        <TalRallyTeamGenerator team={team} config={config} players={players} event={event} locked={config.locked} onSave={rallyTeamDraft=>updateTeam(team.id,{rallyTeamDraft})} />
+        <TalRallyTeamGenerator team={team} config={config} players={players} event={event} locked={config.locked} onSave={patch=>updateTeam(team.id,patch)} />
         {team.buildings.map((b,i)=><div key={b} style={{marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><strong style={{color:C.white,flex:1}}>{i+1}. {b}</strong>{[-1,1].map(delta=><button key={delta} aria-label={`Move ${b} ${delta<0?'up':'down'}`} disabled={config.locked||i+delta<0||i+delta>=team.buildings.length} style={button} onClick={()=>{const buildings=[...team.buildings];[buildings[i],buildings[i+delta]]=[buildings[i+delta],buildings[i]];updateTeam(team.id,{buildings,assignments:{}});}}>{delta<0?'↑':'↓'}</button>)}</div>
           <p style={{color:C.icy,fontSize:14}}>{(team.assignments[b]||[]).map((id,j)=>`${j===0?'Leader: ':'Follow: '}${name(id)}`).join(' · ')||'No assignment yet'}</p>
