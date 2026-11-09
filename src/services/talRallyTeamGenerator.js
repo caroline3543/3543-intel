@@ -124,10 +124,11 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
       assigned.set(String(player.id),mergeAllocation(prior,amount));
       return true;
     };
-    // Strict type-aware T11 pass over the leader and all joiners before any T10 use.
-    // Each member contributes at most one march, possibly composed of both tiers.
+    // The leader must send their own march. Reserve known leader troops first;
+    // other players' T11 takes priority over joiner T10 or unknown quantities.
+    add(leader,'t11');
+    add(leader,'t10');
     for (const phase of ['t11','t10','unknown']) {
-      if(phase==='t11') add(leader,'t11');
       else for(const player of [leader,...pool.filter(p=>assigned.has(String(p.id)))]) add(player,phase);
       let candidates=pool.filter(p=>!used.has(String(p.id)) && playerCapacity(p,overrides[p.id]||{}));
       while (assigned.size - (assigned.has(String(leader.id))?1:0) < maxJoiners &&
@@ -147,7 +148,8 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
     const fill=capacity-Object.values(remaining).reduce((a,b)=>a+b,0);
     const estimated=participants.some(a=>a.estimated);
     const full=fill===capacity;
-    return {id:'rally-'+(i+1),leader:snapshotItem(leader),capacity,ratio,targets:troopTargets(capacity,ratio),remaining,players:participants,fill,estimated,status:full?(estimated?'estimated-full':'confirmed-full'):'incomplete',warnings:[...(!full?['Not enough recorded available troops or usable march capacity.']:[]),...(estimated?['Unknown troop quantities used as estimated contributions.']:[])]};
+    const leaderRecorded=assigned.has(String(leader.id));
+    return {id:'rally-'+(i+1),leader:snapshotItem(leader),capacity,ratio,targets:troopTargets(capacity,ratio),remaining,players:participants,fill,estimated,status:!leaderRecorded?'needs-review':full?(estimated?'estimated-full':'confirmed-full'):'incomplete',warnings:[...(!leaderRecorded?['Leader own march cannot be established from recorded inventory.']:[]),...(!full?['Not enough recorded available troops or usable march capacity.']:[]),...(estimated?['Unknown troop quantities used as estimated contributions.']:[])]};
   });
   if(mode==='balanced') warnings.push('Balanced mode currently shares the Strongest allocator; full cross-team balancing is not yet implemented.');
   return {mode,teamId:team.id,teams:result,warnings,unused:pool.filter(p=>!used.has(String(p.id))).map(snapshotItem),settings:{teamCount:count,preferredSize,maxJoiners,ratio}};
