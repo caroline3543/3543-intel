@@ -35,6 +35,7 @@ export function talBattleRallyInputs({battle,plan,players}) {
     members,battleAttendance:attendance,
     rallyTeamDraft:battle.rallyTeamDraft,
     rallyMatchOverrides:battle.rallyMatchOverrides,
+    rallyTeamPreferences:battle.rallyTeamPreferences,
   };
   const warnings=[];
   if(excluded.length)warnings.push(excluded.length+' combatants excluded because selection, player ID or sheet registration could not be verified.');
