@@ -44,9 +44,24 @@ function heroPriority(player) {
   const heroes = joinerHeroes(player).filter(h => h.confirmed && h.skillLevel != null);
   return heroes.reduce((best,h) => Math.max(best, Math.min(5,h.skillLevel) * 100 + (h.name.toLowerCase().includes('norah') ? 10 : 0)),0);
 }
-function ranking(player,event) {
+/** Transparent hierarchy: explicit commander rank, recorded TAL power, then
+ * recorded leader setup completeness. Capacity is not a substitute for combat strength. */
+export function leaderRanking(player, event) {
   const rank = number(player.leadershipRank);
-  return (rank != null && rank > 0 ? 1e12 / rank : 0) + power(player,event);
+  const talPower = power(player, event);
+  const setups = (player.leaderProfile?.teams || [])
+    .filter(t => Array.isArray(t.leadHeroes) && t.leadHeroes.filter(Boolean).length === 3).length;
+  return { rank: rank > 0 ? rank : null, talPower, setups };
+}
+function compareLeaders(a, b, event) {
+  const left = leaderRanking(a, event), right = leaderRanking(b, event);
+  if (left.rank !== null || right.rank !== null) {
+    if (left.rank === null) return 1;
+    if (right.rank === null) return -1;
+    if (left.rank !== right.rank) return left.rank - right.rank;
+  }
+  return right.talPower - left.talPower || right.setups - left.setups ||
+    String(a.id).localeCompare(String(b.id));
 }
 function eligibleLeader(player) {
   return player?.leaderProfile?.role === 'leader' || player?.leaderProfile?.role === 'both' || player?.roles?.some(role => /rally.?lead/i.test(role));
@@ -98,20 +113,21 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
   const maxJoiners = Math.max(1, Math.min(49, Math.floor(Number(settings.maxJoiners) || 29)));
   const ratio = normaliseRatio(settings.ratio || [50, 0, 50]);
   const members = (team.members || []).filter(m => m.role === 'combatant');
+  const registrationVerified = members.filter(m => m.verified === true || m.registration === 'Verified' || m.registrationStatus === 'Verified');
   const ids = new Set(members.map(m => String(m.id)));
   const eligible = players.filter(p =>
     ids.has(String(p.id)) &&
     !p.blacklisted &&
     (!team.matchTime || battleStatus(team, config, p.id) !== 'not-attending'));
   const warnings = [];
+  if (registrationVerified.length !== members.length) warnings.push('Legion roster includes players without explicitly verified TAL registration. Confirm spreadsheet eligibility before using teams for battle.');
   if (!team.matchTime) warnings.push('Match time is not confirmed; attendance is provisional.');
   if (eligible.length < members.length) warnings.push('Some combatants are excluded or unavailable.');
   if (eligible.some(p => !team.matchTime || battleStatus(team, config, p.id) !== 'attending'))
     warnings.push('Unknown attendance is included provisionally; confirm before the match.');
 
   const byId = new Map(eligible.map(p => [String(p.id), p]));
-  const leaders = eligible.filter(eligibleLeader).sort((a, b) =>
-    ranking(b, event) - ranking(a, event) || String(a.id).localeCompare(String(b.id)));
+  const leaders = eligible.filter(eligibleLeader).sort((a, b) => compareLeaders(a, b, event));
   const locked = [...new Set(settings.lockedLeaderIds || [])]
     .map(id => byId.get(String(id)))
     .filter(p => p && eligibleLeader(p));
@@ -119,7 +135,7 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
     .slice(0, teamCount);
   if (selected.length < teamCount) warnings.push('Not enough eligible rally leaders for the requested number of teams.');
   if (!selected.length) warnings.push('Record a rally leader profile or Rally Lead role before generating teams.');
-  if (selected.some(p => !p.leadershipRank && power(p, event) === 0))
+  if (selected.some(p => leaderRanking(p, event).rank === null && leaderRanking(p, event).talPower === 0))
     warnings.push('Leader strength is estimated: some leaders lack leadership ranking and TAL troop power.');
 
   if (mode === 'balanced' && eligible.some(p => power(p, event) === 0)) warnings.push('Balanced mode uses recorded TAL troop power; missing values make the balance approximate.');
@@ -223,6 +239,7 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
   });
   return {
     mode, teamId: team.id, teams: result, warnings,
+    rosterVerification: registrationVerified.length === members.length ? 'verified' : 'provisional',
     unused: pool.filter(p => !assignedToTeam.has(String(p.id))).map(snapshotItem),
     settings: { teamCount, preferredSize, maxJoiners, ratio },
   };
