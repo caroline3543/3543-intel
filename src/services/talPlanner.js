@@ -1,3 +1,4 @@
+import {battleStatus} from './talMatchReadiness.js';
 export const TAL_BUILDINGS = ['Proto I', 'Proto II', 'Repair I', 'Repair II', 'Repair III', 'Repair IV', 'Boiler', 'Transit'];
 export const TAL_SLOTS = ['02:00', '07:00', '12:00', '14:00', '19:00'];
 export function talConfig(event) {
@@ -33,8 +34,8 @@ export function suggestTalTeams(config, players, event) {
     return { ...team, slots, members: ranked.map((p,i) => ({ id:p.id, role:i<30?'combatant':'substitute' })) };
   });
 }
-export function assignTalBuildings(team, players, event) {
-  const ranked = team.members.filter(m => m.role === 'combatant').map(m => players.find(p => p.id === m.id)).filter(Boolean).sort((a,b) => strength(b,event)-strength(a,event) || a.id.localeCompare(b.id));
+export function assignTalBuildings(team, players, event, config=null) {
+  const ranked = team.members.filter(m => m.role === 'combatant' && (!team.matchTime || battleStatus(team,config,m.id)==='attending')).map(m => players.find(p => p.id === m.id)).filter(Boolean).sort((a,b) => strength(b,event)-strength(a,event) || a.id.localeCompare(b.id));
   // First eight are leaders in priority order; distribute followers evenly.
   return Object.fromEntries(team.buildings.map((building,i) => [building, [ranked[i], ...ranked.slice(8).filter((_,j) => j%8 === i)].filter(Boolean).map(p => p.id)]));
 }
