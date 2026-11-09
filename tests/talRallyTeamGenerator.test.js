@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateTalRallyDraft, troopTargets, normaliseRatio, hasNorah, leaderRanking } from '../src/services/talRallyTeamGenerator.js';
+import { generateTalRallyDraft, troopTargets, normaliseRatio, hasNorah, leaderRanking, coordinationLanguage, languageAffinity } from '../src/services/talRallyTeamGenerator.js';
 
 function player(id, counts={}, { leader=false, march=200, rally=400, heroes=[] }={}) {
   return {
@@ -186,4 +186,28 @@ test('locked leader outside combatants is never imported into the plan',()=>{
   const draft=generateTalRallyDraft({team:{id:'HOT:1',matchTime:'19:00',members:[{id:'lead',role:'combatant'}]},config:{},players:[lead,unassigned],event:{},settings:{teamCount:1,lockedLeaderIds:['unassigned']}});
   assert.equal(draft.teams[0].leader.id,'lead');
   assert.deepEqual(draft.settings.lockedLeaderIds,[]);
+});
+
+test('Chinese-language players receive a communication affinity when troop options are comparable',()=>{
+ const leader=player('leader',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+ const other=player('other',{infantry:{t11:100},marksman:{t11:100}});
+ const chinese=player('chinese',{infantry:{t11:100},marksman:{t11:100}});
+ leader.gameLanguage='Chinese (Traditional)';other.gameLanguage='English';chinese.gameLanguage='简体中文';
+ assert.equal(coordinationLanguage(leader),'Chinese');
+ assert.equal(coordinationLanguage(chinese),'Chinese');
+ assert.equal(languageAffinity(chinese,[leader]),1);
+ const team={id:'HOT:1',matchTime:'19:00',members:[leader,other,chinese].map(p=>({id:p.id,role:'combatant',verified:true}))};
+ const draft=generateTalRallyDraft({team,config:{},players:[leader,other,chinese],event:{},settings:{teamCount:1,ratio:[50,0,50]}});
+ assert.equal(draft.teams[0].players.find(p=>!p.leader)?.id,'chinese');
+ assert.equal(draft.teams[0].languages.Chinese,2);
+});
+test('language preference cannot allocate absent players or unusable troop types',()=>{
+ const leader=player('leader',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+ const specialist=player('specialist',{infantry:{t11:100},marksman:{t11:100}});
+ const sameLanguage=player('sameLanguage',{lancer:{t11:200}});
+ leader.gameLanguage='Korean';sameLanguage.gameLanguage='Korean';specialist.gameLanguage='English';
+ const team={id:'HOT:1',matchTime:'19:00',members:[leader,specialist,sameLanguage].map(p=>({id:p.id,role:'combatant',verified:true}))};
+ const draft=generateTalRallyDraft({team,config:{},players:[leader,specialist,sameLanguage],event:{},settings:{teamCount:1,ratio:[50,0,50]}});
+ assert.equal(draft.teams[0].players.find(p=>!p.leader)?.id,'specialist');
+ assert.ok(!draft.teams[0].players.some(p=>p.id==='sameLanguage'));
 });
