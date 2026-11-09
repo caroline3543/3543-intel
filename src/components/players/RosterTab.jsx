@@ -1,6 +1,4 @@
 import {PlayerSearch} from './PlayerSearch.jsx';
-import {RosterLegions,LegionPlayerStatus} from './RosterLegions.jsx';
-import {plannedMemberIds,legionForPlayer,allianceCheck,recentNameChanges} from '../../services/talRosterService.js';
 import { useState, useEffect } from 'react';
 import { C } from '../../utils/constants.js';
 import { PlayerCard, comparePriority, getPriorityTier } from './PlayerCard.jsx';
@@ -69,10 +67,6 @@ function compareRosterPlayers(a,b,field,direction,events) {
 }
 
 export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,roles,onSaveCustomRoles,onSavePlayer,onUpdatePlayers,onDeletePlayer,onGoToIntel,showToast,onLoadAlliance,legionPlan,onRefreshLegion,legionRefresh}) {
-  const [legion,setLegion]=useState('');
-  const [allianceStatus,setAllianceStatus]=useState('all');
-  const activeLegion=legionPlan?.teams?.find(t=>t.id===legion);
-  const nameChanges=legionPlan?recentNameChanges(players):[];
   const [search,setSearch]=useState('');
   const [filters,setFilters]=useState({...EMPTY_FILTERS});
   const [filtersOpen,setFiltersOpen]=useState(false);
@@ -97,7 +91,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   },[initialPlayerId,players,onInitialPlayerOpened]);
   // Keep open profiles current after API refreshes and manual edits.
   const currentPlayer=players.find(p=>p.id===viewingPlayer?.id)||viewingPlayer;
-  const visible=players.filter(p=>matchesRosterFilters(p,search,filters)&&(!activeLegion||plannedMemberIds(activeLegion).has(p.id))&&(!activeLegion||allianceStatus==='all'||allianceCheck(p,activeLegion).status===allianceStatus)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
+  const visible=players.filter(p=>matchesRosterFilters(p,search,filters)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
   const filterCount=rosterFilterCount(filters);
   const allianceTags=[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].sort();
   const lastFetch=latestRosterFetch(players);
@@ -111,7 +105,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       showToast?.(`Copied ${visible.length} players`);
     }catch{showToast?.('Unable to copy. Try again.','error');}
   }
-  function card(player){return <PlayerCard key={player.id} player={player} sortDetail={sortDetail(player,sort)} sortField={sort} detail={legionPlan?<LegionPlayerStatus player={player} team={legionForPlayer(legionPlan,player.id)} previousName={nameChanges.find(c=>c.playerId===player.id)?.before}/>:null} roles={roles} onClick={()=>selecting?toggle(player.id):openProfile(player)} onDelete={onDeletePlayer} missingCount={(filters.review||sort==='review')?troopGaps(player).length+!player.fid+!player.allianceTag:0} onOpenFields={()=>openProfile(player)} bulkMode={selecting} isSelected={selected.has(player.id)} onToggleRallyLead={()=>onSavePlayer({...player,roles:player.roles?.includes('Rally Lead')?(player.roles||[]).filter(r=>r!=='Rally Lead'):[...(player.roles||[]),'Rally Lead']})}/>;}
+  function card(player){return <PlayerCard key={player.id} player={player} sortDetail={sortDetail(player,sort)} sortField={sort} detail={null} roles={roles} onClick={()=>selecting?toggle(player.id):openProfile(player)} onDelete={onDeletePlayer} missingCount={(filters.review||sort==='review')?troopGaps(player).length+!player.fid+!player.allianceTag:0} onOpenFields={()=>openProfile(player)} bulkMode={selecting} isSelected={selected.has(player.id)} onToggleRallyLead={()=>onSavePlayer({...player,roles:player.roles?.includes('Rally Lead')?(player.roles||[]).filter(r=>r!=='Rally Lead'):[...(player.roles||[]),'Rally Lead']})}/>;}
   const groups=[
     {name:'Rally leaders',members:visible.filter(p=>p.roles?.includes('Rally Lead')&&!p.blacklisted)},
     {name:'Joiners',members:visible.filter(p=>!p.roles?.includes('Rally Lead')&&!p.blacklisted)},
@@ -122,9 +116,8 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       <p style={{fontSize:13,color:C.icy,margin:'0 0 12px'}}>Latest roster fetch: {lastFetch?new Date(lastFetch).toISOString().slice(0,16).replace('T',' ')+' UTC':'Not recorded'}</p>
       <PlayerSearch label="Search roster" players={players} value={search} onChange={setSearch} onSelect={p=>{setSearch(p.fid||p.username||p.alias);openProfile(p);}}/>
       <div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:6,marginBottom:10}}>
-        {[['','All alliances'],...allianceTags.map(tag=>[tag,`[${tag}]`])].map(([tag,label])=><button key={tag||'all'} aria-pressed={filters.alliance===tag} onClick={()=>{setFilters({...filters,alliance:filters.alliance===tag?'':tag});setLegion('');setAllianceStatus('all');}} style={{...button,flexShrink:0,color:filters.alliance===tag?C.gold:C.icy,borderColor:filters.alliance===tag?C.gold:C.border}}>{label}{tag?` · ${players.filter(p=>p.allianceTag===tag).length}`:''}</button>)}
+        {[['','All alliances'],...allianceTags.map(tag=>[tag,`[${tag}]`])].map(([tag,label])=><button key={tag||'all'} aria-pressed={filters.alliance===tag} onClick={()=>{setFilters({...filters,alliance:filters.alliance===tag?'':tag});}} style={{...button,flexShrink:0,color:filters.alliance===tag?C.gold:C.icy,borderColor:filters.alliance===tag?C.gold:C.border}}>{label}{tag?` · ${players.filter(p=>p.allianceTag===tag).length}`:''}</button>)}
       </div>
-      {!!legionPlan?.teams?.length&&<RosterLegions teams={legionPlan.teams} availability={legionPlan.availability||{}} selected={activeLegion?.id||''} onSelect={id=>{setLegion(id);setAllianceStatus('all');setSearch('');setFilters({...EMPTY_FILTERS});}} players={players} check={allianceStatus} onCheck={setAllianceStatus} onRefresh={onRefreshLegion} refresh={legionRefresh} onCopied={showToast}/>}
       <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
         <button style={button} aria-expanded={filtersOpen} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button>
         <label style={{flex:1,minWidth:0}}><span style={{position:'absolute',width:1,height:1,overflow:'hidden'}}>Sort by</span><select aria-label="Sort by" value={sort} onChange={e=>{const field=e.target.value;setSort(field);setSortDirection(field==='name'||field==='labyrinth'?'asc':'desc');}} style={{...button,width:'100%',fontSize:14}}>{SORT_FIELDS.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
@@ -139,7 +132,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       </div>}
       {sort==='progression' && <p style={{fontSize:13,color:C.icy}}>Sorts by Helios troops and furnace level. Gear, stats and heroes are not included.</p>}
       {(sort==='labyrinth'||sort==='labyrinthScore') && <p style={{fontSize:13,color:C.icy}}>State Labyrinth {sort==='labyrinth'?'rank':'score'} from Whiteout Stats. Missing values appear last.</p>}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}><span role="status" style={{color:C.icy,fontSize:14}}>{visible.length} of {players.length} players</span>{(filterCount>0||search||activeLegion) && <button style={button} onClick={()=>{setSearch('');setFilters({...EMPTY_FILTERS});setLegion('');setAllianceStatus('all');}}>Clear filters</button>}</div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}><span role="status" style={{color:C.icy,fontSize:14}}>{visible.length} of {players.length} players</span>{(filterCount>0||search) && <button style={button} onClick={()=>{setSearch('');setFilters({...EMPTY_FILTERS});}}>Clear filters</button>}</div>
       {selecting && <section style={{padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
         <div role="status" style={{fontSize:14,marginBottom:8}}>{selected.size} selected across this roster</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={button} onClick={()=>setSelected(prev=>new Set([...prev,...visible.map(p=>p.id)]))}>Select shown</button><button style={button} onClick={()=>setSelected(new Set())}>Clear selection</button><button style={{...button,color:C.gold}} disabled={!selected.size} onClick={()=>setEditingSelection(!editingSelection)}>Update selected</button></div>
@@ -149,7 +142,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     {!players.length && <section style={{textAlign:'center',padding:'32px 0'}}><h2 style={{fontSize:20}}>Load your alliance roster</h2><p style={{fontSize:16,color:C.icy,lineHeight:1.5}}>Choose an alliance to retrieve its players and available game data.</p><button style={{...button,background:C.gold,color:C.bg}} onClick={onLoadAlliance}>Load alliance</button></section>}
     {players.length>0&&!visible.length && <p style={{textAlign:'center',padding:24,color:C.icy}}>No players match. Clear filters or try another search.</p>}
     {grouped?groups.filter(g=>g.members.length).map(group=><section key={group.name}><h3 style={{fontSize:16,color:C.icy}}>{group.name} · {group.members.length}</h3>{group.members.map(card)}</section>):visible.map(card)}
-    {filtersOpen && <RosterFilters players={players} roles={roles} filters={filters} onChange={next=>{if(next.alliance!==filters.alliance){setLegion('');setAllianceStatus('all');}setFilters(next);}} onClose={()=>setFiltersOpen(false)} count={visible.length}/>}
+    {filtersOpen && <RosterFilters players={players} roles={roles} filters={filters} onChange={next=>{if(next.alliance!==filters.alliance){}setFilters(next);}} onClose={()=>setFiltersOpen(false)} count={visible.length}/>}
     <ProfileView player={currentPlayer} roles={roles} open={profileOpen} onClose={()=>setProfileOpen(false)} onEdit={()=>{setProfileOpen(false);setEditingPlayer(currentPlayer);}} events={events} onOpenLeaderProfile={()=>setLeaderOpen(true)} onSave={savePlayer}/>
     <RallyLeaderProfileSheet player={currentPlayer} open={leaderOpen} onClose={()=>setLeaderOpen(false)} onSave={savePlayer}/>
     <PlayerSheet open={!!editingPlayer} player={editingPlayer} roles={roles} onClose={()=>setEditingPlayer(null)} onSave={savePlayer} existingTags={[...new Set(players.map(p=>p.allianceTag).filter(Boolean))]} existingPlayers={players} onOpenExisting={openProfile} onGoToIntel={onGoToIntel}/>
