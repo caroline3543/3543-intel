@@ -34,7 +34,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
     <h4 style={{color:C.white,margin:'0 0 6px',fontSize:18}}>Rally team generator</h4>
     <p style={{color:C.icy,fontSize:13,lineHeight:1.5}}>Build up to eight rally teams. Your building assignments are not changed.</p>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
-      {['strongest','balanced'].map(m=><button key={m} type="button" onClick={()=>setMode(m)} aria-pressed={mode===m} style={{...control,background:mode===m?C.gold+'22':C.card,color:mode===m?C.gold:C.icy,borderColor:mode===m?C.gold:C.border,fontWeight:700,textTransform:'capitalize'}}>{m}</button>)}
+      {['strongest','balanced'].map(m=><button key={m} type="button" onClick={()=>setMode(m)} disabled={m==='balanced'} aria-pressed={mode===m} style={{...control,background:mode===m?C.gold+'22':C.card,color:mode===m?C.gold:C.icy,borderColor:mode===m?C.gold:C.border,fontWeight:700,textTransform:'capitalize'}}>{m}{m==='balanced'?' · Coming next':''}</button>)}
     </div>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
       <div><label style={label} htmlFor={team.id+'-talcount'}>Number of teams</label><select id={team.id+'-talcount'} style={control} value={count} onChange={e=>setCount(Number(e.target.value))}>{Array.from({length:8},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select></div>
@@ -71,10 +71,10 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         </>}
       </div>)}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-        <button type="button" disabled={!draft||locked} onClick={()=>{onSave(draft);setDraft(null);setError('Team draft saved without changing building assignments.');}} style={{...control,background:C.gold,color:C.bg,fontWeight:700,opacity:!draft||locked?.5:1}}>Save draft</button>
+        <button type="button" disabled={!draft||locked} onClick={()=>{onSave(draft);setDraft(null);setError('Team draft saved without changing building assignments.');}} style={{...control,background:C.gold,color:C.bg,fontWeight:700,opacity:(!draft||locked) ? 0.5 : 1}}>Save draft</button>
         <button type="button" onClick={copyPlan} style={control}>Copy names</button>
       </div>
     </>}
-    <p style={{color:C.muted,fontSize:12,marginBottom:0}}>Missing troop counts produce estimated fill. Ratio and tier allocations require recorded troop inventory. Strongest and Balanced optimisation are still under development.</p>
+    <p style={{color:C.muted,fontSize:12,marginBottom:0}}>Missing troop counts produce estimated fill. Ratio and tier allocations require recorded troop inventory. Balanced mode is coming next. Current previews use the Strongest allocator and existing legion memberships; live spreadsheet verification is not yet integrated.</p>
   </section>;
 }
