@@ -1,7 +1,7 @@
 import {allianceEvidence} from './allianceEvidenceService.js';
-export const legionLabel = team => `${team.host} Legion ${team.number}`;
-export function plannedMemberIds(team){return new Set([...team.members,...(team.candidates||[]).filter(c=>String(c.status).toLowerCase()!=='withdrawn')].map(m=>m.id));}
-export function legionForPlayer(plan,id){const selected=plan?.teams?.find(t=>t.members.some(m=>m.id===id));if(selected)return selected;const proposed=plan?.teams?.find(t=>(t.candidates||[]).some(c=>c.id===id&&String(c.status).toLowerCase()!=='withdrawn'));return proposed?{...proposed,proposalStatus:proposed.candidates.find(c=>c.id===id).status||'Needs review'}:undefined;}
+export const legionLabel = team => `${team.host} Legion ${team.number ?? team.legion}`;
+export function plannedMemberIds(team){return new Set([...(team.members||[]),...(team.candidates||[]).filter(c=>String(c.status).toLowerCase()!=='withdrawn')].map(m=>typeof m==='object'?m.id:m).filter(Boolean));}
+export function legionForPlayer(plan,id){const selected=plan?.teams?.find(t=>t.members.some(m=>(typeof m==='object'?m.id:m)===id));if(selected)return selected;const proposed=plan?.teams?.find(t=>(t.candidates||[]).some(c=>c.id===id&&String(c.status).toLowerCase()!=='withdrawn'));return proposed?{...proposed,proposalStatus:proposed.candidates.find(c=>c.id===id).status||'Needs review'}:undefined;}
 export function allianceCheck(player, team) {
   const {tag,at,noAlliance}=allianceEvidence(player);
   const matches=tag&&tag.toLowerCase()===team.host.trim().toLowerCase();
