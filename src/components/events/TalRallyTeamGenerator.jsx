@@ -165,6 +165,13 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         <span>{combatants.find(p=>String(p.id)===a)?.username||a} + {combatants.find(p=>String(p.id)===b)?.username||b}</span>
         <button type="button" disabled={locked} onClick={()=>removePair(a,b)} style={{...control,width:'auto',minHeight:36,color:C.gold}}>Remove</button>
       </div>)}
+      {preferenceScope==='battle'&&(battlePreferenceOverrides.excludedPairs||[]).length>0&&<div style={{marginTop:10}}>
+        <p style={{color:C.icy,fontSize:12}}>Temporarily separated for this battle</p>
+        {(battlePreferenceOverrides.excludedPairs||[]).map(([a,b])=><div key={[a,b].sort().join(':')} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,minHeight:40}}>
+          <span style={{fontSize:12,color:C.icy}}>{combatants.find(p=>String(p.id)===a)?.username||a} + {combatants.find(p=>String(p.id)===b)?.username||b}</span>
+          <button type="button" disabled={locked} onClick={()=>{setBattlePreferenceOverrides(old=>withBattlePairOverride(old,sharedDraft,a,b,true));prepareChanges();}} style={{...control,width:'auto',minHeight:36,color:C.gold}}>Restore</button>
+        </div>)}
+      </div>}
       {preferenceScope==='shared'
         ?<button type="button" disabled={locked||!sharedDirty||!onSaveSharedPreferences} onClick={saveSharedPreferences} style={{...control,marginTop:10,background:C.gold,color:C.bg,fontWeight:700,opacity:sharedDirty?1:0.5}}>Save reusable defaults</button>
         :<><button type="button" disabled={locked} onClick={resetBattlePreferences} style={{...control,marginTop:10}}>Reset battle exceptions</button><p style={{color:C.muted,fontSize:12}}>Battle exceptions are stored when you save the generated rally draft.</p></>}
