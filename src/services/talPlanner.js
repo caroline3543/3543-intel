@@ -45,8 +45,6 @@ export function teamWarnings(team, config, players = []) {
   if (team.members.length < 15) warnings.push('At least 15 registered players needed.');
   if (team.members.filter(m => m.role === 'combatant').length > 30) warnings.push('Maximum 30 combatants.');
   if (team.members.filter(m => m.role === 'substitute').length > 20) warnings.push('Maximum 20 substitutes.');
-  const conflicts = team.members.filter(m => !team.slots.every(s => (config.availability[m.id] || []).includes(s))).length;
-  if (conflicts) warnings.push(`${conflicts} players cannot confirm every selected time.`);
   const conflictCount = talAvailabilityConflicts(team,config,players).length;
   if (conflictCount) warnings.push(`${conflictCount} players need availability at two of these three times.`);
   return warnings;
