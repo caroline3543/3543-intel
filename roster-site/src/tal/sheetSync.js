@@ -82,7 +82,10 @@ export function applyTalSheetSnapshot(data,sheet,now=new Date().toISOString()){
     }else updated++;
     p.importedSheet={...p.importedSheet,...sheetField(row),importedAt:now};
     const language=norm(row.Language);
-    if(language&&!p.languages?.some(x=>key(x)===key(language)))p.languages=[...(p.languages||[]),language];
+    if(language){
+      p.sheetLanguage=language; // Spreadsheet observation, not verified spoken fluency.
+      if(!p.languages?.some(x=>key(x)===key(language)))p.languages=[...(p.languages||[]),language];
+    }
     if(prior){const index=players.findIndex(v=>v.id===p.id);players[index]=p;}
     const old=records[p.id]||{};
     const evidence=sourceRecord(row),times=timeValues(row);
