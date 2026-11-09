@@ -129,7 +129,7 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
     add(leader,'t11');
     add(leader,'t10');
     for (const phase of ['t11','t10','unknown']) {
-      else for(const player of [leader,...pool.filter(p=>assigned.has(String(p.id)))]) add(player,phase);
+      if (phase!=='t11') for(const player of [leader,...pool.filter(p=>assigned.has(String(p.id)))]) add(player,phase);
       let candidates=pool.filter(p=>!used.has(String(p.id)) && playerCapacity(p,overrides[p.id]||{}));
       while (assigned.size - (assigned.has(String(leader.id))?1:0) < maxJoiners &&
           Object.values(remaining).some(x=>x>0) && candidates.length) {
