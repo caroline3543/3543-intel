@@ -82,6 +82,16 @@ export async function importFromXlsxFile(file) {
       updatedAt: row.updatedAt || new Date().toISOString(),
       snapshots: parseJsonCell(row.snapshots, []),
       tal: parseJsonCell(row.tal, null),
+      kind: row.kind || undefined,
+      title: row.title || undefined,
+      sourceTeamId: row.sourceTeamId || undefined,
+      sourceLabel: row.sourceLabel || undefined,
+      participants: parseJsonCell(row.participants, undefined),
+      battleTeams: parseJsonCell(row.battleTeams, undefined),
+      rallyTeamDraft: parseJsonCell(row.rallyTeamDraft, undefined),
+      rallyMatchOverrides: parseJsonCell(row.rallyMatchOverrides, undefined),
+      officer: row.officer || '',
+      opponent: row.opponent || '',
     })).filter(e => e.id);
 
     const svsPlans = sheet('Plans Data').map(row => ({
