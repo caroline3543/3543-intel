@@ -140,3 +140,20 @@ test('explicit non-attending players are excluded',()=>{
   });
   assert.ok(!draft.teams[0].players.some(p=>p.id==='joiner'));
 });
+
+test('explicit zero troop counts are not treated as unknown capacity',()=>{
+  const lead=player('lead',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+  const zero=player('zero',{infantry:{t11:0,t10:0},marksman:{t11:0,t10:0}});
+  const draft=generateTalRallyDraft({team:{id:'HOT:1',matchTime:'19:00',members:[lead,zero].map(p=>({id:p.id,role:'combatant'}))},config:{},players:[lead,zero],event:{},settings:{teamCount:1,ratio:[50,0,50]}});
+  assert.equal(draft.teams[0].fill,200);
+  assert.equal(draft.teams[0].estimated,false);
+  assert.ok(!draft.teams[0].players.some(p=>p.id==='zero'));
+});
+test('rally leader profile rally-capacity override affects targets and fill',()=>{
+  const lead=player('lead',{infantry:{t11:200},marksman:{t11:200}},{leader:true,march:400,rally:400});
+  const draft=generateTalRallyDraft({team:{id:'HOT:1',matchTime:'19:00',members:[{id:'lead',role:'combatant'}]},config:{},players:[lead],event:{},settings:{ratio:[50,0,50]},overrides:{lead:{rallyCapacity:200}}});
+  assert.equal(draft.teams[0].capacity,200);
+  assert.deepEqual(draft.teams[0].targets,{infantry:100,lancer:0,marksman:100});
+  assert.equal(draft.teams[0].fill,200);
+  assert.equal(lead.leaderProfile.rallyCapacity,400);
+});
