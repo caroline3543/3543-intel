@@ -19,12 +19,19 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const [error,setError] = useState('');
   const [showDetails,setShowDetails] = useState({});
   const [overrides,setOverrides] = useState(team.rallyMatchOverrides || {});
+  const [preferences,setPreferences] = useState(team.rallyTeamPreferences || {players:{},pairs:[]});
+  const [pairA,setPairA] = useState('');
+  const [pairB,setPairB] = useState('');
   const [overridePlayer,setOverridePlayer] = useState('');
   const combatants=(team.members||[]).filter(m=>m.role==='combatant').map(m=>players.find(p=>String(p.id)===String(m.id))).filter(Boolean);
   const possibleLeaders=combatants.filter(p=>['leader','both'].includes(p.leaderProfile?.role)||p.roles?.some(role=>/rally.?lead/i.test(role)));
   function toggleLeader(id){setLockedLeaderIds(current=>current.includes(id)?current.filter(x=>x!==id):[...current,id]);setDraft(null);setConfirmReplace(false);}
   const selectedPlayer=combatants.find(p=>String(p.id)===overridePlayer);
   const activeOverride=overrides[overridePlayer] || {};
+  const traitOptions=[['priority','Priority joiner'],['reliable','Reliable'],['strategy','Understands strategy'],['voice','Uses voice chat'],['punctual','On time']];
+  function updateTrait(id,key,checked){setPreferences(old=>({...old,players:{...old.players,[id]:{...old.players?.[id],[key]:checked}}}));prepareChanges();}
+  function addPair(){if(!pairA||!pairB||pairA===pairB)return;setPreferences(old=>{const pairs=old.pairs||[];return {...old,pairs:pairs.some(([a,b])=>a===pairA&&b===pairB||a===pairB&&b===pairA)?pairs:[...pairs,[pairA,pairB]]};});setPairA('');setPairB('');prepareChanges();}
+  function removePair(a,b){setPreferences(old=>({...old,pairs:(old.pairs||[]).filter(([x,y])=>!(x===a&&y===b||x===b&&y===a))}));prepareChanges();}
   function updateOverride(field,type,tier,value) {
     const parsed=value===''?undefined:Number(value);
     if(value!=='' && (!Number.isSafeInteger(parsed)||parsed<0))return;
@@ -44,7 +51,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const saved=team.rallyTeamDraft;
   function generate() {
     try {
-      const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners,ratio:ratio.map(Number),lockedLeaderIds},overrides});
+      const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners,ratio:ratio.map(Number),lockedLeaderIds,preferences},overrides});
       setDraft(result);setConfirmReplace(false);setError('');
     } catch (e) {setError(e.message);setDraft(null);}
   }
@@ -76,6 +83,34 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         {['Infantry','Lancer','Marksman'].map((name,i)=><label key={name} style={label}>{name} %<input style={{...control,marginTop:5}} type="number" min="0" max="100" value={ratio[i]} onChange={e=>(setRatio(p=>p.map((v,j)=>i===j?e.target.value:v)),prepareChanges())}/></label>)}
       </div>
     </div>
+    <details style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
+      <summary style={{color:C.white,fontSize:14,fontWeight:700,cursor:'pointer',minHeight:36}}>Priority joiners & teamwork</summary>
+      <p style={{color:C.icy,fontSize:12,lineHeight:1.5}}>Optional R5 observations. These help choose between suitable joiners; they do not override troop requirements or attendance.</p>
+      <label style={label}>Joiner
+        <select style={{...control,marginTop:5}} value={overridePlayer} onChange={e=>setOverridePlayer(e.target.value)}>
+          <option value="">Select a player…</option>
+          {combatants.map(p=><option key={p.id} value={String(p.id)}>{p.username||p.alias||p.fid||p.id}</option>)}
+        </select>
+      </label>
+      {selectedPlayer&&<div style={{margin:'10px 0'}}>
+        {traitOptions.map(([key,title])=><label key={key} style={{display:'flex',alignItems:'center',gap:10,color:C.white,minHeight:44,fontSize:13}}>
+          <input type="checkbox" disabled={locked} checked={preferences.players?.[overridePlayer]?.[key]===true} onChange={e=>updateTrait(overridePlayer,key,e.target.checked)}/>{title}
+        </label>)}
+      </div>}
+      <p style={{color:C.icy,fontSize:13,margin:'14px 0 6px'}}>People who work well together</p>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+        {[pairA,pairB].map((value,index)=><select key={index} aria-label={index===0?'First teammate':'Second teammate'} style={control} value={value} disabled={locked} onChange={e=>index===0?setPairA(e.target.value):setPairB(e.target.value)}>
+          <option value="">Choose player</option>
+          {combatants.map(p=><option key={p.id} value={String(p.id)}>{p.username||p.alias||p.fid||p.id}</option>)}
+        </select>)}
+      </div>
+      <button type="button" disabled={locked||!pairA||!pairB||pairA===pairB} onClick={addPair} style={{...control,margin:'8px 0 4px',color:C.gold}}>Add relationship</button>
+      {(preferences.pairs||[]).map(([a,b])=><div key={[a,b].sort().join(':')} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,minHeight:40,fontSize:13,color:C.icy}}>
+        <span>{combatants.find(p=>String(p.id)===a)?.username||a} + {combatants.find(p=>String(p.id)===b)?.username||b}</span>
+        <button type="button" disabled={locked} onClick={()=>removePair(a,b)} style={{...control,width:'auto',minHeight:36,color:C.gold}}>Remove</button>
+      </div>)}
+      <p style={{color:C.muted,fontSize:12}}>Only positive pairings are stored. No automatic judgements are made about other players.</p>
+    </details>
     <details style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
       <summary style={{color:C.white,fontSize:14,fontWeight:700,cursor:'pointer',minHeight:36}}>Lock rally leaders</summary>
       <p style={{color:C.icy,fontSize:12}}>Locked leaders are selected first in the chosen order. The generator fills remaining leader slots automatically.</p>
@@ -119,18 +154,18 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
           <div style={{display:'flex',justifyContent:'space-between',gap:8}}><strong>{t.id.replace('rally-','Team ')} · {t.leader.name}</strong><span style={{fontSize:12,color:t.status==='confirmed-full'?C.green:C.gold}}>{t.status.replaceAll('-',' ')}</span></div>
           <p style={{color:C.icy,fontSize:12,margin:'6px 0'}}>Rally fill: {fmt(t.fill)} / {t.capacity==null?'Unknown':fmt(t.capacity)} · {t.players.length} recorded contributors</p>
           {t.capacity>0&&<div style={{height:6,background:C.border,borderRadius:8,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(100,t.fill/t.capacity*100)}%`,background:t.status==='confirmed-full'?C.green:C.gold}}/></div>}
-          <p style={{color:C.icy,fontSize:12,margin:'8px 0 0'}}>T11 share: {t11Share(t)}% · Norah: {t.players.filter(p=>p.norah).length} · Ratio {t.ratio.join('/')} · {showDetails[t.id]?'Hide details ▲':'Show allocations ▼'}</p>
+          <p style={{color:C.icy,fontSize:12,margin:'8px 0 0'}}>T11 share: {t11Share(t)}% · Priority joiners: {t.priorityJoiners||0} · Familiar pairs: {t.familiarPairs||0} · Norah: {t.players.filter(p=>p.norah).length} · Ratio {t.ratio.join('/')} · {showDetails[t.id]?'Hide details ▲':'Show allocations ▼'}</p>
         </button>
         {showDetails[t.id]&&<>
           {t.warnings?.map((w,i)=><p key={i} style={{fontSize:12,color:C.gold}}>{w}</p>)}
           {t.players.map(p=><div key={p.id} style={{borderTop:`1px solid ${C.border}`,padding:'8px 0',fontSize:13,color:C.icy}}>
-            <strong style={{color:C.white}}>{p.name}</strong>{p.leader?' · Leader':''}{p.norah?' · Norah'+(p.norah.skillLevel?' Lv.'+p.norah.skillLevel:''):''}<div>{fmt(p.total)} troops{p.estimated?' · Estimated inventory':''}</div>
+            <strong style={{color:C.white}}>{p.name}</strong>{p.leader?' · Leader':''}{preferences.players?.[String(p.id)]?.priority?' · Priority joiner':''}{p.norah?' · Norah'+(p.norah.skillLevel?' Lv.'+p.norah.skillLevel:''):''}<div>{fmt(p.total)} troops{p.estimated?' · Estimated inventory':''}</div>
             <div style={{fontSize:12}}>{['infantry','lancer','marksman'].map(type=>{const a=p.troops[type];return a.t11+a.t10+a.unknown?`${type.slice(0,3)}: ${fmt(a.t11)} T11 / ${fmt(a.t10)} T10${a.unknown?' / '+fmt(a.unknown)+' unknown':''}`:null;}).filter(Boolean).join(' · ')}</div>
           </div>)}
         </>}
       </div>)}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-        <button type="button" disabled={!draft||locked} onClick={()=>{if(saved&&!confirmReplace){setConfirmReplace(true);setError('An existing rally draft is saved. Select Confirm replacement to overwrite only that draft.');return;}onSave({rallyTeamDraft:draft,rallyMatchOverrides:overrides});setDraft(null);setConfirmReplace(false);setError('Rally draft saved. Building assignments unchanged.');}} style={{...control,background:C.gold,color:C.bg,fontWeight:700,opacity:(!draft||locked) ? 0.5 : 1}}>{confirmReplace?'Confirm replacement':'Save draft'}</button>
+        <button type="button" disabled={!draft||locked} onClick={()=>{if(saved&&!confirmReplace){setConfirmReplace(true);setError('An existing rally draft is saved. Select Confirm replacement to overwrite only that draft.');return;}onSave({rallyTeamDraft:draft,rallyMatchOverrides:overrides,rallyTeamPreferences:preferences});setDraft(null);setConfirmReplace(false);setError('Rally draft saved. Building assignments unchanged.');}} style={{...control,background:C.gold,color:C.bg,fontWeight:700,opacity:(!draft||locked) ? 0.5 : 1}}>{confirmReplace?'Confirm replacement':'Save draft'}</button>
         <button type="button" onClick={copyPlan} style={control}>Copy names</button>
       </div>
     </>}
