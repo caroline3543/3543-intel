@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { generateTalRallyDraft } from '../../services/talRallyTeamGenerator.js';
 import {mergeRallyPreferences,normaliseRallyPreferences,withBattlePairOverride} from '../../services/talTeamPreferences.js';
@@ -25,6 +25,9 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const [preferenceScope,setPreferenceScope] = useState('shared');
   const [sharedDirty,setSharedDirty] = useState(false);
   const effectivePreferences=mergeRallyPreferences(sharedDraft,battlePreferenceOverrides);
+  useEffect(()=>{
+    if(!sharedDirty)setSharedDraft(normaliseRallyPreferences(sharedPreferences));
+  },[sharedPreferences,sharedDirty]);
   const [pairA,setPairA] = useState('');
   const [pairB,setPairB] = useState('');
   const [overridePlayer,setOverridePlayer] = useState('');
@@ -92,6 +95,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const saved=team.rallyTeamDraft;
   function generate() {
     try {
+      if(sharedDirty){setError('Save reusable defaults before previewing teams.');return;}
       const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners,ratio:ratio.map(Number),lockedLeaderIds,preferences:effectivePreferences},overrides});
       setDraft(result);setConfirmReplace(false);setError('');
     } catch (e) {setError(e.message);setDraft(null);}
@@ -195,7 +199,8 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         <p style={{color:C.muted,fontSize:12}}>0 means zero available troops. Blank means use the saved profile value.</p>
       </>}
     </details>
-    <button type="button" disabled={locked} onClick={generate} style={{...control,background:locked?C.card:C.gold,color:locked?C.muted:C.bg,fontWeight:700,marginBottom:8}}>Preview teams</button>
+    {sharedDirty&&<p role="status" style={{color:C.gold,fontSize:13}}>Unsaved reusable defaults. Save them before generating a new preview.</p>}
+    <button type="button" disabled={locked||sharedDirty} onClick={generate} style={{...control,background:locked||sharedDirty?C.card:C.gold,color:locked||sharedDirty?C.muted:C.bg,fontWeight:700,marginBottom:8}}>Preview teams</button>
     {error&&<p role="status" style={{color:C.gold,fontSize:13}}>{error}</p>}
     {result&&<>
       <div style={{display:'flex',gap:8,justifyContent:'space-between',alignItems:'center',margin:'12px 0'}}>
@@ -224,6 +229,6 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         <button type="button" onClick={copyPlan} style={control}>Copy names</button>
       </div>
     </>}
-    <p style={{color:C.muted,fontSize:12,marginBottom:0}}>Missing troop counts produce estimated fill. Ratio and tier allocations require recorded troop inventory. Both modes use the existing legion membership until live spreadsheet verification is connected. Rally fill with unknown troop quantities is estimated.</p>
+    <p style={{color:C.muted,fontSize:12,marginBottom:0}}>Missing troop counts produce estimated fill. Only spreadsheet-verified legion combatants are eligible in State 3573. Reusable preferences are shared between TAL battles; battle exceptions remain local to the selected event. Rally fill with unknown troop quantities is estimated.</p>
   </section>;
 }
