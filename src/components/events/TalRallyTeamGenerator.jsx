@@ -6,7 +6,7 @@ const control = { width:'100%', boxSizing:'border-box', background:C.bg, border:
 const label = { display:'block', color:C.icy, fontSize:12, marginBottom:5 };
 const fmt = n => Number(n || 0).toLocaleString();
 export function TalRallyTeamGenerator({ team, config, players, event, locked, onSave }) {
-  const [mode,setMode] = useState('strongest');
+  const [mode,setMode] = useState(team.rallyTeamDraft?.mode || 'strongest');
   const [count,setCount] = useState(8);
   const [size,setSize] = useState(5);
   const [maxJoiners,setMaxJoiners] = useState(29);
@@ -14,10 +14,30 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const [draft,setDraft] = useState(null);
   const [error,setError] = useState('');
   const [showDetails,setShowDetails] = useState({});
+  const [overrides,setOverrides] = useState(team.rallyMatchOverrides || {});
+  const [overridePlayer,setOverridePlayer] = useState('');
+  const combatants=(team.members||[]).filter(m=>m.role==='combatant').map(m=>players.find(p=>String(p.id)===String(m.id))).filter(Boolean);
+  const selectedPlayer=combatants.find(p=>String(p.id)===overridePlayer);
+  const activeOverride=overrides[overridePlayer] || {};
+  function updateOverride(field,type,tier,value) {
+    const parsed=value===''?undefined:Number(value);
+    if(value!=='' && (!Number.isSafeInteger(parsed)||parsed<0))return;
+    setOverrides(prev=>{
+      const current={...(prev[overridePlayer]||{})};
+      if(field==='troopInventory'){
+        const troops={...(current.troopInventory||{})};const category={...(troops[type]||{})};
+        if(parsed===undefined)delete category[tier];else category[tier]=parsed;
+        if(Object.keys(category).length)troops[type]=category;else delete troops[type];
+        if(Object.keys(troops).length)current.troopInventory=troops;else delete current.troopInventory;
+      }else if(parsed===undefined)delete current[field];else current[field]=parsed;
+      const next={...prev};if(Object.keys(current).length)next[overridePlayer]=current;else delete next[overridePlayer];return next;
+    });
+    setDraft(null);
+  }
   const saved=team.rallyTeamDraft;
   function generate() {
     try {
-      const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners,ratio:ratio.map(Number)}});
+      const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners,ratio:ratio.map(Number)},overrides});
       setDraft(result);setError('');
     } catch (e) {setError(e.message);setDraft(null);}
   }
@@ -34,7 +54,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
     <h4 style={{color:C.white,margin:'0 0 6px',fontSize:18}}>Rally team generator</h4>
     <p style={{color:C.icy,fontSize:13,lineHeight:1.5}}>Build up to eight rally teams. Your building assignments are not changed.</p>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
-      {['strongest','balanced'].map(m=><button key={m} type="button" onClick={()=>setMode(m)} disabled={m==='balanced'} aria-pressed={mode===m} style={{...control,background:mode===m?C.gold+'22':C.card,color:mode===m?C.gold:C.icy,borderColor:mode===m?C.gold:C.border,fontWeight:700,textTransform:'capitalize'}}>{m}{m==='balanced'?' · Coming next':''}</button>)}
+      {['strongest','balanced'].map(m=><button key={m} type="button" onClick={()=>{setMode(m);setDraft(null);}} aria-pressed={mode===m} style={{...control,background:mode===m?C.gold+'22':C.card,color:mode===m?C.gold:C.icy,borderColor:mode===m?C.gold:C.border,fontWeight:700,textTransform:'capitalize'}}>{m}</button>)}
     </div>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
       <div><label style={label} htmlFor={team.id+'-talcount'}>Number of teams</label><select id={team.id+'-talcount'} style={control} value={count} onChange={e=>setCount(Number(e.target.value))}>{Array.from({length:8},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select></div>
@@ -47,6 +67,27 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         {['Infantry','Lancer','Marksman'].map((name,i)=><label key={name} style={label}>{name} %<input style={{...control,marginTop:5}} type="number" min="0" max="100" value={ratio[i]} onChange={e=>setRatio(p=>p.map((v,j)=>i===j?e.target.value:v))}/></label>)}
       </div>
     </div>
+    <details style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
+      <summary style={{color:C.white,fontSize:14,fontWeight:700,cursor:'pointer',minHeight:36}}>Match-day capacity & troop overrides</summary>
+      <p style={{color:C.icy,fontSize:12,lineHeight:1.5}}>Optional. Blank fields inherit the saved profile. Changes here only affect this legion's rally draft.</p>
+      <label style={label}>Player
+        <select style={{...control,marginTop:5}} value={overridePlayer} onChange={e=>setOverridePlayer(e.target.value)}>
+          <option value="">Select a player…</option>
+          {combatants.map(p=><option key={p.id} value={String(p.id)}>{p.username||p.alias||p.fid||p.id}</option>)}
+        </select>
+      </label>
+      {selectedPlayer&&<>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,margin:'12px 0'}}>
+          {[['marchCapacity','March capacity'],['rallyCapacity','Rally capacity']].map(([key,title])=><label key={key} style={label}>{title}<input type="number" min="0" disabled={locked} style={{...control,marginTop:5}} placeholder={String(key==='marchCapacity'?(selectedPlayer.marchCapacity??'Unknown'):(selectedPlayer.leaderProfile?.rallyCapacity??'Unknown'))} value={activeOverride[key]??''} onChange={e=>updateOverride(key,null,null,e.target.value)}/></label>)}
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:8,color:C.icy,fontSize:12}}><span>Type</span><span>T11</span><span>T10</span></div>
+        {['infantry','lancer','marksman'].map(type=><div key={type} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:8,alignItems:'center'}}>
+          <span style={{color:C.icy,fontSize:12,textTransform:'capitalize'}}>{type}</span>
+          {['t11','t10'].map(tier=><input key={tier} type="number" min="0" disabled={locked} aria-label={type+' '+tier+' match-day override'} style={control} placeholder={String(selectedPlayer.talTroopInventory?.[type]?.[tier]??'Unknown')} value={activeOverride.troopInventory?.[type]?.[tier]??''} onChange={e=>updateOverride('troopInventory',type,tier,e.target.value)}/>)}
+        </div>)}
+        <p style={{color:C.muted,fontSize:12}}>0 means zero available troops. Blank means use the saved profile value.</p>
+      </>}
+    </details>
     <button type="button" disabled={locked} onClick={generate} style={{...control,background:locked?C.card:C.gold,color:locked?C.muted:C.bg,fontWeight:700,marginBottom:8}}>Preview teams</button>
     {error&&<p role="status" style={{color:C.gold,fontSize:13}}>{error}</p>}
     {result&&<>
@@ -71,10 +112,10 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         </>}
       </div>)}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-        <button type="button" disabled={!draft||locked} onClick={()=>{onSave(draft);setDraft(null);setError('Team draft saved without changing building assignments.');}} style={{...control,background:C.gold,color:C.bg,fontWeight:700,opacity:(!draft||locked) ? 0.5 : 1}}>Save draft</button>
+        <button type="button" disabled={!draft||locked} onClick={()=>{onSave({rallyTeamDraft:draft,rallyMatchOverrides:overrides});setDraft(null);setError('Team draft saved without changing building assignments.');}} style={{...control,background:C.gold,color:C.bg,fontWeight:700,opacity:(!draft||locked) ? 0.5 : 1}}>Save draft</button>
         <button type="button" onClick={copyPlan} style={control}>Copy names</button>
       </div>
     </>}
-    <p style={{color:C.muted,fontSize:12,marginBottom:0}}>Missing troop counts produce estimated fill. Ratio and tier allocations require recorded troop inventory. Balanced mode is coming next. Current previews use the Strongest allocator and existing legion memberships; live spreadsheet verification is not yet integrated.</p>
+    <p style={{color:C.muted,fontSize:12,marginBottom:0}}>Missing troop counts produce estimated fill. Ratio and tier allocations require recorded troop inventory. Both modes use the existing legion membership until live spreadsheet verification is connected. Rally fill with unknown troop quantities is estimated.</p>
   </section>;
 }
