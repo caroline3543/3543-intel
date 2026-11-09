@@ -1,4 +1,5 @@
-// Manual, battle-scoped R5 preferences. Never infer attendance, skill or trust.
+// Manual R5 preferences. Reusable defaults can be overridden for one battle.
+// Never infer attendance, skill or trust.
 const TRAITS = ['reliable', 'strategy', 'voice', 'punctual'];
 const pairKey = (a, b) => [String(a), String(b)].sort().join(':');
 export function normaliseRallyPreferences(raw = {}) {
@@ -32,4 +33,37 @@ export function joinerPreferenceScore(playerId, teammateIds, preferences) {
   // A nudge within otherwise viable same-tier marches; never a substitute
   // for T11/T10 troop suitability, capacity or eligibility.
   return (p.priority ? 4 : 0) + traits + relationshipMatches(playerId,teammateIds,preferences)*3;
+}
+
+/** Apply explicit match overrides without changing reusable defaults.
+ * pairs add affinities, excludedPairs suppress them for this battle.
+ * Explicit false trait values can override saved true values. */
+export function mergeRallyPreferences(shared = {}, overrides = {}) {
+  const base = normaliseRallyPreferences(shared);
+  const mergedPlayers = Object.fromEntries(Object.entries(base.players).map(([id, v]) => [id,{...v}]));
+  for(const [id, values] of Object.entries(overrides?.players || {})){
+    if (!values || typeof values !== 'object') continue;
+    const current = {...(mergedPlayers[String(id)] || {})};
+    for(const trait of [...TRAITS,'priority']){
+      if(typeof values[trait] === 'boolean') current[trait] = values[trait];
+    }
+    mergedPlayers[String(id)] = current;
+  }
+  const removed = new Set((overrides?.excludedPairs || [])
+    .filter(pair=>Array.isArray(pair) && pair.length===2)
+    .map(([a,b])=>pairKey(a,b)));
+  const pairs = normaliseRallyPreferences({pairs:[...base.pairs,...(overrides?.pairs||[])]}).pairs
+    .filter(([a,b])=>!removed.has(pairKey(a,b)));
+  return normaliseRallyPreferences({players:mergedPlayers,pairs});
+}
+export function withBattlePairOverride(current = {}, shared = {}, a, b, enabled) {
+  const key=pairKey(a,b);
+  const has = pairs => (pairs||[]).some(pair=>Array.isArray(pair)&&pair.length===2&&pairKey(pair[0],pair[1])===key);
+  const normalized = pair => [String(pair[0]),String(pair[1])];
+  const baseHas = has(shared.pairs);
+  const next={...current,pairs:(current.pairs||[]).filter(pair=>pairKey(pair[0],pair[1])!==key).map(normalized),
+    excludedPairs:(current.excludedPairs||[]).filter(pair=>pairKey(pair[0],pair[1])!==key).map(normalized)};
+  if(enabled && !baseHas) next.pairs.push([String(a),String(b)]);
+  if(!enabled && baseHas) next.excludedPairs.push([String(a),String(b)]);
+  return next;
 }
