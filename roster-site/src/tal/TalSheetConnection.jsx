@@ -30,12 +30,13 @@ export function TalSheetConnection({data,onImport,locked=false}){
    <p style={{color:C.icy,fontSize:13,margin:'8px 0'}}>
      {last?.importedAt?'Last imported '+new Date(last.importedAt).toLocaleString():'No live import recorded yet'}
    </p>
-   <button type="button" style={{...button,width:'100%',color:C.gold}} disabled={loading||locked} onClick={refresh}>{loading?'Checking Google Sheets…':'Refresh sheet & review changes'}</button>
+   <button type="button" style={{...button,width:'100%',color:C.gold}} disabled={loading} onClick={refresh}>{loading?'Checking Google Sheets…':'Refresh sheet & review changes'}</button>
    {error&&<p role="alert" style={{fontSize:13,color:C.gold,lineHeight:1.5}}>{error}</p>}
    {review&&<section aria-label="Google Sheets import review" style={{marginTop:12,padding:10,borderRadius:10,background:C.section}}>
      <strong style={{fontSize:15}}>Review changes before import</strong>
      <p style={{fontSize:13,color:C.icy,lineHeight:1.6}}>Sheet rows: {review.total} · Valid unique IDs: {review.valid} · Changes: {review.changes.length} · New members: {review.newPlayers} · ID issues: {review.invalid.length}</p>
      <Hint>{review.warning}</Hint>
+   {locked&&<p role="status" style={{fontSize:13,color:C.gold}}>This TAL plan is locked. You can inspect the sheet, but must unlock the plan before importing.</p>
      {!!review.invalid.length&&<details><summary style={{minHeight:44,color:C.gold}}>Review {review.invalid.length} skipped ID issues</summary>
        {review.invalid.slice(0,30).map(row=><p key={row.row} style={{fontSize:12,color:C.icy}}>Row {row.row} · {row.name||'Unnamed'}: {row.reason}</p>)}
      </details>}
