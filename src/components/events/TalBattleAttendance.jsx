@@ -24,8 +24,11 @@ export function TalBattleAttendance({team,config,players,onChange,locked=false})
      <div style={{fontSize:12,color:C.icy}}>{r.role==='substitute'?'Substitute · ':''}{r.pollYes?'Available in poll':'No poll availability'} · {r.alliance==='in-host'?'Correct alliance':r.alliance==='move'?'Needs alliance move':'Alliance unverified'}</div>
     </div>
     <select aria-label={`Battle-day attendance for ${r.player?.username||r.id}`} disabled={locked} value={r.status} style={{...control,width:138,flexShrink:0,color:r.status==='attending'?C.green:C.icy}} onChange={e=>{
-      const battleAttendance={...(team.battleAttendance||{}),[r.id]:e.target.value};
-      onChange({battleAttendance,assignments:{}});
+      const nextStatus=e.target.value;
+      const battleAttendance={...(team.battleAttendance||{}),[r.id]:nextStatus};
+      const assignments=nextStatus==='attending'?(team.assignments||{}):
+       Object.fromEntries(Object.entries(team.assignments||{}).map(([building,ids])=>[building,ids.filter(id=>String(id)!==r.id)]));
+      onChange({battleAttendance,assignments});
     }}>
      <option value="attending">Expected</option>
      <option value="not-attending">Not attending</option>
