@@ -26,7 +26,7 @@ export function TalSheetConnection({data,onImport,locked=false}){
  const last=data.settings?.sheetImport;
  return <Card title="Google Sheets connection">
    <Hint>State 3573 · TAL Nov-4. Read-only source. Player IDs match sheet records to Members; importing will not delete players, change legion assignments or overwrite battle plans.</Hint>
-   <a href={TAL_SHEET_URL} target="_blank" rel="noreferrer" style={{color:C.gold,fontSize:13,display:'block',padding:'8px 0'}}>Open connected spreadsheet</a>
+   <a href={TAL_SHEET_URL} target="_blank" rel="noreferrer" style={{color:C.gold,fontSize:13,display:'block',padding:'8px 0'}}>Open source spreadsheet</a>
    <p style={{color:C.icy,fontSize:13,margin:'8px 0'}}>
      {last?.importedAt?'Last imported '+new Date(last.importedAt).toLocaleString():'No live import recorded yet'}
    </p>
