@@ -11,6 +11,12 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
  const [check,setCheck]=useState('all');
  const [search,setSearch]=useState('');
  const [copying,setCopying]=useState(false);
+ const teams=(value?.teams||[]).filter(t=>['HOT','ARC','RKG'].includes(String(t.host||'').toUpperCase()));
+ const team=teams.find(t=>t.id===selected);
+ const shownTeams=team?[team]:teams;
+ const assigned=shownTeams.flatMap(t=>[...plannedMemberIds(t)].map(id=>({team:t,player:players.find(p=>p.id===id)})));
+ const unique=new Map();
+ for(const entry of assigned)if(entry.player&&!unique.has(entry.player.id))unique.set(entry.player.id,entry);
  const [timeFilters,setTimeFilters]=useState([]);
  const [timeMode,setTimeMode]=useState('any');
  const [adding,setAdding]=useState(false);
@@ -23,12 +29,6 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
  function updateTeam(nextTeam){onChange?.({...value,teams:(value?.teams||[]).map(t=>t.id===nextTeam.id?nextTeam:t)});}
  function addPlayer(player){if(!team||value?.locked)return;const already=team.members.some(m=>m.id===player.id);if(already){onMessage?.('Player is already selected for this legion.');return;}const elsewhere=teams.some(t=>t.id!==team.id&&t.members.some(m=>m.id===player.id));if(elsewhere){onMessage?.('Player is selected in another legion. Move them there first.');return;}if(team.members.length>=50){onMessage?.('This legion has 50 selected players. Remove someone first.');return;}updateTeam({...team,members:[...team.members,{id:player.id,role:'pending',registered:false}],candidates:(team.candidates||[]).filter(c=>c.id!==player.id)});setAddQuery('');onMessage?.(`${player.username||player.alias||'Player'} added to ${legionLabel(team)}. Check availability and registration.`);}
  function removePlayer(player){if(!team||value?.locked)return;updateTeam({...team,members:team.members.filter(m=>m.id!==player.id),candidates:(team.candidates||[]).filter(c=>c.id!==player.id),captain:team.captain===player.id?'':team.captain});setRemoveId('');onMessage?.(`${player.username||player.alias||'Player'} removed from ${legionLabel(team)}. Their Members profile and availability were retained.`);}
- const teams=(value?.teams||[]).filter(t=>['HOT','ARC','RKG'].includes(String(t.host||'').toUpperCase()));
- const team=teams.find(t=>t.id===selected);
- const shownTeams=team?[team]:teams;
- const assigned=shownTeams.flatMap(t=>[...plannedMemberIds(t)].map(id=>({team:t,player:players.find(p=>p.id===id)})));
- const unique=new Map();
- for(const entry of assigned)if(entry.player&&!unique.has(entry.player.id))unique.set(entry.player.id,entry);
  const roster=[...unique.values()].filter(({player,team})=>(check==='all'||allianceCheck(player,team).status===check)&&matchesTime(player)&&(!search||[player.username,player.alias,player.fid].some(v=>String(v||'').toLowerCase().includes(search.toLowerCase())))).sort((a,b)=>compareNames(a.player,b.player));
  const addCandidates=team?players.filter(p=>!plannedMemberIds(team).has(p.id)&&(!addQuery||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(addQuery.toLowerCase())))&&matchesTime(p)).sort(compareNames).slice(0,30):[];
  async function copyStay(){
