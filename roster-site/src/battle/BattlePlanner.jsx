@@ -11,7 +11,7 @@ import {fmtPower,powerPastePreview} from '../tal/power.js';
 import {BUILDINGS,battleEvents,createBattle,patchParticipant,battleStats,battleText,battlePower} from './model.js';
 import {playerSearchFields} from '../../../src/services/playerNames.js';
 const small={fontSize:14,color:C.icy,lineHeight:1.5};
-export function BattlePlanner({events,players,plan=newPlan(),onUpdate,onMessage}){
+export function BattlePlanner({events,players,plan=newPlan(),onUpdate,onMessage,sharedTeamPreferences,onSaveTeamPreferences}){
  const battles=battleEvents(events),[active,setActive]=useState(()=>[...battleEvents(events)].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time))[0]?.id||''),[creating,setCreating]=useState(false),[type,setType]=useState('tal'),[source,setSource]=useState(plan.teams[0]?.id||''),[date,setDate]=useState(''),[time,setTime]=useState('19:00'),[error,setError]=useState(''),[query,setQuery]=useState(''),[view,setView]=useState('available'),[addQuery,setAddQuery]=useState(''),[paste,setPaste]=useState(''),[preview,setPreview]=useState(null),[copy,setCopy]=useState('');
  const [openPlayer,setOpenPlayer]=useState(''),filtersRef=useRef(null),attendanceControls=useRef({}),focusAttendance=useRef(''),playerRows=useRef({});
  const event=battles.find(e=>e.id===active)||[...battles].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time))[0];
@@ -40,6 +40,7 @@ export function BattlePlanner({events,players,plan=newPlan(),onUpdate,onMessage}
      {rallyInputs.excluded.map(row=><p key={row.id} style={{color:C.icy,fontSize:13}}>{byId.get(row.id)?.username||row.id}: {row.reason}</p>)}
    </details>}
    <TalRallyTeamGenerator key={event.id} team={rallyInputs.team} config={rallyInputs.config} players={players} event={rallyInputs.event}
+     sharedPreferences={sharedTeamPreferences} onSaveSharedPreferences={onSaveTeamPreferences}
      locked={false} onSave={patch=>change(patch)}/>
  </section>}
  {rallyInputs&&!rallyInputs.ready&&<Card title="TAL rally generator"><Hint>{rallyInputs.reason}</Hint></Card>}
