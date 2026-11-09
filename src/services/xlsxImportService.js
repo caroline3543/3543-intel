@@ -90,6 +90,7 @@ export async function importFromXlsxFile(file) {
       battleTeams: parseJsonCell(row.battleTeams, undefined),
       rallyTeamDraft: parseJsonCell(row.rallyTeamDraft, undefined),
       rallyMatchOverrides: parseJsonCell(row.rallyMatchOverrides, undefined),
+      rallyTeamPreferences: parseJsonCell(row.rallyTeamPreferences, undefined),
       officer: row.officer || '',
       opponent: row.opponent || '',
     })).filter(e => e.id);
