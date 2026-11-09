@@ -8,7 +8,7 @@ const label = { display:'block', color:C.icy, fontSize:12, marginBottom:5 };
 const fmt = n => Number(n || 0).toLocaleString();
 const t11Count = team => (team.players||[]).reduce((sum,p)=>sum+['infantry','lancer','marksman'].reduce((n,t)=>n+(p.troops?.[t]?.t11||0),0),0);
 const t11Share = team => team.fill>0?Math.round(t11Count(team)/team.fill*100):0;
-export function TalRallyTeamGenerator({ team, config, players, event, locked, onSave, sharedPreferences = {}, onSaveSharedPreferences }) {
+export function TalRallyTeamGenerator({ team, config, players, event, locked, onSave, sharedPreferences = {}, onSaveSharedPreferences, onOpenMemberProfile }) {
   const [mode,setMode] = useState(team.rallyTeamDraft?.mode || 'strongest');
   const [lockedLeaderIds,setLockedLeaderIds] = useState(team.rallyTeamDraft?.settings?.lockedLeaderIds || []);
   const [confirmReplace,setConfirmReplace] = useState(false);
@@ -128,7 +128,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         {['Infantry','Lancer','Marksman'].map((name,i)=><label key={name} style={label}>{name} %<input style={{...control,marginTop:5}} type="number" min="0" max="100" value={ratio[i]} onChange={e=>(setRatio(p=>p.map((v,j)=>i===j?e.target.value:v)),prepareChanges())}/></label>)}
       </div>
     </div>
-    <p style={{fontSize:12,color:C.icy,lineHeight:1.5}}>Priority joiners and familiar working pairs are managed from each player's profile in Members. Recorded game language helps keep communication groups together where practical. Match-day exceptions already saved to this battle remain in effect.</p>
+    <p style={{fontSize:12,color:C.icy,lineHeight:1.5}}>Priority joiners and familiar working pairs are managed in each player's profile. Open a player from the generated team details to edit their settings. Recorded game language helps keep communication groups together where practical. Match-day exceptions already saved to this battle remain in effect.</p>
     <details style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
       <summary style={{color:C.white,fontSize:14,fontWeight:700,cursor:'pointer',minHeight:36}}>Lock rally leaders</summary>
       <p style={{color:C.icy,fontSize:12}}>Locked leaders are selected first in the chosen order. The generator fills remaining leader slots automatically.</p>
@@ -178,7 +178,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         {showDetails[t.id]&&<>
           {t.warnings?.map((w,i)=><p key={i} style={{fontSize:12,color:C.gold}}>{w}</p>)}
           {t.players.map(p=><div key={p.id} style={{borderTop:`1px solid ${C.border}`,padding:'8px 0',fontSize:13,color:C.icy}}>
-            <strong style={{color:C.white}}>{p.name}</strong>{p.leader?' · Leader':''}{effectivePreferences.players?.[String(p.id)]?.priority?' · Priority joiner':''}{p.norah?' · Norah'+(p.norah.skillLevel?' Lv.'+p.norah.skillLevel:''):''}<div>{fmt(p.total)} troops{p.estimated?' · Estimated inventory':''}</div>
+            <button type="button" disabled={!onOpenMemberProfile} onClick={()=>onOpenMemberProfile?.(p.id)} style={{background:'none',border:0,padding:0,color:C.white,fontSize:13,fontWeight:700,textDecoration:onOpenMemberProfile?'underline':'none',cursor:onOpenMemberProfile?'pointer':'default'}} aria-label={'Open '+p.name+' player profile'}>{p.name}</button>{p.leader?' · Leader':''}{effectivePreferences.players?.[String(p.id)]?.priority?' · Priority joiner':''}{p.norah?' · Norah'+(p.norah.skillLevel?' Lv.'+p.norah.skillLevel:''):''}<div>{fmt(p.total)} troops{p.estimated?' · Estimated inventory':''}</div>
             <div style={{fontSize:12}}>{['infantry','lancer','marksman'].map(type=>{const a=p.troops[type];return a.t11+a.t10+a.unknown?`${type.slice(0,3)}: ${fmt(a.t11)} T11 / ${fmt(a.t10)} T10${a.unknown?' / '+fmt(a.unknown)+' unknown':''}`:null;}).filter(Boolean).join(' · ')}</div>
           </div>)}
         </>}
