@@ -14,7 +14,7 @@ const snapshot=rows=>({spreadsheetId:TAL_SHEET_ID,readAt:'2026-11-10T00:00:00Z',
 const base=()=>({players:[{id:'existing',fid:'12345',username:'Manually edited name',notes:'Keep my note',power:999,gameLanguage:'English',joinerHeroes:[{hero:'Norah',skillLevel:5}],languages:['English'],importedSheet:null}],
  events:[{id:'battle',type:'tal',participants:[{id:'existing',attendance:'available'}],rallyTeamDraft:{teams:[{id:'rally-1'}]}}],
  talPlan:{...newPlan(),teams:[{...createTeam('HOT',1),members:[{id:'existing',role:'combatant',registered:true}]}],records:{existing:{status:'available',times:['19:00'],sheetRegistration:'Pending'}}},
- settings:{stateId:'3573'},talTeamPreferences:{players:{existing:{priority:true}},pairs:[]}
+ customRoles:[],settings:{stateId:'3573'},talTeamPreferences:{players:{existing:{priority:true}},pairs:[]}
 });
 test('sheet preview rejects duplicate IDs without merging either row',()=>{
  const payload=snapshot([row('12345','A'),row('12345','B'),row('','Unnamed')]);
