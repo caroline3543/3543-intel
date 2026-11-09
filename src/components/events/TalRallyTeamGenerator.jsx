@@ -14,7 +14,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const [confirmReplace,setConfirmReplace] = useState(false);
   const [count,setCount] = useState(team.rallyTeamDraft?.settings?.teamCount || 8);
   const [size,setSize] = useState(team.rallyTeamDraft?.settings?.preferredSize || 5);
-  const [maxJoiners,setMaxJoiners] = useState(team.rallyTeamDraft?.settings?.maxJoiners || 29);
+  const [maxJoiners,setMaxJoiners] = useState(String(team.rallyTeamDraft?.settings?.maxJoiners || 29));
   const [ratio,setRatio] = useState((team.rallyTeamDraft?.settings?.ratio || [50,0,50]).map(String));
   const [draft,setDraft] = useState(null);
   const [error,setError] = useState('');
@@ -96,7 +96,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   function generate() {
     try {
       if(sharedDirty){setError('Save reusable defaults before previewing teams.');return;}
-      const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners,ratio:ratio.map(Number),lockedLeaderIds,preferences:effectivePreferences},overrides});
+      const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners:Number(maxJoiners)||29,ratio:ratio.map(Number),lockedLeaderIds,preferences:effectivePreferences},overrides});
       setDraft(result);setConfirmReplace(false);setError('');
     } catch (e) {setError(e.message);setDraft(null);}
   }
@@ -119,64 +119,16 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
     </div>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
       <div><label style={label} htmlFor={team.id+'-talcount'}>Number of teams</label><select id={team.id+'-talcount'} style={control} value={count} onChange={e=>(setCount(Number(e.target.value)),prepareChanges())}>{Array.from({length:8},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select></div>
-      <div><label style={label} htmlFor={team.id+'-talsize'}>Preferred team size</label><input id={team.id+'-talsize'} style={control} type="number" min="2" max="50" value={size} onChange={e=>(setSize(Math.max(2,Number(e.target.value)||2)),prepareChanges())}/></div>
+      <div><label style={label} htmlFor={team.id+'-talsize'}>Preferred team size</label><select id={team.id+'-talsize'} style={control} value={size} onChange={e=>{setSize(Number(e.target.value));prepareChanges();}}>{Array.from({length:11},(_,i)=>i+2).map(n=><option key={n} value={n}>{n} players</option>)}</select></div>
     </div>
-    <div style={{marginBottom:12}}><label style={label} htmlFor={team.id+'-talmax'}>Maximum joiners per rally (check game limit)</label><input id={team.id+'-talmax'} style={control} type="number" min="1" max="49" value={maxJoiners} onChange={e=>(setMaxJoiners(Math.max(1,Number(e.target.value)||1)),prepareChanges())}/></div>
+    <div style={{marginBottom:12}}><label style={label} htmlFor={team.id+'-talmax'}>Maximum joiners per rally (check game limit)</label><input id={team.id+'-talmax'} style={control} type="number" min="1" max="49" inputMode="numeric" value={maxJoiners} onChange={e=>{setMaxJoiners(e.target.value);prepareChanges();}} onBlur={()=>setMaxJoiners(String(Math.max(1,Math.min(49,Number(maxJoiners)||29))))}/></div>
     <div style={{marginBottom:12}}>
       <p style={{color:C.icy,fontSize:13,margin:'0 0 8px'}}>Combined rally troop ratio (must total 100%)</p>
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:8}}>
         {['Infantry','Lancer','Marksman'].map((name,i)=><label key={name} style={label}>{name} %<input style={{...control,marginTop:5}} type="number" min="0" max="100" value={ratio[i]} onChange={e=>(setRatio(p=>p.map((v,j)=>i===j?e.target.value:v)),prepareChanges())}/></label>)}
       </div>
     </div>
-    <details style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
-      <summary style={{color:C.white,fontSize:14,fontWeight:700,cursor:'pointer',minHeight:36}}>Priority joiners & teamwork</summary>
-      <p style={{color:C.icy,fontSize:12,lineHeight:1.5}}>Set reusable R5 observations, or make exceptions for this battle. These preferences never override eligibility, attendance or troop requirements.</p>
-      <div role="group" aria-label="Teamwork preference scope" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
-        {[['shared','Reusable defaults'],['battle','This battle']].map(([scope,title])=><button key={scope} type="button" aria-pressed={preferenceScope===scope} style={{...control,background:preferenceScope===scope?C.gold+'22':C.section,color:preferenceScope===scope?C.gold:C.icy}} onClick={()=>setPreferenceScope(scope)}>{title}</button>)}
-      </div>
-      <p style={{color:C.icy,fontSize:12}}>{preferenceScope==='shared'?'Saved for all future TAL matches on this state workspace.':'Choose Inherit to use the reusable default; Yes or No applies only to this battle.'}</p>
-      <label style={label}>Player
-        <select style={{...control,marginTop:5}} value={overridePlayer} onChange={e=>setOverridePlayer(e.target.value)}>
-          <option value="">Select a player…</option>
-          {combatants.map(p=><option key={p.id} value={String(p.id)}>{p.username||p.alias||p.fid||p.id}</option>)}
-        </select>
-      </label>
-      {selectedPlayer&&<div style={{margin:'10px 0'}}>
-        {traitOptions.map(([key,title])=>preferenceScope==='shared'
-          ?<label key={key} style={{display:'flex',alignItems:'center',gap:10,color:C.white,minHeight:44,fontSize:13}}>
-            <input type="checkbox" disabled={locked} checked={sharedDraft.players?.[overridePlayer]?.[key]===true} onChange={e=>updateTrait(overridePlayer,key,e.target.checked)}/>{title}
-          </label>
-          :<label key={key} style={{display:'grid',gridTemplateColumns:'1fr 135px',gap:8,alignItems:'center',color:C.white,minHeight:46,fontSize:13}}>
-            <span>{title} <span style={{color:C.muted,fontSize:11}}>Default: {sharedDraft.players?.[overridePlayer]?.[key]===true?'Yes':'Not marked'}</span></span>
-            <select disabled={locked} aria-label={title+' match override'} style={control} value={battlePreferenceOverrides.players?.[overridePlayer]?.[key]===undefined?'inherit':battlePreferenceOverrides.players?.[overridePlayer]?.[key]?'yes':'no'} onChange={e=>updateTrait(overridePlayer,key,e.target.value)}>
-              <option value="inherit">Inherit</option><option value="yes">Yes</option><option value="no">No</option>
-            </select>
-          </label>)}
-      </div>}
-      <p style={{color:C.icy,fontSize:13,margin:'14px 0 6px'}}>People who work well together</p>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-        {[pairA,pairB].map((value,index)=><select key={index} aria-label={index===0?'First teammate':'Second teammate'} style={control} value={value} disabled={locked} onChange={e=>index===0?setPairA(e.target.value):setPairB(e.target.value)}>
-          <option value="">Choose player</option>
-          {combatants.map(p=><option key={p.id} value={String(p.id)}>{p.username||p.alias||p.fid||p.id}</option>)}
-        </select>)}
-      </div>
-      <button type="button" disabled={locked||!pairA||!pairB||pairA===pairB} onClick={addPair} style={{...control,margin:'8px 0 4px',color:C.gold}}>Add working pair</button>
-      {(preferenceScope==='shared'?sharedDraft.pairs:effectivePreferences.pairs).map(([a,b])=><div key={[a,b].sort().join(':')} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,minHeight:40,fontSize:13,color:C.icy}}>
-        <span>{combatants.find(p=>String(p.id)===a)?.username||a} + {combatants.find(p=>String(p.id)===b)?.username||b}</span>
-        <button type="button" disabled={locked} onClick={()=>removePair(a,b)} style={{...control,width:'auto',minHeight:36,color:C.gold}}>Remove</button>
-      </div>)}
-      {preferenceScope==='battle'&&(battlePreferenceOverrides.excludedPairs||[]).length>0&&<div style={{marginTop:10}}>
-        <p style={{color:C.icy,fontSize:12}}>Temporarily separated for this battle</p>
-        {(battlePreferenceOverrides.excludedPairs||[]).map(([a,b])=><div key={[a,b].sort().join(':')} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,minHeight:40}}>
-          <span style={{fontSize:12,color:C.icy}}>{combatants.find(p=>String(p.id)===a)?.username||a} + {combatants.find(p=>String(p.id)===b)?.username||b}</span>
-          <button type="button" disabled={locked} onClick={()=>{setBattlePreferenceOverrides(old=>withBattlePairOverride(old,sharedDraft,a,b,true));prepareChanges();}} style={{...control,width:'auto',minHeight:36,color:C.gold}}>Restore</button>
-        </div>)}
-      </div>}
-      {preferenceScope==='shared'
-        ?<button type="button" disabled={locked||!sharedDirty||!onSaveSharedPreferences} onClick={saveSharedPreferences} style={{...control,marginTop:10,background:C.gold,color:C.bg,fontWeight:700,opacity:sharedDirty?1:0.5}}>Save reusable defaults</button>
-        :<><button type="button" disabled={locked} onClick={resetBattlePreferences} style={{...control,marginTop:10}}>Reset battle exceptions</button><p style={{color:C.muted,fontSize:12}}>Battle exceptions are stored when you save the generated rally draft.</p></>}
-      <p style={{color:C.muted,fontSize:12}}>Only manually recorded positive working pairs are used. Preferences do not change player profiles.</p>
-    </details>
+    <p style={{fontSize:12,color:C.icy,lineHeight:1.5}}>Priority joiners and familiar working pairs are managed from each player's profile in Members. Recorded game language helps keep communication groups together where practical. Match-day exceptions already saved to this battle remain in effect.</p>
     <details style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
       <summary style={{color:C.white,fontSize:14,fontWeight:700,cursor:'pointer',minHeight:36}}>Lock rally leaders</summary>
       <p style={{color:C.icy,fontSize:12}}>Locked leaders are selected first in the chosen order. The generator fills remaining leader slots automatically.</p>
