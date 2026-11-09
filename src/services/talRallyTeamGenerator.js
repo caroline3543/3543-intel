@@ -41,6 +41,21 @@ export function joinerHeroes(player) {
 export function hasNorah(player) {
   return joinerHeroes(player).some(h => h.name.toLowerCase().includes('norah'));
 }
+// In-game UI language is a weak proxy for spoken communication. Never assume
+// two players can voice-chat together solely because they use Chinese UI.
+export function coordinationLanguage(player) {
+  const raw=String(player?.gameLanguage||player?.language||'').trim().toLowerCase();
+  if (!raw) return '';
+  if (/^(zh(?:-|$))|chinese|中文|mandarin|简体|繁體|繁体/.test(raw)) return 'Chinese';
+  if (/^en(?:-|$)|english/.test(raw)) return 'English';
+  if (/^ko(?:-|$)|korean|한국/.test(raw)) return 'Korean';
+  if (/^ar(?:-|$)|arabic|العربية/.test(raw)) return 'Arabic';
+  return raw;
+}
+export function languageAffinity(player, teammatePlayers) {
+  const language=coordinationLanguage(player);
+  return language ? teammatePlayers.filter(p=>coordinationLanguage(p)===language).length : 0;
+}
 function heroPriority(player) {
   const heroes = joinerHeroes(player).filter(h => h.confirmed && h.skillLevel != null);
   return heroes.reduce((best,h) => Math.max(best, Math.min(5,h.skillLevel) * 100 + (h.name.toLowerCase().includes('norah') ? 10 : 0)),0);
@@ -179,7 +194,8 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
     const viable = candidates.map(p => {
       const trial = memberAllocation(p, { ...state.remaining }, overrides[p.id] || {}, tier);
       const teammates=[state.leader.id,...state.assigned.keys()];
-      return { player: p, trial, score: stageScore(p, state.remaining, event, tier, overrides[p.id] || {}) + joinerPreferenceScore(p.id,teammates,preferences)*20000 };
+      const teammatePlayers=[state.leader,...pool.filter(member=>state.assigned.has(String(member.id)))];
+      return { player: p, trial, score: stageScore(p, state.remaining, event, tier, overrides[p.id] || {}) + joinerPreferenceScore(p.id,teammates,preferences)*20000 + languageAffinity(p,teammatePlayers)*8000 };
     }).filter(v => v.trial);
     viable.sort((a, b) => b.score - a.score || String(a.player.id).localeCompare(String(b.player.id)));
     return !!viable[0] && addToState(state, viable[0].player, tier);
@@ -226,10 +242,11 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
     const estimated = participants.some(a => a.estimated);
     const full = s.capacity != null && fill === s.capacity;
     const leaderRecorded = s.assigned.has(String(s.leader.id));
+    const languages=participants.reduce((out,p)=>{const member=eligible.find(x=>String(x.id)===String(p.id));const lang=coordinationLanguage(member);if(lang)out[lang]=(out[lang]||0)+1;return out;},{});
     const status = !s.capacity || !leaderRecorded ? 'needs-review'
       : full ? (estimated ? 'estimated-full' : 'confirmed-full') : 'incomplete';
     return {
-      id: s.id, leader: snapshotItem(s.leader), capacity: s.capacity,
+      id: s.id, leader: snapshotItem(s.leader), capacity: s.capacity, languages,
       priorityJoiners: participants.filter(p=>!p.leader && joinerPreference(p.id,preferences).priority).length,
       familiarPairs: preferences.pairs.filter(([a,b])=>participants.some(p=>String(p.id)===a)&&participants.some(p=>String(p.id)===b)).length,
       ratio, targets: s.capacity ? troopTargets(s.capacity, ratio) : null,
