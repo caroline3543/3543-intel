@@ -65,3 +65,12 @@ export function moveTalMember(teams, playerId, targetId, swapId = null, config =
   if (!swapped && target.members.filter(m => m.role === role).length >= (role === 'combatant' ? 30 : 20)) throw new Error('This legion is full. Swap with a player instead.');
   return teams.map(t => t.id === source.id ? {...t, assignments:{}, members: swapped ? t.members.map(m => m.id === playerId ? {...swapped,role:member.role} : m) : t.members.filter(m => m.id !== playerId)} : t.id === target.id ? {...t, assignments:{}, members: swapped ? t.members.map(m => m.id === swapId ? {...member,role:swapped.role} : m) : [...t.members,{...member,role}]} : t);
 }
+
+/** Clears battle-day data without destroying poll responses or legion membership. */
+export function clearTalBattlePlans(teams=[]) {
+ return teams.map(team=>({...team,matchTime:'',battleAttendance:{},assignments:{},buildings:[...(team.buildings||TAL_BUILDINGS)]}));
+}
+/** Remove one draft legion. Other legions and the poll remain untouched. */
+export function deleteTalLegion(teams=[],id) {
+ return teams.filter(team=>team.id!==id);
+}
