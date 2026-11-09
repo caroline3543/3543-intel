@@ -122,6 +122,7 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
   if (selected.some(p => !p.leadershipRank && power(p, event) === 0))
     warnings.push('Leader strength is estimated: some leaders lack leadership ranking and TAL troop power.');
 
+  if (mode === 'balanced' && eligible.some(p => power(p, event) === 0)) warnings.push('Balanced mode uses recorded TAL troop power; missing values make the balance approximate.');
   const assignedToTeam = new Set(selected.map(p => String(p.id)));
   const pool = eligible.filter(p => !assignedToTeam.has(String(p.id)));
   const states = selected.map((leader, i) => {
@@ -181,13 +182,16 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
         while (addBestNewPlayer(s, tier)) { /* strongest rally fills first */ }
       }
     } else {
-      // In balanced mode, repeatedly give the least-filled rally the next suitable
-      // contributor, avoiding a single team monopolising the best joiners.
+      // Balance recorded TAL troop power when known, using fill as a secondary
+      // measure. This is a transparent heuristic, not a combat simulation.
+      const hasRecordedPower = eligible.some(p => power(p, event) > 0);
+      const teamRecordedPower = state => power(state.leader, event) +
+        pool.filter(p => state.assigned.has(String(p.id))).reduce((sum, p) => sum + power(p, event), 0);
       const exhausted = new Set();
       while (true) {
         const candidates = states.filter(s =>
           !exhausted.has(s.id) && hasShortfall(s) && slotsFree(s))
-          .sort((a, b) => fillFraction(a) - fillFraction(b) || a.id.localeCompare(b.id));
+          .sort((a, b) => (hasRecordedPower ? teamRecordedPower(a) - teamRecordedPower(b) : 0) || fillFraction(a) - fillFraction(b) || a.id.localeCompare(b.id));
         if (!candidates.length) break;
         const current = candidates[0];
         if (!addBestNewPlayer(current, tier)) exhausted.add(current.id);
