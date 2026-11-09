@@ -9,6 +9,8 @@ const t11Count = team => (team.players||[]).reduce((sum,p)=>sum+['infantry','lan
 const t11Share = team => team.fill>0?Math.round(t11Count(team)/team.fill*100):0;
 export function TalRallyTeamGenerator({ team, config, players, event, locked, onSave }) {
   const [mode,setMode] = useState(team.rallyTeamDraft?.mode || 'strongest');
+  const [lockedLeaderIds,setLockedLeaderIds] = useState(team.rallyTeamDraft?.settings?.lockedLeaderIds || []);
+  const [confirmReplace,setConfirmReplace] = useState(false);
   const [count,setCount] = useState(8);
   const [size,setSize] = useState(5);
   const [maxJoiners,setMaxJoiners] = useState(29);
@@ -19,6 +21,8 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const [overrides,setOverrides] = useState(team.rallyMatchOverrides || {});
   const [overridePlayer,setOverridePlayer] = useState('');
   const combatants=(team.members||[]).filter(m=>m.role==='combatant').map(m=>players.find(p=>String(p.id)===String(m.id))).filter(Boolean);
+  const possibleLeaders=combatants.filter(p=>['leader','both'].includes(p.leaderProfile?.role)||p.roles?.some(role=>/rally.?lead/i.test(role)));
+  function toggleLeader(id){setLockedLeaderIds(current=>current.includes(id)?current.filter(x=>x!==id):[...current,id]);setDraft(null);setConfirmReplace(false);}
   const selectedPlayer=combatants.find(p=>String(p.id)===overridePlayer);
   const activeOverride=overrides[overridePlayer] || {};
   function updateOverride(field,type,tier,value) {
@@ -39,11 +43,12 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const saved=team.rallyTeamDraft;
   function generate() {
     try {
-      const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners,ratio:ratio.map(Number)},overrides});
+      const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners,ratio:ratio.map(Number),lockedLeaderIds},overrides});
       setDraft(result);setError('');
     } catch (e) {setError(e.message);setDraft(null);}
   }
   const result=draft || saved;
+  const prepareChanges=()=>{setDraft(null);setConfirmReplace(false);};
   function copyPlan() {
     if(!result) return;
     const message=result.teams.map(t=>[
@@ -57,19 +62,27 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
     <h4 style={{color:C.white,margin:'0 0 6px',fontSize:18}}>Rally team generator</h4>
     <p style={{color:C.icy,fontSize:13,lineHeight:1.5}}>Build up to eight rally teams. Your building assignments are not changed.</p>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
-      {['strongest','balanced'].map(m=><button key={m} type="button" onClick={()=>{setMode(m);setDraft(null);}} aria-pressed={mode===m} style={{...control,background:mode===m?C.gold+'22':C.card,color:mode===m?C.gold:C.icy,borderColor:mode===m?C.gold:C.border,fontWeight:700,textTransform:'capitalize'}}>{m}</button>)}
+      {['strongest','balanced'].map(m=><button key={m} type="button" onClick={()=>{setMode(m);prepareChanges();}} aria-pressed={mode===m} style={{...control,background:mode===m?C.gold+'22':C.card,color:mode===m?C.gold:C.icy,borderColor:mode===m?C.gold:C.border,fontWeight:700,textTransform:'capitalize'}}>{m}</button>)}
     </div>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
-      <div><label style={label} htmlFor={team.id+'-talcount'}>Number of teams</label><select id={team.id+'-talcount'} style={control} value={count} onChange={e=>setCount(Number(e.target.value))}>{Array.from({length:8},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select></div>
-      <div><label style={label} htmlFor={team.id+'-talsize'}>Preferred team size</label><input id={team.id+'-talsize'} style={control} type="number" min="2" max="50" value={size} onChange={e=>setSize(Math.max(2,Number(e.target.value)||2))}/></div>
+      <div><label style={label} htmlFor={team.id+'-talcount'}>Number of teams</label><select id={team.id+'-talcount'} style={control} value={count} onChange={e=>(setCount(Number(e.target.value)),prepareChanges())}>{Array.from({length:8},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select></div>
+      <div><label style={label} htmlFor={team.id+'-talsize'}>Preferred team size</label><input id={team.id+'-talsize'} style={control} type="number" min="2" max="50" value={size} onChange={e=>(setSize(Math.max(2,Number(e.target.value)||2)),prepareChanges())}/></div>
     </div>
-    <div style={{marginBottom:12}}><label style={label} htmlFor={team.id+'-talmax'}>Maximum joiners per rally (check game limit)</label><input id={team.id+'-talmax'} style={control} type="number" min="1" max="49" value={maxJoiners} onChange={e=>setMaxJoiners(Math.max(1,Number(e.target.value)||1))}/></div>
+    <div style={{marginBottom:12}}><label style={label} htmlFor={team.id+'-talmax'}>Maximum joiners per rally (check game limit)</label><input id={team.id+'-talmax'} style={control} type="number" min="1" max="49" value={maxJoiners} onChange={e=>(setMaxJoiners(Math.max(1,Number(e.target.value)||1)),prepareChanges())}/></div>
     <div style={{marginBottom:12}}>
       <p style={{color:C.icy,fontSize:13,margin:'0 0 8px'}}>Combined rally troop ratio (must total 100%)</p>
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:8}}>
-        {['Infantry','Lancer','Marksman'].map((name,i)=><label key={name} style={label}>{name} %<input style={{...control,marginTop:5}} type="number" min="0" max="100" value={ratio[i]} onChange={e=>setRatio(p=>p.map((v,j)=>i===j?e.target.value:v))}/></label>)}
+        {['Infantry','Lancer','Marksman'].map((name,i)=><label key={name} style={label}>{name} %<input style={{...control,marginTop:5}} type="number" min="0" max="100" value={ratio[i]} onChange={e=>(setRatio(p=>p.map((v,j)=>i===j?e.target.value:v)),prepareChanges())}/></label>)}
       </div>
     </div>
+    <details style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
+      <summary style={{color:C.white,fontSize:14,fontWeight:700,cursor:'pointer',minHeight:36}}>Lock rally leaders</summary>
+      <p style={{color:C.icy,fontSize:12}}>Locked leaders are selected first in the chosen order. The generator fills remaining leader slots automatically.</p>
+      {possibleLeaders.length?possibleLeaders.map(p=><label key={p.id} style={{display:'flex',alignItems:'center',gap:10,minHeight:44,color:C.white,fontSize:14}}>
+        <input type="checkbox" disabled={locked} checked={lockedLeaderIds.includes(String(p.id))} onChange={()=>toggleLeader(String(p.id))}/>
+        <span>{p.username||p.alias||p.fid||p.id}</span>
+      </label>):<p style={{color:C.gold,fontSize:12}}>No players marked as rally leaders. Record their role in the player profile.</p>}
+    </details>
     <details style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
       <summary style={{color:C.white,fontSize:14,fontWeight:700,cursor:'pointer',minHeight:36}}>Match-day capacity & troop overrides</summary>
       <p style={{color:C.icy,fontSize:12,lineHeight:1.5}}>Optional. Blank fields inherit the saved profile. Changes here only affect this legion's rally draft.</p>
@@ -98,6 +111,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         <strong style={{color:C.white}}>{result.teams.length} rally teams</strong>
         <span style={{fontSize:12,color:C.icy}}>{draft?'Unsaved preview':'Saved draft'}</span>
       </div>
+      {result.rosterVerification==='provisional'&&<p role="status" style={{color:C.gold,fontSize:13,fontWeight:700}}>Roster registration not verified. Treat all team recommendations as provisional.</p>}
       {result.warnings?.map((warning,i)=><p key={i} style={{fontSize:12,color:C.gold}}>{warning}</p>)}
       {result.teams.map(t=><div key={t.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:12,marginBottom:10}}>
         <button type="button" aria-expanded={!!showDetails[t.id]} onClick={()=>setShowDetails(p=>({...p,[t.id]:!p[t.id]}))} style={{background:'none',border:0,color:C.white,padding:0,width:'100%',textAlign:'left',cursor:'pointer'}}>
@@ -115,7 +129,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         </>}
       </div>)}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-        <button type="button" disabled={!draft||locked} onClick={()=>{onSave({rallyTeamDraft:draft,rallyMatchOverrides:overrides});setDraft(null);setError('Team draft saved without changing building assignments.');}} style={{...control,background:C.gold,color:C.bg,fontWeight:700,opacity:(!draft||locked) ? 0.5 : 1}}>Save draft</button>
+        <button type="button" disabled={!draft||locked} onClick={()=>{if(saved&&!confirmReplace){setConfirmReplace(true);setError('An existing rally draft is saved. Select Confirm replacement to overwrite only that draft.');return;}onSave({rallyTeamDraft:draft,rallyMatchOverrides:overrides});setDraft(null);setConfirmReplace(false);setError('Rally draft saved. Building assignments unchanged.');}} style={{...control,background:C.gold,color:C.bg,fontWeight:700,opacity:(!draft||locked) ? 0.5 : 1}}>{confirmReplace?'Confirm replacement':'Save draft'}</button>
         <button type="button" onClick={copyPlan} style={control}>Copy names</button>
       </div>
     </>}
