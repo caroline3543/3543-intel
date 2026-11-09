@@ -27,10 +27,16 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Build
+      - name: Build main app
+        if: success() || failure()
         run: npm run build
 
+      - name: Build 3573 roster site
+        if: success() || failure()
+        run: npm --prefix roster-site run build
+
       - name: Check bundle size
+        if: success() || failure()
         run: |
           SIZE=$(du -sk dist | cut -f1)
           echo "Bundle size: ${SIZE}KB"
