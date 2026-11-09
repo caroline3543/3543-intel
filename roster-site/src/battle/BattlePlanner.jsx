@@ -1,3 +1,5 @@
+import {talBattleRallyInputs} from './talRallyAdapter.js';
+import {TalRallyTeamGenerator} from '../../../src/components/events/TalRallyTeamGenerator.jsx';
 import {PlayerSearch} from '../../../src/components/players/PlayerSearch.jsx';
 import {AttendanceActions} from './AttendanceActions.jsx';
 import {BattleTeams} from './BattleTeams.jsx';
@@ -23,6 +25,7 @@ export function BattlePlanner({events,players,plan=newPlan(),onUpdate,onMessage}
  function create(){try{const team=plan.teams.find(t=>t.id===source),alliance=source.startsWith('alliance:')?source.slice(9):'';if(!team&&!alliance)throw Error('Choose a legion or alliance.');const e=createBattle({id:crypto.randomUUID(),type,date,time,team,alliance,players,plan});commit({type:'add',event:e});setActive(e.id);setCreating(false);setError('');}catch(e){setError(e.message);}}
  async function copyPlan(){const text=battleText(event,players);try{await navigator.clipboard.writeText(text);setCopy('Battle plan copied.');}catch{setCopy('Select the text below to copy.');}}
  const byId=new Map(players.map(p=>[p.id,p])),stats=event?battleStats(event):null;
+ const rallyInputs=event?.type==='tal'?talBattleRallyInputs({battle:event,plan,players}):null;
  const rows=event?.participants.filter(m=>{const p=byId.get(m.id)||{id:m.id};return playerSearchFields(p).some(s=>String(s||'').toLowerCase().includes(query.toLowerCase().trim()))&&(view==='all'||view==='unassigned'&&m.attendance==='available'&&!m.building||view===m.attendance);}).sort((a,b)=>{const av=battlePower(a),bv=battlePower(b);return ({available:0,unknown:1,unavailable:2}[a.attendance]??1)-({available:0,unknown:1,unavailable:2}[b.attendance]??1)||(av==null)-(bv==null)||(bv??0)-(av??0)||playerLabel(byId.get(a.id)).localeCompare(playerLabel(byId.get(b.id)));})||[];
  return <section style={{padding:20,minWidth:0}}><h2 style={{fontSize:24,margin:'0 0 8px'}}>Battle planner</h2><Hint>Plan one battle at a time. Attendance, power and assignments are saved for that battle.</Hint>
  <button style={{...button,width:'100%',color:C.gold,marginBottom:12}} onClick={()=>{setCreating(!creating);setError('');}}>New battle</button>
@@ -31,6 +34,15 @@ export function BattlePlanner({events,players,plan=newPlan(),onUpdate,onMessage}
  {!event&&!creating&&<Hint>{battles.length?'Choose a battle to view the plan.':'Create a battle to assign buildings and check who can attend.'}</Hint>}
  {error&&<p role="alert" style={{...small,color:C.red}}>{error}</p>}
  {event&&<><Card title={event.title}><div style={small}>{event.date} · {event.time} UTC</div><p style={{fontSize:16,fontWeight:600}}>{stats.available} attending · {stats.unknown} unknown</p><Hint>{stats.unassigned} attending players need an assignment. {stats.selected} combatants and substitutes.</Hint><Hint>{stats.known?`Attending power ${fmtPower(stats.total)} · Top 20 ${fmtPower(stats.top20)}`:'Event troop power not entered'}{stats.known<stats.available?` · ${stats.available-stats.known} missing`:''}</Hint><details><summary style={{minHeight:44,padding:'12px 0',color:C.icy}}>Battle details & plan</summary><label>Battle name<input style={field} value={event.title} onChange={e=>change({title:e.target.value})}/></label><BattleSchedule key={event.id} event={event} onSave={change}/><label>Battle lead<input style={field} placeholder="Officer name" value={event.officer} onChange={e=>change({officer:e.target.value})}/></label><label>Opponent<input style={field} value={event.opponent} onChange={e=>change({opponent:e.target.value})}/></label><label>Battle plan<textarea style={{...field,minHeight:120}} placeholder="Opening moves, reinforcements, rally leaders and fallback plan" value={event.notes} onChange={e=>change({notes:e.target.value})}/></label></details></Card>
+ {rallyInputs?.ready&&<section aria-label="TAL rally generation" style={{padding:'0 0 14px'}}>
+   {rallyInputs.warnings.map((warning,i)=><p key={i} role="status" style={{color:C.gold,fontSize:13,padding:'0 4px'}}>{warning}</p>)}
+   {!!rallyInputs.excluded.length&&<details style={{margin:'4px 0 12px'}}><summary style={{color:C.icy,minHeight:44,cursor:'pointer'}}>Review {rallyInputs.excluded.length} excluded players</summary>
+     {rallyInputs.excluded.map(row=><p key={row.id} style={{color:C.icy,fontSize:13}}>{byId.get(row.id)?.username||row.id}: {row.reason}</p>)}
+   </details>}
+   <TalRallyTeamGenerator key={event.id} team={rallyInputs.team} config={rallyInputs.config} players={players} event={rallyInputs.event}
+     locked={false} onSave={patch=>change(patch)}/>
+ </section>}
+ {rallyInputs&&!rallyInputs.ready&&<Card title="TAL rally generator"><Hint>{rallyInputs.reason}</Hint></Card>}
  <BattleTeams key={event.id} event={event} players={players} onCommit={commit} onNeedPower={id=>{setView('all');setQuery(byId.get(id)?.fid||playerLabel(byId.get(id)));setOpenPlayer(id);}}/>
  <Card title="Players"><Hint>Showing attending players first. Use All, Not attending or Unknown to check others. Availability copied from matching TAL poll times is a starting point and can be changed for this battle.</Hint><PlayerSearch label="Search battle players" players={players.filter(p=>event.participants.some(m=>m.id===p.id))} value={query} onChange={setQuery} onSelect={p=>{setQuery(p.fid||playerLabel(p));setView('all');setOpenPlayer(p.id);}}/>
  <div role="group" aria-label="Battle attendance views" style={{display:'flex',gap:6,flexWrap:'wrap',margin:'8px 0'}}>{[['all','All'],['available','Attending'],['unavailable','Not attending'],['unknown','Unknown'],['unassigned','Needs assignment']].map(([key,label])=><button key={key} ref={view===key?filtersRef:null} style={{...button,color:view===key?C.gold:C.icy}} aria-pressed={view===key} onClick={()=>{setView(key);setQuery('');}}>{label} · {event.participants.filter(m=>key==='all'||key==='unassigned'&&m.attendance==='available'&&!m.building||m.attendance===key).length}</button>)}</div>
