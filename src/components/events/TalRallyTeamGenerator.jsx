@@ -5,6 +5,8 @@ import { generateTalRallyDraft } from '../../services/talRallyTeamGenerator.js';
 const control = { width:'100%', boxSizing:'border-box', background:C.bg, border:`1px solid ${C.border}`, color:C.white, borderRadius:10, minHeight:44, padding:'8px 10px', fontSize:16 };
 const label = { display:'block', color:C.icy, fontSize:12, marginBottom:5 };
 const fmt = n => Number(n || 0).toLocaleString();
+const t11Count = team => (team.players||[]).reduce((sum,p)=>sum+['infantry','lancer','marksman'].reduce((n,t)=>n+(p.troops?.[t]?.t11||0),0),0);
+const t11Share = team => team.fill>0?Math.round(t11Count(team)/team.fill*100):0;
 export function TalRallyTeamGenerator({ team, config, players, event, locked, onSave }) {
   const [mode,setMode] = useState(team.rallyTeamDraft?.mode || 'strongest');
   const [count,setCount] = useState(8);
@@ -48,7 +50,8 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
       `Team ${t.id.split('-').at(-1)} · ${t.leader.name} (${t.status})`,
       ...t.players.filter(p=>!p.leader).map(p=>`${p.name}${p.norah?' · Norah'+(p.norah.skillLevel?' Lv.'+p.norah.skillLevel:''):''}`),
     ].join('\n')).join('\n\n');
-    navigator.clipboard?.writeText(message).then(()=>setError('Team names copied.')).catch(()=>setError('Copy unavailable on this device.'));
+    if(!navigator.clipboard?.writeText){setError('Clipboard unavailable on this device.');return;}
+    navigator.clipboard.writeText(message).then(()=>setError('Team names copied.')).catch(()=>setError('Copy unavailable on this device.'));
   }
   return <section aria-label="TAL rally team generator" style={{background:C.section,border:`1px solid ${C.border}`,borderRadius:14,padding:14,margin:'16px 0'}}>
     <h4 style={{color:C.white,margin:'0 0 6px',fontSize:18}}>Rally team generator</h4>
@@ -101,7 +104,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
           <div style={{display:'flex',justifyContent:'space-between',gap:8}}><strong>{t.id.replace('rally-','Team ')} · {t.leader.name}</strong><span style={{fontSize:12,color:t.status==='confirmed-full'?C.green:C.gold}}>{t.status.replaceAll('-',' ')}</span></div>
           <p style={{color:C.icy,fontSize:12,margin:'6px 0'}}>Rally fill: {fmt(t.fill)} / {t.capacity==null?'Unknown':fmt(t.capacity)} · {t.players.length} recorded contributors</p>
           {t.capacity>0&&<div style={{height:6,background:C.border,borderRadius:8,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(100,t.fill/t.capacity*100)}%`,background:t.status==='confirmed-full'?C.green:C.gold}}/></div>}
-          <p style={{color:C.icy,fontSize:12,margin:'8px 0 0'}}>Norah: {t.players.filter(p=>p.norah).length} · Ratio {t.ratio.join('/')} · {showDetails[t.id]?'Hide details ▲':'Show allocations ▼'}</p>
+          <p style={{color:C.icy,fontSize:12,margin:'8px 0 0'}}>T11 share: {t11Share(t)}% · Norah: {t.players.filter(p=>p.norah).length} · Ratio {t.ratio.join('/')} · {showDetails[t.id]?'Hide details ▲':'Show allocations ▼'}</p>
         </button>
         {showDetails[t.id]&&<>
           {t.warnings?.map((w,i)=><p key={i} style={{fontSize:12,color:C.gold}}>{w}</p>)}
