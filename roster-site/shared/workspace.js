@@ -1,5 +1,5 @@
 export const WORKSPACE_ID='3573-leaders';
-export const SHARED_KEYS=['players','events','customRoles','settings','talPlan'];
+export const SHARED_KEYS=['players','events','customRoles','settings','talPlan','talTeamPreferences'];
 const plain=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 export function sharedData(data){const out={};for(const key of SHARED_KEYS)if(data[key]!==undefined)out[key]=structuredClone(data[key]);return {...out,players:out.players||[],events:out.events||[],customRoles:out.customRoles||[],settings:{...out.settings,stateId:'3573'}};}
 export function validateWorkspace(data){
@@ -10,6 +10,14 @@ export function validateWorkspace(data){
   if(!plain(p)||typeof p.id!=='string'||!p.id||ids.has(p.id))throw Error('Player IDs must be unique.');ids.add(p.id);
   if(p.fid){const fid=String(p.fid).trim();if(!/^[1-9]\d{3,14}$/.test(fid)||fids.has(fid))throw Error('Game IDs must be valid and unique.');fids.add(fid);}
   for(const source of [p.providerStats,p.providerDetails,...Object.values(p.providerRankings||{})])if(source?.stateId&&String(source.stateId)!=='3573')throw Error('A profile belongs to another state.');
+ }
+ if(data.talTeamPreferences!=null){
+  const prefs=data.talTeamPreferences;
+  if(!plain(prefs)||!plain(prefs.players||{})||!Array.isArray(prefs.pairs||[]))throw Error('Invalid TAL teamwork preferences.');
+  for(const [id,fields] of Object.entries(prefs.players||{})){
+   if(!id||!plain(fields)||Object.entries(fields).some(([key,value])=>!['priority','reliable','strategy','voice','punctual'].includes(key)||typeof value!=='boolean'))throw Error('Invalid TAL teamwork player preference.');
+  }
+  if((prefs.pairs||[]).some(pair=>!Array.isArray(pair)||pair.length!==2||pair.some(id=>typeof id!=='string'||!id)||pair[0]===pair[1]))throw Error('Invalid TAL teamwork pairing.');
  }
  if(data.talPlan!=null){
   if(!plain(data.talPlan)||!Array.isArray(data.talPlan.teams||[])||!plain(data.talPlan.records||{}))throw Error('Invalid TAL plan.');
@@ -67,6 +75,6 @@ export function resolveConflicts(data,conflicts,side){
 }
 export function conflictLabel(conflict,data){
  if(!conflict.path.length)return 'Workspace structure';
- const labels={players:'Members',talPlan:'TAL plan',records:'Player details',teams:'Legion assignments',members:'Legion players',username:'Username',alias:'Nickname',notes:'Notes',note:'Availability note',troopPower:'TAL troop power',times:'Availability',status:'Participation',homeAlliance:'Home alliance',allianceTag:'Alliance',allianceRank:'Alliance rank',troops:'Troop levels',infantry:'Infantry',lancer:'Lancers',marksman:'Marksmen',registered:'Registered in game',providerStats:'Game data',providerDetails:'Game profile',providerRankings:'Rankings',settings:'Settings',customRoles:'Custom roles'};
+ const labels={players:'Members',talPlan:'TAL plan',talTeamPreferences:'TAL teamwork defaults',pairs:'Working pairs',priority:'Priority joiner',reliable:'Reliable',strategy:'Strategy',voice:'Voice chat',punctual:'On time',records:'Player details',teams:'Legion assignments',members:'Legion players',username:'Username',alias:'Nickname',notes:'Notes',note:'Availability note',troopPower:'TAL troop power',times:'Availability',status:'Participation',homeAlliance:'Home alliance',allianceTag:'Alliance',allianceRank:'Alliance rank',troops:'Troop levels',infantry:'Infantry',lancer:'Lancers',marksman:'Marksmen',registered:'Registered in game',providerStats:'Game data',providerDetails:'Game profile',providerRankings:'Rankings',settings:'Settings',customRoles:'Custom roles'};
  return conflict.path.map((part,index)=>{const id=typeof part==='object'?part.id:conflict.path[index-1]==='records'?part:null;if(id)return data.players?.find(p=>p.id===id)?.username||id;return labels[part]||String(part);}).join(' › ');
 }
