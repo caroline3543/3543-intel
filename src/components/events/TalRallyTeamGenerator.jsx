@@ -11,10 +11,10 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const [mode,setMode] = useState(team.rallyTeamDraft?.mode || 'strongest');
   const [lockedLeaderIds,setLockedLeaderIds] = useState(team.rallyTeamDraft?.settings?.lockedLeaderIds || []);
   const [confirmReplace,setConfirmReplace] = useState(false);
-  const [count,setCount] = useState(8);
-  const [size,setSize] = useState(5);
-  const [maxJoiners,setMaxJoiners] = useState(29);
-  const [ratio,setRatio] = useState(['50','0','50']);
+  const [count,setCount] = useState(team.rallyTeamDraft?.settings?.teamCount || 8);
+  const [size,setSize] = useState(team.rallyTeamDraft?.settings?.preferredSize || 5);
+  const [maxJoiners,setMaxJoiners] = useState(team.rallyTeamDraft?.settings?.maxJoiners || 29);
+  const [ratio,setRatio] = useState((team.rallyTeamDraft?.settings?.ratio || [50,0,50]).map(String));
   const [draft,setDraft] = useState(null);
   const [error,setError] = useState('');
   const [showDetails,setShowDetails] = useState({});
@@ -39,12 +39,13 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
       const next={...prev};if(Object.keys(current).length)next[overridePlayer]=current;else delete next[overridePlayer];return next;
     });
     setDraft(null);
+    setConfirmReplace(false);
   }
   const saved=team.rallyTeamDraft;
   function generate() {
     try {
       const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners,ratio:ratio.map(Number),lockedLeaderIds},overrides});
-      setDraft(result);setError('');
+      setDraft(result);setConfirmReplace(false);setError('');
     } catch (e) {setError(e.message);setDraft(null);}
   }
   const result=draft || saved;
@@ -60,7 +61,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   }
   return <section aria-label="TAL rally team generator" style={{background:C.section,border:`1px solid ${C.border}`,borderRadius:14,padding:14,margin:'16px 0'}}>
     <h4 style={{color:C.white,margin:'0 0 6px',fontSize:18}}>Rally team generator</h4>
-    <p style={{color:C.icy,fontSize:13,lineHeight:1.5}}>Build up to eight rally teams. Your building assignments are not changed.</p>
+    <p style={{color:C.icy,fontSize:13,lineHeight:1.5}}>Build up to eight rally teams. Your building assignments are not changed. Preferred team size is a target; extra joiners may be needed to fill a rally.</p>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
       {['strongest','balanced'].map(m=><button key={m} type="button" onClick={()=>{setMode(m);prepareChanges();}} aria-pressed={mode===m} style={{...control,background:mode===m?C.gold+'22':C.card,color:mode===m?C.gold:C.icy,borderColor:mode===m?C.gold:C.border,fontWeight:700,textTransform:'capitalize'}}>{m}</button>)}
     </div>
