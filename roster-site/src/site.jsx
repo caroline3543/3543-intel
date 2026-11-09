@@ -139,7 +139,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='members'&&!DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag))&&<AllianceSetup players={players} onLoad={importRoster}/>}
     {tab==='members'&&players.length>0&&<RosterTab initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
     {tab==='changes'&&<NameChanges players={players} plan={data.talPlan||newPlan()} onOpen={id=>{setInitialPlayerId(id);navigate('members');}}/>}
-    {tab==='tal'&&<TalTab value={data.talPlan} players={players} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage}/>}
+    {tab==='tal'&&<TalTab value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage}/>}
     </div>}
     </div>
     {workspaceOpen&&<WorkspaceOptions sync={sync} data={data} onPublish={publish} onJoin={join} onRetry={syncNow} onResolve={resolve} onClose={()=>setWorkspaceOpen(false)} onLogout={onLogout} onAlliance={()=>{setWorkspaceOpen(false);setImporting(true);}} onHelp={()=>{setWorkspaceOpen(false);setTourOpen(true);}}/>}
