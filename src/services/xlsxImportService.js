@@ -58,6 +58,13 @@ export async function importFromXlsxFile(file) {
       marksmanCampLevel: row.marksmanCampLevel || null,
       troops: parseJsonCell(row.troops, { infantry:null, lancer:null, marksman:null }),
       joinerHeroes: parseJsonCell(row.joinerHeroes, []),
+      marchCapacity: row.marchCapacity ?? null,
+      leaderProfile: parseJsonCell(row.leaderProfile, null),
+      talTroopInventory: parseJsonCell(row.talTroopInventory, null),
+      talTroopInventoryRecordedAt: row.talTroopInventoryRecordedAt || null,
+      leadershipRank: row.leadershipRank ?? null,
+      talTroopPower: row.talTroopPower ?? null,
+      importedSheet: parseJsonCell(row.importedSheet, null),
       roles: parseJsonCell(row.roles, []),
       teamAssignment: row.teamAssignment || null,
       notes: row.notes || '',
@@ -74,6 +81,7 @@ export async function importFromXlsxFile(file) {
       createdAt: row.createdAt || new Date().toISOString(),
       updatedAt: row.updatedAt || new Date().toISOString(),
       snapshots: parseJsonCell(row.snapshots, []),
+      tal: parseJsonCell(row.tal, null),
     })).filter(e => e.id);
 
     const svsPlans = sheet('Plans Data').map(row => ({
