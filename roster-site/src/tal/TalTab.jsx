@@ -148,7 +148,6 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
       {movePreview?<><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:13,lineHeight:1.6,padding:12,borderRadius:10,background:C.section,maxHeight:300,overflowY:'auto',margin:'0 0 8px'}}>{movePreview}</pre><button type="button" style={{...button,width:'100%',color:C.gold}} disabled={copying} onClick={copyMovePreview}>{copying?'Copying…':'Copy reviewed list ('+move+')'}</button></>:<p style={muted}>No players need to move in this view.</p>}
      </div>}
    </section>
-   {team&&<section   </section>
    {team&&<section style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:14}}>
     <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}><strong style={{fontSize:15}}>{legionLabel(team)} · {tournamentStatus(team)==='eliminated'?'Eliminated':'Active'}</strong><button type="button" style={{...button,fontSize:12,padding:'7px 9px',minHeight:36}} onClick={()=>setTournamentConfirm(tournamentConfirm?'':'open')}>{tournamentStatus(team)==='eliminated'?'Correct result':'Record a loss'}</button></div>
     {tournamentStatus(team)==='eliminated'&&<p style={{...muted,margin:'8px 0 0'}}>This legion is eliminated. Its roster and match history remain visible. Player assignments are read-only.</p>}
