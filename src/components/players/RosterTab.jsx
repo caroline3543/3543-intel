@@ -1,5 +1,5 @@
 import {PlayerSearch} from './PlayerSearch.jsx';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { C } from '../../utils/constants.js';
 import { PlayerCard, comparePriority, getPriorityTier } from './PlayerCard.jsx';
 import { ProfileView } from './ProfileView.jsx';
@@ -83,6 +83,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const [selecting,setSelecting]=useState(false);
   const [selected,setSelected]=useState(new Set());
   const [editingSelection,setEditingSelection]=useState(false);
+  const [displayLimit,setDisplayLimit]=useState(30);
   useEffect(()=>{
     if(!initialPlayerId)return;
     const player=players.find(p=>p.id===initialPlayerId);
@@ -91,7 +92,11 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   },[initialPlayerId,players,onInitialPlayerOpened]);
   // Keep open profiles current after API refreshes and manual edits.
   const currentPlayer=players.find(p=>p.id===viewingPlayer?.id)||viewingPlayer;
-  const visible=players.filter(p=>matchesRosterFilters(p,search,filters)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
+  // Sort all matches for correct search/filter behaviour, but only mount the visible cards.
+  // Rendering hundreds of player cards at once caused a noticeable delay on mobile tab switches.
+  const visible=useMemo(()=>players.filter(p=>matchesRosterFilters(p,search,filters)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events)),[players,search,filters,sort,sortDirection,events]);
+  const displayed=visible.slice(0,displayLimit);
+  useEffect(()=>{setDisplayLimit(30);},[search,filters,sort,sortDirection,grouped]);
   const filterCount=rosterFilterCount(filters);
   const allianceTags=[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].sort();
   const lastFetch=latestRosterFetch(players);
@@ -107,9 +112,9 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   }
   function card(player){return <PlayerCard key={player.id} player={player} sortDetail={sortDetail(player,sort)} sortField={sort} detail={null} roles={roles} onClick={()=>selecting?toggle(player.id):openProfile(player)} onDelete={onDeletePlayer} missingCount={(filters.review||sort==='review')?troopGaps(player).length+!player.fid+!player.allianceTag:0} onOpenFields={()=>openProfile(player)} bulkMode={selecting} isSelected={selected.has(player.id)} onToggleRallyLead={()=>onSavePlayer({...player,roles:player.roles?.includes('Rally Lead')?(player.roles||[]).filter(r=>r!=='Rally Lead'):[...(player.roles||[]),'Rally Lead']})}/>;}
   const groups=[
-    {name:'Rally leaders',members:visible.filter(p=>p.roles?.includes('Rally Lead')&&!p.blacklisted)},
-    {name:'Joiners',members:visible.filter(p=>!p.roles?.includes('Rally Lead')&&!p.blacklisted)},
-    {name:'Excluded from battle plans',members:visible.filter(p=>p.blacklisted)},
+    {name:'Rally leaders',members:displayed.filter(p=>p.roles?.includes('Rally Lead')&&!p.blacklisted)},
+    {name:'Joiners',members:displayed.filter(p=>!p.roles?.includes('Rally Lead')&&!p.blacklisted)},
+    {name:'Excluded from battle plans',members:displayed.filter(p=>p.blacklisted)},
   ];
   return <div style={{padding:'16px 20px 0'}}>
     {players.length>0 && <>
@@ -141,7 +146,8 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     </>}
     {!players.length && <section style={{textAlign:'center',padding:'32px 0'}}><h2 style={{fontSize:20}}>Load your alliance roster</h2><p style={{fontSize:16,color:C.icy,lineHeight:1.5}}>Choose an alliance to retrieve its players and available game data.</p><button style={{...button,background:C.gold,color:C.bg}} onClick={onLoadAlliance}>Load alliance</button></section>}
     {players.length>0&&!visible.length && <p style={{textAlign:'center',padding:24,color:C.icy}}>No players match. Clear filters or try another search.</p>}
-    {grouped?groups.filter(g=>g.members.length).map(group=><section key={group.name}><h3 style={{fontSize:16,color:C.icy}}>{group.name} · {group.members.length}</h3>{group.members.map(card)}</section>):visible.map(card)}
+    {grouped?groups.filter(g=>g.members.length).map(group=><section key={group.name}><h3 style={{fontSize:16,color:C.icy}}>{group.name} · {group.members.length}</h3>{group.members.map(card)}</section>):displayed.map(card)}
+    {visible.length>displayLimit&&<button type="button" style={{...button,width:'100%',marginTop:10,marginBottom:18,color:C.gold}} onClick={()=>setDisplayLimit(n=>n+30)}>Show 30 more · {visible.length-displayLimit} remaining</button>}
     {filtersOpen && <RosterFilters players={players} roles={roles} filters={filters} onChange={next=>{if(next.alliance!==filters.alliance){}setFilters(next);}} onClose={()=>setFiltersOpen(false)} count={visible.length}/>}
     <ProfileView player={currentPlayer} roles={roles} open={profileOpen} onClose={()=>setProfileOpen(false)} onEdit={()=>{setProfileOpen(false);setEditingPlayer(currentPlayer);}} events={events} onOpenLeaderProfile={()=>setLeaderOpen(true)} onSave={savePlayer}/>
     <RallyLeaderProfileSheet player={currentPlayer} open={leaderOpen} onClose={()=>setLeaderOpen(false)} onSave={savePlayer}/>
