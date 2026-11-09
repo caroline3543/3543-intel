@@ -15,16 +15,16 @@ function transferRows(teams,players){
 }
 function transferText(rows){
  const groups=new Map();
- for(const {id,team,player,check} of rows){
+ for(const {team,player,check} of rows){
   if(check.status!=='move'||!player)continue;
   const origin=check.tag||'No alliance',dest=team.host;
   const key=JSON.stringify([origin.toLowerCase(),dest.toLowerCase()]);
   if(!groups.has(key))groups.set(key,{origin,dest,members:[]});
-  groups.get(key).members.push({name:player.username||player.alias||'Unknown player',id:player.fid||id});
+  groups.get(key).members.push({name:player.username||player.alias||'Unknown player'});
  }
  return [...groups.values()].sort((a,b)=>a.dest.localeCompare(b.dest)||a.origin.localeCompare(b.origin)).map(g=>{
   const heading=g.origin==='No alliance'?`Players without an alliance who should join ${g.dest}`:`Players in ${g.origin} alliance who should be in ${g.dest}`;
-  return heading+'\n'+g.members.sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base'})).map(m=>`• ${m.name} · ${m.id}`).join('\n');
+  return heading+'\n'+g.members.sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base'})).map(m=>`• ${m.name}`).join('\n');
  }).join('\n\n');
 }
 export function RosterLegions({teams,selected,onSelect,players,check,onCheck,onRefresh,refresh,onCopied}){
