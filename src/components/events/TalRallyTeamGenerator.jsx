@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { C } from '../../utils/constants.js';
 import { generateTalRallyDraft } from '../../services/talRallyTeamGenerator.js';
-import {mergeRallyPreferences,normaliseRallyPreferences,withBattlePairOverride} from '../../services/talTeamPreferences.js';
+import {mergeRallyPreferences} from '../../services/talTeamPreferences.js';
 
 const control = { width:'100%', boxSizing:'border-box', background:C.bg, border:`1px solid ${C.border}`, color:C.white, borderRadius:10, minHeight:44, padding:'8px 10px', fontSize:16 };
 const label = { display:'block', color:C.icy, fontSize:12, marginBottom:5 };
 const fmt = n => Number(n || 0).toLocaleString();
 const t11Count = team => (team.players||[]).reduce((sum,p)=>sum+['infantry','lancer','marksman'].reduce((n,t)=>n+(p.troops?.[t]?.t11||0),0),0);
 const t11Share = team => team.fill>0?Math.round(t11Count(team)/team.fill*100):0;
-export function TalRallyTeamGenerator({ team, config, players, event, locked, onSave, sharedPreferences = {}, onSaveSharedPreferences, onOpenMemberProfile }) {
+export function TalRallyTeamGenerator({ team, config, players, event, locked, onSave, sharedPreferences = {}, onOpenMemberProfile }) {
   const [mode,setMode] = useState(team.rallyTeamDraft?.mode || 'strongest');
   const [lockedLeaderIds,setLockedLeaderIds] = useState(team.rallyTeamDraft?.settings?.lockedLeaderIds || []);
   const [confirmReplace,setConfirmReplace] = useState(false);
@@ -21,61 +21,14 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const [showDetails,setShowDetails] = useState({});
   const [overrides,setOverrides] = useState(team.rallyMatchOverrides || {});
   const [battlePreferenceOverrides,setBattlePreferenceOverrides] = useState(team.rallyTeamPreferences || {players:{},pairs:[],excludedPairs:[]});
-  const [sharedDraft,setSharedDraft] = useState(()=>normaliseRallyPreferences(sharedPreferences));
-  const [preferenceScope,setPreferenceScope] = useState('shared');
-  const [sharedDirty,setSharedDirty] = useState(false);
-  const effectivePreferences=mergeRallyPreferences(sharedDraft,battlePreferenceOverrides);
-  useEffect(()=>{
-    if(!sharedDirty)setSharedDraft(normaliseRallyPreferences(sharedPreferences));
-  },[sharedPreferences,sharedDirty]);
-  const [pairA,setPairA] = useState('');
-  const [pairB,setPairB] = useState('');
+  const effectivePreferences=mergeRallyPreferences(sharedPreferences,battlePreferenceOverrides);
+  const overrideCount=Object.keys(battlePreferenceOverrides.players||{}).length+(battlePreferenceOverrides.pairs||[]).length+(battlePreferenceOverrides.excludedPairs||[]).length;
   const [overridePlayer,setOverridePlayer] = useState('');
   const combatants=(team.members||[]).filter(m=>m.role==='combatant').map(m=>players.find(p=>String(p.id)===String(m.id))).filter(Boolean);
   const possibleLeaders=combatants.filter(p=>['leader','both'].includes(p.leaderProfile?.role)||p.roles?.some(role=>/rally.?lead/i.test(role)));
   function toggleLeader(id){setLockedLeaderIds(current=>current.includes(id)?current.filter(x=>x!==id):[...current,id]);setDraft(null);setConfirmReplace(false);}
   const selectedPlayer=combatants.find(p=>String(p.id)===overridePlayer);
   const activeOverride=overrides[overridePlayer] || {};
-  const traitOptions=[['priority','Priority joiner'],['reliable','Reliable'],['strategy','Understands strategy'],['voice','Uses voice chat'],['punctual','On time']];
-  function updateTrait(id,key,checked){
-    if(preferenceScope==='shared'){
-      setSharedDraft(old=>({...old,players:{...old.players,[id]:{...old.players?.[id],[key]:checked}}}));
-      setSharedDirty(true);
-    }else{
-      setBattlePreferenceOverrides(old=>{
-        const players={...old.players}, fields={...(players[id]||{})};
-        if(checked==='inherit')delete fields[key];else fields[key]=checked==='yes';
-        if(Object.keys(fields).length)players[id]=fields;else delete players[id];
-        return {...old,players};
-      });
-    }
-    prepareChanges();
-  }
-  function addPair(){
-    if(!pairA||!pairB||pairA===pairB)return;
-    if(preferenceScope==='shared'){
-      setSharedDraft(old=>normaliseRallyPreferences({...old,pairs:[...(old.pairs||[]),[pairA,pairB]]}));
-      setSharedDirty(true);
-    }else setBattlePreferenceOverrides(old=>withBattlePairOverride(old,sharedDraft,pairA,pairB,true));
-    setPairA('');setPairB('');prepareChanges();
-  }
-  function removePair(a,b){
-    if(preferenceScope==='shared'){
-      setSharedDraft(old=>({...old,pairs:(old.pairs||[]).filter(([x,y])=>!(x===a&&y===b||x===b&&y===a))}));
-      setSharedDirty(true);
-    }else setBattlePreferenceOverrides(old=>withBattlePairOverride(old,sharedDraft,a,b,false));
-    prepareChanges();
-  }
-  function saveSharedPreferences(){
-    if(!onSaveSharedPreferences)return;
-    onSaveSharedPreferences(normaliseRallyPreferences(sharedDraft));
-    setSharedDirty(false);
-    setError('Reusable preferences saved for future TAL battles. Preview again to apply changes to the current draft.');
-  }
-  function resetBattlePreferences(){
-    setBattlePreferenceOverrides({players:{},pairs:[],excludedPairs:[]});
-    prepareChanges();
-  }
   function updateOverride(field,type,tier,value) {
     const parsed=value===''?undefined:Number(value);
     if(value!=='' && (!Number.isSafeInteger(parsed)||parsed<0))return;
@@ -95,7 +48,6 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
   const saved=team.rallyTeamDraft;
   function generate() {
     try {
-      if(sharedDirty){setError('Save reusable defaults before previewing teams.');return;}
       const result=generateTalRallyDraft({team,config,players,event,settings:{mode,teamCount:count,preferredSize:size,maxJoiners:Number(maxJoiners)||29,ratio:ratio.map(Number),lockedLeaderIds,preferences:effectivePreferences},overrides});
       setDraft(result);setConfirmReplace(false);setError('');
     } catch (e) {setError(e.message);setDraft(null);}
@@ -128,7 +80,12 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         {['Infantry','Lancer','Marksman'].map((name,i)=><label key={name} style={label}>{name} %<input style={{...control,marginTop:5}} type="number" min="0" max="100" value={ratio[i]} onChange={e=>(setRatio(p=>p.map((v,j)=>i===j?e.target.value:v)),prepareChanges())}/></label>)}
       </div>
     </div>
-    <p style={{fontSize:12,color:C.icy,lineHeight:1.5}}>Priority joiners and familiar working pairs are managed in each player's profile. Open a player from the generated team details to edit their settings. Recorded game language helps keep communication groups together where practical. Match-day exceptions already saved to this battle remain in effect.</p>
+    <p style={{fontSize:12,color:C.icy,lineHeight:1.5}}>Priority joiners, working pairs and communication language are managed in each player's profile. Open a player from team details to edit them. Language matching is a preference, not a requirement.</p>
+    {overrideCount>0&&<div style={{background:C.card,padding:10,borderRadius:10,marginBottom:12}}>
+      <p style={{fontSize:12,color:C.gold,margin:'0 0 8px'}}>{overrideCount} saved battle-specific teamwork exceptions may override profile defaults.</p>
+      <button type="button" disabled={locked} onClick={()=>{setBattlePreferenceOverrides({players:{},pairs:[],excludedPairs:[]});prepareChanges();}} style={{...control,color:C.gold}}>Reset battle exceptions</button>
+      <p style={{fontSize:12,color:C.icy,margin:'8px 0 0'}}>Generate and save again to apply the change.</p>
+    </div>}
     <details style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
       <summary style={{color:C.white,fontSize:14,fontWeight:700,cursor:'pointer',minHeight:36}}>Lock rally leaders</summary>
       <p style={{color:C.icy,fontSize:12}}>Locked leaders are selected first in the chosen order. The generator fills remaining leader slots automatically.</p>
@@ -158,8 +115,7 @@ export function TalRallyTeamGenerator({ team, config, players, event, locked, on
         <p style={{color:C.muted,fontSize:12}}>0 means zero available troops. Blank means use the saved profile value.</p>
       </>}
     </details>
-    {sharedDirty&&<p role="status" style={{color:C.gold,fontSize:13}}>Unsaved reusable defaults. Save them before generating a new preview.</p>}
-    <button type="button" disabled={locked||sharedDirty} onClick={generate} style={{...control,background:locked||sharedDirty?C.card:C.gold,color:locked||sharedDirty?C.muted:C.bg,fontWeight:700,marginBottom:8}}>Preview teams</button>
+    <button type="button" disabled={locked} onClick={generate} style={{...control,background:locked?C.card:C.gold,color:locked?C.muted:C.bg,fontWeight:700,marginBottom:8}}>Preview teams</button>
     {error&&<p role="status" style={{color:C.gold,fontSize:13}}>{error}</p>}
     {result&&<>
       <div style={{display:'flex',gap:8,justifyContent:'space-between',alignItems:'center',margin:'12px 0'}}>
