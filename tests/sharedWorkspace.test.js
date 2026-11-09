@@ -57,3 +57,20 @@ test('manual sync reports start and checked time even with no changes',async()=>
 test('API refresh from one leader reaches another while manual notes and battle plans merge',async()=>{
  const s=server(),a=client(s);await a.c.initialize();await a.c.publish();const b=client(s,initial(),a.cache);await b.c.initialize();edit(b.c,'a',{notes:'Keep availability constraint'});a.c.update(d=>({...d,players:d.players.map(p=>p.id==='a'?{...p,username:'API new name',providerStats:{stateId:'3573',power:999}}:p),settings:{...d.settings,lastApiRefresh:{at:'2026-11-07T12:00:00Z',scope:'HOT'}}}));b.c.update(d=>({...d,events:[{id:'battle',kind:'battle-plan',participants:[{id:'a',power:'1234'}]}]}));await a.c.sync();await b.c.sync();await a.c.sync();assert.equal(b.c.getState().local.players[0].username,'API new name');assert.equal(a.c.getState().local.players[0].notes,'Keep availability constraint');assert.equal(a.c.getState().local.events[0].participants[0].power,'1234');assert.equal(b.c.getState().local.settings.lastApiRefresh.scope,'HOT');a.c.dispose();b.c.dispose();
 });
+
+test('reusable teamwork defaults synchronize between leaders and leave match overrides independent',async()=>{
+ const s=server(),a=client(s);await a.c.initialize();await a.c.publish();
+ const b=client(s,initial(),{...a.cache});await b.c.initialize();
+ a.c.update(data=>({...data,talTeamPreferences:{players:{a:{priority:true,reliable:true}},pairs:[['a','b']]} }));
+ await a.c.sync();await b.c.sync();
+ assert.equal(b.c.getState().local.talTeamPreferences.players.a.priority,true);
+ assert.deepEqual(s.data.talTeamPreferences.pairs,[['a','b']]);
+ assert.equal(b.c.getState().local.events.length,0);
+ a.c.dispose();b.c.dispose();
+});
+test('invalid teamwork fields and self relationships are rejected by workspace validation',()=>{
+ const base=initial();
+ assert.throws(()=>validateWorkspace({...base,talTeamPreferences:{players:{a:{reliable:'yes'}},pairs:[]}}),/Invalid TAL teamwork player preference/);
+ assert.throws(()=>validateWorkspace({...base,talTeamPreferences:{players:{},pairs:[['a','a']]}}),/Invalid TAL teamwork pairing/);
+ assert.doesNotThrow(()=>validateWorkspace({...base,talTeamPreferences:{players:{a:{reliable:false,voice:true}},pairs:[['a','b']]}}));
+});
