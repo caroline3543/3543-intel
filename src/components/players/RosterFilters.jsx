@@ -30,7 +30,7 @@ export function RosterFilters({players,roles,filters,onChange,onClose,count}) {
       <div style={{display:'grid',gap:14}}>
         {select('alliance','Alliance',unique(players.map(p=>p.allianceTag)).map(v=>[v,v]))}
         {select('role','Role',[['joiner','Joiners'],...roles.map(r=>[r.name,r.name==='Rally Lead'?'Rally leaders':r.name])])}
-        {select('tier','Combined troop strength',TIER_FILTERS)}
+        {select('tier','Combined joiner strength',TIER_FILTERS)}
         <div style={{display:'grid',gap:10}}><strong style={{fontSize:14,color:C.icy}}>Find specific troop combinations</strong><span style={{fontSize:13,color:C.icy}}>Choose a minimum for each troop type. Selected requirements are combined.</span>{select('infantry','Infantry',TROOP_TYPE_FILTERS)}{select('lancer','Lancer',TROOP_TYPE_FILTERS)}{select('marksman','Marksman',TROOP_TYPE_FILTERS)}</div>
         {select('hero','Joiner hero · Skill 5',unique(players.flatMap(p=>(p.joinerHeroes||[]).filter(h=>h.skillLevel>=5).map(h=>h.hero))).map(v=>[v,v]))}
         
