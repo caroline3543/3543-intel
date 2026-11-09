@@ -211,3 +211,12 @@ test('language preference cannot allocate absent players or unusable troop types
  assert.equal(draft.teams[0].players.find(p=>!p.leader)?.id,'specialist');
  assert.ok(!draft.teams[0].players.some(p=>p.id==='sameLanguage'));
 });
+
+test('explicit voice language wins over in-game UI language for communication preference',()=>{
+ const playerOne={gameLanguage:'English',communicationLanguage:'Mandarin'};
+ const playerTwo={gameLanguage:'Chinese (Traditional)'};
+ const playerThree={gameLanguage:'Korean'};
+ assert.equal(coordinationLanguage(playerOne),'Chinese');
+ assert.equal(languageAffinity(playerOne,[playerTwo,playerThree]),1);
+ assert.equal(coordinationLanguage({gameLanguage:''}),'');
+});
