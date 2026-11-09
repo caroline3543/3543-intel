@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateTalRallyDraft, troopTargets, normaliseRatio, hasNorah } from '../src/services/talRallyTeamGenerator.js';
+import { generateTalRallyDraft, troopTargets, normaliseRatio, hasNorah, leaderRanking } from '../src/services/talRallyTeamGenerator.js';
 
 function player(id, counts={}, { leader=false, march=200, rally=400, heroes=[] }={}) {
   return {
@@ -156,4 +156,34 @@ test('rally leader profile rally-capacity override affects targets and fill',()=
   assert.deepEqual(draft.teams[0].targets,{infantry:100,lancer:0,marksman:100});
   assert.equal(draft.teams[0].fill,200);
   assert.equal(lead.leaderProfile.rallyCapacity,400);
+});
+
+test('explicit leader priority is explainable and preserves locked commander',()=>{
+  const ranked=player('ranked',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+  ranked.leadershipRank=1;
+  const highPower=player('highPower',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+  const locked=player('locked',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+  const event={snapshots:[{playerId:'ranked',troopPower:100},{playerId:'highPower',troopPower:9000},{playerId:'locked',troopPower:10}]};
+  const team={id:'HOT:1',matchTime:'19:00',members:[ranked,highPower,locked].map(p=>({id:p.id,role:'combatant',verified:true}))};
+  const recommended=generateTalRallyDraft({team,config:{},players:[ranked,highPower,locked],event,settings:{teamCount:2,lockedLeaderIds:['locked'],ratio:[50,0,50]}});
+  assert.equal(recommended.teams[0].leader.id,'locked');
+  assert.equal(recommended.teams[1].leader.id,'ranked');
+  assert.deepEqual(recommended.settings.lockedLeaderIds,['locked']);
+  assert.equal(leaderRanking(ranked,event).rank,1);
+});
+test('provisional registrations remain visible as warnings, not falsely verified',()=>{
+  const lead=player('lead',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+  const team={id:'HOT:1',matchTime:'19:00',members:[{id:'lead',role:'combatant'}]};
+  const result=generateTalRallyDraft({team,config:{},players:[lead],event:{},settings:{teamCount:1}});
+  assert.equal(result.rosterVerification,'provisional');
+  assert.ok(result.warnings.some(w=>w.includes('spreadsheet eligibility')));
+  const verified=generateTalRallyDraft({team:{...team,members:[{id:'lead',role:'combatant',verified:true}]},config:{},players:[lead],event:{},settings:{teamCount:1}});
+  assert.equal(verified.rosterVerification,'verified');
+});
+test('locked leader outside combatants is never imported into the plan',()=>{
+  const lead=player('lead',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+  const unassigned=player('unassigned',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+  const draft=generateTalRallyDraft({team:{id:'HOT:1',matchTime:'19:00',members:[{id:'lead',role:'combatant'}]},config:{},players:[lead,unassigned],event:{},settings:{teamCount:1,lockedLeaderIds:['unassigned']}});
+  assert.equal(draft.teams[0].leader.id,'lead');
+  assert.deepEqual(draft.settings.lockedLeaderIds,[]);
 });
