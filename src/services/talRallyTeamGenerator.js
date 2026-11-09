@@ -25,7 +25,7 @@ export function playerCapacity(player, overrides = {}) {
   return number(overrides.marchCapacity ?? player.marchCapacity);
 }
 export function playerInventory(player, overrides = {}) {
-  const raw = { ...(player.talTroopInventory || {}), ...(overrides.troopInventory || {}) };
+  const raw = Object.fromEntries(TAL_TYPES.map(type => [type, { ...(player.talTroopInventory?.[type] || {}), ...(overrides.troopInventory?.[type] || {}) }]));
   return Object.fromEntries(TAL_TYPES.map(type => [type, Object.fromEntries(TAL_TIERS.map(tier => [tier, number(raw[type]?.[tier])]))]));
 }
 export function rallyCapacity(player, overrides = {}) {
