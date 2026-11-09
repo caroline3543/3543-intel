@@ -75,3 +75,68 @@ test('never exceeds individual march and rally limits or reuses joiners across t
 test('Norah identification works for manually confirmed heroes',()=>{
   assert.equal(hasNorah({joinerHeroes:[{hero:'Norah',skillLevel:5,verified:true}]}),true);
 });
+
+test('balanced mode distributes joiners across two rallies',()=>{
+  const players=[
+    player('L1',{infantry:{t11:50},marksman:{t11:50}},{leader:true}),
+    player('L2',{infantry:{t11:50},marksman:{t11:50}},{leader:true}),
+    player('J1',{infantry:{t11:200},marksman:{t11:0}}),
+    player('J2',{infantry:{t11:0},marksman:{t11:200}}),
+    player('J3',{infantry:{t11:200},marksman:{t11:0}}),
+    player('J4',{infantry:{t11:0},marksman:{t11:200}})
+  ];
+  const draft=generateTalRallyDraft({
+    team:{id:'HOT:1',matchTime:'19:00',members:players.map(p=>({id:p.id,role:'combatant'}))},
+    config:{},players,event:{},settings:{teamCount:2,mode:'balanced',ratio:[50,0,50]}
+  });
+  assert.equal(draft.mode,'balanced');
+  assert.equal(draft.teams.length,2);
+  assert.ok(draft.teams.every(t=>t.players.filter(p=>!p.leader).length>0));
+  const used=draft.teams.flatMap(t=>t.players.map(p=>p.id));
+  assert.equal(used.length,new Set(used).size);
+});
+test('partial match-day tier override preserves other profile tiers and does not mutate profile',()=>{
+  const lead=player('lead',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+  const joiner=player('joiner',{infantry:{t11:100,t10:50},marksman:{t11:100,t10:50}});
+  const team={id:'HOT:1',matchTime:'19:00',members:[lead,joiner].map(p=>({id:p.id,role:'combatant'}))};
+  const draft=generateTalRallyDraft({
+    team,players:[lead,joiner],event:{},config:{},
+    overrides:{joiner:{troopInventory:{infantry:{t11:0}}}},
+    settings:{teamCount:1,ratio:[50,0,50]}
+  });
+  const allocation=draft.teams[0].players.find(p=>p.id==='joiner');
+  assert.equal(allocation.troops.infantry.t11,0);
+  assert.equal(allocation.troops.infantry.t10,50);
+  assert.equal(joiner.talTroopInventory.infantry.t11,100);
+});
+test('match-day march capacity override caps troop contribution',()=>{
+  const lead=player('lead',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+  const joiner=player('joiner',{infantry:{t11:200},marksman:{t11:200}});
+  const draft=generateTalRallyDraft({
+    team:{id:'HOT:1',matchTime:'19:00',members:[lead,joiner].map(p=>({id:p.id,role:'combatant'}))},
+    players:[lead,joiner],config:{},event:{},
+    overrides:{joiner:{marchCapacity:50}},
+    settings:{teamCount:1,ratio:[50,0,50]}
+  });
+  const allocation=draft.teams[0].players.find(p=>p.id==='joiner');
+  assert.equal(allocation.total,50);
+  assert.equal(draft.teams[0].fill,250);
+  assert.equal(joiner.marchCapacity,200);
+});
+test('team count cannot exceed eight',()=>{
+  const participants=Array.from({length:10},(_,i)=>player('L'+i,{infantry:{t11:100},marksman:{t11:100}},{leader:true}));
+  const draft=generateTalRallyDraft({
+    team:{id:'HOT:1',matchTime:'19:00',members:participants.map(p=>({id:p.id,role:'combatant'}))},
+    players:participants,config:{},event:{},settings:{teamCount:20}
+  });
+  assert.equal(draft.teams.length,8);
+});
+test('explicit non-attending players are excluded',()=>{
+  const lead=player('lead',{infantry:{t11:100},marksman:{t11:100}},{leader:true});
+  const joiner=player('joiner',{infantry:{t11:100},marksman:{t11:100}});
+  const draft=generateTalRallyDraft({
+    team:{id:'HOT:1',matchTime:'19:00',members:[lead,joiner].map(p=>({id:p.id,role:'combatant'})),battleAttendance:{joiner:'not-attending'}},
+    players:[lead,joiner],config:{},event:{},settings:{teamCount:1}
+  });
+  assert.ok(!draft.teams[0].players.some(p=>p.id==='joiner'));
+});
