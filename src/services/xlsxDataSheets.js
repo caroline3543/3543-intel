@@ -52,14 +52,14 @@ export function buildEventsDataSheet(events) {
   const headers = [
     'id','type','name','allianceTag','date','time','status',
     'participantIds','notes','createdAt','updatedAt','snapshots','tal',
-    'kind','title','sourceTeamId','sourceLabel','participants','battleTeams','rallyTeamDraft','rallyMatchOverrides','officer','opponent',
+    'kind','title','sourceTeamId','sourceLabel','participants','battleTeams','rallyTeamDraft','rallyMatchOverrides','rallyTeamPreferences','officer','opponent',
   ];
   const rows = [headers.map(cell)];
   (events || []).forEach(e => {
     rows.push([
       cell(e.id), cell(e.type), cell(e.name), cell(e.allianceTag), cell(e.date), cell(e.time), cell(e.status),
       jsonCell(e.participantIds), cell(e.notes), cell(e.createdAt), cell(e.updatedAt), jsonCell(e.snapshots), jsonCell(e.tal),
-      cell(e.kind), cell(e.title), cell(e.sourceTeamId), cell(e.sourceLabel), jsonCell(e.participants), jsonCell(e.battleTeams), jsonCell(e.rallyTeamDraft), jsonCell(e.rallyMatchOverrides), cell(e.officer), cell(e.opponent),
+      cell(e.kind), cell(e.title), cell(e.sourceTeamId), cell(e.sourceLabel), jsonCell(e.participants), jsonCell(e.battleTeams), jsonCell(e.rallyTeamDraft), jsonCell(e.rallyMatchOverrides), jsonCell(e.rallyTeamPreferences), cell(e.officer), cell(e.opponent),
     ]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
