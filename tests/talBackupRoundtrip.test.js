@@ -12,6 +12,7 @@ test('XLSX backup keeps TAL rally inventory, battle attendance and draft assignm
  const wb=XLSX.utils.book_new();
  XLSX.utils.book_append_sheet(wb,buildRosterDataSheet([player]),'Roster Data');
  XLSX.utils.book_append_sheet(wb,buildEventsDataSheet([event]),'Events Data');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([{stateId:'3573',talTeamPreferences:JSON.stringify({players:{p1:{priority:true,reliable:true}},pairs:[['p1','p2']]})}]),'Workspace Data');
  const binary=XLSX.write(wb,{type:'binary',bookType:'xlsx'});
  const previous=globalThis.FileReader;
  globalThis.FileReader=class {
@@ -27,5 +28,6 @@ test('XLSX backup keeps TAL rally inventory, battle attendance and draft assignm
    assert.deepEqual(result.events[0].rallyMatchOverrides,event.rallyMatchOverrides);
    assert.deepEqual(result.events[0].rallyTeamPreferences,event.rallyTeamPreferences);
    assert.deepEqual(result.events[0].battleTeams,event.battleTeams);
+   assert.deepEqual(result.talTeamPreferences,{players:{p1:{priority:true,reliable:true}},pairs:[['p1','p2']]});
  }finally{if(previous===undefined)delete globalThis.FileReader;else globalThis.FileReader=previous;}
 });
