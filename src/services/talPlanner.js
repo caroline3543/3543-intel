@@ -1,3 +1,4 @@
+import {battleStatus} from './talMatchReadiness.js';
 export const TAL_BUILDINGS = ['Proto I', 'Proto II', 'Repair I', 'Repair II', 'Repair III', 'Repair IV', 'Boiler', 'Transit'];
 export const TAL_SLOTS = ['02:00', '07:00', '12:00', '14:00', '19:00'];
 export function talConfig(event) {
@@ -33,8 +34,8 @@ export function suggestTalTeams(config, players, event) {
     return { ...team, slots, members: ranked.map((p,i) => ({ id:p.id, role:i<30?'combatant':'substitute' })) };
   });
 }
-export function assignTalBuildings(team, players, event) {
-  const ranked = team.members.filter(m => m.role === 'combatant').map(m => players.find(p => p.id === m.id)).filter(Boolean).sort((a,b) => strength(b,event)-strength(a,event) || a.id.localeCompare(b.id));
+export function assignTalBuildings(team, players, event, config=null) {
+  const ranked = team.members.filter(m => m.role === 'combatant' && (!team.matchTime || battleStatus(team,config,m.id)==='attending')).map(m => players.find(p => p.id === m.id)).filter(Boolean).sort((a,b) => strength(b,event)-strength(a,event) || a.id.localeCompare(b.id));
   // First eight are leaders in priority order; distribute followers evenly.
   return Object.fromEntries(team.buildings.map((building,i) => [building, [ranked[i], ...ranked.slice(8).filter((_,j) => j%8 === i)].filter(Boolean).map(p => p.id)]));
 }
@@ -44,8 +45,6 @@ export function teamWarnings(team, config, players = []) {
   if (team.members.length < 15) warnings.push('At least 15 registered players needed.');
   if (team.members.filter(m => m.role === 'combatant').length > 30) warnings.push('Maximum 30 combatants.');
   if (team.members.filter(m => m.role === 'substitute').length > 20) warnings.push('Maximum 20 substitutes.');
-  const conflicts = team.members.filter(m => !team.slots.every(s => (config.availability[m.id] || []).includes(s))).length;
-  if (conflicts) warnings.push(`${conflicts} players cannot confirm every selected time.`);
   const conflictCount = talAvailabilityConflicts(team,config,players).length;
   if (conflictCount) warnings.push(`${conflictCount} players need availability at two of these three times.`);
   return warnings;
@@ -63,4 +62,13 @@ export function moveTalMember(teams, playerId, targetId, swapId = null, config =
   const role = swapped?.role || (target.members.filter(m => m.role === member.role).length < (member.role === 'combatant' ? 30 : 20) ? member.role : member.role === 'combatant' ? 'substitute' : 'combatant');
   if (!swapped && target.members.filter(m => m.role === role).length >= (role === 'combatant' ? 30 : 20)) throw new Error('This legion is full. Swap with a player instead.');
   return teams.map(t => t.id === source.id ? {...t, assignments:{}, members: swapped ? t.members.map(m => m.id === playerId ? {...swapped,role:member.role} : m) : t.members.filter(m => m.id !== playerId)} : t.id === target.id ? {...t, assignments:{}, members: swapped ? t.members.map(m => m.id === swapId ? {...member,role:swapped.role} : m) : [...t.members,{...member,role}]} : t);
+}
+
+/** Clears battle-day data without destroying poll responses or legion membership. */
+export function clearTalBattlePlans(teams=[]) {
+ return teams.map(team=>({...team,matchTime:'',battleAttendance:{},assignments:{},buildings:[...(team.buildings||TAL_BUILDINGS)]}));
+}
+/** Remove one draft legion. Other legions and the poll remain untouched. */
+export function deleteTalLegion(teams=[],id) {
+ return teams.filter(team=>team.id!==id);
 }

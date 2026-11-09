@@ -41,10 +41,10 @@ export function recordPlayerObservation(previous,next,{stateId,stream,observedAt
   const last=[...history].reverse().find(entry=>entry.stream===stream);
   // Late cached responses cannot rewrite the recorded sequence.
   if(last && Date.parse(observedAt)<Date.parse(last.observedAt))return {...next,observationHistory:history};
-  const changes=last?fields.filter(key=>last.values[key]!=null && last.values[key]!==supplied[key]).map(field=>({field,before:last.values[field],after:supplied[field]})):[];
+  const changes=last?fields.filter(key=>last.values[key]!=null && last.values[key]!==supplied[key]).map(field=>({field,before:last.values[field],after:supplied[field]})):stream==='profile'&&previous?.username&&supplied.username&&previous.username!==supplied.username?[{field:'username',before:previous.username,after:supplied.username}]:[];
   const allValues={...last?.values,...supplied};
   const sameDay=last && new Date(last.observedAt).toISOString().slice(0,10)===observedAt.slice(0,10);
   if(last && sameDay && !changes.length && JSON.stringify(clean(last.values))===JSON.stringify(clean(allValues)) && fields.every(key=>last.fields?.includes(key)))return {...next,observationHistory:history};
-  const entry=observation(stateId,stream,observedAt,allValues,fields,changes,!last);
+  const entry=observation(stateId,stream,observedAt,allValues,fields,changes,!last&&!changes.length);
   return {...next,observationHistory:mergeObservationHistory(history,[entry])};
 }

@@ -113,6 +113,10 @@ BattleTab and LiveRallyRoom both hit ~1000 lines before being split. Don't let i
 
 ---
 
+### Standalone State 3573 Members site
+
+`caroline3573_preferences_v1` is owned by `roster-site/src/preferences.js`. It stores only the per-device tutorial completion and touch-feedback preference. Roster data continues to use the existing state-scoped storage.
+
 ## Decisions already made — don't revisit without cause
 
 | Decision | Outcome | Reason |

@@ -7,6 +7,7 @@ export function useAllianceProfileImport(data, setData, showToast) {
     const result = mergeAllianceProfiles(data.players || [], rows, activeStateId());
     setData(prev => ({...prev, players:result.players, lastUpdated:new Date().toISOString()}));
     [...result.added,...result.updated].forEach(player => { void pushPlayer(player,player.allianceTag); });
-    showToast(`${result.updated.length} profiles updated · ${result.added.length} added ✓`);
+    showToast(`${result.updated.length} players updated · ${result.added.length} added`);
+    return {updated:result.updated.length,added:result.added.length};
   }, [data.players,setData,showToast]);
 }

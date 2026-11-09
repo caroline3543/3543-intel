@@ -46,6 +46,7 @@ export function mergeAllianceProfiles(existing, rows, stateId) {
     for (const [key,value] of Object.entries(row)) if (value != null && value !== '') snapshot[key] = value;
     snapshot.raw = {...previous?.providerStats?.raw, ...row.raw};
     snapshot.source = 'Whiteout Stats';
+    if(row.allianceTag?.trim())snapshot.allianceObservation={tag:row.allianceTag.trim(),at:row.retrievedAt,noAlliance:false};
     const player = {
       ...(previous || newPlayer({fid:row.fid})), ...patch,
       providerStats:snapshot, profileLastUpdated:at,

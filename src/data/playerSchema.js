@@ -4,13 +4,14 @@ export function newPlayer(overrides = {}) {
   return {
     id:                 uid(),
     fid:                '',
+    importedSheet:      null, // Original spreadsheet fields, row identity and source notes; never an API observation.
     providerDetails:    null, // State/FID, retrieval dates, Arena heroes, chief gear and complete source response.
     observationHistory: [], // Latest 200 dated source observations; see newPlayerObservation.
     providerRankings:   {}, // Board snapshots keyed by category; scoped to the workspace state.
     avatarUrl:          null,
     power:              null,
     kills:              null,
-    providerStats:      null, // Complete fetched member data plus retrieval/source information; locationObservation stores independent state/FID/x/y/retrievedAt/cachedAt.
+    providerStats:      null, // Complete fetched member data plus retrieval/source information; allianceObservation is {tag,at,noAlliance} or null and dates alliance evidence independently; locationObservation stores independent state/FID/x/y/retrievedAt/cachedAt.
     username:           '',
     alias:              '',
     pastUsernames:      [], // history of previous usernames, oldest first — see BulkNameAdd.jsx, which appends here on a detected FID-matched rename rather than silently overwriting

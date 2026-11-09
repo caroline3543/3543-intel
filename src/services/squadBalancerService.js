@@ -57,7 +57,7 @@ export function balanceSquads(participants, leaderIds, teamCount, getPower) {
   withPower.forEach(p => {
     let targetIdx = 0;
     for (let i = 1; i < squads.length; i++) {
-      if (squads[i].totalPower < squads[targetIdx].totalPower) targetIdx = i;
+      if (squads[i].totalPower < squads[targetIdx].totalPower || (squads[i].totalPower === squads[targetIdx].totalPower && squads[i].memberIds.length + Number(!!squads[i].leaderId) < squads[targetIdx].memberIds.length + Number(!!squads[targetIdx].leaderId))) targetIdx = i;
     }
     squads[targetIdx].memberIds.push(p.id);
     squads[targetIdx].totalPower += getPower(p) || 0;
