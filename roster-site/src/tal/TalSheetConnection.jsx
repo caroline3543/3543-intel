@@ -50,7 +50,7 @@ export function TalSheetConnection({data,onImport,locked=false}){
      </div>
    </section>}
    <details style={{marginTop:10}}><summary style={{color:C.icy,fontSize:13,minHeight:36}}>Connection requirements</summary>
-     <Hint>The deployed app needs a Google service account with Viewer access to this sheet. Its credentials must be configured securely on Vercel. Signing in to ChatGPT does not automatically authorise the website.</Hint>
+     <Hint>No payment card needed. Connect with a Google Apps Script web app owned by your Google account. Configure its URL and private shared secret on Vercel. The spreadsheet stays private. The first integration is read-only.</Hint>
    </details>
  </Card>;
 }
