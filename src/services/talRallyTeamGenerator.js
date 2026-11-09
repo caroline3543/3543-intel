@@ -241,6 +241,6 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
     mode, teamId: team.id, teams: result, warnings,
     rosterVerification: registrationVerified.length === members.length ? 'verified' : 'provisional',
     unused: pool.filter(p => !assignedToTeam.has(String(p.id))).map(snapshotItem),
-    settings: { teamCount, preferredSize, maxJoiners, ratio },
+    settings: { teamCount, preferredSize, maxJoiners, ratio, lockedLeaderIds: locked.map(p=>String(p.id)) },
   };
 }
