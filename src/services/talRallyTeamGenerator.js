@@ -44,7 +44,7 @@ export function hasNorah(player) {
 // In-game UI language is a weak proxy for spoken communication. Never assume
 // two players can voice-chat together solely because they use Chinese UI.
 export function coordinationLanguage(player) {
-  const raw=String(player?.communicationLanguage||player?.gameLanguage||player?.language||'').trim().toLowerCase();
+  const raw=String(player?.communicationLanguage||player?.sheetLanguage||player?.gameLanguage||player?.language||'').trim().toLowerCase();
   if (!raw) return '';
   if (/^(zh(?:-|$))|chinese|中文|mandarin|简体|繁體|繁体/.test(raw)) return 'Chinese';
   if (/^en(?:-|$)|english/.test(raw)) return 'English';
