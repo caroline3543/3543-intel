@@ -1,3 +1,4 @@
+import { ProfileTalCapacity } from './ProfileTalCapacity.jsx';
 import {ProfileSheetImport} from './ProfileSheetImport.jsx';
 import {CopyPlayerId} from './CopyPlayerId.jsx';
 import { useEffect, useRef } from 'react';
@@ -53,6 +54,7 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
       {player.blacklisted&&<p style={{fontSize:14,color:C.red}}>Excluded from battle plans{player.blacklistReason?`: ${player.blacklistReason}`:''}</p>}
       <ProfileSection title="Alliance rank"><p style={{fontSize:14,color:C.icy,margin:'0 0 12px'}}>Tap a rank to set it. Tap again to clear.</p><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{ALLIANCE_RANKS.map(rank=><button key={rank} style={{...profileButton,color:player.allianceRank===rank?C.gold:C.icy,borderColor:player.allianceRank===rank?C.gold:C.border}} aria-pressed={player.allianceRank===rank} onClick={()=>setAllianceRank(rank)}>{rank}</button>)}</div></ProfileSection>
       <ProfileTroops key={`troops:${player.id}`} player={player} onSave={onSave}/>
+      <ProfileTalCapacity key={`tal-capacity:${player.id}`} player={player} onSave={onSave}/>
       <ProfileJoiners key={`heroes:${player.id}`} player={player} onSave={onSave}/>
       <ProfileRoles key={`roles:${player.id}`} player={player} roles={roles} onSave={onSave}/>
         {(player.leaderProfile?.teams || []).length > 0 && (
