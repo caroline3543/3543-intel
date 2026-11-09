@@ -15,7 +15,7 @@ const button={minHeight:44,borderRadius:10,border:`1px solid ${C.border}`,backgr
 const SORT_FIELDS = [
   ['name','Name'],['labyrinth','Labyrinth rank'],['labyrinthScore','Labyrinth score'],
   ['furnace','Furnace level'],['power','City power'],['kills','Kills'],
-  ['progression','Troop strength'],['review','Needs review']
+  ['progression','Joiner strength'],['review','Needs review']
 ];
 const playerName = p => p.username || p.alias || '';
 const numeric = value => {
@@ -43,7 +43,7 @@ function sortDetail(player,field) {
   if(field==='name')return null;
   if(field==='progression'){
     const tier=getPriorityTier(player);
-    return {label:'Troop strength',value:tier===1?'Full Helios':tier===2?'Partial Helios':'Other troops'};
+    return {label:'Joiner strength',value:tier===1?'Full Helios':tier===2?'Partial Helios':'Other troops'};
   }
   const value=rosterSortValue(player,field);
   if(field==='furnace')return {label:'Furnace level',value:player.furnaceLevel||'Not recorded'};
@@ -113,7 +113,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   ];
   return <div style={{padding:'16px 20px 0'}}>
     {players.length>0 && <>
-      <p style={{fontSize:13,color:C.icy,margin:'0 0 12px'}}>Latest roster fetch: {lastFetch?new Date(lastFetch).toISOString().slice(0,16).replace('T',' ')+' UTC':'Not recorded'}</p>
+
       <PlayerSearch label="Search roster" players={players} value={search} onChange={setSearch} onSelect={p=>{setSearch(p.fid||p.username||p.alias);openProfile(p);}}/>
       <div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:6,marginBottom:10}}>
         {[['','All alliances'],...allianceTags.map(tag=>[tag,`[${tag}]`])].map(([tag,label])=><button key={tag||'all'} aria-pressed={filters.alliance===tag} onClick={()=>{setFilters({...filters,alliance:filters.alliance===tag?'':tag});}} style={{...button,flexShrink:0,color:filters.alliance===tag?C.gold:C.icy,borderColor:filters.alliance===tag?C.gold:C.border}}>{label}{tag?` · ${players.filter(p=>p.allianceTag===tag).length}`:''}</button>)}
@@ -124,13 +124,13 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
         <button style={{...button,minWidth:44,padding:'10px 8px',flexShrink:0}} aria-label={sortDirection==='asc'?'Sort ascending. Tap for descending':'Sort descending. Tap for ascending'} title={sortDirection==='asc'?'Ascending · switch to descending':'Descending · switch to ascending'} onClick={()=>setSortDirection(d=>d==='asc'?'desc':'asc')}>{sortDirection==='asc'?'↑':'↓'} <span style={{fontSize:12}}>{sortDirection==='asc'?'Asc':'Desc'}</span></button>
         <button style={button} onClick={()=>{if(selecting)stopSelection();else setSelecting(true);}}>{selecting?'Done':'Select'}</button>
       </div>
-      <button style={{...button,width:'100%',marginBottom:10}} aria-expanded={optionsOpen} onClick={()=>setOptionsOpen(!optionsOpen)}>Roster options {optionsOpen?'▴':'▾'}</button>
+      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}><button style={{...button,minHeight:36,fontSize:13,padding:'6px 10px',background:'transparent'}} aria-expanded={optionsOpen} onClick={()=>setOptionsOpen(!optionsOpen)}>Roster options {optionsOpen?'▴':'▾'}</button></div>
       {optionsOpen && <div style={{display:'grid',gap:8,padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
         <button style={button} onClick={()=>{setGrouped(!grouped);setOptionsOpen(false);}}>{grouped?'Show list':'Group by role'}</button>
         <button style={button} onClick={()=>{setFieldsOpen(true);setOptionsOpen(false);}}>Update player details</button>
         <button style={button} onClick={copyRoster} disabled={!visible.length}>Copy filtered roster ({visible.length})</button>
       </div>}
-      {sort==='progression' && <p style={{fontSize:13,color:C.icy}}>Sorts by Helios troops and furnace level. Gear, stats and heroes are not included.</p>}
+      {sort==='progression' && <p style={{fontSize:13,color:C.icy}}>Based on Helios troop tiers and furnace level, not gear, stats or heroes.</p>}
       {(sort==='labyrinth'||sort==='labyrinthScore') && <p style={{fontSize:13,color:C.icy}}>State Labyrinth {sort==='labyrinth'?'rank':'score'} from Whiteout Stats. Missing values appear last.</p>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}><span role="status" style={{color:C.icy,fontSize:14}}>{visible.length} of {players.length} players</span>{(filterCount>0||search) && <button style={button} onClick={()=>{setSearch('');setFilters({...EMPTY_FILTERS});}}>Clear filters</button>}</div>
       {selecting && <section style={{padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
