@@ -79,7 +79,7 @@ export function RosterLegions({teams,selected,onSelect,players,check,onCheck,onR
    <p style={{fontSize:14,color:C.icy,margin:'0 0 10px'}}>{members.filter(p=>allianceCheck(p,team).status==='in-host').length} last seen in {team.host} · {members.filter(p=>allianceCheck(p,team).status==='move').length} to move · {members.filter(p=>allianceCheck(p,team).status==='unknown').length} unknown</p>
    <label style={{display:'block',fontSize:14,color:C.icy}}>Alliance check<select aria-label="Alliance check" value={check} onChange={e=>onCheck(e.target.value)} style={{...button,width:'100%',margin:'6px 0 10px',fontSize:16}}><option value="all">All players</option><option value="move">Needs to move</option><option value="in-host">In host alliance</option><option value="unknown">Alliance unknown</option></select></label>
    {onRefresh&&<button disabled={!!refresh} style={{...button,width:'100%',color:C.gold}} onClick={()=>onRefresh(team)}>{refresh?`Refreshing ${refresh.done} of ${refresh.total}…` :'Refresh legion players'}</button>}
-   <p style={{fontSize:13,color:C.icy,lineHeight:1.5,margin:'8px 0 0'}}>Checks each player by ID. Uses one lookup per player. Game data may be cached for up to an hour. Confirm registration in game.</p>
+   <p style={{fontSize:13,color:C.icy,lineHeight:1.5,margin:'8px 0 0'}}>Alliance checks use the latest recorded game data. Confirm in-game registration before the match.</p>
   </div>}
  </section>;
 }
