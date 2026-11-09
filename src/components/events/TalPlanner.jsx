@@ -47,7 +47,7 @@ export function TalPlanner({ event, players, onUpdate }) {
     <TalCommandOverview config={config} players={players} step={step} onNavigate={go}/>
     <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',margin:'8px 0 12px'}}>
       <h2 style={{color:C.white,fontSize:21,margin:0}}>{({Availability:'Poll availability',Legions:'Legion rosters',Buildings:'Battle assignments',Review:'Final checks'})[step]}</h2>
-      {step==='Buildings'&&config.teams.length>0&&<button disabled={config.locked} style={{...button,fontSize:13,color:C.red,padding:'8px 10px'}} onClick={()=>setPendingDelete({type:'battle'})}>Delete battle plan</button>}
+      {(step==='Buildings'||step==='Review')&&config.teams.length>0&&<button disabled={config.locked} style={{...button,fontSize:13,color:C.red,padding:'8px 10px'}} onClick={()=>setPendingDelete({type:'battle'})}>Delete battle plan</button>}
     </div>
     {step==='Availability' && <>
       <p style={{color:C.icy}}>Record every time each player can join. Players may choose more than one time.</p>
