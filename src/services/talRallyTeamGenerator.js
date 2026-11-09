@@ -54,40 +54,42 @@ function eligibleLeader(player) {
 function snapshotItem(player) {
   return { id:player.id, name:player.username || player.alias || String(player.fid || player.id), norah: joinerHeroes(player).find(h => h.name.toLowerCase().includes('norah')) || null };
 }
-function memberAllocation(player, remaining, overrides = {}, plannedCount = null) {
+function memberAllocation(player, remaining, overrides = {}, phase = 't11', previous = null) {
   const cap = playerCapacity(player, overrides);
-  if (!cap) return null;
+  if (!cap || (previous?.total || 0) >= cap) return null;
   const inventory = playerInventory(player, overrides);
-  const count = Math.min(cap, plannedCount ?? cap, TAL_TYPES.reduce((s,t) => s + remaining[t],0));
-  if (!count) return null;
   const assigned = Object.fromEntries(TAL_TYPES.map(t => [t,{t11:0,t10:0,unknown:0}]));
-  let budget=count, estimated=false;
-  // Relevant T11 first; then relevant T10; unknown inventory is estimated, never claimed as T11.
-  for (const tier of TAL_TIERS) {
-    for (const type of TAL_TYPES) {
-      if (!budget || !remaining[type]) continue;
-      const available=inventory[type][tier];
-      if (available == null) continue;
-      const use=Math.min(budget,remaining[type],available);
-      assigned[type][tier]+=use; remaining[type]-=use;budget-=use;
-    }
-  }
-  // Missing inventory entries can contribute only to a hypothetical estimated fill.
+  let budget=cap-(previous?.total||0), estimated=false;
   for (const type of TAL_TYPES) {
     if (!budget || !remaining[type]) continue;
-    if (inventory[type].t11 !== null && inventory[type].t10 !== null) continue;
-    const use=Math.min(budget,remaining[type]);
-    assigned[type].unknown+=use;remaining[type]-=use;budget-=use;estimated=true;
+    if (phase==='unknown' && inventory[type].t11!==null && inventory[type].t10!==null) continue;
+    const availability=phase==='unknown' ? budget : inventory[type][phase];
+    if (availability == null) continue;
+    const prior=previous?.troops[type]?.[phase] || 0;
+    const use=Math.max(0,Math.min(budget,remaining[type],availability-prior));
+    if (!use) continue;
+    assigned[type][phase]+=use;
+    remaining[type]-=use;
+    budget-=use;
+    if(phase==='unknown') estimated=true;
   }
-  const used=count-budget;
+  const used=cap-(previous?.total||0)-budget;
   if (!used) return null;
-  return {...snapshotItem(player), troops:assigned, total:used, estimated, marchCapacity:cap};
+  return {...snapshotItem(player),troops:assigned,total:used,estimated,marchCapacity:cap};
 }
-function preferredScore(player,targets,event) {
+function mergeAllocation(previous, additional) {
+  if (!previous) return additional;
+  return {...previous,total:previous.total+additional.total,estimated:previous.estimated||additional.estimated,
+    troops:Object.fromEntries(TAL_TYPES.map(t=>[t,Object.fromEntries(['t11','t10','unknown'].map(k=>[k,previous.troops[t][k]+additional.troops[t][k]]))]))};
+}
+function stageScore(player,remaining,event,phase) {
   const inv=playerInventory(player);
-  const t11=TAL_TYPES.reduce((s,type)=>s+(targets[type]>0 ? (inv[type].t11 || 0):0),0);
-  const t10=TAL_TYPES.reduce((s,type)=>s+(targets[type]>0 ? (inv[type].t10 || 0):0),0);
-  return t11 * 3 + t10 + heroPriority(player) * 1000 + power(player,event) * 0.01;
+  const available=TAL_TYPES.reduce((sum,type)=>{
+    if (remaining[type]<=0) return sum;
+    const n=phase==='unknown' ? (inv[type].t11==null||inv[type].t10==null ? playerCapacity(player)||0 : 0) : (inv[type][phase]||0);
+    return sum+Math.min(n,remaining[type]);
+  },0);
+  return available*1000 + heroPriority(player)*1000 + power(player,event)*0.001;
 }
 export function generateTalRallyDraft({ team, config, players, event, settings = {}, overrides = {} }) {
   const mode=settings.mode === 'balanced' ? 'balanced' : 'strongest';
@@ -114,28 +116,38 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
       return { id:'rally-'+(i+1),leader:snapshotItem(leader),capacity:null,players:[],ratio,targets:null,remaining:null,fill:0,estimated:true,status:'needs-review',warnings:['Rally capacity missing for leader.'] };
     }
     const remaining=troopTargets(capacity,ratio);
-    const assigned=[];
-    const own=memberAllocation(leader,remaining,overrides[leader.id] || {});
-    if (own) assigned.push({...own,leader:true});
-    let candidates=pool.filter(p=>!used.has(String(p.id)) && playerCapacity(p,overrides[p.id] || {}));
-    while (assigned.length < maxJoiners+1 && Object.values(remaining).some(x=>x>0) && candidates.length) {
-      candidates.sort((a,b)=>preferredScore(b,remaining,event)-preferredScore(a,remaining,event) || String(a.id).localeCompare(String(b.id)));
-      let next=null, allocation=null;
-      for (const candidate of candidates) {
-        const trial=memberAllocation(candidate,{...remaining},overrides[candidate.id]||{});
-        if (trial) {next=candidate;allocation=trial;break;}
+    const assigned=new Map();
+    const add=(player,phase)=>{
+      const prior=assigned.get(String(player.id))||null;
+      const amount=memberAllocation(player,remaining,overrides[player.id]||{},phase,prior);
+      if (!amount) return false;
+      assigned.set(String(player.id),mergeAllocation(prior,amount));
+      return true;
+    };
+    // Strict type-aware T11 pass over the leader and all joiners before any T10 use.
+    // Each member contributes at most one march, possibly composed of both tiers.
+    for (const phase of ['t11','t10','unknown']) {
+      if(phase==='t11') add(leader,'t11');
+      else for(const player of [leader,...pool.filter(p=>assigned.has(String(p.id)))]) add(player,phase);
+      let candidates=pool.filter(p=>!used.has(String(p.id)) && playerCapacity(p,overrides[p.id]||{}));
+      while (assigned.size - (assigned.has(String(leader.id))?1:0) < maxJoiners &&
+          Object.values(remaining).some(x=>x>0) && candidates.length) {
+        candidates.sort((a,b)=>stageScore(b,remaining,event,phase)-stageScore(a,remaining,event,phase) || String(a.id).localeCompare(String(b.id)));
+        let next=null;
+        for (const candidate of candidates) {
+          if (memberAllocation(candidate,{...remaining},overrides[candidate.id]||{},phase)) {next=candidate;break;}
+        }
+        if(!next)break;
+        add(next,phase);
+        used.add(String(next.id));
+        candidates=candidates.filter(p=>p.id!==next.id);
       }
-      if (!next) break;
-      const actual=memberAllocation(next,remaining,overrides[next.id]||{});
-      assigned.push(actual);
-      used.add(String(next.id));
-      candidates=candidates.filter(p=>p.id!==next.id);
-      // Flexible preferred size. Extra joiners are allowed when needed to fill.
     }
+    const participants=[...assigned.values()].map(a=>String(a.id)===String(leader.id)?{...a,leader:true}:a);
     const fill=capacity-Object.values(remaining).reduce((a,b)=>a+b,0);
-    const estimated=assigned.some(a=>a.estimated);
+    const estimated=participants.some(a=>a.estimated);
     const full=fill===capacity;
-    return {id:'rally-'+(i+1),leader:snapshotItem(leader),capacity,ratio,targets:troopTargets(capacity,ratio),remaining,players:assigned,fill,estimated,status:full?(estimated?'estimated-full':'confirmed-full'):'incomplete',warnings:[...(!full?['Not enough recorded available troops or usable march capacity.']:[]),...(estimated?['Unknown troop quantities used as estimated contributions.']:[])]};
+    return {id:'rally-'+(i+1),leader:snapshotItem(leader),capacity,ratio,targets:troopTargets(capacity,ratio),remaining,players:participants,fill,estimated,status:full?(estimated?'estimated-full':'confirmed-full'):'incomplete',warnings:[...(!full?['Not enough recorded available troops or usable march capacity.']:[]),...(estimated?['Unknown troop quantities used as estimated contributions.']:[])]};
   });
   if(mode==='balanced') warnings.push('Balanced mode currently shares the Strongest allocator; full cross-team balancing is not yet implemented.');
   return {mode,teamId:team.id,teams:result,warnings,unused:pool.filter(p=>!used.has(String(p.id))).map(snapshotItem),settings:{teamCount:count,preferredSize,maxJoiners,ratio}};
