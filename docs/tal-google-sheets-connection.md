@@ -1,30 +1,40 @@
 # State 3573 TAL · Google Sheets connection
 
-## Source
+## Existing source
 - Workbook: https://docs.google.com/spreadsheets/d/1iHHBMYDu2FF3HjNTzas8VoyzUQz7_3L__ZS48EDXMdY/edit
-- Key worksheet: `Players` (including player ID, selection, registration, availability, language and legion labels)
-- Supporting worksheets are retrieved for future reconciliation but not automatically written or merged into events.
-- Match by valid, unique `Player ID`. Duplicate or missing IDs are excluded from import.
+- Primary worksheet: `Players`, keyed by `Player ID`.
+- Other worksheets are included as read-only reference data.
+- The initial app integration is **read-only** with a preview and explicit confirmation. It does not write back to the Google Sheet.
 
-## Security and one-time setup
-The Google Drive connector inside ChatGPT does **not** authorize the deployed website.
+## Recommended setup: free Google Apps Script (no card)
 
-1. In a Google Cloud project, enable the Google Sheets API and create a service account with a JSON key.
-2. Share the exact source workbook with that service account email as **Viewer**. Do not make the workbook public.
-3. On Vercel project `3573-caroline`, set the **server-only** environment variable `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` to the complete JSON key for the intended environment(s). Never prefix this secret with `VITE_` and never commit it to GitHub.
-4. Redeploy the tested branch to ensure the deployment reads that environment variable.
-5. Sign in with the leader password, open TAL planner, choose **Refresh sheet & review changes**, review discrepancies, and confirm import.
+The script runs with your existing Google account's permission to access the spreadsheet. You do not need to create a Google Cloud billing account or a service account.
 
-The read-only API `/api/tal-sheet` requires a valid signed leader session. No browser token or Google private key is transmitted to clients; Google OAuth access tokens remain server-side.
+1. Open the spreadsheet in a desktop browser and choose **Extensions → Apps Script**.
+2. Replace the editor's sample `Code.gs` with the contents of [`scripts/tal-google-apps-script.js`](../scripts/tal-google-apps-script.js). Save the Apps Script project.
+3. In Apps Script, go to **Project settings → Script properties**. Add `TAL_BRIDGE_SECRET`, set to a securely generated random secret at least 32 characters long. Keep it private.
+4. Choose **Deploy → New deployment → Web app**. Choose **Execute as: Me** and **Who has access: Anyone**. Approve the Google permissions to read the spreadsheet and copy the resulting URL ending in `/exec`.
+5. In Vercel project `3573-caroline`, add these **server-only** environment variables:
+   - `GOOGLE_TAL_SCRIPT_URL`: the Apps Script web-app deployment URL.
+   - `GOOGLE_TAL_SCRIPT_SECRET`: exactly the same value as `TAL_BRIDGE_SECRET`.
+6. Redeploy the application, then sign in to the leader website and open **TAL → Refresh sheet & review changes**.
+
+**Privacy model:** The spreadsheet remains private. The Apps Script web app is reachable by anyone with its URL, but it performs no read unless the request contains the shared secret. Keep the URL and secret out of client code and shared links. If the secret is leaked, rotate it in both Apps Script and Vercel. The script has no `doGet` data endpoint.
+
+**Limits:** Free Apps Script executions are subject to Google quotas, and some accounts or Workspace admins can restrict public web-app deployments. If the app cannot be deployed with those settings, do not make the spreadsheet public as a workaround.
+
+## Alternate setup: service account
+
+The Vercel endpoint also supports a service-account reader using `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` if that is already configured. It is **not required** for the Apps Script route, and the website automatically selects Apps Script when `GOOGLE_TAL_SCRIPT_URL` is provided.
 
 ## Data-safety contract
-- The workbook is read-only to the app. The first integration **does not** write to Google Sheets.
-- Refresh makes no changes to local data.
-- Confirmation saves source observations to `importedSheet`, and sheet status/availability evidence to TAL records.
-- Existing saved player identity, notes, power, confirmed in-game registration, troop inventory, team assignment, priority relationships, battle attendance and rally drafts remain untouched.
-- Sheet language is retained as `sheetLanguage`, a **soft** coordination hint. It is not automatically presented as confirmed fluency or preferred voice language.
-- If the TAL plan is locked, previews still work, but imports require unlocking it first.
-- The shared workspace synchronization will propagate a confirmed import to other leaders.
+- Refreshing Google Sheets does not modify your data.
+- Confirming an import saves source evidence to `importedSheet` and the existing TAL planning records, matched by valid unique player IDs.
+- Existing profiles, team and legion assignments, battle attendance, manual notes, priority relationships and rally-team drafts are preserved.
+- Missing or duplicate IDs are excluded and listed for review.
+- Spreadsheet language is a soft coordination hint, not a verified claim of spoken fluency.
+- A locked plan may be reviewed, but not changed until unlocked.
+- The shared leader workspace syncs the confirmed import to other connected leaders.
 
-## Follow-up
-Bidirectional updates should be developed with range-specific write controls, revision checks and a separate explicit confirmation. Do not enable sheet writes simply by increasing the service account permissions; this implementation requests read-only OAuth scope.
+## Possible future phase
+Bidirectional edits would require separate explicit write authorization, column-level conflict handling, and safeguards against overwriting formulas or another leader's changes. It is not enabled in the current implementation.
