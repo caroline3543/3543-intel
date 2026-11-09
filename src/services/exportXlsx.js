@@ -610,7 +610,7 @@ export function exportWorkbook(data, options = {}) {
   // default (Sheet > Unhide to see them) so they don't clutter the
   // view for someone just reading the report.
   const dataSheetNames = ['Workspace Data'];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{stateId:data.settings?.stateId || ''}]), 'Workspace Data');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{stateId:data.settings?.stateId || '',talTeamPreferences:data.talTeamPreferences==null?'':JSON.stringify(data.talTeamPreferences)}]), 'Workspace Data');
   if (includeRoster && scopedPlayers.some(p => p.providerStats)) {
     const stats = scopedPlayers.filter(p => p.providerStats).map(p => ({
       State: data.settings?.stateId || '', FID:p.fid, Name:p.username, Alliance:p.allianceTag,
