@@ -25,10 +25,10 @@ export function ProfileTeamwork({player,players=[],preferences={},onSavePreferen
      <select aria-label="Preferred voice communication language" value={player.communicationLanguage||''}
        onChange={e=>onSavePlayer?.({...player,communicationLanguage:e.target.value,profileLastUpdated:new Date().toISOString()})}
        style={{...profileButton,width:'100%',marginTop:6}}>
-       <option value="">Not specified (use recorded game language)</option>
+       <option value="">Not specified (use spreadsheet or game language)</option>
        {LANGUAGES.map(lang=><option key={lang} value={lang}>{lang}</option>)}
      </select>
-     <span style={{display:'block',fontSize:12,marginTop:5}}>Game UI language: {player.gameLanguage||'Not recorded'}. This may differ from the language used in voice chat.</span>
+     <span style={{display:'block',fontSize:12,marginTop:5}}>Spreadsheet language: {player.sheetLanguage||'Not recorded'} · Game UI language: {player.gameLanguage||'Not recorded'}. Neither confirms spoken fluency.</span>
    </label>
    {traits.map(([key,title])=><label key={key} style={{display:'flex',gap:10,alignItems:'center',minHeight:44,fontSize:14,color:C.white}}>
      <input type="checkbox" checked={values[key]===true} onChange={e=>trait(key,e.target.checked)}/>{title}
