@@ -1,6 +1,7 @@
 // TAL rally team generator, separate from legion/building assignments.
 // No writes to player profiles, event snapshots or spreadsheet data.
 import { battleStatus } from './talMatchReadiness.js';
+import {normaliseRallyPreferences,joinerPreference,joinerPreferenceScore,relationshipMatches} from './talTeamPreferences.js';
 
 export const TAL_TYPES = ['infantry', 'lancer', 'marksman'];
 export const TAL_TIERS = ['t11', 't10'];
@@ -112,6 +113,7 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
   const preferredSize = Math.max(2, Math.floor(Number(settings.preferredSize) || 5));
   const maxJoiners = Math.max(1, Math.min(49, Math.floor(Number(settings.maxJoiners) || 29)));
   const ratio = normaliseRatio(settings.ratio || [50, 0, 50]);
+  const preferences = normaliseRallyPreferences(settings.preferences || team.rallyTeamPreferences || {});
   const members = (team.members || []).filter(m => m.role === 'combatant');
   const registrationVerified = members.filter(m => m.verified === true || m.registration === 'Verified' || m.registrationStatus === 'Verified');
   const ids = new Set(members.map(m => String(m.id)));
@@ -176,7 +178,8 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
       !assignedToTeam.has(String(p.id)) && playerCapacity(p, overrides[p.id] || {}) > 0);
     const viable = candidates.map(p => {
       const trial = memberAllocation(p, { ...state.remaining }, overrides[p.id] || {}, tier);
-      return { player: p, trial, score: stageScore(p, state.remaining, event, tier, overrides[p.id] || {}) };
+      const teammates=[state.leader.id,...state.assigned.keys()];
+      return { player: p, trial, score: stageScore(p, state.remaining, event, tier, overrides[p.id] || {}) + joinerPreferenceScore(p.id,teammates,preferences)*20000 };
     }).filter(v => v.trial);
     viable.sort((a, b) => b.score - a.score || String(a.player.id).localeCompare(String(b.player.id)));
     return !!viable[0] && addToState(state, viable[0].player, tier);
@@ -227,6 +230,8 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
       : full ? (estimated ? 'estimated-full' : 'confirmed-full') : 'incomplete';
     return {
       id: s.id, leader: snapshotItem(s.leader), capacity: s.capacity,
+      priorityJoiners: participants.filter(p=>!p.leader && joinerPreference(p.id,preferences).priority).length,
+      familiarPairs: preferences.pairs.filter(([a,b])=>participants.some(p=>String(p.id)===a)&&participants.some(p=>String(p.id)===b)).length,
       ratio, targets: s.capacity ? troopTargets(s.capacity, ratio) : null,
       remaining: s.remaining, players: participants, fill, estimated, status,
       warnings: [
@@ -242,5 +247,6 @@ export function generateTalRallyDraft({ team, config, players, event, settings =
     rosterVerification: registrationVerified.length === members.length ? 'verified' : 'provisional',
     unused: pool.filter(p => !assignedToTeam.has(String(p.id))).map(snapshotItem),
     settings: { teamCount, preferredSize, maxJoiners, ratio, lockedLeaderIds: locked.map(p=>String(p.id)) },
+    preferences,
   };
 }
