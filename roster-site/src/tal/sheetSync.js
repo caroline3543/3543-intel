@@ -46,7 +46,7 @@ export function talSheetPreview(data,sheet){
   for(const row of parsed.safe){
     const fid=norm(row['Player ID']),old=byId.get(fid),previous=recordsByFid.get(fid)||{},now=sourceRecord(row);
     const priorSource=old?.importedSheet?.fields || {};
-    const differs=(!old)||['Selection','Registration','Assigned Legion','TAL Alliance','Language','Notes',...TIMES.map(t=>t+' UTC')].some(k=>norm(priorSource[k])!==norm(row[k]));
+    const differs=(!old)||Object.keys(row).filter(k=>k!=='_row').some(k=>norm(priorSource[k])!==norm(row[k]));
     const registrationChanged=norm(previous.sheetRegistration)!==now.sheetRegistration;
     const selectionChanged=norm(previous.sheetSelection)!==now.sheetSelection;
     const times=timeValues(row);
