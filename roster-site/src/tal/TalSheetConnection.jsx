@@ -36,7 +36,7 @@ export function TalSheetConnection({data,onImport,locked=false}){
      <strong style={{fontSize:15}}>Review changes before import</strong>
      <p style={{fontSize:13,color:C.icy,lineHeight:1.6}}>Sheet rows: {review.total} · Valid unique IDs: {review.valid} · Changes: {review.changes.length} · New members: {review.newPlayers} · ID issues: {review.invalid.length}</p>
      <Hint>{review.warning}</Hint>
-   {locked&&<p role="status" style={{fontSize:13,color:C.gold}}>This TAL plan is locked. You can inspect the sheet, but must unlock the plan before importing.</p>
+   {locked&&<p role="status" style={{fontSize:13,color:C.gold}}>This TAL plan is locked. You can inspect the sheet, but must unlock the plan before importing.</p>}
      {!!review.invalid.length&&<details><summary style={{minHeight:44,color:C.gold}}>Review {review.invalid.length} skipped ID issues</summary>
        {review.invalid.slice(0,30).map(row=><p key={row.row} style={{fontSize:12,color:C.icy}}>Row {row.row} · {row.name||'Unnamed'}: {row.reason}</p>)}
      </details>}
