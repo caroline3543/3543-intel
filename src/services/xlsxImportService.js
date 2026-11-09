@@ -110,8 +110,11 @@ export async function importFromXlsxFile(file) {
       updatedAt: row.updatedAt || new Date().toISOString(),
     })).filter(r => r.id && !r.builtin); // never import the built-in Rally Lead row as a custom role
 
-    const stateId = sheet('Workspace Data')[0]?.stateId;
-    return { players, events, svsPlans, customRoles, ...(stateId ? {settings:{stateId:String(stateId)}} : {}) };
+    const workspaceRow = sheet('Workspace Data')[0] || {};
+    const stateId = workspaceRow.stateId;
+    const talTeamPreferences=parseJsonCell(workspaceRow.talTeamPreferences,null);
+    return { players, events, svsPlans, customRoles, ...(stateId ? {settings:{stateId:String(stateId)}} : {}),
+      ...(talTeamPreferences && typeof talTeamPreferences==='object' && !Array.isArray(talTeamPreferences) ? {talTeamPreferences} : {}) };
   } catch (err) {
     throw new Error('Could not read this spreadsheet — make sure it was exported from this app.');
   }
