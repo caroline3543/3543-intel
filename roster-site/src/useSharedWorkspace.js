@@ -1,48 +1,48 @@
 import {useEffect,useRef,useState} from 'react';
-import {workspaceCache,workspaceRequest} from './sharedWorkspace.js';
+import {workspaceCache} from './sharedWorkspace.js';
 import {sharedData} from '../shared/workspace.js';
 
-// Caroline 3739 is a testing copy. It imports the original roster once,
-// stores changes only on this browser, and never sends workspace writes.
-export function useSharedWorkspace(initial) {
- const cache=useRef(workspaceCache());
- const local=useRef(sharedData(initial));
- const [data,setData]=useState(local.current);
- const [sync,setSync]=useState({mode:'active',status:'Opening Caroline 3739 testing copy…',ready:false,joined:true,conflicts:[],dirty:false,checkedAt:null,syncing:false,issue:null});
- const statusPatch=patch=>setSync(old=>({...old,...patch}));
+// Fresh State 3739 workspace, independent of the original 3573 snapshot.
+// Every edit remains in this browser. No cross-state import or remote write.
+export function useSharedWorkspace(initial){
+ const storage=useRef(null);
+ const current=useRef(sharedData({...initial,players:[],events:[],customRoles:[],settings:{stateId:'3739'}}));
+ const [data,setData]=useState(current.current);
+ const [sync,setSync]=useState({mode:'active',ready:false,joined:true,conflicts:[],dirty:false,syncing:false,issue:null,checkedAt:null});
  useEffect(()=>{
-  let disposed=false;
+  let cancelled=false;
   (async()=>{
    try{
-    const saved=await cache.current.read();
-    if(disposed)return;
-    if(saved?.local?.players?.length){
-     local.current=sharedData(saved.local);setData(local.current);
-     statusPatch({ready:true,status:'Saved locally · independent testing copy',checkedAt:new Date().toISOString()});
-     return;
+    // One-time purge of previously imported State 3573 data on this clone's origin.
+    if(localStorage.getItem('caroline3739-clean-v2')!=='yes'){
+     localStorage.clear();
+     localStorage.setItem('caroline3739-clean-v2','yes');
+     try{indexedDB.deleteDatabase('caroline-shared-workspace');}catch{}
     }
-    const original=await workspaceRequest('GET');
-    if(disposed)return;
-    if(original?.data){
-     local.current=sharedData(original.data);
-     setData(local.current);
-     await cache.current.write({local:local.current,origin:'3573-snapshot',importedAt:new Date().toISOString()});
-     statusPatch({ready:true,status:'Imported testing snapshot · changes saved only here',checkedAt:new Date().toISOString()});
+    const cache=workspaceCache();
+    storage.current=cache;
+    const saved=await cache.read();
+    if(cancelled)return;
+    if(saved?.local?.settings?.stateId==='3739'){
+     current.current=sharedData(saved.local);
+     setData(current.current);
     }else{
-     statusPatch({ready:true,status:'No shared snapshot available',issue:'Original roster data was not available. No changes will reach the live website.'});
+     await cache.write({local:current.current,origin:'3739-fresh'});
     }
-   }catch(error){if(!disposed)statusPatch({ready:true,status:'Offline testing copy',issue:error.message||'Could not load original roster snapshot'});}
+    setSync(s=>({...s,ready:true,checkedAt:new Date().toISOString()}));
+   }catch(e){if(!cancelled)setSync(s=>({...s,ready:true,issue:'Unable to open local storage. Export a backup after making changes.'}));}
   })();
-  return()=>{disposed=true;};
+  return()=>{cancelled=true};
  },[]);
- const setLocal=update=>{
-  const next=sharedData(typeof update==='function'?update(local.current):update);
-  local.current=next;setData(next);
-  statusPatch({dirty:false,status:'Saving on this device…'});
-  cache.current.write({local:next,origin:'3739-local',updatedAt:new Date().toISOString()})
-   .then(()=>statusPatch({dirty:false,status:'Saved on this device · original unchanged',checkedAt:new Date().toISOString()}))
-   .catch(()=>statusPatch({issue:'Could not save locally. Export a backup.',status:'Local save failed'}));
- };
- const retry=async()=>({mode:'active',joined:true,ready:true,conflicts:[],dirty:false,syncing:false,checkedAt:new Date().toISOString()});
- return {data,setData:setLocal,sync,publish:retry,join:retry,retry,resolve:retry};
+ function update(value){
+  const next=sharedData(typeof value==='function'?value(current.current):value);
+  if(next.settings?.stateId!=='3739'||next.players.some(p=>p.stateId&&String(p.stateId)!=='3739'||p.providerStats?.stateId&&String(p.providerStats.stateId)!=='3739')){
+   setSync(s=>({...s,issue:'This app accepts only State 3739 records.'}));
+   return;
+  }
+  current.current=next;setData(next);
+  storage.current?.write({local:next,origin:'3739-only',savedAt:new Date().toISOString()}).then(()=>setSync(s=>({...s,issue:null,checkedAt:new Date().toISOString()}))).catch(()=>setSync(s=>({...s,issue:'Could not save to this device.'})));
+ }
+ const noop=async()=>({mode:'active',ready:true,joined:true,conflicts:[],dirty:false,syncing:false,checkedAt:new Date().toISOString()});
+ return {data,setData:update,sync,publish:noop,join:noop,retry:noop,resolve:noop};
 }
