@@ -338,7 +338,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
          {(languageInfo(byId.get(String(id))).length>0||norahInfo(byId.get(String(id))))&&<span style={{...small,display:'block',marginTop:3}}>{[...languageInfo(byId.get(String(id))),norahInfo(byId.get(String(id)))].filter(Boolean).join(' · ')}</span>}
         </span>
         <span style={{...small,fontVariantNumeric:'tabular-nums'}}>{powerFormat(powerOf(id))}</span>
-        <button type="button" aria-label={'Mark '+name(byId.get(String(id))||{id})+' absent'} style={{...btn,padding:5,minHeight:38,fontSize:11}} onClick={()=>markAbsent(id)} disabled={absentIds.includes(String(id))}>Absent</button>
+        <button type="button" aria-label={'Mark '+name(byId.get(String(id))||{id})+' absent'} style={{...btn,padding:5,minHeight:38,fontSize:11}} onClick={()=>absentIds.includes(String(id))?setAbsentIds(old=>old.filter(x=>x!==String(id))):markAbsent(id)}>{absentIds.includes(String(id))?'Restore':'Absent'}</button>
         <select aria-label={'Move '+name(byId.get(String(id))||{id})+' to another team'} value={g.key} onChange={e=>moveMember(id,Number(e.target.value))} style={{...btn,width:82,padding:6,fontSize:12,minHeight:38}}>{groups.map(t=><option key={t.key} value={t.key}>{COLORS.find(c=>c.id===t.color)?.name}</option>)}</select>
         <button type="button" title="Remove from active team" aria-label={'Remove '+name(byId.get(String(id))||{id})+' from team'} style={{...btn,padding:6,minHeight:38,color:C.red}} onClick={()=>removeFromBattle(id)}>×</button>
        </div>)}
@@ -364,18 +364,6 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
      </section>;
     })}
     <button style={{...btn,width:'100%',background:C.gold,color:C.bg,marginBottom:10}} disabled={missing.length>0||groups.some(g=>!g.leader)} onClick={()=>{setConfirmed(true);setStep('buildings')}}>Confirm teams · Assign buildings</button>
-    <section style={{...panel,marginTop:8}}>
-     <button type="button" aria-expanded={copyOpen} style={{...btn,width:'100%',textAlign:'left',color:C.gold}} onClick={openTeamCopy}>{copyOpen?'Hide preview':'Preview copy teams'}</button>
-     {copyOpen&&<div style={{marginTop:10}}>
-      {copyStale&&<p role="status" style={{...small,color:C.gold}}>Team assignments have changed since the preview was generated. Refresh it to include the current complete teams.</p>}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
-       <strong style={{fontSize:14}}>Editable team message</strong>
-       <button type="button" style={{...btn,color:C.gold}} onClick={regenerateCopy}>Regenerate from teams</button>
-      </div>
-      <textarea aria-label="Editable team copy" rows={10} value={copyDraft} onChange={e=>setCopyDraft(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,lineHeight:1.55,resize:'vertical'}}/>
-      <button type="button" style={{...btn,width:'100%',marginTop:10,background:C.gold,color:C.bg}} onClick={()=>copy(copyDraft)} disabled={!copyDraft.trim()||copyStale}>Copy complete team list</button>
-     </div>}
-    </section>
    </>}
    {step==='buildings'&&<>
     <section style={{...panel,marginBottom:12}}>
@@ -410,7 +398,19 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
      <button style={{...btn,width:'100%',background:assignedCount===activePlayers.length&&missing.length===0?C.gold:C.section,color:assignedCount===activePlayers.length&&missing.length===0?C.bg:C.icy}} disabled={!activePlayers.length||assignedCount!==activePlayers.length||missing.length>0} onClick={()=>copy(assignmentText)}>Copy initial assignments</button>
     </section>
    </>}
-   {copyMessage&&<div role="status" style={{...panel,color:C.gold,fontSize:12,marginTop:10,display:'flex',gap:10,justifyContent:'space-between'}}>{copyMessage}<button style={{...btn,minHeight:30,padding:'3px 7px'}} onClick={()=>setCopyMessage('')}>×</button></div>}
+    <section style={{...panel,marginTop:8}}>
+     <button type="button" aria-expanded={copyOpen} style={{...btn,width:'100%',textAlign:'left',color:C.gold}} onClick={openTeamCopy}>{copyOpen?'Hide preview':'Preview copy teams'}</button>
+     {copyOpen&&<div style={{marginTop:10}}>
+      {copyStale&&<p role="status" style={{...small,color:C.gold}}>Team assignments have changed since the preview was generated. Refresh it to include the current complete teams.</p>}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
+       <strong style={{fontSize:14}}>Editable team message</strong>
+       <button type="button" style={{...btn,color:C.gold}} onClick={regenerateCopy}>Regenerate from teams</button>
+      </div>
+      <textarea aria-label="Editable team copy" rows={10} value={copyDraft} onChange={e=>setCopyDraft(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,lineHeight:1.55,resize:'vertical'}}/>
+      <button type="button" style={{...btn,width:'100%',marginTop:10,background:C.gold,color:C.bg}} onClick={()=>copy(copyDraft)} disabled={!copyDraft.trim()||copyStale}>Copy complete team list</button>
+     </div>}
+    </section>
+      {copyMessage&&<div role="status" style={{...panel,color:C.gold,fontSize:12,marginTop:10,display:'flex',gap:10,justifyContent:'space-between'}}>{copyMessage}<button style={{...btn,minHeight:30,padding:'3px 7px'}} onClick={()=>setCopyMessage('')}>×</button></div>}
   </>}
  </section>;
 }
