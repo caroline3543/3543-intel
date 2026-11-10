@@ -258,9 +258,29 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
     <button role="tab" aria-selected={step==='buildings'} style={{...btn,color:step==='buildings'?C.gold:C.icy,borderColor:step==='buildings'?C.gold:C.border}} onClick={()=>{setStep('buildings');setPicked('')}}>2 · Initial assignments</button>
    </div>
    {step==='teams'&&<>
+    <section style={{background:'#183044',borderRadius:12,padding:12,marginBottom:12}}>
+     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+      <span><strong style={{fontSize:15}}>{coreLock?'Battle mode · Core locked':'Planning · Core unlocked'}</strong><span style={{...small,display:'block',marginTop:4}}>{coreLock?'Manual changes are allowed. Auto-generation is disabled.':'Lock core teams after publishing the initial plan.'}</span></span>
+      <button style={{...btn,color:coreLock?C.gold:C.bg,background:coreLock?C.section:C.gold,flexShrink:0}} onClick={lockCore}>{coreLock?'Unlock core':'Lock core teams'}</button>
+     </div>
+     {coreLock&&<div style={{...small,marginTop:8}}>Original team snapshot preserved · Current player assignments remain editable.</div>}
+    </section>
+    <section style={{...panel,marginBottom:12}}>
+     <strong>Add to battle · Last-minute players</strong>
+     <p style={{...small,margin:'6px 0 10px'}}>Choose anyone from Members, even without recorded availability. Existing teams will not be regenerated.</p>
+     <input aria-label="Find last-minute player" placeholder="Search name or Player ID" value={lateSearch} onChange={e=>{setLateSearch(e.target.value);setLateId('');}} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:8}}/>
+     <select aria-label="Select last-minute player" value={lateId} onChange={e=>setLateId(e.target.value)} style={{...btn,width:'100%',fontSize:14,marginBottom:8}}>
+      <option value="">Choose unassigned player</option>
+      {battlePool.filter(p=>!allTeamIds.has(String(p.id))&&(!lateSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(lateSearch.toLowerCase())))).slice(0,80).map(p=><option key={p.id} value={p.id}>{name(p)}{languageInfo(p).length?' · '+languageInfo(p).join(', '):''}{norahInfo(p)?' · '+norahInfo(p):''}</option>)}
+     </select>
+     <div style={{display:'flex',alignItems:'center',gap:8}}>
+      <select aria-label="Destination colour team" value={lateTarget} onChange={e=>setLateTarget(e.target.value)} style={{...btn,flex:1}}>{COLORS.map(c=><option key={c.id} value={c.id}>{c.name} Team</option>)}</select>
+      <button style={{...btn,color:C.bg,background:lateId?C.gold:C.section}} disabled={!lateId} onClick={addLatePlayer}>Assign player</button>
+     </div>
+    </section>
     <section style={{...panel,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><strong>Available player pool</strong><span style={small}>{selectedIds.length} selected · {pool.length} available</span></div>
-     <p style={{...small,margin:'6px 0'}}>Availability comes from the selected legion and UTC time. This is not confirmed attendance.</p>
+     <p style={{...small,margin:'6px 0'}}>Recorded availability is a suggestion. Use Add to battle above to include anyone at short notice.</p>
      <button style={{...btn,marginBottom:8}} onClick={chooseAll}>Select all available</button>
      <div style={{maxHeight:195,overflowY:'auto',borderTop:'1px solid '+C.border}}>
       {pool.map(p=><label key={p.id} style={{display:'flex',alignItems:'center',gap:9,minHeight:40,borderBottom:'1px solid '+C.border,fontSize:13}}><input type="checkbox" checked={selectedIds.includes(String(p.id))} onChange={()=>toggle(p.id)} style={{width:18,height:18}}/><span style={{flex:1,overflowWrap:'anywhere'}}>{name(p)}</span><span style={{...small,whiteSpace:'nowrap'}}>{powerFormat(powerOf(p.id))}</span></label>)}
@@ -276,7 +296,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
     <section style={{...panel,marginBottom:12}}>
      <strong>Generate teams</strong>
      <div style={{display:'flex',gap:8,marginTop:10}}>{[['stack','Power-stacked'],['balanced','Balanced']].map(([id,label])=><button key={id} style={{...btn,flex:1,borderColor:mode===id?C.gold:C.border,color:mode===id?C.gold:C.icy}} aria-pressed={mode===id} onClick={()=>setMode(id)}>{label}</button>)}</div>
-     <button style={{...btn,width:'100%',marginTop:9,background:C.gold,color:C.bg}} onClick={generate}>Auto-generate four teams</button>
+     <button style={{...btn,width:'100%',marginTop:9,background:coreLock?C.section:C.gold,color:coreLock?C.icy:C.bg}} disabled={coreLock} onClick={generate}>Auto-generate four teams</button>
      
     </section>
     <section aria-label="Compare four teams" style={{margin:'5px 0 12px'}}>
@@ -303,13 +323,18 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
        <button type="button" style={{...btn,minHeight:44,color:C.gold,background:'transparent',borderColor:'#415365'}} onClick={()=>setEditingTeam(g.key)}>Assign leader</button>
       </div>:<>
        {!!ids.length&&<div style={{display:'flex',flexWrap:'wrap',gap:13,margin:'9px 0',fontSize:12,color:'#CAD7E0'}}>
-        <span>{ids.length} players</span><span>FC8 {ps.filter(p=>fcNumber(p)===8).length}</span><span>Helios {ps.filter(helios).length}</span><span>Norah {g.members.map(id=>byId.get(id)).filter(p=>p&&norah(p)).length}</span>
+        <span>{ids.length} players</span><span>FC8 {ps.filter(p=>fcNumber(p)===8).length}</span><span>Helios {ps.filter(helios).length}</span>{g.members.some(id=>norah(byId.get(String(id))))&&<span>Norah Skill 5 {g.members.filter(id=>norah(byId.get(String(id)))).length}</span>}
        </div>}
        {g.leader&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'6px 0',fontSize:14}}><span style={{minWidth:0,overflowWrap:'anywhere'}}><span aria-hidden="true" style={{color:C.gold,marginRight:7}}>♛</span><strong>{name(byId.get(String(g.leader))||{id:g.leader})}</strong></span><span style={{...small,fontVariantNumeric:'tabular-nums'}}>{powerFormat(powerOf(g.leader))}</span></div>}
        {g.members.map(id=><div key={id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:'1px solid #304355'}}>
-        <span style={{fontSize:14,flex:1,minWidth:0,overflowWrap:'anywhere'}}>{name(byId.get(String(id))||{id})}</span>
+        <span style={{flex:1,minWidth:0}}>
+         <span style={{fontSize:14,display:'block',overflowWrap:'anywhere'}}>{name(byId.get(String(id))||{id})}{absentIds.includes(String(id))?' · Absent':''}</span>
+         {(languageInfo(byId.get(String(id))).length>0||norahInfo(byId.get(String(id))))&&<span style={{...small,display:'block',marginTop:3}}>{[...languageInfo(byId.get(String(id))),norahInfo(byId.get(String(id)))].filter(Boolean).join(' · ')}</span>}
+        </span>
         <span style={{...small,fontVariantNumeric:'tabular-nums'}}>{powerFormat(powerOf(id))}</span>
+        <button type="button" aria-label={'Mark '+name(byId.get(String(id))||{id})+' absent'} style={{...btn,padding:5,minHeight:38,fontSize:11}} onClick={()=>markAbsent(id)} disabled={absentIds.includes(String(id))}>Absent</button>
         <select aria-label={'Move '+name(byId.get(String(id))||{id})+' to another team'} value={g.key} onChange={e=>moveMember(id,Number(e.target.value))} style={{...btn,width:82,padding:6,fontSize:12,minHeight:38}}>{groups.map(t=><option key={t.key} value={t.key}>{COLORS.find(c=>c.id===t.color)?.name}</option>)}</select>
+        <button type="button" title="Remove from active team" aria-label={'Remove '+name(byId.get(String(id))||{id})+' from team'} style={{...btn,padding:6,minHeight:38,color:C.red}} onClick={()=>removeFromBattle(id)}>×</button>
        </div>)}
        <button type="button" aria-expanded={editing} style={{...btn,background:'transparent',border:0,color:C.gold,marginTop:8,padding:'8px 0',minHeight:44}} onClick={()=>setEditingTeam(editing?null:g.key)}>{editing?'Done editing':'Edit team'}</button>
       </>}
@@ -333,7 +358,18 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
      </section>;
     })}
     <button style={{...btn,width:'100%',background:C.gold,color:C.bg,marginBottom:10}} disabled={missing.length>0||groups.some(g=>!g.leader)} onClick={()=>{setConfirmed(true);setStep('buildings')}}>Confirm teams · Assign buildings</button>
-    <details style={{...panel}}><summary style={{color:C.gold,cursor:'pointer'}}>Preview copy teams</summary><pre style={{whiteSpace:'pre-wrap',fontFamily:'inherit',fontSize:13}}>{teamText}</pre><button style={btn} onClick={()=>copy(teamText)}>Copy teams</button></details>
+    <section style={{...panel,marginTop:8}}>
+     <button type="button" aria-expanded={copyOpen} style={{...btn,width:'100%',textAlign:'left',color:C.gold}} onClick={openTeamCopy}>{copyOpen?'Hide preview':'Preview copy teams'}</button>
+     {copyOpen&&<div style={{marginTop:10}}>
+      {copyStale&&<p role="status" style={{...small,color:C.gold}}>Team assignments have changed since the preview was generated. Refresh it to include the current complete teams.</p>}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
+       <strong style={{fontSize:14}}>Editable team message</strong>
+       <button type="button" style={{...btn,color:C.gold}} onClick={regenerateCopy}>Regenerate from teams</button>
+      </div>
+      <textarea aria-label="Editable team copy" rows={10} value={copyDraft} onChange={e=>setCopyDraft(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,lineHeight:1.55,resize:'vertical'}}/>
+      <button type="button" style={{...btn,width:'100%',marginTop:10,background:C.gold,color:C.bg}} onClick={()=>copy(copyDraft)} disabled={!copyDraft.trim()||copyStale}>Copy complete team list</button>
+     </div>}
+    </section>
    </>}
    {step==='buildings'&&<>
     <section style={{...panel,marginBottom:12}}>
