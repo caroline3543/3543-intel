@@ -148,7 +148,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const allAssigned=groups.flatMap(g=>[g.leader,...g.members]).filter(Boolean).map(String);
  const missing=selectedIds.filter(id=>!allAssigned.includes(String(id)));
  const activePlayers=groups.flatMap(g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).map(id=>({id:String(id),g})));
- const allTeamIds=new Set(groups.flatMap(g=>[g.leader,...g.members].filter(Boolean).map(String));
+ const allTeamIds=new Set(groups.flatMap(g=>[g.leader,...g.members].filter(Boolean)).map(String));
  const assignedCount=activePlayers.filter(({id})=>assignment[id]).length;
  const teamFor=id=>groups.find(g=>String(g.leader)===String(id)||g.members.some(m=>String(m)===String(id)));
  function resetForMatch(nextLegion=legionId,nextTime=matchTime){setLegionId(nextLegion);setMatchTime(nextTime);setBulk('');setPicked('');setStep('teams');setLocked([]);setPreview(false);setEditingTeam(null);}
