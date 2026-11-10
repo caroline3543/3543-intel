@@ -85,7 +85,9 @@ export function TalTeamsTab({value,players=[]}){
  }
  function generate(){
   if(selectedPlayers.length<4){setCopyMessage('Select at least four players before generating teams.');return;}
-  const sorted=[...selectedPlayers].sort((a,b)=>(powerOf(b.id)||0)-(powerOf(a.id)||0));
+  const unknown=selectedPlayers.filter(p=>powerOf(p.id)===null);
+  if(unknown.length){setCopyMessage('Enter troop power for '+unknown.length+' selected player'+(unknown.length===1?'':'s')+' before generating. Unknown power cannot be counted as zero.');return;}
+  const sorted=[...selectedPlayers].sort((a,b)=>powerOf(b.id)-powerOf(a.id));
   const eligible=sorted.filter(p=>leaderCandidates.some(l=>String(l.id)===String(p.id)));
   // Preview supports a manual fallback when leadership has not yet been recorded.
   if(eligible.length<4){setCopyMessage('Four rally leaders are required. Set Rally Lead on player profiles before generating, or choose the four leaders manually below.');return;}
@@ -98,12 +100,13 @@ export function TalTeamsTab({value,players=[]}){
     next[groupIndex].members.push(String(p.id));
    });
   }else{
+   const cap=Math.ceil(joiners.length/4);
    joiners.forEach(p=>{
-    const target=[...next].sort((a,b)=>a.members.length-b.members.length||teamPower(a)-teamPower(b))[0];
+    const target=[...next].filter(g=>g.members.length<cap).sort((a,b)=>teamPower(a)-teamPower(b)||a.members.length-b.members.length)[0];
     target.members.push(String(p.id));
    });
   }
-  setGroups(next);setAssignment({});setConfirmed(false);setStep('teams');setCopyMessage('Generated four '+(mode==='stack'?'power-stacked':'evenly distributed')+' teams. Review before confirming.');
+  setGroups(next);setAssignment({});setConfirmed(false);setStep('teams');setCopyMessage('Generated four '+(mode==='stack'?'power-stacked':'power-balanced')+' teams. Review before confirming.');
  }
  function moveMember(id,targetKey){
   const source=teamFor(id);if(!source||String(source.leader)===String(id))return;
@@ -160,7 +163,7 @@ export function TalTeamsTab({value,players=[]}){
      <button style={{...btn,marginBottom:8}} onClick={chooseAll}>Select all available</button>
      <div style={{maxHeight:195,overflowY:'auto',borderTop:'1px solid '+C.border}}>
       {pool.map(p=><label key={p.id} style={{display:'flex',alignItems:'center',gap:9,minHeight:40,borderBottom:'1px solid '+C.border,fontSize:13}}><input type="checkbox" checked={selectedIds.includes(String(p.id))} onChange={()=>toggle(p.id)} style={{width:18,height:18}}/><span style={{flex:1,overflowWrap:'anywhere'}}>{name(p)}</span><span style={{...small,whiteSpace:'nowrap'}}>{powerFormat(powerOf(p.id))}</span></label>)}
-      {!pool.length&&<p style={small}>No players have recorded availability at this time. Choose another time or update their TAL availability.</p>}
+      {!pool.length&&<p role="status" style={small}>{!players.length?'No GLR roster loaded. Open Members and load GLR first.':!selectedLegion?.members?.length?'No one is assigned to this legion. Add players in TAL Planner first.':'No selected players have recorded availability at '+matchTime+' UTC. Missing availability is not the same as unavailable. Update the poll records or choose another time.'}</p>}
      </div>
     </section>
     <section style={{...panel,marginBottom:12}}>
