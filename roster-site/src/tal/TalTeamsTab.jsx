@@ -49,7 +49,9 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const [showBulk,setShowBulk]=useState(false);
  const [playerSearch,setPlayerSearch]=useState('');
  const [onlyAvailable,setOnlyAvailable]=useState(false);
- const [mode,setMode]=useState('stack');
+ const [mode,setMode]=useState('balanced');
+ const [leaderStrategy,setLeaderStrategy]=useState('power');
+ const [generationError,setGenerationError]=useState('');
  const [assignment,setAssignment]=useState({});
  const [picked,setPicked]=useState('');
  const [activeColour,setActiveColour]=useState('blue');
@@ -94,18 +96,20 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const pool=legionRoster.filter(availableForMatch);
  const visibleRoster=legionRoster.filter(p=>(!onlyAvailable||availableForMatch(p))&&(!playerSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(playerSearch.trim().toLowerCase())))).sort((a,b)=>Number(availableForMatch(b))-Number(availableForMatch(a))||name(a).localeCompare(name(b),undefined,{sensitivity:'base'}));
   const battlePool=useMemo(()=>players.filter(p=>!p.blacklisted),[players]);
- const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,confirmed,coreLock,coreSnapshot,absentIds,copyDraft,copySource}),[chosen,powers,groups,assignment,mode,confirmed,coreLock,coreSnapshot,absentIds,copyDraft,copySource]);
+ const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,coreLock,coreSnapshot,absentIds,copyDraft,copySource}),[chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,coreLock,coreSnapshot,absentIds,copyDraft,copySource]);
  const snapshotSignature=JSON.stringify(snapshot);
  function applyDraft(saved){
   setChosen(Array.isArray(saved?.chosen)?saved.chosen.map(String):[]);
   setPowers(saved?.powers&&typeof saved.powers==='object'?saved.powers:{});
   setGroups(Array.isArray(saved?.groups)&&saved.groups.length===4?saved.groups:initialGroups());
   setAssignment(saved?.assignment&&typeof saved.assignment==='object'?saved.assignment:{});
-  setMode(saved?.mode==='balanced'?'balanced':'stack');
+  setMode(saved?.mode==='stack'?'stack':'balanced');
+  setLeaderStrategy(saved?.leaderStrategy==='manual'?'manual':'power');
   setConfirmed(!!saved?.confirmed);
-  setCoreLock(!!saved?.coreLock);setCoreSnapshot(saved?.coreSnapshot||null);setAbsentIds(Array.isArray(saved?.absentIds)?saved.absentIds:[]);
+  const hasValidCore=Array.isArray(saved?.groups)&&saved.groups.length===4&&saved.groups.every(g=>Boolean(g.leader))&&saved.groups.some(g=>g.members?.length>0);
+  setCoreLock(!!saved?.coreLock&&hasValidCore);setCoreSnapshot(hasValidCore?saved?.coreSnapshot||null:null);setAbsentIds(Array.isArray(saved?.absentIds)?saved.absentIds:[]);
   setCopyDraft(typeof saved?.copyDraft==='string'?saved.copyDraft:'');setCopySource(typeof saved?.copySource==='string'?saved.copySource:'');
-  lastSaved.current=JSON.stringify({chosen:Array.isArray(saved?.chosen)?saved.chosen.map(String):[],powers:saved?.powers&&typeof saved.powers==='object'?saved.powers:{},groups:Array.isArray(saved?.groups)&&saved.groups.length===4?saved.groups:initialGroups(),assignment:saved?.assignment&&typeof saved.assignment==='object'?saved.assignment:{},mode:saved?.mode==='balanced'?'balanced':'stack',confirmed:!!saved?.confirmed,coreLock:!!saved?.coreLock,coreSnapshot:saved?.coreSnapshot||null,absentIds:Array.isArray(saved?.absentIds)?saved.absentIds:[],copyDraft:typeof saved?.copyDraft==='string'?saved.copyDraft:'',copySource:typeof saved?.copySource==='string'?saved.copySource:''});
+  lastSaved.current=JSON.stringify({chosen:Array.isArray(saved?.chosen)?saved.chosen.map(String):[],powers:saved?.powers&&typeof saved.powers==='object'?saved.powers:{},groups:Array.isArray(saved?.groups)&&saved.groups.length===4?saved.groups:initialGroups(),assignment:saved?.assignment&&typeof saved.assignment==='object'?saved.assignment:{},mode:saved?.mode==='stack'?'stack':'balanced',leaderStrategy:saved?.leaderStrategy==='manual'?'manual':'power',confirmed:!!saved?.confirmed,coreLock:!!saved?.coreLock&&hasValidCore,coreSnapshot:hasValidCore?saved?.coreSnapshot||null:null,absentIds:Array.isArray(saved?.absentIds)?saved.absentIds:[],copyDraft:typeof saved?.copyDraft==='string'?saved.copyDraft:'',copySource:typeof saved?.copySource==='string'?saved.copySource:''});
  }
  useEffect(()=>{
   let saved=null;
@@ -115,7 +119,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   applyDraft(source||{chosen:pool.map(p=>String(p.id))});
   remoteApplied.current=remoteDraft?.updatedAt||'';
   setDraftState(remoteDraft?'Shared draft restored':saved?'Device draft restored':'Available players selected for this time');
-  setStep('teams');setPicked('');setEditingTeam(null);setDraftLoaded(draftKey);
+  setStep('teams');setPicked('');setEditingTeam(null);setGenerationError('');setDraftLoaded(draftKey);
  // A new legion/time is a distinct draft; avoid resetting for every cloud refresh.
  },[draftKey]);
  useEffect(()=>{
@@ -127,7 +131,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  useEffect(()=>{
   if(draftLoaded!==draftKey||!remoteDraft||remoteApplied.current===remoteDraft.updatedAt)return;
   remoteApplied.current=remoteDraft.updatedAt;
-  const incoming=JSON.stringify({chosen:remoteDraft.chosen||[],powers:remoteDraft.powers||{},groups:remoteDraft.groups||initialGroups(),assignment:remoteDraft.assignment||{},mode:remoteDraft.mode||'stack',confirmed:!!remoteDraft.confirmed,coreLock:!!remoteDraft.coreLock,coreSnapshot:remoteDraft.coreSnapshot||null,absentIds:remoteDraft.absentIds||[],copyDraft:remoteDraft.copyDraft||'',copySource:remoteDraft.copySource||''});
+  const incoming=JSON.stringify({chosen:remoteDraft.chosen||[],powers:remoteDraft.powers||{},groups:remoteDraft.groups||initialGroups(),assignment:remoteDraft.assignment||{},mode:remoteDraft.mode==='stack'?'stack':'balanced',leaderStrategy:remoteDraft.leaderStrategy==='manual'?'manual':'power',confirmed:!!remoteDraft.confirmed,coreLock:!!remoteDraft.coreLock&&Array.isArray(remoteDraft.groups)&&remoteDraft.groups.length===4&&remoteDraft.groups.every(g=>!!g.leader)&&remoteDraft.groups.some(g=>g.members?.length>0),coreSnapshot:remoteDraft.coreSnapshot||null,absentIds:remoteDraft.absentIds||[],copyDraft:remoteDraft.copyDraft||'',copySource:remoteDraft.copySource||''});
   if(incoming===snapshotSignature){lastSaved.current=incoming;return;}
   if(snapshotSignature!==lastSaved.current){
    setDraftState('New shared draft available. Finish or review your unsaved edits.');
@@ -166,7 +170,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const allTeamIds=new Set(groups.flatMap(g=>[g.leader,...g.members].filter(Boolean)).map(String));
  const assignedCount=activePlayers.filter(({id})=>assignment[id]).length;
  const teamFor=id=>groups.find(g=>String(g.leader)===String(id)||g.members.some(m=>String(m)===String(id)));
- function resetForMatch(nextLegion=legionId,nextTime=matchTime){setLegionId(nextLegion);setMatchTime(nextTime);setBulk('');setPicked('');setPlayerSearch('');setOnlyAvailable(false);setStep('teams');setLocked([]);setPreview(false);setEditingTeam(null);}
+ function resetForMatch(nextLegion=legionId,nextTime=matchTime){setLegionId(nextLegion);setMatchTime(nextTime);setGenerationError('');setBulk('');setPicked('');setPlayerSearch('');setOnlyAvailable(false);setStep('teams');setLocked([]);setPreview(false);setEditingTeam(null);}
  function chooseAll(){if(coreLock)return;autoSelectionPending.current='';setChosen(pool.map(p=>String(p.id)));}
  function toggle(id){const key=String(id);if(coreLock||!pool.some(p=>String(p.id)===key))return;
   if(allTeamIds.has(key)){setCopyMessage('Remove this player from their team before deselecting.');return;}
@@ -184,17 +188,19 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   setPowers(p=>({...p,...updates}));setCopyMessage('Updated '+Object.keys(updates).length+' troop power values in this preview.');setShowBulk(false);
  }
  function generate(){
-  if(coreLock){setCopyMessage('Core teams are locked. Unlock to regenerate; use Add to battle for last-minute players.');return;}
-  if(selectedPlayers.length<4){setCopyMessage('Select at least four players before generating teams.');return;}
+  setGenerationError('');
+  if(coreLock){setGenerationError('Unlock the core before regenerating teams.');return;}
+  if(selectedPlayers.length<4){setGenerationError('Select at least four available players.');return;}
   const unknown=selectedPlayers.filter(p=>powerOf(p.id)===null);
-  if(unknown.length){setCopyMessage('Enter troop power for '+unknown.length+' selected player'+(unknown.length===1?'':'s')+' before generating. Unknown power cannot be counted as zero.');return;}
+  if(unknown.length){setGenerationError('Missing troop power for '+unknown.length+' player'+(unknown.length===1?'':'s')+': '+unknown.slice(0,3).map(name).join(', ')+(unknown.length>3?'…':'')+'. Enter power before generating.');return;}
   const sorted=[...selectedPlayers].sort((a,b)=>powerOf(b.id)-powerOf(a.id));
-  const eligible=sorted.filter(p=>leaderCandidates.some(l=>String(l.id)===String(p.id)));
-  // Preview supports a manual fallback when leadership has not yet been recorded.
-  if(eligible.length<4){setCopyMessage('Four rally leaders are required. Set Rally Lead on player profiles before generating, or choose the four leaders manually below.');return;}
-  const leads=eligible.slice(0,4),used=new Set(leads.map(p=>String(p.id)));
+  const manualLeaders=groups.map(g=>String(g.leader||''));
+  const usableManual=manualLeaders.every(Boolean)&&new Set(manualLeaders).size===4&&manualLeaders.every(id=>selectedIds.includes(id));
+  if(leaderStrategy==='manual'&&!usableManual){setGenerationError('Assign four different selected leaders to the colour teams, or use Highest troop power.');return;}
+  const leads=leaderStrategy==='manual'?manualLeaders:sorted.slice(0,4).map(p=>String(p.id));
+  const used=new Set(leads);
   const joiners=sorted.filter(p=>!used.has(String(p.id)));
-  const next=initialGroups().map((g,i)=>({...g,leader:String(leads[i].id)}));
+  const next=initialGroups().map((g,i)=>({...g,leader:leads[i]}));
   if(mode==='stack'){
    joiners.forEach((p,index)=>{
     const groupIndex=Math.min(3,Math.floor(index/(Math.ceil(joiners.length/4)||1)));
@@ -203,14 +209,16 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   }else{
    const cap=Math.ceil(joiners.length/4);
    joiners.forEach(p=>{
-    const target=[...next].filter(g=>g.members.length<cap).sort((a,b)=>teamPower(a)-teamPower(b)||a.members.length-b.members.length)[0];
-    target.members.push(String(p.id));
+    const eligible=next.filter(g=>g.members.length<cap);
+    const target=eligible.sort((a,b)=>a.members.reduce((n,id)=>n+(powerOf(id)||0),powerOf(a.leader)||0)-b.members.reduce((n,id)=>n+(powerOf(id)||0),powerOf(b.leader)||0)||a.members.length-b.members.length)[0];
+    target?.members.push(String(p.id));
    });
   }
-  if(groups.some(g=>g.leader||g.members.length)&&!window.confirm('Replace the current four teams? Existing manual team assignments and initial buildings will be reset.'))return;
-  setGroups(next);setAssignment({});setConfirmed(false);setStep('teams');setCopyMessage('Generated four '+(mode==='stack'?'power-stacked':'power-balanced')+' teams. Review before confirming.');
+  if(groups.some(g=>g.leader||g.members.length)&&!window.confirm('Replace the current four team assignments? This preserves your participant selection and troop power, but replaces manual team and building allocations.'))return;
+  setGroups(next);setAssignment({});setConfirmed(false);setStep('teams');
+  setCopyMessage('Generated '+joiners.length+' joiners around '+(leaderStrategy==='manual'?'your four chosen leaders':'the four strongest players')+'. Review teams before locking.');
  }
- function moveMember(id,targetKey){
+  function moveMember(id,targetKey){
   const source=teamFor(id);if(!source||String(source.leader)===String(id))return;
   setGroups(old=>old.map(g=>({...g,members:[...g.members.filter(x=>String(x)!==String(id)),...(g.key===targetKey?[String(id)]:[])]})));
   setAssignment(prev=>{const next={...prev};delete next[String(id)];return next;});
@@ -252,7 +260,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  function openTeamCopy(){if(!copyOpen&&!copyDraft){setCopyDraft(teamText);setCopySource(teamText)}setCopyOpen(v=>!v)}
  function regenerateCopy(){setCopyDraft(teamText);setCopySource(teamText);setCopyMessage('Preview updated from current teams.');}
  function lockCore(){if(coreLock){if(!window.confirm('Unlock the core? Auto-generation can replace the published team plan.'))return;setCoreLock(false);return;}
-  if(groups.some(g=>!g.leader)){setCopyMessage('Assign all four rally leaders before locking the core.');return;}
+  if(groups.some(g=>!g.leader)||missing.length>0||!allAssigned.length){setCopyMessage('Assign four leaders and every selected player before locking the core.');return;}
   setCoreSnapshot(groups.map(g=>({...g,members:[...g.members]})));setCoreLock(true);setCopyMessage('Core locked. Existing teams will not be automatically redistributed.');}
  function addLatePlayer(){const id=String(lateId);const target=groups.find(g=>g.color===lateTarget);if(!id||!target||!byId.has(id))return;
   if(allTeamIds.size>=50){setCopyMessage('The 50-player battle roster is full. Remove someone before adding a late arrival.');return;}
