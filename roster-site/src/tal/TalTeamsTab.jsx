@@ -25,7 +25,7 @@ const norahInfo=p=>{
  return matches.length?'Norah':null;
 };
 const norah=p=>norahInfo(p)==='Norah · Skill 5';
-const languageInfo=p=>[...new Set([p?.gameLanguage,...(Array.isArray(p?.languages)?p.languages:[])].map(x=>typeof x==='string'?x:typeof x?.language==='string'?x.language:'').map(x=>x.trim()).filter(Boolean))];
+const languageInfo=p=>p?.communicationLanguage?[String(p.communicationLanguage).trim()]:[...new Set([p?.gameLanguage,...(Array.isArray(p?.languages)?p.languages:[])].map(x=>typeof x==='string'?x:typeof x?.language==='string'?x.language:'').map(x=>x.trim()).filter(Boolean))];
 function textOfTeams(groups,playersById) {
  return groups.map(g=>{
   const leader=g.leader?name(playersById.get(String(g.leader))||{id:g.leader}):'Not assigned';
