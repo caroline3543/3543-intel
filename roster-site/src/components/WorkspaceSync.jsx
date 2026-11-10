@@ -2,7 +2,7 @@ import {useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
 import {conflictLabel} from '../../shared/workspace.js';
 const button={minHeight:44,padding:'10px 12px',fontSize:14,fontWeight:600,borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.icy,cursor:'pointer'};
-function backup(data){const url=URL.createObjectURL(new Blob([JSON.stringify({_version:'3.1.0',...data},null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download=`3573-device-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();URL.revokeObjectURL(url);}
+function backup(data){const url=URL.createObjectURL(new Blob([JSON.stringify({_version:'3.1.0',...data},null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download=`3739-device-backup-${new Date().toISOString().slice(0,10)}.json`;link.click();URL.revokeObjectURL(url);}
 export function WorkspaceSync({sync,data,onPublish,onJoin,onRetry,onResolve}){
  const [linkStatus,setLinkStatus]=useState('');
  async function copyLink(){try{await navigator.clipboard.writeText(window.location.origin);setLinkStatus('Leader link copied. Share it with the current password.');}catch{setLinkStatus(window.location.origin);}}
