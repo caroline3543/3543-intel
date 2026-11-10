@@ -25,7 +25,7 @@ function moveText(rows){
   (g.origin==='No alliance'?'No alliance → '+g.destination:g.origin+' → '+g.destination)+'\n'+g.players.sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'})).map(name=>'• '+name).join('\n')
  ).join('\n\n');
 }
-export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onMessage}){
+export function TalTab({value,players,onChange,onCreatePlayer,onRefreshLegion,legionRefresh,onMessage}){
  const [selected,setSelected]=useState(()=>{try{return window.sessionStorage.getItem('tal:selected-legion')||'';}catch{return '';}});
  const [check,setCheck]=useState('all');
  const [search,setSearch]=useState('');
@@ -35,6 +35,11 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
  const [registrationFilter,setRegistrationFilter]=useState('all');
  const [adding,setAdding]=useState(false);
  const [addQuery,setAddQuery]=useState('');
+ const [addMode,setAddMode]=useState('existing');
+ const [newName,setNewName]=useState('');
+ const [newFid,setNewFid]=useState('');
+ const [newHomeAlliance,setNewHomeAlliance]=useState('');
+ const [newError,setNewError]=useState('');
  const [removeId,setRemoveId]=useState('');
  const [actionsId,setActionsId]=useState('');
  const [previewOpen,setPreviewOpen]=useState(false);
@@ -79,7 +84,7 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
  const addCandidates=team?players.filter(p=>!plannedMemberIds(team).has(p.id)&&(!addQuery||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(addQuery.toLowerCase())))&&matchesTime(p)).sort(compareNames).slice(0,30):[];
  const anyFilter=check!=='all'||timeFilters.length>0||registrationFilter!=='all'||search.trim();
  useEffect(()=>{try{window.sessionStorage.setItem('tal:selected-legion',effectiveSelection);}catch{}},[effectiveSelection]);
- function chooseLegion(id){setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setRemoveId('');setActionsId('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
+ function chooseLegion(id){setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddMode('existing');setRemoveId('');setActionsId('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
  function focusPlayers(){playersAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'});}
  function chooseReadiness(next){setCheck(current=>current===next?'all':next);setListLimit(40);focusPlayers();}
  function resetFilters(){setCheck('all');setSearch('');setTimeFilters([]);setRegistrationFilter('all');setListLimit(40);}
@@ -92,7 +97,21 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
   updateTeam({...team,members:[...(team.members||[]),{id:player.id,role:'pending',registered:false}],candidates:(team.candidates||[]).filter(c=>c.id!==player.id)});
   setAddQuery('');onMessage?.('Added to '+legionLabel(team)+'. Confirm availability and in-game registration.');
  }
- function removePlayer(player){
+ function createTalPlayer(event){
+  event.preventDefault();
+  if(!canEdit||!onCreatePlayer)return;
+  const username=newName.trim(),fid=newFid.trim(),allianceTag=newHomeAlliance.trim().toUpperCase();
+  if(!username){setNewError('Enter the player's in-game name.');return;}
+  if(fid&&!/^[1-9]\\d{3,14}$/.test(fid)){setNewError('Enter a valid numeric game ID or leave it blank.');return;}
+  if(allianceTag&&!/^[A-Z0-9_-]{2,10}$/.test(allianceTag)){setNewError('Enter a valid alliance tag or leave it blank.');return;}
+  const existing=players.find(p=>fid&&String(p.fid||'')===fid||(p.username||'').trim().toLowerCase()===username.toLowerCase());
+  if(existing){setNewError('A matching Members profile already exists. Search for that player instead.');setAddMode('existing');setAddQuery(fid||username);return;}
+  if((team.members||[]).length>=50){setNewError('This legion is full. Remove someone before adding a new player.');return;}
+  const result=onCreatePlayer({username,fid,allianceTag},team.id);
+  if(result===false){setNewError('Unable to add the player. Try again.');return;}
+  setNewName('');setNewFid('');setNewHomeAlliance('');setNewError('');setAdding(false);setAddMode('existing');onMessage?.('New player added to Members and '+legionLabel(team)+'. Availability and registration are pending.');
+ }
+  function removePlayer(player){
   if(!team||value?.locked||tournamentStatus(team)==='eliminated')return;
   updateTeam({...team,members:(team.members||[]).filter(m=>m.id!==player.id),candidates:(team.candidates||[]).filter(c=>c.id!==player.id),captain:team.captain===player.id?'':team.captain});
   setRemoveId('');setActionsId('');onMessage?.('Removed from '+legionLabel(team)+'. Members profile and availability retained.');
@@ -180,16 +199,35 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
       {search&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12}} onClick={()=>setSearch('')}>Clear search ×</button>}
     </div>}
     {team&&<button style={{...button,width:'100%',marginBottom:10,color:C.gold}} disabled={!canEdit} onClick={()=>{setAdding(v=>!v);setRemoveId('');}}>{adding?'Close player picker':'+ Add players'}</button>}
-    {adding&&team&&<div style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:12}}>
-     <label style={{...muted,display:'block',marginBottom:6}}>Add an existing Members profile</label>
-     <input aria-label="Find player to add" value={addQuery} onChange={e=>setAddQuery(e.target.value)} placeholder="Name or player ID" style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:10}}/>
-     <p style={{...muted,margin:'0 0 8px'}}>Availability filters apply. Players already assigned to another legion cannot be added here.</p>
-     {addCandidates.map(p=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:'1px solid '+C.border}}>
+    {adding&&team&&<section aria-label="Add TAL player" style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
+     <div role="group" aria-label="Player source" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
+      <button type="button" aria-pressed={addMode==='existing'} style={{...button,color:addMode==='existing'?C.gold:C.icy,borderColor:addMode==='existing'?C.gold:C.border}} onClick={()=>{setAddMode('existing');setNewError('')}}>From Members</button>
+      <button type="button" aria-pressed={addMode==='new'} style={{...button,color:addMode==='new'?C.gold:C.icy,borderColor:addMode==='new'?C.gold:C.border}} onClick={()=>{setAddMode('new');setNewError('')}}>New player</button>
+     </div>
+     {addMode==='existing'?<>
+      <label style={{...muted,display:'block',marginBottom:6}}>Find an existing player</label>
+      <input aria-label="Find player to add" value={addQuery} onChange={e=>setAddQuery(e.target.value)} placeholder="Name or player ID" style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:10}}/>
+      {addCandidates.map(p=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:'1px solid '+C.border}}>
        <PlayerAvatar player={p} size={38}/><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14,overflowWrap:'anywhere'}}>{p.username||p.alias||'Unknown'}</strong><div style={muted}>{availabilityFor(p).join(' · ')||'Times not confirmed'}</div></div>
-       <button style={{...button,padding:'6px 10px',color:C.gold}} disabled={!canEdit||teams.some(t=>t.id!==team.id&&(t.members||[]).some(m=>m.id===p.id))} onClick={()=>addPlayer(p)}>Add</button>
+       <button type="button" style={{...button,padding:'6px 10px',color:C.gold}} disabled={!canEdit||teams.some(t=>t.id!==team.id&&(t.members||[]).some(m=>m.id===p.id))} onClick={()=>addPlayer(p)}>Add</button>
       </div>)}
-     {!addCandidates.length&&<p style={muted}>No matching profiles.</p>}
-    </div>}
+      {!addCandidates.length&&<p style={muted}>No matching profiles. Choose New player to create one.</p>}
+     </>:<form onSubmit={createTalPlayer} style={{display:'grid',gap:12}}>
+      <p style={{...muted,margin:0}}>Create a Members profile and add it to {legionLabel(team)} in one step.</p>
+      <label style={{fontSize:13,color:C.icy}}>In-game username <span style={{color:C.gold}}>*</span>
+       <input required autoComplete="off" maxLength={120} value={newName} onChange={e=>{setNewName(e.target.value);setNewError('')}} placeholder="Player name" style={{...button,width:'100%',marginTop:5,fontSize:16}}/>
+      </label>
+      <label style={{fontSize:13,color:C.icy}}>Player ID · optional
+       <input inputMode="numeric" autoComplete="off" value={newFid} onChange={e=>{setNewFid(e.target.value.replace(/[^0-9]/g,''));setNewError('')}} placeholder="Numeric game ID" style={{...button,width:'100%',marginTop:5,fontSize:16}}/>
+      </label>
+      <label style={{fontSize:13,color:C.icy}}>Current alliance · optional
+       <input autoCapitalize="characters" autoComplete="off" maxLength={10} value={newHomeAlliance} onChange={e=>{setNewHomeAlliance(e.target.value);setNewError('')}} placeholder="GLR or another alliance" style={{...button,width:'100%',marginTop:5,fontSize:16}}/>
+      </label>
+      {newError&&<p role="alert" style={{color:C.gold,fontSize:13,margin:0}}>{newError}</p>}
+      <button type="submit" disabled={!canEdit||!newName.trim()} style={{...button,background:C.gold,color:C.bg,width:'100%'}}>Create and add to {legionLabel(team)}</button>
+      <p style={{...muted,margin:0}}>Registration and availability remain pending until confirmed. The player can be edited later in Members.</p>
+     </form>}
+    </section>}
     {roster.slice(0,listLimit).map(({team:entryTeam,player,check:status,member})=>{
       const available=availabilityFor(player),isMove=status.status==='move',isCorrect=status.status==='in-host';
       const shownStat=sort==='troop'?'TAL troop power '+compact(value?.records?.[player.id]?.troopPower):sort==='city'?'City power '+compact(player.power??player.providerStats?.power):sort==='labyrinth'?'Labyrinth '+(player.providerRankings?.labyrinth?.rank?'#'+player.providerRankings.labyrinth.rank:'Not recorded'):sort==='joiner'?'Joiner strength '+([player.troops?.infantry,player.troops?.lancer,player.troops?.marksman].every(t=>String(t||'').startsWith('Helios'))?'Full Helios':'See troop tiers'):null;
