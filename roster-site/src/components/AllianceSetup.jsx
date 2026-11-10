@@ -2,7 +2,7 @@ import {useRef,useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
 import {fetchMightpulseAlliance} from '../../../src/services/mightpulseService.js';
 import {allianceRows} from '../../../src/services/allianceImportService.js';
-export const DEFAULT_ALLIANCES=['HOT','ARC','RKG','LUN'];
+export const DEFAULT_ALLIANCES=['GLR'];
 const button={minHeight:44,minWidth:76,padding:'10px 14px',fontSize:14,fontWeight:600,borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.icy,cursor:'pointer'};
 export function AllianceSetup({players,onLoad}){
   const [status,setStatus]=useState({}),[busy,setBusy]=useState(false);
@@ -15,8 +15,8 @@ export function AllianceSetup({players,onLoad}){
       for(const tag of tags){
         setStatus(prev=>({...prev,[tag]:{state:'loading'}}));
         try{
-          const response=await fetchMightpulseAlliance(3573,tag);
-          const rows=allianceRows(response,'3573',tag);
+          const response=await fetchMightpulseAlliance(3739,tag);
+          const rows=allianceRows(response,'3739',tag);
           if(!rows.length)throw new Error('No players found. Check the alliance tag.');
           await onLoad(rows);
           setStatus(prev=>({...prev,[tag]:{state:'done',count:rows.length}}));
@@ -30,10 +30,10 @@ export function AllianceSetup({players,onLoad}){
   const hasDefaults=DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag));
   return <section aria-label="Your alliances" style={{margin:'16px 20px 4px',padding:16,borderRadius:14,background:C.section}}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}><h2 style={{fontSize:18,margin:0}}>Your alliances</h2><button style={button} aria-expanded={expanded} disabled={busy} onClick={()=>setExpanded(!expanded)}>{expanded?"Hide":"Manage"}</button></div>
-    {!expanded&&<p style={{fontSize:14,color:C.icy,marginBottom:0}}>HOT · ARC · RKG · LUN</p>}
+    {!expanded&&<p style={{fontSize:14,color:C.icy,marginBottom:0}}>GLR</p>}
     {expanded&&<>
-    <p style={{fontSize:14,color:C.icy,lineHeight:1.5,margin:'0 0 14px'}}>Load HOT, ARC, RKG and LUN from State 3573.</p>
-    <button style={{...button,width:'100%',background:C.gold,color:C.bg,marginBottom:10}} disabled={busy} onClick={()=>load(DEFAULT_ALLIANCES)}>{busy?'Loading…':hasDefaults?'Refresh all four':'Load all four'}</button>
+    <p style={{fontSize:14,color:C.icy,lineHeight:1.5,margin:'0 0 14px'}}>Load GLR from State 3739.</p>
+    <button style={{...button,width:'100%',background:C.gold,color:C.bg,marginBottom:10}} disabled={busy} onClick={()=>load(DEFAULT_ALLIANCES)}>{busy?'Loading…':hasDefaults?'Refresh GLR':'Load GLR'}</button>
     {DEFAULT_ALLIANCES.map(tag=>{
       const count=players.filter(p=>p.allianceTag===tag).length;
       const item=status[tag];
