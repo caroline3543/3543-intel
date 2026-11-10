@@ -272,34 +272,51 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     {roster.slice(0,listLimit).map(({team:entryTeam,player,check:status,member})=>{
       const available=availabilityFor(player),isMove=status.status==='move',isCorrect=status.status==='in-host';
       const shownStat=sort==='troop'?'TAL troop power '+compact(value?.records?.[player.id]?.troopPower):sort==='city'?'City power '+compact(player.power??player.providerStats?.power):sort==='labyrinth'?'Labyrinth '+(player.providerRankings?.labyrinth?.rank?'#'+player.providerRankings.labyrinth.rank:'Not recorded'):sort==='joiner'?'Joiner strength '+([player.troops?.infantry,player.troops?.lancer,player.troops?.marksman].every(t=>String(t||'').startsWith('Helios'))?'Full Helios':'See troop tiers'):null;
-      return <article key={player.id} style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:8}}>
-       <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <PlayerAvatar player={player} size={46}/>
-        <div style={{flex:1,minWidth:0}}>
-         <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}><strong style={{fontSize:16,overflowWrap:'anywhere'}}>{player.username||player.alias||'Unknown player'}</strong>{player.furnaceLevel&&<span style={{fontSize:12,color:C.gold}}>{player.furnaceLevel}</span>}</div>
-         <div style={{...muted,marginTop:3}}>{status.tag||player.allianceTag||'Alliance unknown'} · {legionLabel(entryTeam)}{!member?' · Proposed':''}</div>
+      const editable=!value?.locked&&tournamentStatus(entryTeam)!=='eliminated';
+      const revealed=swipeId===String(player.id);
+      const selectedEditing=editingTimes===String(player.id);
+      const statusText=member?.registered?'Registered':member?'Needs registration':'Proposed';
+      return <article key={player.id} onPointerDown={e=>onSwipeDown(e,String(player.id))} onPointerUp={e=>onSwipeUp(e,String(player.id),!!member&&editable)} onPointerCancel={()=>{gesture.current=null;}} style={{background:C.card,borderRadius:11,marginBottom:8,overflow:'hidden',touchAction:'pan-y'}}>
+       {revealed&&member&&<div role="group" aria-label={'Registration action for '+(player.username||player.alias||'player')} style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',padding:'9px 11px',background:C.section}}>
+        <button type="button" style={{...button,color:member.registered?C.gold:C.green,background:C.card}} disabled={!editable} onClick={()=>setRegistration(entryTeam,player.id,!member.registered)}>{member.registered?'Mark unregistered':'Confirm registered'}</button>
+        <button type="button" aria-label="Close swipe actions" style={{...button,minWidth:44,padding:8}} onClick={()=>setSwipeId('')}>✕</button>
+       </div>}
+       <div style={{display:'flex',alignItems:'center',gap:6,padding:'10px 10px 5px'}}>
+        <button type="button" title="Open Members profile" aria-label={'Open profile for '+(player.username||player.alias||'player')} style={{display:'flex',alignItems:'center',flex:1,minWidth:0,gap:10,padding:'4px 0',textAlign:'left',background:'transparent',border:0,color:C.white,cursor:'pointer',minHeight:48}} onClick={()=>{setSwipeId('');setActionsId('');onOpenPlayer?.(player.id)}}>
+         <PlayerAvatar player={player} size={44}/>
+         <span style={{flex:1,minWidth:0}}>
+          <span style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:7}}><strong style={{fontSize:16,overflowWrap:'anywhere'}}>{player.username||player.alias||'Unknown player'}</strong>{player.furnaceLevel&&<span style={{fontSize:12,color:C.gold}}>{player.furnaceLevel}</span>}</span>
+          <span style={{...muted,display:'block',marginTop:3}}>{status.tag||player.allianceTag||'Alliance unknown'} · {legionLabel(entryTeam)}{!member?' · Proposed':''}</span>
+         </span>
+        </button>
+        <button type="button" title="Player actions" aria-label={'Actions for '+(player.username||player.alias||'player')} aria-expanded={actionsId===player.id} style={{...button,minWidth:44,padding:7,background:'transparent',border:0,fontSize:20}} onClick={()=>{setActionsId(actionsId===player.id?'':player.id);setSwipeId('');setRemoveId('')}}>•••</button>
+       </div>
+       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'2px 11px 10px'}}>
+        <button type="button" aria-label={'Edit availability for '+(player.username||player.alias||'player')} onClick={()=>beginEditTimes(player)} style={{border:0,background:'transparent',padding:'7px 0',color:C.icy,cursor:'pointer',fontSize:12,textAlign:'left',minHeight:38}}>UTC: {available.length?available.join(' · '):'Unknown'} <span aria-hidden="true" style={{color:C.gold}}>✎</span></button>
+        <span style={{marginLeft:'auto',fontSize:12,fontWeight:600,color:member?.registered?C.green:member?C.gold:C.icy}}>{statusText}</span>
+       </div>
+       {(isMove||shownStat)&&<div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'0 11px 10px',color:isMove?C.gold:C.icy,fontSize:12}}>{isMove&&<span>Move {status.tag||'No alliance'} → {entryTeam.host}</span>}{shownStat&&<span>{shownStat}</span>}</div>}
+       {actionsId===player.id&&<div style={{padding:'8px 11px 12px',background:C.section,display:'grid',gap:5}}>
+        {member&&<button type="button" style={{...button,textAlign:'left',color:member.registered?C.gold:C.green}} disabled={!editable} onClick={()=>setRegistration(entryTeam,player.id,!member.registered)}>{member.registered?'Mark registration pending':'Confirm registered'}</button>}
+        <button type="button" style={{...button,textAlign:'left'}} onClick={()=>beginEditTimes(player)}>Edit available times</button>
+        <button type="button" style={{...button,textAlign:'left'}} onClick={()=>{setActionsId('');onOpenPlayer?.(player.id)}}>Open Members profile</button>
+        {member&&<button type="button" style={{...button,textAlign:'left',color:C.red}} disabled={!editable} onClick={()=>setRemoveId(player.id)}>Remove from legion…</button>}
+       </div>}
+       {selectedEditing&&<section aria-label={'Edit availability for '+(player.username||player.alias||'player')} style={{padding:'12px 11px',background:C.section}}>
+        <strong style={{fontSize:14}}>Available times · UTC</strong>
+        <p style={{...muted,margin:'6px 0 10px'}}>Tap a time to cycle: Unknown → Available → Unavailable.</p>
+        <div role="group" aria-label="Set time preferences" style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:5}}>
+         {times.map(t=>{const state=timesDraft[t]||'unknown',next=state==='unknown'?'available':state==='available'?'unavailable':'unknown';return <button key={t} type="button" aria-label={t+' UTC: '+state+'. Change to '+next} aria-pressed={state==='available'} onClick={()=>setTimesDraft(old=>({...old,[t]:next}))} style={{...button,minWidth:0,minHeight:58,padding:'5px 2px',background:state==='available'?C.green+'22':state==='unavailable'?C.red+'17':C.card,borderColor:state==='available'?C.green:state==='unavailable'?C.red:C.border}}>
+          <span style={{display:'block',fontSize:11,color:C.white}}>{t}</span><span style={{display:'block',fontSize:10,marginTop:3,color:state==='available'?C.green:state==='unavailable'?C.red:C.icy}}>{state==='available'?'Yes':state==='unavailable'?'No':'Unknown'}</span>
+         </button>})}
         </div>
-        {team&&<button aria-label={'Options for '+(player.username||player.alias||'player')} aria-expanded={actionsId===player.id} style={{...button,minWidth:44,padding:8,background:'transparent'}} onClick={()=>{setActionsId(actionsId===player.id?'':player.id);setRemoveId('');}}>•••</button>}
-       </div>
-       <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginTop:9}}>
-        <span style={{fontSize:11,color:C.icy}}>UTC</span>
-        {available.length?available.map(t=><span key={t} style={{fontSize:12,padding:'4px 7px',borderRadius:6,background:timeFilters.includes(t)?C.green+'22':C.section,border:'1px solid '+(timeFilters.includes(t)?C.green:C.border),color:timeFilters.includes(t)?C.green:C.icy}}>{t}</span>):<span style={{fontSize:12,color:C.icy}}>Times not confirmed</span>}
-       </div>
-       <div style={{display:'flex',flexWrap:'wrap',gap:'4px 12px',marginTop:9,alignItems:'center'}}>
-        <span style={{fontSize:13,fontWeight:isMove?600:400,color:isMove?C.gold:isCorrect?C.green:C.icy}}>{isMove?'Move '+(status.tag||'No alliance')+' → '+entryTeam.host:isCorrect?'In correct alliance':'Alliance unverified'}</span>
-        {member&&!member.registered&&<span style={{fontSize:12,color:C.gold}}>Needs registration</span>}
-        {member?.registered&&<span style={{fontSize:12,color:C.green}}>Registered</span>}
-       </div>
-       {shownStat&&<div style={{...muted,marginTop:7}}>{shownStat}</div>}
-       {actionsId===player.id&&team&&<div style={{paddingTop:10,marginTop:10,borderTop:'1px solid '+C.border}}>
-        <button style={{...button,color:C.red,width:'100%',textAlign:'left'}} disabled={!canEdit} onClick={()=>setRemoveId(player.id)}>Remove from legion…</button>
-        <div style={{...muted,marginTop:6}}>Player ID: {player.fid||'Not recorded'}</div>
+        <div style={{display:'flex',gap:8,marginTop:12}}><button style={{...button,flex:1}} onClick={()=>setEditingTimes('')}>Cancel</button><button style={{...button,flex:1,background:C.gold,color:C.bg}} disabled={!!value?.locked} onClick={()=>saveTimes(player)}>Save times</button></div>
+       </section>}
+       {removeId===player.id&&member&&<div style={{padding:'10px 11px',background:C.section}}>
+        <p style={{...muted,margin:'0 0 10px'}}>Remove from {legionLabel(entryTeam)}? The Members profile and availability will remain.</p>
+        <div style={{display:'flex',gap:8}}><button style={button} onClick={()=>setRemoveId('')}>Cancel</button><button style={{...button,color:C.red}} disabled={!editable} onClick={()=>{onChange?.({...value,teams:value.teams.map(t=>t.id===entryTeam.id?{...t,members:t.members.filter(m=>String(m.id)!==String(player.id)),candidates:(t.candidates||[]).filter(c=>String(c.id)!==String(player.id)),captain:t.captain===player.id?'':t.captain}:t)});setRemoveId('');setActionsId('');onMessage?.('Removed from legion. Members profile retained.');}}>Remove</button></div>
        </div>}
-       {removeId===player.id&&team&&<div style={{paddingTop:10,marginTop:10,borderTop:'1px solid '+C.border}}>
-        <p style={{...muted,margin:'0 0 10px'}}>Remove from {legionLabel(team)}? This keeps the Members profile and availability.</p>
-        <div style={{display:'flex',gap:8}}><button style={button} onClick={()=>setRemoveId('')}>Cancel</button><button style={{...button,color:C.red}} disabled={!canEdit} onClick={()=>removePlayer(player)}>Remove player</button></div>
-       </div>}
-      </article>;
+      </article>;icle>;
     })}
     {!roster.length&&<div style={{padding:18,background:C.card,borderRadius:12,color:C.icy,fontSize:14}}>No players match the current filters. <button style={{...button,marginTop:10,width:'100%'}} onClick={resetFilters}>Clear filters</button></div>}
     {roster.length>listLimit&&<button style={{...button,width:'100%',marginTop:8}} onClick={()=>setListLimit(n=>n+40)}>Show 40 more players</button>}
