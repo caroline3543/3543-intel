@@ -25,7 +25,7 @@ function moveText(rows){
   (g.origin==='No alliance'?'No alliance → '+g.destination:g.origin+' → '+g.destination)+'\n'+g.players.sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'})).map(name=>'• '+name).join('\n')
  ).join('\n\n');
 }
-export function TalTab({value,players,onChange,onCreatePlayer,onRefreshLegion,legionRefresh,onMessage}){
+export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legionRefresh,onMessage}){
  const [selected,setSelected]=useState(()=>{try{return window.sessionStorage.getItem('tal:selected-legion')||'';}catch{return '';}});
  const [check,setCheck]=useState('all');
  const [search,setSearch]=useState('');
@@ -35,11 +35,15 @@ export function TalTab({value,players,onChange,onCreatePlayer,onRefreshLegion,le
  const [registrationFilter,setRegistrationFilter]=useState('all');
  const [adding,setAdding]=useState(false);
  const [addQuery,setAddQuery]=useState('');
- const [addMode,setAddMode]=useState('existing');
- const [newName,setNewName]=useState('');
- const [newFid,setNewFid]=useState('');
- const [newHomeAlliance,setNewHomeAlliance]=useState('');
- const [newError,setNewError]=useState('');
+ const [addSearch,setAddSearch]=useState('');
+ const [addTimes,setAddTimes]=useState([]);
+ const [addRule,setAddRule]=useState('any');
+ const [addSelected,setAddSelected]=useState([]);
+ const [swipeId,setSwipeId]=useState('');
+ const gesture=useRef(null);
+ const [editingTimes,setEditingTimes]=useState('');
+ const [timesDraft,setTimesDraft]=useState({});
+ const [addingReview,setAddingReview]=useState(false);
  const [removeId,setRemoveId]=useState('');
  const [actionsId,setActionsId]=useState('');
  const [previewOpen,setPreviewOpen]=useState(false);
@@ -81,10 +85,16 @@ export function TalTab({value,players,onChange,onCreatePlayer,onRefreshLegion,le
   return compareNames(a.player,b.player);
  });
  const movePreview=moveText(entries);
- const addCandidates=team?players.filter(p=>!plannedMemberIds(team).has(p.id)&&(!addQuery||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(addQuery.toLowerCase()))) ).sort(compareNames).slice(0,50):[];
+ const otherAssigned=new Set(teams.filter(t=>t.id!==team?.id).flatMap(t=>(t.members||[]).map(m=>String(m.id))));
+ const alreadyHere=new Set(team?[...plannedMemberIds(team)].map(String):[]);
+ const addMatches=team?players.filter(p=>!alreadyHere.has(String(p.id))&&!p.blacklisted&&(!addSearch||[p.username,p.alias,p.fid,p.id].some(v=>String(v||'').toLowerCase().includes(addSearch.trim().toLowerCase())))&&(!addTimes.length||(addRule==='all'?addTimes.every(t=>availabilityFor(p).includes(t)):addTimes.some(t=>availabilityFor(p).includes(t))))).sort(compareNames):[];
+ const addEligible=addMatches.filter(p=>!otherAssigned.has(String(p.id)));
+ const selectedAdd=addSelected.filter(id=>addEligible.some(p=>String(p.id)===id));
+ const remaining=team?Math.max(0,50-(team.members||[]).length):0;
+ const canBatch=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated'&&selectedAdd.length>0&&selectedAdd.length<=remaining;
  const anyFilter=check!=='all'||timeFilters.length>0||registrationFilter!=='all'||search.trim();
  useEffect(()=>{try{window.sessionStorage.setItem('tal:selected-legion',effectiveSelection);}catch{}},[effectiveSelection]);
- function chooseLegion(id){setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddMode('existing');setRemoveId('');setActionsId('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
+ function chooseLegion(id){setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
  function focusPlayers(){playersAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'});}
  function chooseReadiness(next){setCheck(current=>current===next?'all':next);setListLimit(40);focusPlayers();}
  function resetFilters(){setCheck('all');setSearch('');setTimeFilters([]);setRegistrationFilter('all');setListLimit(40);}
@@ -97,19 +107,44 @@ export function TalTab({value,players,onChange,onCreatePlayer,onRefreshLegion,le
   updateTeam({...team,members:[...(team.members||[]),{id:player.id,role:'pending',registered:false}],candidates:(team.candidates||[]).filter(c=>c.id!==player.id)});
   setAddQuery('');onMessage?.('Added to '+legionLabel(team)+'. Confirm availability and in-game registration.');
  }
- function createTalPlayer(event){
-  event.preventDefault();
-  if(!canEdit||!onCreatePlayer)return;
-  const username=newName.trim(),fid=newFid.trim(),allianceTag=newHomeAlliance.trim().toUpperCase();
-  if(!username){setNewError("Enter the player's in-game name.");return;}
-  if(fid&&!/^[1-9]\d{3,14}$/.test(fid)){setNewError('Enter a valid numeric game ID or leave it blank.');return;}
-  if(allianceTag&&!/^[A-Z0-9_-]{2,10}$/.test(allianceTag)){setNewError('Enter a valid alliance tag or leave it blank.');return;}
-  const existing=players.find(p=>fid&&String(p.fid||'')===fid||(p.username||'').trim().toLowerCase()===username.toLowerCase());
-  if(existing){setNewError('A matching Members profile already exists. Search for that player instead.');setAddMode('existing');setAddQuery(fid||username);return;}
-  if((team.members||[]).length>=50){setNewError('This legion is full. Remove someone before adding a new player.');return;}
-  const result=onCreatePlayer({username,fid,allianceTag},team.id);
-  if(result===false){setNewError('Unable to add the player. Try again.');return;}
-  setNewName('');setNewFid('');setNewHomeAlliance('');setNewError('');setAdding(false);setAddMode('existing');onMessage?.('New player added to Members and '+legionLabel(team)+'. Availability and registration are pending.');
+ function batchAddPlayers(){
+  if(!canBatch)return;
+  const ids=new Set(selectedAdd);
+  if(teams.some(t=>t.id!==team.id&&(t.members||[]).some(m=>ids.has(String(m.id))))){onMessage?.('A selected player is already assigned to another legion. Review selection.');return;}
+  if((team.members||[]).length+ids.size>50){onMessage?.('Not enough legion spaces. Review selection.');return;}
+  updateTeam({...team,members:[...(team.members||[]),...selectedAdd.map(id=>({id,role:'pending',registered:false}))],candidates:(team.candidates||[]).filter(c=>!ids.has(String(c.id)))});
+  setAddSelected([]);setAdding(false);setAddingReview(false);
+  onMessage?.(ids.size+' Members player'+(ids.size===1?'':'s')+' added to '+legionLabel(team)+'. Registration remains pending.');
+ }
+ function setRegistration(entryTeam,playerId,registered){
+  if(!entryTeam||value?.locked||tournamentStatus(entryTeam)==='eliminated')return;
+  onChange?.({...value,teams:(value?.teams||[]).map(t=>t.id!==entryTeam.id?t:{...t,members:(t.members||[]).map(m=>String(m.id)===String(playerId)?{...m,registered}:m)})});
+  setSwipeId('');setActionsId('');
+  onMessage?.(registered?'Registration confirmed.':'Registration marked pending.');
+ }
+ function beginEditTimes(player){
+  const record=value?.records?.[player.id]||{};
+  const yes=new Set(availabilityFor(player));
+  const no=new Set(record.unavailableTimes||[]);
+  setTimesDraft(Object.fromEntries(times.map(t=>[t,yes.has(t)?'available':no.has(t)?'unavailable':'unknown'])));
+  setEditingTimes(String(player.id));setActionsId('');setSwipeId('');
+ }
+ function saveTimes(player){
+  if(value?.locked)return;
+  const yes=times.filter(t=>timesDraft[t]==='available'),no=times.filter(t=>timesDraft[t]==='unavailable');
+  const old=value?.records?.[player.id]||{};
+  const nextRecord={...old,times:yes,unavailableTimes:no,status:yes.length?'available':'pending'};
+  onChange?.({...value,records:{...(value?.records||{}),[player.id]:nextRecord},availability:{...(value?.availability||{}),[player.id]:yes}});
+  setEditingTimes('');onMessage?.('Updated '+(player.username||player.alias||'player')+' availability.');
+ }
+ function onSwipeDown(e,id){if(e.pointerType==='mouse'&&e.button!==0)return;gesture.current={id,x:e.clientX,y:e.clientY};}
+ function onSwipeUp(e,id,canReveal){
+  const p=gesture.current;gesture.current=null;
+  if(!p||p.id!==id||!canReveal)return;
+  const dx=e.clientX-p.x,dy=e.clientY-p.y;
+  if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.4){
+   setSwipeId(dx<0?id:'');setActionsId('');setEditingTimes('');
+  }
  }
   function removePlayer(player){
   if(!team||value?.locked||tournamentStatus(team)==='eliminated')return;
