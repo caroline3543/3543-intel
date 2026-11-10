@@ -116,20 +116,20 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     {name:'Joiners',members:displayed.filter(p=>!p.roles?.includes('Rally Lead')&&!p.blacklisted)},
     {name:'Excluded from battle plans',members:displayed.filter(p=>p.blacklisted)},
   ];
-  return <div style={{padding:'16px 20px 0'}}>
+  return <div style={{padding:'12px 20px 0'}}>
     {players.length>0 && <>
 
       <PlayerSearch label="Search roster" players={players} value={search} onChange={setSearch} onSelect={p=>{setSearch(p.fid||p.username||p.alias);openProfile(p);}}/>
-      <div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:6,marginBottom:10}}>
+      <div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:6,marginBottom:7}}>
         {[['','All alliances'],...allianceTags.map(tag=>[tag,`[${tag}]`])].map(([tag,label])=><button key={tag||'all'} aria-pressed={filters.alliance===tag} onClick={()=>{setFilters({...filters,alliance:filters.alliance===tag?'':tag});}} style={{...button,flexShrink:0,color:filters.alliance===tag?C.gold:C.icy,borderColor:filters.alliance===tag?C.gold:C.border}}>{label}{tag?` · ${players.filter(p=>p.allianceTag===tag).length}`:''}</button>)}
       </div>
-      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
+      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
         <button style={button} aria-expanded={filtersOpen} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button>
         <label style={{flex:1,minWidth:0}}><span style={{position:'absolute',width:1,height:1,overflow:'hidden'}}>Sort by</span><select aria-label="Sort by" value={sort} onChange={e=>{const field=e.target.value;setSort(field);setSortDirection(field==='name'||field==='labyrinth'?'asc':'desc');}} style={{...button,width:'100%',fontSize:14}}>{SORT_FIELDS.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
         <button style={{...button,minWidth:44,padding:'10px 8px',flexShrink:0}} aria-label={sortDirection==='asc'?'Sort ascending. Tap for descending':'Sort descending. Tap for ascending'} title={sortDirection==='asc'?'Ascending · switch to descending':'Descending · switch to ascending'} onClick={()=>setSortDirection(d=>d==='asc'?'desc':'asc')}>{sortDirection==='asc'?'↑':'↓'} <span style={{fontSize:12}}>{sortDirection==='asc'?'Asc':'Desc'}</span></button>
         <button style={button} onClick={()=>{if(selecting)stopSelection();else setSelecting(true);}}>{selecting?'Done':'Select'}</button>
       </div>
-      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}><button style={{...button,minHeight:36,fontSize:13,padding:'6px 10px',background:'transparent'}} aria-expanded={optionsOpen} onClick={()=>setOptionsOpen(!optionsOpen)}>Roster options {optionsOpen?'▴':'▾'}</button></div>
+      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:2}}><button style={{...button,minHeight:36,fontSize:13,padding:'6px 10px',background:'transparent'}} aria-expanded={optionsOpen} onClick={()=>setOptionsOpen(!optionsOpen)}>Roster options {optionsOpen?'▴':'▾'}</button></div>
       {optionsOpen && <div style={{display:'grid',gap:8,padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
         <button style={button} onClick={()=>{setGrouped(!grouped);setOptionsOpen(false);}}>{grouped?'Show list':'Group by role'}</button>
         <button style={button} onClick={()=>{setFieldsOpen(true);setOptionsOpen(false);}}>Update player details</button>
