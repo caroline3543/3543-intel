@@ -37,7 +37,8 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [addQuery,setAddQuery]=useState('');
  const [addSearch,setAddSearch]=useState('');
  const [addTimes,setAddTimes]=useState([]);
- const [addRule,setAddRule]=useState('any');
+ const [batchStatus,setBatchStatus]=useState('needs');
+ const [timeMerge,setTimeMerge]=useState('add');
  const [addSelected,setAddSelected]=useState([]);
  const [swipeId,setSwipeId]=useState('');
  const gesture=useRef(null);
@@ -87,14 +88,15 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const movePreview=moveText(entries);
  const otherAssigned=new Set(teams.filter(t=>t.id!==team?.id).flatMap(t=>(t.members||[]).map(m=>String(m.id))));
  const alreadyHere=new Set(team?[...plannedMemberIds(team)].map(String):[]);
- const addMatches=team?players.filter(p=>!alreadyHere.has(String(p.id))&&!p.blacklisted&&(!addSearch||[p.username,p.alias,p.fid,p.id].some(v=>String(v||'').toLowerCase().includes(addSearch.trim().toLowerCase())))&&(!addTimes.length||(addRule==='all'?addTimes.every(t=>availabilityFor(p).includes(t)):addTimes.some(t=>availabilityFor(p).includes(t))))).sort(compareNames):[];
+ const addMatches=team?players.filter(p=>!alreadyHere.has(String(p.id))&&!p.blacklisted&&(!addSearch||[p.username,p.alias,p.fid,p.id].some(v=>String(v||'').toLowerCase().includes(addSearch.trim().toLowerCase())))).sort(compareNames):[];
  const addEligible=addMatches.filter(p=>!otherAssigned.has(String(p.id)));
  const selectedAdd=addSelected.filter(id=>addEligible.some(p=>String(p.id)===id));
  const remaining=team?Math.max(0,50-(team.members||[]).length):0;
- const canBatch=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated'&&selectedAdd.length>0&&selectedAdd.length<=remaining;
+ const countedAdd=batchStatus==='considering'?0:selectedAdd.length;
+ const canBatch=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated'&&selectedAdd.length>0&&countedAdd<=remaining;
  const anyFilter=check!=='all'||timeFilters.length>0||registrationFilter!=='all'||search.trim();
  useEffect(()=>{try{window.sessionStorage.setItem('tal:selected-legion',effectiveSelection);}catch{}},[effectiveSelection]);
- function chooseLegion(id){setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
+ function chooseLegion(id){setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setBatchStatus('needs');setTimeMerge('add');setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
  function focusPlayers(){playersAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'});}
  function chooseReadiness(next){setCheck(current=>current===next?'all':next);setListLimit(40);focusPlayers();}
  function resetFilters(){setCheck('all');setSearch('');setTimeFilters([]);setRegistrationFilter('all');setListLimit(40);}
@@ -109,14 +111,24 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  }
  function batchAddPlayers(){
   if(!canBatch)return;
-  const ids=new Set(selectedAdd);
-  if(teams.some(t=>t.id!==team.id&&(t.members||[]).some(m=>ids.has(String(m.id))))){onMessage?.('A selected player is already assigned to another legion. Review selection.');return;}
-  if((team.members||[]).length+ids.size>50){onMessage?.('Not enough legion spaces. Review selection.');return;}
-  updateTeam({...team,members:[...(team.members||[]),...selectedAdd.map(id=>({id,role:'pending',registered:false}))],candidates:(team.candidates||[]).filter(c=>!ids.has(String(c.id)))});
+  const ids=new Set(selectedAdd),considering=batchStatus==='considering';
+  if(teams.some(t=>t.id!==team.id&&(t.members||[]).some(m=>ids.has(String(m.id))))){onMessage?.('A selected player is assigned to another legion. Review the selection.');return;}
+  if(!considering&&(team.members||[]).length+ids.size>50){onMessage?.('Not enough legion spaces. Review the selection.');return;}
+  const records={...(value?.records||{})},availability={...(value?.availability||{})};
+  selectedAdd.forEach(id=>{
+    const player=players.find(p=>String(p.id)===id);if(!player)return;
+    const existing=Array.isArray(availabilityFor(player))?availabilityFor(player):[];
+    const updated=timeMerge==='replace'?addTimes:[...new Set([...existing,...addTimes])];
+    records[id]={...(records[id]||{}),times:updated,status:updated.length?'available':records[id]?.status||'pending'};
+    availability[id]=updated;
+  });
+  const nextMembers=considering?[...(team.members||[])]:[...(team.members||[]),...selectedAdd.map(id=>({id,role:'pending',registered:batchStatus==='registered'}))];
+  const nextCandidates=considering?[...(team.candidates||[]).filter(c=>!ids.has(String(c.id))),...selectedAdd.map(id=>({id,role:'candidate',registered:false}))]:(team.candidates||[]).filter(c=>!ids.has(String(c.id)));
+  onChange?.({...value,records,availability,teams:(value?.teams||[]).map(t=>t.id===team.id?{...t,members:nextMembers,candidates:nextCandidates}:t)});
   setAddSelected([]);setAdding(false);setAddingReview(false);
-  onMessage?.(ids.size+' Members player'+(ids.size===1?'':'s')+' added to '+legionLabel(team)+'. Registration remains pending.');
+  onMessage?.(ids.size+' player'+(ids.size===1?'':'s')+' '+(considering?'added for consideration.':'added to '+legionLabel(team)+'.'));
  }
- function setRegistration(entryTeam,playerId,registered){
+  function setRegistration(entryTeam,playerId,registered){
   if(!entryTeam||value?.locked||tournamentStatus(entryTeam)==='eliminated')return;
   onChange?.({...value,teams:(value?.teams||[]).map(t=>t.id!==entryTeam.id?t:{...t,members:(t.members||[]).map(m=>String(m.id)===String(playerId)?{...m,registered}:m)})});
   setSwipeId('');setActionsId('');
@@ -239,14 +251,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       <strong style={{fontSize:16}}>Add from Members</strong><span style={muted}>{remaining} spaces left</span>
      </div>
      <input aria-label="Search Members to add" value={addSearch} onChange={e=>{setAddSearch(e.target.value);setAddingReview(false);}} placeholder="Search name or player ID" style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:12}}/>
-     <strong style={{fontSize:13,color:C.icy}}>Available times · UTC</strong>
-     <div role="group" aria-label="Filter Members by available time" style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:5,margin:'8px 0'}}>
-      {times.map(t=><button key={t} type="button" aria-pressed={addTimes.includes(t)} onClick={()=>{setAddTimes(old=>old.includes(t)?old.filter(x=>x!==t):[...old,t]);setAddingReview(false);}} style={{...button,minWidth:0,padding:3,minHeight:44,fontSize:11,color:addTimes.includes(t)?C.green:C.icy,borderColor:addTimes.includes(t)?C.green:C.border}}>{t}</button>)}
-     </div>
-     <div role="group" aria-label="How availability times must match" style={{display:'flex',gap:8,marginBottom:10}}>
-      {[['any','Any selected time'],['all','All selected times']].map(([id,label])=><button type="button" aria-pressed={addRule===id} key={id} style={{...button,flex:1,padding:7,fontSize:12,color:addRule===id?C.gold:C.icy,borderColor:addRule===id?C.gold:C.border}} onClick={()=>{setAddRule(id);setAddingReview(false);}}>{label}</button>)}
-     </div>
-     <p style={{...muted,margin:'0 0 10px'}}>{addTimes.length?'Players with matching recorded availability.':'All unassigned Members, including people with unknown availability.'} Players in other legions cannot be selected.</p>
+     <p style={{...muted,margin:'0 0 12px'}}>Select Members first, then assign their times and TAL status. Times do not filter the player list.</p>
      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
       <span role="status" style={{...muted}}>{addEligible.length} eligible · {selectedAdd.length} selected</span>
       <div style={{display:'flex',gap:6}}>
@@ -259,12 +264,25 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
        <input type="checkbox" disabled={blocked||!canEdit} checked={checked} onChange={e=>{const id=String(p.id);setAddSelected(old=>e.target.checked?[...new Set([...old,id])]:old.filter(v=>v!==id));setAddingReview(false);}} style={{height:21,width:21,flexShrink:0,accentColor:C.gold}}/>
        <PlayerAvatar player={p} size={36}/><span style={{flex:1,minWidth:0}}><strong style={{fontSize:14,display:'block',overflowWrap:'anywhere'}}>{p.username||p.alias||p.fid}</strong><span style={muted}>{blocked?'Assigned to another legion':availabilityFor(p).join(' · ')||'Availability unknown'}</span></span>
       </label>})}
-      {!addMatches.length&&<p style={{...muted,padding:'12px 0'}}>No matching Members. Create or import profiles in Members first.</p>}
+      {!addMatches.length&&<p style={{...muted,padding:'12px 0'}}>No matching Members. Add profiles in Members first.</p>}
      </div>
-     {!!selectedAdd.length&&<div style={{margin:'12px 0',color:selectedAdd.length>remaining?C.red:C.icy,fontSize:13}}>{selectedAdd.length} selected · {remaining} spaces left{selectedAdd.length>remaining?' · Reduce the selection before continuing.':''}</div>}
+     <div style={{borderTop:'1px solid '+C.border,marginTop:12,paddingTop:12}}>
+      <strong style={{fontSize:14}}>Assign available times · UTC</strong>
+      <div role="group" aria-label="Times to assign to selected players" style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:5,margin:'9px 0'}}>
+       {times.map(t=><button type="button" key={t} aria-pressed={addTimes.includes(t)} onClick={()=>{setAddTimes(old=>old.includes(t)?old.filter(x=>x!==t):[...old,t]);setAddingReview(false)}} style={{...button,padding:'8px 2px',minHeight:44,fontSize:11,minWidth:0,color:addTimes.includes(t)?C.green:C.icy,borderColor:addTimes.includes(t)?C.green:C.border}}>{t}</button>)}
+      </div>
+      <div role="group" aria-label="Existing availability" style={{display:'flex',gap:8,marginBottom:12}}>
+       {[['add','Add to existing times'],['replace','Replace times']].map(([id,label])=><button type="button" key={id} aria-pressed={timeMerge===id} style={{...button,flex:1,fontSize:12,padding:7,color:timeMerge===id?C.gold:C.icy,borderColor:timeMerge===id?C.gold:C.border}} onClick={()=>{setTimeMerge(id);setAddingReview(false)}}>{label}</button>)}
+      </div>
+      <strong style={{fontSize:14}}>TAL status</strong>
+      <div role="radiogroup" aria-label="TAL status for selected players" style={{display:'grid',gap:6,margin:'8px 0'}}>
+       {[['considering','Considering for team'],['needs','Needs registration'],['registered','Registered in game']].map(([id,label])=><label key={id} style={{display:'flex',alignItems:'center',gap:9,minHeight:38,fontSize:14}}><input type="radio" checked={batchStatus===id} onChange={()=>{setBatchStatus(id);setAddingReview(false)}} style={{width:18,height:18,accentColor:C.gold}}/>{label}</label>)}
+      </div>
+      <p role="status" style={{...muted,margin:'4px 0 8px',color:countedAdd>remaining?C.red:C.icy}}>{selectedAdd.length} selected · {remaining} confirmed roster spaces{countedAdd>remaining?' · Reduce selection to continue.':''}</p>
+     </div>
      {addingReview&&<div role="region" aria-label="Review batch addition" style={{padding:10,background:C.section,borderRadius:9,margin:'10px 0'}}>
-      <strong style={{fontSize:14}}>Confirm {selectedAdd.length} players</strong>
-      <p style={{...muted}}>They will be added as pending, not marked registered. Availability will be preserved.</p>
+      <strong style={{fontSize:14}}>Review {selectedAdd.length} players</strong>
+      <p style={{...muted}}>{batchStatus==='considering'?'Considering, no roster slots consumed':batchStatus==='registered'?'Registered in game':'Needs registration'} · {addTimes.length?addTimes.join(', ')+' UTC':'No times chosen'} · {timeMerge==='add'?'Keep existing times':'Replace existing times'}</p>
       <div style={{fontSize:13,maxHeight:125,overflowY:'auto'}}>{selectedAdd.map(id=><div key={id}>{players.find(p=>String(p.id)===id)?.username||id}</div>)}</div>
      </div>}
      <button type="button" disabled={!canBatch} style={{...button,width:'100%',background:canBatch?C.gold:C.section,color:canBatch?C.bg:C.icy,marginTop:10}} onClick={()=>addingReview?batchAddPlayers():setAddingReview(true)}>{addingReview?'Confirm add '+selectedAdd.length+' players':'Review '+selectedAdd.length+' selected'}</button>
