@@ -273,13 +273,13 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   setChosen(old=>old.filter(x=>String(x)!==String(id)));setAbsentIds(old=>old.filter(x=>String(x)!==String(id)));setAssignment(old=>{const n={...old};delete n[String(id)];return n;});}
  return <section style={{padding:'14px 20px 35px'}}>
   <h2 style={{fontSize:25,letterSpacing:'-.4px',margin:'0 0 8px'}}>TAL Teams</h2>
-  <p style={{...small,margin:'0 0 10px'}}>Build teams, then allocate every player to a building.</p>
+  <p style={{...small,margin:'0 0 10px'}}>{coreLock?'Update live teams without reshuffling the core.':'Choose participants, generate teams, review, then lock your battle plan.'}</p>
   {!legions.length?<p style={{...panel,...small}}>No legions in your TAL plan. Assign players in TAL Planner first.</p>:<>
    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
     <label style={small}>Legion<select value={selectedLegion?.id||''} onChange={e=>resetForMatch(e.target.value,matchTime)} style={{...btn,width:'100%',marginTop:5}}>{legions.map(t=><option value={t.id} key={t.id}>{legionLabel(t)}</option>)}</select></label>
     <label style={small}>Match time · UTC<select value={matchTime} onChange={e=>resetForMatch(legionId,e.target.value)} style={{...btn,width:'100%',marginTop:5}}>{(value?.times||DEFAULT_TIMES).map(t=><option key={t}>{t}</option>)}</select></label>
    </div>
-   <div role="status" style={{fontSize:12,color:draftState.startsWith('Could not')?C.gold:'#B5C8D6',marginBottom:9}}>{draftState} · Match drafts stay on this device</div>
+   <div role="status" style={{fontSize:12,color:draftState.startsWith('Could not')?C.gold:'#B5C8D6',marginBottom:9}}>{draftState}</div>
    <div role="tablist" aria-label="TAL team planning phase" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
     <button role="tab" aria-selected={step==='teams'} style={{...btn,color:step==='teams'?C.gold:C.icy,borderColor:step==='teams'?C.gold:C.border}} onClick={()=>setStep('teams')}>1 · Colour teams</button>
     <button role="tab" aria-selected={step==='buildings'} style={{...btn,color:step==='buildings'?C.gold:C.icy,borderColor:step==='buildings'?C.gold:C.border}} onClick={()=>{setStep('buildings');setPicked('')}}>2 · Initial assignments</button>
@@ -287,11 +287,11 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
    {step==='teams'&&<>
     <section style={{background:'#183044',borderRadius:12,padding:12,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-      <span><strong style={{fontSize:15}}>{coreLock?'Battle mode · Core locked':'Planning · Core unlocked'}</strong><span style={{...small,display:'block',marginTop:4}}>{coreLock?'Manual changes are allowed. Auto-generation is disabled.':'Lock core teams after publishing the initial plan.'}</span></span>
-      <button style={{...btn,color:coreLock?C.gold:C.bg,background:coreLock?C.section:C.gold,flexShrink:0}} onClick={lockCore}>{coreLock?'Unlock core':'Lock core teams'}</button>
+      <span><strong style={{fontSize:15}}>{coreLock?'Battle mode · Core locked':'1 · Prepare teams'}</strong><span style={{...small,display:'block',marginTop:4}}>{coreLock?'Your existing team allocations are protected. You can still make individual changes.':'Select participants, check power, then generate. Lock only when the teams are ready.'}</span></span>
+      {coreLock&&<button style={{...btn,color:C.gold,flexShrink:0}} onClick={lockCore}>Unlock core</button>}
      </div>
-     {coreLock&&<div style={{...small,marginTop:8}}>Original team snapshot preserved · Current player assignments remain editable.</div>}
     </section>
+    {coreLock&&<>
     <section style={{...panel,marginBottom:12}}>
      <strong>Add to battle · Last-minute players</strong>
      <p style={{...small,margin:'6px 0 10px'}}>Choose anyone from Members, even without recorded availability. Existing teams will not be regenerated.</p>
@@ -305,6 +305,8 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
       <button style={{...btn,color:C.bg,background:lateId?C.gold:C.section}} disabled={!lateId} onClick={addLatePlayer}>Assign player</button>
      </div>
     </section>
+    </>}
+    {!coreLock&&<>
     <section style={{...panel,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><strong>Legion participants</strong><span style={small}>{selectedIds.length} selected · {pool.length} available · {legionRoster.length} total</span></div>
      <p style={{...small,margin:'6px 0 10px'}}>Only players available at {matchTime} UTC are selected by default. Others stay visible but greyed out. Use Add to battle for a last-minute override.</p>
@@ -334,11 +336,19 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
      <div style={{maxHeight:185,overflowY:'auto'}}>{selectedPlayers.map(p=><label key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,fontSize:13}}><span style={{flex:1,minWidth:0,overflowWrap:'anywhere'}}>{name(p)}</span><input type="number" inputMode="numeric" min="0" aria-label={'Troop power for '+name(p)} value={powers[String(p.id)]??value?.records?.[p.id]?.troopPower??''} onChange={e=>setPowers(old=>({...old,[String(p.id)]:e.target.value}))} placeholder="Power" style={{...btn,width:105,minHeight:38,fontSize:16}}/></label>)}</div>
     </section>
     <section style={{...panel,marginBottom:12}}>
-     <strong>Generate teams</strong>
+     <strong>2 · Generate teams</strong>
+     <p style={{...small,margin:'6px 0 9px'}}>Choose leaders, then distribute everyone around them. Player profiles do not need the Rally Lead role.</p>
+     <div role="group" aria-label="Choose leader method" style={{display:'grid',gap:7,marginBottom:9}}>
+      <button type="button" aria-pressed={leaderStrategy==='power'} style={{...btn,textAlign:'left',color:leaderStrategy==='power'?C.gold:C.icy,borderColor:leaderStrategy==='power'?C.gold:C.border}} onClick={()=>{setLeaderStrategy('power');setGenerationError('')}}>✓ Highest troop power · default</button>
+      <button type="button" aria-pressed={leaderStrategy==='manual'} style={{...btn,textAlign:'left',color:leaderStrategy==='manual'?C.gold:C.icy,borderColor:leaderStrategy==='manual'?C.gold:C.border}} onClick={()=>{setLeaderStrategy('manual');setGenerationError('')}}>Keep four manually assigned leaders</button>
+     </div>
+     {leaderStrategy==='manual'&&<p style={{...small,margin:'0 0 8px'}}>Assign one leader in each colour team below first. Auto-generate will keep those four leaders in place.</p>}
      <div style={{display:'flex',gap:8,marginTop:10}}>{[['stack','Power-stacked'],['balanced','Balanced']].map(([id,label])=><button key={id} style={{...btn,flex:1,borderColor:mode===id?C.gold:C.border,color:mode===id?C.gold:C.icy}} aria-pressed={mode===id} onClick={()=>setMode(id)}>{label}</button>)}</div>
-     <button style={{...btn,width:'100%',marginTop:9,background:coreLock?C.section:C.gold,color:coreLock?C.icy:C.bg}} disabled={coreLock} onClick={generate}>Auto-generate four teams</button>
+     <button style={{...btn,width:'100%',marginTop:9,background:C.gold,color:C.bg}} onClick={generate}>Generate four teams · {selectedPlayers.length} selected</button>
+     {generationError&&<p role="alert" style={{fontSize:13,color:C.gold,lineHeight:1.5,margin:'9px 0 0'}}>{generationError}</p>}
      
     </section>
+    </>}
     <section aria-label="Compare four teams" style={{margin:'5px 0 12px'}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><strong style={{fontSize:14}}>Team comparison</strong><span style={small}>{selectedIds.length} selected · {missing.length} unassigned</span></div>
      <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6}}>
@@ -401,7 +411,12 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
       </div>}
      </section>;
     })}
-    <button style={{...btn,width:'100%',background:C.gold,color:C.bg,marginBottom:10}} disabled={missing.length>0||groups.some(g=>!g.leader)} onClick={()=>{setConfirmed(true);setStep('buildings')}}>Confirm teams · Assign buildings</button>
+    {!coreLock&&<section style={{...panel,marginBottom:10}}>
+     <strong style={{fontSize:14}}>3 · Finalise teams</strong>
+     <p style={{...small,margin:'6px 0 10px'}}>{groups.some(g=>!g.leader)?'Four leaders are required.':missing.length?missing.length+' selected players still need a team.':'All selected players have a team. Review and lock when ready.'}</p>
+     <button style={{...btn,width:'100%',background:C.gold,color:C.bg,marginBottom:8}} disabled={!allAssigned.length||missing.length>0||groups.some(g=>!g.leader)} onClick={()=>{setConfirmed(true);setStep('buildings')}}>Confirm teams · Assign buildings</button>
+     <button style={{...btn,width:'100%',color:!allAssigned.length||missing.length||groups.some(g=>!g.leader)?C.icy:C.gold}} disabled={!allAssigned.length||missing.length>0||groups.some(g=>!g.leader)} onClick={lockCore}>Lock core teams · Enter battle mode</button>
+    </section>}
    </>}
    {step==='buildings'&&<>
     <section style={{...panel,marginBottom:12}}>
