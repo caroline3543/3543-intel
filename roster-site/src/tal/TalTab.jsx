@@ -67,10 +67,11 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  }
  const activeCount=teams.filter(t=>tournamentStatus(t)==='active').length;
  const eliminatedCount=teams.length-activeCount;
- const ready=entries.filter(e=>e.check.status==='in-host').length;
- const move=entries.filter(e=>e.check.status==='move').length;
- const unverified=entries.filter(e=>e.check.status==='unknown').length;
- const percent=entries.length?Math.round(ready/entries.length*100):0;
+ const ready=entries.filter(e=>e.member&&e.check.status==='in-host').length;
+ const move=entries.filter(e=>e.member&&e.check.status==='move').length;
+ const unverified=entries.filter(e=>e.member&&e.check.status==='unknown').length;
+ const activeEntryCount=entries.filter(e=>e.member).length;
+ const percent=activeEntryCount?Math.round(ready/activeEntryCount*100):0;
  const times=(Array.isArray(value?.times)&&value.times.length?value.times:DEFAULT_TIMES).map(String);
  const availabilityFor=player=>{
   const raw=value?.availability?.[player.id]??value?.availability?.[String(player.fid)]??value?.records?.[player.id]?.times??[];
@@ -86,11 +87,11 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   return compareNames(a.player,b.player);
  });
  const movePreview=moveText(entries);
- const otherAssigned=new Set(teams.filter(t=>t.id!==team?.id).flatMap(t=>(t.members||[]).map(m=>String(m.id))));
+ const otherAssigned=new Set(teams.filter(t=>t.id!==team?.id).flatMap(t=>[...plannedMemberIds(t)].map(String)));
  const alreadyHere=new Set(team?[...plannedMemberIds(team)].map(String):[]);
  const addMatches=team?players.filter(p=>!alreadyHere.has(String(p.id))&&!p.blacklisted&&(!addSearch||[p.username,p.alias,p.fid,p.id].some(v=>String(v||'').toLowerCase().includes(addSearch.trim().toLowerCase())))).sort(compareNames):[];
  const addEligible=addMatches.filter(p=>!otherAssigned.has(String(p.id)));
- const selectedAdd=addSelected.filter(id=>addEligible.some(p=>String(p.id)===id));
+ const selectedAdd=addSelected.filter(id=>players.some(p=>String(p.id)===id&&!p.blacklisted)&&!alreadyHere.has(id)&&!otherAssigned.has(id));
  const remaining=team?Math.max(0,50-(team.members||[]).length):0;
  const countedAdd=batchStatus==='considering'?0:selectedAdd.length;
  const combatantSlots=team?Math.max(0,30-(team.members||[]).filter(m=>m.role==='combatant').length):0;
@@ -129,6 +130,19 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   onChange?.({...value,records,availability,teams:(value?.teams||[]).map(t=>t.id===team.id?{...t,members:nextMembers,candidates:nextCandidates}:t)});
   setAddSelected([]);setAdding(false);setAddingReview(false);
   onMessage?.(ids.size+' player'+(ids.size===1?'':'s')+' '+(considering?'added for consideration.':'added to '+legionLabel(team)+'.'));
+ }
+  function promoteCandidate(entryTeam,playerId,registered){
+  if(!entryTeam||value?.locked||tournamentStatus(entryTeam)==='eliminated')return;
+  const candidate=(entryTeam.candidates||[]).find(c=>String(c.id)===String(playerId));
+  if(!candidate)return;
+  if((entryTeam.members||[]).length>=50){onMessage?.('Legion is full. Remove someone before promoting this candidate.');return;}
+  const combatants=entryTeam.members.filter(m=>m.role==='combatant').length;
+  const substitutes=entryTeam.members.filter(m=>m.role==='substitute').length;
+  const role=registered?(combatants<30?'combatant':substitutes<20?'substitute':null):'pending';
+  if(!role){onMessage?.('All combatant and substitute places are full.');return;}
+  onChange?.({...value,teams:(value?.teams||[]).map(t=>t.id===entryTeam.id?{...t,candidates:(t.candidates||[]).filter(c=>String(c.id)!==String(playerId)),members:[...(t.members||[]),{id:String(playerId),role,registered}]}:t)});
+  setActionsId('');
+  onMessage?.(registered?'Candidate confirmed as registered.':'Candidate moved to registration list.');
  }
   function setRegistration(entryTeam,playerId,registered){
   if(!entryTeam||value?.locked||tournamentStatus(entryTeam)==='eliminated')return;
@@ -205,7 +219,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      <div><strong style={{fontSize:15}}>Alliance readiness</strong><div style={{...muted,marginTop:4}}>{matchLabel(team)}</div></div>
      <strong style={{fontSize:19,color:C.green}}>{percent}%</strong>
     </div>
-    <div role="progressbar" aria-label="Players in the correct host alliance" aria-valuemin={0} aria-valuemax={entries.length||1} aria-valuenow={ready} style={{height:8,background:C.border,borderRadius:20,overflow:'hidden',margin:'12px 0 10px'}}><div style={{height:'100%',width:percent+'%',background:C.green}}/></div>
+    <div role="progressbar" aria-label="Players in the correct host alliance" aria-valuemin={0} aria-valuemax={activeEntryCount||1} aria-valuenow={ready} style={{height:8,background:C.border,borderRadius:20,overflow:'hidden',margin:'12px 0 10px'}}><div style={{height:'100%',width:percent+'%',background:C.green}}/></div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:7}}>
      {[{id:'in-host',count:ready,label:'In alliance',color:C.green},{id:'move',count:move,label:'Need to move',color:C.gold},{id:'unknown',count:unverified,label:'Unverified',color:C.icy}].map(item=>
       <button key={item.id} type="button" aria-pressed={check===item.id} onClick={()=>chooseReadiness(item.id)} style={{...button,minWidth:0,minHeight:70,padding:8,textAlign:'left',borderColor:check===item.id?item.color:C.border,background:check===item.id?item.color+'17':C.section}}>
@@ -262,7 +276,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
       <span role="status" style={{...muted}}>{addEligible.length} eligible · {selectedAdd.length} selected</span>
       <div style={{display:'flex',gap:6}}>
-       <button type="button" style={{...button,padding:'7px 9px',minHeight:38,fontSize:12}} onClick={()=>setAddSelected(addEligible.map(p=>String(p.id)))}>Select matches</button>
+       <button type="button" style={{...button,padding:'7px 9px',minHeight:38,fontSize:12}} onClick={()=>setAddSelected(old=>[...new Set([...old,...addEligible.map(p=>String(p.id))])])}>Select matches</button>
        <button type="button" style={{...button,padding:'7px 9px',minHeight:38,fontSize:12}} onClick={()=>setAddSelected([])}>Clear</button>
       </div>
      </div>
@@ -300,7 +314,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       const editable=!value?.locked&&tournamentStatus(entryTeam)!=='eliminated';
       const revealed=swipeId===String(player.id);
       const selectedEditing=editingTimes===String(player.id);
-      const statusText=member?.registered?'Registered':member?'Needs registration':'Proposed';
+      const statusText=member?.registered?'Registered':member?'Needs registration':'Considering';
       return <article key={player.id} onPointerDown={e=>onSwipeDown(e,String(player.id))} onPointerUp={e=>onSwipeUp(e,String(player.id),!!member&&editable)} onPointerCancel={()=>{gesture.current=null;}} style={{background:C.card,borderRadius:11,marginBottom:8,overflow:'hidden',touchAction:'pan-y'}}>
        {revealed&&member&&<div role="group" aria-label={'Registration action for '+(player.username||player.alias||'player')} style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',padding:'9px 11px',background:C.section}}>
         <button type="button" style={{...button,color:member.registered?C.gold:C.green,background:C.card}} disabled={!editable} onClick={()=>setRegistration(entryTeam,player.id,!member.registered)}>{member.registered?'Mark unregistered':'Confirm registered'}</button>
@@ -311,7 +325,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
          <PlayerAvatar player={player} size={44}/>
          <span style={{flex:1,minWidth:0}}>
           <span style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:7}}><strong style={{fontSize:16,overflowWrap:'anywhere'}}>{player.username||player.alias||'Unknown player'}</strong>{player.furnaceLevel&&<span style={{fontSize:12,color:C.gold}}>{player.furnaceLevel}</span>}</span>
-          <span style={{...muted,display:'block',marginTop:3}}>{status.tag||player.allianceTag||'Alliance unknown'} · {legionLabel(entryTeam)}{!member?' · Proposed':''}</span>
+          <span style={{...muted,display:'block',marginTop:3}}>{status.tag||player.allianceTag||'Alliance unknown'} · {legionLabel(entryTeam)}</span>
          </span>
         </button>
         <button type="button" title="Player actions" aria-label={'Actions for '+(player.username||player.alias||'player')} aria-expanded={actionsId===player.id} style={{...button,minWidth:44,padding:7,background:'transparent',border:0,fontSize:20}} onClick={()=>{setActionsId(actionsId===player.id?'':player.id);setSwipeId('');setRemoveId('')}}>•••</button>
@@ -322,6 +336,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
        </div>
        {(isMove||shownStat)&&<div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'0 11px 10px',color:isMove?C.gold:C.icy,fontSize:12}}>{isMove&&<span>Move {status.tag||'No alliance'} → {entryTeam.host}</span>}{shownStat&&<span>{shownStat}</span>}</div>}
        {actionsId===player.id&&<div style={{padding:'8px 11px 12px',background:C.section,display:'grid',gap:5}}>
+        {!member&&editable&&<><button type="button" style={{...button,textAlign:'left',color:C.gold}} onClick={()=>promoteCandidate(entryTeam,player.id,false)}>Move to needs registration</button><button type="button" style={{...button,textAlign:'left',color:C.green}} onClick={()=>promoteCandidate(entryTeam,player.id,true)}>Confirm registered in game</button></>}
         {member&&<button type="button" style={{...button,textAlign:'left',color:member.registered?C.gold:C.green}} disabled={!editable} onClick={()=>setRegistration(entryTeam,player.id,!member.registered)}>{member.registered?'Mark registration pending':'Confirm registered'}</button>}
         <button type="button" style={{...button,textAlign:'left'}} onClick={()=>beginEditTimes(player)}>Edit available times</button>
         <button type="button" style={{...button,textAlign:'left'}} onClick={()=>{setActionsId('');onOpenPlayer?.(player.id)}}>Open Members profile</button>
