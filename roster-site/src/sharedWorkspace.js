@@ -77,10 +77,10 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
  return {initialize,sync,update,publish,join,resolve,getState:()=>structuredClone(state),dispose(){disposed=true;clearTimeout(timer);}};
 }
 export function workspaceCache(){
- const db=new Promise((resolve,reject)=>{const request=indexedDB.open('caroline-shared-workspace',1);request.onupgradeneeded=()=>request.result.createObjectStore('workspace');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+ const db=new Promise((resolve,reject)=>{const request=indexedDB.open('caroline-3739-workspace',1);request.onupgradeneeded=()=>request.result.createObjectStore('workspace');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
  return {
-  async read(){const database=await db;return new Promise((resolve,reject)=>{const tx=database.transaction('workspace'),r=tx.objectStore('workspace').get('3573-leaders');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});},
-  async write(value){const database=await db;return new Promise((resolve,reject)=>{const tx=database.transaction('workspace','readwrite');tx.objectStore('workspace').put(value,'3573-leaders');tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('Device save interrupted'));});},
+  async read(){const database=await db;return new Promise((resolve,reject)=>{const tx=database.transaction('workspace'),r=tx.objectStore('workspace').get('3739-leaders');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});},
+  async write(value){const database=await db;return new Promise((resolve,reject)=>{const tx=database.transaction('workspace','readwrite');tx.objectStore('workspace').put(value,'3739-leaders');tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('Device save interrupted'));});},
  };
 }
 export async function workspaceRequest(method,input){
