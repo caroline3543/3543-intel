@@ -219,6 +219,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   setPicked('');
  }
  function autoAssign(){
+  if(coreLock){setCopyMessage('Core teams are locked. Adjust individual building assignments manually or unlock the core to auto-allocate.');return;}
   const next={};
   groups.forEach(g=>{
    const [first,second]=COLORS.find(c=>c.id===g.color).buildings;
@@ -237,6 +238,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   if(groups.some(g=>!g.leader)){setCopyMessage('Assign all four rally leaders before locking the core.');return;}
   setCoreSnapshot(groups.map(g=>({...g,members:[...g.members]})));setCoreLock(true);setCopyMessage('Core locked. Existing teams will not be automatically redistributed.');}
  function addLatePlayer(){const id=String(lateId);const target=groups.find(g=>g.color===lateTarget);if(!id||!target||!byId.has(id))return;
+  if(allTeamIds.size>=50){setCopyMessage('The 50-player battle roster is full. Remove someone before adding a late arrival.');return;}
   if(allTeamIds.has(id)){setCopyMessage('This player already has a team. Move them manually.');return;}
   setChosen(old=>[...new Set([...old,id])]);setGroups(old=>old.map(g=>g.key===target.key?{...g,members:[...g.members,id]}:g));setLateId('');setLateSearch('');setCopyMessage('Player assigned to '+(COLORS.find(c=>c.id===lateTarget)?.name||'selected')+' team without reshuffling.');}
  function markAbsent(id){if(groups.some(g=>String(g.leader)===String(id))&&!window.confirm('This is a rally leader. Mark absent and arrange a replacement leader?'))return;
@@ -325,7 +327,11 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
        {!!ids.length&&<div style={{display:'flex',flexWrap:'wrap',gap:13,margin:'9px 0',fontSize:12,color:'#CAD7E0'}}>
         <span>{ids.length} players</span><span>FC8 {ps.filter(p=>fcNumber(p)===8).length}</span><span>Helios {ps.filter(helios).length}</span>{g.members.some(id=>norah(byId.get(String(id))))&&<span>Norah Skill 5 {g.members.filter(id=>norah(byId.get(String(id)))).length}</span>}
        </div>}
-       {g.leader&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'6px 0',fontSize:14}}><span style={{minWidth:0,overflowWrap:'anywhere'}}><span aria-hidden="true" style={{color:C.gold,marginRight:7}}>♛</span><strong>{name(byId.get(String(g.leader))||{id:g.leader})}</strong></span><span style={{...small,fontVariantNumeric:'tabular-nums'}}>{powerFormat(powerOf(g.leader))}</span></div>}
+       {g.leader&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'6px 0',fontSize:14}}>
+        <span style={{minWidth:0,overflowWrap:'anywhere'}}><span aria-hidden="true" style={{color:C.gold,marginRight:7}}>♛</span><strong>{name(byId.get(String(g.leader))||{id:g.leader})}</strong>
+        {(languageInfo(byId.get(String(g.leader))).length>0||norahInfo(byId.get(String(g.leader))))&&<span style={{...small,display:'block',marginLeft:22,marginTop:3}}>{[...languageInfo(byId.get(String(g.leader))),norahInfo(byId.get(String(g.leader)))].filter(Boolean).join(' · ')}</span>}
+        </span><span style={{...small,fontVariantNumeric:'tabular-nums'}}>{powerFormat(powerOf(g.leader))}</span>
+       </div>}
        {g.members.map(id=><div key={id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:'1px solid #304355'}}>
         <span style={{flex:1,minWidth:0}}>
          <span style={{fontSize:14,display:'block',overflowWrap:'anywhere'}}>{name(byId.get(String(id))||{id})}{absentIds.includes(String(id))?' · Absent':''}</span>
@@ -375,7 +381,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
     <section style={{...panel,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center'}}><strong>Initial assignments</strong><strong style={{color:assignedCount===activePlayers.length?C.green:C.gold}}>{assignedCount} / {activePlayers.length} assigned</strong></div>
      <p style={{...small,margin:'6px 0 10px'}}>Drag players by their handle into another building in the same colour territory. On mobile you can also tap a player, then tap the destination building.</p>
-     <div style={{display:'flex',gap:7}}><button style={{...btn,flex:1,color:C.gold}} onClick={autoAssign} disabled={!activePlayers.length}>Auto-allocate</button><button style={{...btn,flex:1}} onClick={()=>setAssignment({})}>Clear buildings</button></div>
+     <div style={{display:'flex',gap:7}}><button style={{...btn,flex:1,color:C.gold}} onClick={autoAssign} disabled={!activePlayers.length||coreLock}>Auto-allocate</button><button style={{...btn,flex:1}} disabled={coreLock} onClick={()=>{if(window.confirm('Clear every building assignment?'))setAssignment({});}}>Clear buildings</button></div>
      {!!missing.length&&<p style={{...small,color:C.gold,marginBottom:0}}>There are {missing.length} players missing from the four teams. Return to Colour teams to place them first.</p>}
     </section>
     <div style={{display:'flex',overflowX:'auto',gap:7,marginBottom:12,paddingBottom:5}}>{COLORS.map(c=><button key={c.id} onClick={()=>{setActiveColour(c.id);setPicked('')}} style={{...btn,flex:'0 0 105px',borderColor:activeColour===c.id?c.color:C.border,background:activeColour===c.id?c.bg:C.section,color:activeColour===c.id?c.color:C.icy}}>{c.name} · {activePlayers.filter(p=>p.g.color===c.id).length}</button>)}</div>
