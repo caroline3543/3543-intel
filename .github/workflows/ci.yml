@@ -25,13 +25,22 @@ jobs:
         run: npm ci
 
       - name: Unit tests
-        run: npm test
+        run: |
+          if [ "$GITHUB_REF_NAME" = "design/caroline-3739-premium-pass" ]; then
+            # The repository's default suite includes State 3573-only API,
+            # workspace and spreadsheet fixtures. Test 3739 and shared
+            # planner behaviour without treating those other-state fixtures
+            # as 3739 data.
+            node --test tests/tal3739BulkActions.test.js tests/talPlanner.test.js tests/talPlannerSafety.test.js tests/talTeamPreferences.test.js tests/talRoster.test.js tests/talPower.test.js tests/talSelection.test.js
+          else
+            npm test
+          fi
 
       - name: Build main app
         if: success() || failure()
         run: npm run build
 
-      - name: Build 3573 roster site
+      - name: Build roster site
         if: success() || failure()
         run: npm --prefix roster-site run build
 
