@@ -37,5 +37,5 @@ export function useSharedWorkspace(initial){
   work.update(value);
  };
  const call=method=>async(...args)=>controller.current?.[method](...args);
- return {data,setData:update,sync,publish:call('publish'),join:call('join'),retry:call('sync'),resolve:call('resolve')};
+ return {data,setData:update,sync,publish:call('publish'),join:call('join'),seedFromDevice:call('seedFromDevice'),retry:call('sync'),resolve:call('resolve')};
 }
