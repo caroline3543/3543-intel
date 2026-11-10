@@ -1,4 +1,4 @@
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
 import {plannedMemberIds,legionLabel} from '../../../src/services/talRosterService.js';
 import {DEFAULT_TIMES} from './planner.js';
@@ -27,6 +27,7 @@ function textOfTeams(groups,playersById) {
  }).join('\n\n');
 }
 const initialGroups=()=>COLORS.map((c,i)=>({key:i+1,color:c.id,leader:null,members:[]}));
+const draftPrefix='caroline-3739-tal-teams-v1:';
 export function TalTeamsTab({value,players=[]}){
  const legions=(value?.teams||[]).filter(t=>['GLR'].includes(String(t.host||'').toUpperCase()));
  const [legionId,setLegionId]=useState(legions[0]?.id||'');
@@ -49,6 +50,11 @@ export function TalTeamsTab({value,players=[]}){
  const [locked,setLocked]=useState([]);
  const [manual,setManual]=useState(true);
  const [editingTeam,setEditingTeam]=useState(null);
+ const [draftLoaded,setDraftLoaded]=useState('');
+ const [draftState,setDraftState]=useState('');
+ const [focusedTeam,setFocusedTeam]=useState('blue');
+ const teamRefs=useRef({});
+ const draftKey=draftPrefix+String(selectedLegion?.id||'unknown')+':'+matchTime;
  const byId=useMemo(()=>new Map(players.map(p=>[String(p.id),p])),[players]);
  const pool=useMemo(()=>{
   if(!selectedLegion)return [];
@@ -58,7 +64,36 @@ export function TalTeamsTab({value,players=[]}){
    return Array.isArray(avail)&&avail.map(String).includes(matchTime);
   });
  },[selectedLegion,value,byId,matchTime]);
- const selectedIds=chosen.filter(id=>pool.some(p=>String(p.id)===String(id)));
+ useEffect(()=>{
+  try{
+   const raw=window.localStorage.getItem(draftKey);
+   if(raw){
+    const saved=JSON.parse(raw);
+    setChosen(Array.isArray(saved.chosen)?saved.chosen.map(String):[]);
+    setPowers(saved.powers&&typeof saved.powers==='object'?saved.powers:{});
+    setGroups(Array.isArray(saved.groups)&&saved.groups.length===4?saved.groups:initialGroups());
+    setAssignment(saved.assignment&&typeof saved.assignment==='object'?saved.assignment:{});
+    setMode(saved.mode==='balanced'?'balanced':'stack');
+    setConfirmed(!!saved.confirmed);
+    setDraftState('Saved draft restored');
+   }else{
+    setChosen([]);setPowers({});setGroups(initialGroups());setAssignment({});setMode('stack');setConfirmed(false);
+    setDraftState('No saved draft');
+   }
+  }catch{
+   setChosen([]);setPowers({});setGroups(initialGroups());setAssignment({});
+   setDraftState('Local draft unavailable');
+  }
+  setStep('teams');setPicked('');setEditingTeam(null);setDraftLoaded(draftKey);
+ },[draftKey]);
+ useEffect(()=>{
+  if(draftLoaded!==draftKey)return;
+  try{
+   window.localStorage.setItem(draftKey,JSON.stringify({chosen,powers,groups,assignment,mode,confirmed,updatedAt:new Date().toISOString()}));
+   setDraftState('Saved on this device');
+  }catch{setDraftState('Could not save draft. Copy your assignments before leaving.');}
+ },[draftKey,draftLoaded,chosen,powers,groups,assignment,mode,confirmed]);
+  const selectedIds=chosen.filter(id=>pool.some(p=>String(p.id)===String(id)));
  const selectedPlayers=selectedIds.map(id=>byId.get(String(id))).filter(Boolean);
  const leaderCandidates=[...selectedPlayers].filter(p=>p.roles?.some?.(r=>/rally lead/i.test(String(r)))||p.rallyLeader||p.leaderProfile?.role==='leader');
  const powerOf=id=>valueNumber(powers[String(id)]??value?.records?.[id]?.troopPower);
@@ -68,7 +103,7 @@ export function TalTeamsTab({value,players=[]}){
  const activePlayers=groups.flatMap(g=>[g.leader,...g.members].filter(Boolean).map(id=>({id:String(id),g})));
  const assignedCount=activePlayers.filter(({id})=>assignment[id]).length;
  const teamFor=id=>groups.find(g=>String(g.leader)===String(id)||g.members.some(m=>String(m)===String(id)));
- function resetForMatch(nextLegion=legionId,nextTime=matchTime){setLegionId(nextLegion);setMatchTime(nextTime);setChosen([]);setPowers({});setBulk('');setGroups(initialGroups());setAssignment({});setPicked('');setStep('teams');setConfirmed(false);setLocked([]);setPreview(false);}
+ function resetForMatch(nextLegion=legionId,nextTime=matchTime){setLegionId(nextLegion);setMatchTime(nextTime);setBulk('');setPicked('');setStep('teams');setLocked([]);setPreview(false);setEditingTeam(null);}
  function chooseAll(){setChosen(pool.map(p=>String(p.id)));}
  function toggle(id){const key=String(id);setChosen(old=>old.includes(key)?old.filter(x=>x!==key):[...old,key]);}
  function saveBatch(){
@@ -106,6 +141,7 @@ export function TalTeamsTab({value,players=[]}){
     target.members.push(String(p.id));
    });
   }
+  if(groups.some(g=>g.leader||g.members.length)&&!window.confirm('Replace the current four teams? Existing manual team assignments and initial buildings will be reset.'))return;
   setGroups(next);setAssignment({});setConfirmed(false);setStep('teams');setCopyMessage('Generated four '+(mode==='stack'?'power-stacked':'power-balanced')+' teams. Review before confirming.');
  }
  function moveMember(id,targetKey){
@@ -146,12 +182,13 @@ export function TalTeamsTab({value,players=[]}){
  const teamText=textOfTeams(groups,byId);
  return <section style={{padding:'14px 20px 35px'}}>
   <h2 style={{fontSize:25,letterSpacing:'-.4px',margin:'0 0 8px'}}>TAL Teams</h2>
-  <p style={{...small,margin:'0 0 12px'}}>Build teams, then allocate every player to a building. Drafts aren't shared between devices.</p>
+  <p style={{...small,margin:'0 0 10px'}}>Build teams, then allocate every player to a building.</p>
   {!legions.length?<p style={{...panel,...small}}>No legions in your TAL plan. Assign players in TAL Planner first.</p>:<>
    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
     <label style={small}>Legion<select value={selectedLegion?.id||''} onChange={e=>resetForMatch(e.target.value,matchTime)} style={{...btn,width:'100%',marginTop:5}}>{legions.map(t=><option value={t.id} key={t.id}>{legionLabel(t)}</option>)}</select></label>
     <label style={small}>Match time · UTC<select value={matchTime} onChange={e=>resetForMatch(legionId,e.target.value)} style={{...btn,width:'100%',marginTop:5}}>{(value?.times||DEFAULT_TIMES).map(t=><option key={t}>{t}</option>)}</select></label>
    </div>
+   <div role="status" style={{fontSize:12,color:draftState.startsWith('Could not')?C.gold:'#B5C8D6',marginBottom:9}}>{draftState} · Match drafts stay on this device</div>
    <div role="tablist" aria-label="TAL team planning phase" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
     <button role="tab" aria-selected={step==='teams'} style={{...btn,color:step==='teams'?C.gold:C.icy,borderColor:step==='teams'?C.gold:C.border}} onClick={()=>setStep('teams')}>1 · Colour teams</button>
     <button role="tab" aria-selected={step==='buildings'} style={{...btn,color:step==='buildings'?C.gold:C.icy,borderColor:step==='buildings'?C.gold:C.border}} onClick={()=>{setStep('buildings');setPicked('')}}>2 · Initial assignments</button>
@@ -178,11 +215,21 @@ export function TalTeamsTab({value,players=[]}){
      <button style={{...btn,width:'100%',marginTop:9,background:C.gold,color:C.bg}} onClick={generate}>Auto-generate four teams</button>
      
     </section>
-    <div style={{...small,marginBottom:9}}>{selectedIds.length} participants · {missing.length} not yet placed in a team</div>
+    <section aria-label="Compare four teams" style={{margin:'5px 0 12px'}}>
+     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><strong style={{fontSize:14}}>Team comparison</strong><span style={small}>{selectedIds.length} selected · {missing.length} unassigned</span></div>
+     <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6}}>
+      {groups.map(g=>{const colour=COLORS.find(c=>c.id===g.color);return <button type="button" key={g.key} onClick={()=>{setFocusedTeam(g.color);teamRefs.current[g.key]?.scrollIntoView({behavior:'smooth',block:'center'});}} style={{...btn,padding:'8px 2px',minWidth:0,minHeight:66,borderColor:focusedTeam===g.color?colour.color:C.border,background:'#162B3D'}}>
+       <span style={{display:'block',fontSize:12,color:colour.color,marginBottom:4}}>{colour.name}</span>
+       <strong style={{fontSize:14,fontVariantNumeric:'tabular-nums',color:C.white}}>{g.leader?powerFormat(teamPower(g)):'—'}</strong>
+       <span style={{display:'block',fontSize:11,color:'#C4D2DD',marginTop:2}}>{[g.leader,...g.members].filter(Boolean).length} players</span>
+      </button>})}
+     </div>
+    </section>
+        <div style={{...small,marginBottom:9}}>{selectedIds.length} participants · {missing.length} not yet placed in a team</div>
     {groups.map((g,i)=>{
      const col=COLORS.find(c=>c.id===g.color),ids=[g.leader,...g.members].filter(Boolean),ps=ids.map(id=>byId.get(id)).filter(Boolean),other=groups.flatMap(t=>[t.leader,...t.members].filter(Boolean)).map(String);
      const isEmpty=!g.leader&&!g.members.length,editing=editingTeam===g.key;
-     return <section key={g.key} style={{background:isEmpty?'#17293A':'#192E41',borderRadius:12,padding:'12px 12px 10px',marginBottom:9,borderLeft:'3px solid '+col.color}}>
+     return <section ref={node=>{teamRefs.current[g.key]=node}} key={g.key} style={{background:isEmpty?'#17293A':'#192E41',borderRadius:12,padding:'12px 12px 10px',marginBottom:9,borderLeft:'3px solid '+col.color}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
        <div style={{minWidth:0,display:'flex',alignItems:'center',gap:9}}><span style={{width:10,height:10,borderRadius:'50%',background:col.color,flexShrink:0}}/><strong style={{color:isEmpty?col.color:C.white,fontSize:16}}>{col.name} Team</strong></div>
        <span style={{fontSize:13,fontVariantNumeric:'tabular-nums',fontWeight:600,color:ids.length?C.white:C.icy}}>{ids.length?powerFormat(teamPower(g))+' power':'0 players'}</span>
