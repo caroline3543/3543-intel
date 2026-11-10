@@ -57,7 +57,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const [tourOpen,setTourOpen]=useState(!preferences.tutorialSeen);
   const [exporting,setExporting]=useState(false);
   const localInitial=useRef(null);if(!localInitial.current)localInitial.current=empty;
-  const {data,setData:setSharedData,sync,publish,join,retry,resolve}=useSharedWorkspace(localInitial.current);
+  const {data,setData:setSharedData,sync,publish,join,seedFromDevice,retry,resolve}=useSharedWorkspace(localInitial.current);
   function setData(value){setSharedData(prev=>{const next=withAutomaticRoles(typeof value==='function'?value(prev):value);latest.current=next;return next;});}
   useEffect(()=>{if(sync.ready&&sync.joined&&!sync.conflicts?.length){const normalized=withAutomaticRoles(data);if(normalized!==data)setSharedData(normalized);}},[data,sync.ready,sync.joined,sync.conflicts?.length]);
   const [apiProgress,setApiProgress]=useState('');
