@@ -28,7 +28,7 @@ function textOfTeams(groups,playersById) {
 }
 const initialGroups=()=>COLORS.map((c,i)=>({key:i+1,color:c.id,leader:null,members:[]}));
 const draftPrefix='caroline-3739-tal-teams-v1:';
-export function TalTeamsTab({value,players=[]}){
+export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=false}){
  const legions=(value?.teams||[]).filter(t=>['GLR'].includes(String(t.host||'').toUpperCase()));
  const [legionId,setLegionId]=useState(legions[0]?.id||'');
  const selectedLegion=legions.find(t=>t.id===legionId)||legions[0];
@@ -54,7 +54,12 @@ export function TalTeamsTab({value,players=[]}){
  const [draftState,setDraftState]=useState('');
  const [focusedTeam,setFocusedTeam]=useState('blue');
  const teamRefs=useRef({});
- const draftKey=draftPrefix+String(selectedLegion?.id||'unknown')+':'+matchTime;
+ const matchKey=String(selectedLegion?.id||'unknown')+':'+matchTime;
+ const draftKey=draftPrefix+matchKey;
+ const remoteDraft=drafts?.[matchKey];
+ const lastSaved=useRef('');
+ const bootstrapped=useRef(new Set());
+ const remoteApplied=useRef('');
  const byId=useMemo(()=>new Map(players.map(p=>[String(p.id),p])),[players]);
  const pool=useMemo(()=>{
   if(!selectedLegion)return [];
@@ -64,35 +69,58 @@ export function TalTeamsTab({value,players=[]}){
    return Array.isArray(avail)&&avail.map(String).includes(matchTime);
   });
  },[selectedLegion,value,byId,matchTime]);
+ const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,confirmed}),[chosen,powers,groups,assignment,mode,confirmed]);
+ const snapshotSignature=JSON.stringify(snapshot);
+ function applyDraft(saved){
+  setChosen(Array.isArray(saved?.chosen)?saved.chosen.map(String):[]);
+  setPowers(saved?.powers&&typeof saved.powers==='object'?saved.powers:{});
+  setGroups(Array.isArray(saved?.groups)&&saved.groups.length===4?saved.groups:initialGroups());
+  setAssignment(saved?.assignment&&typeof saved.assignment==='object'?saved.assignment:{});
+  setMode(saved?.mode==='balanced'?'balanced':'stack');
+  setConfirmed(!!saved?.confirmed);
+  lastSaved.current=JSON.stringify({chosen:Array.isArray(saved?.chosen)?saved.chosen.map(String):[],powers:saved?.powers&&typeof saved.powers==='object'?saved.powers:{},groups:Array.isArray(saved?.groups)&&saved.groups.length===4?saved.groups:initialGroups(),assignment:saved?.assignment&&typeof saved.assignment==='object'?saved.assignment:{},mode:saved?.mode==='balanced'?'balanced':'stack',confirmed:!!saved?.confirmed});
+ }
  useEffect(()=>{
-  try{
-   const raw=window.localStorage.getItem(draftKey);
-   if(raw){
-    const saved=JSON.parse(raw);
-    setChosen(Array.isArray(saved.chosen)?saved.chosen.map(String):[]);
-    setPowers(saved.powers&&typeof saved.powers==='object'?saved.powers:{});
-    setGroups(Array.isArray(saved.groups)&&saved.groups.length===4?saved.groups:initialGroups());
-    setAssignment(saved.assignment&&typeof saved.assignment==='object'?saved.assignment:{});
-    setMode(saved.mode==='balanced'?'balanced':'stack');
-    setConfirmed(!!saved.confirmed);
-    setDraftState('Saved draft restored');
-   }else{
-    setChosen([]);setPowers({});setGroups(initialGroups());setAssignment({});setMode('stack');setConfirmed(false);
-    setDraftState('No saved draft');
-   }
-  }catch{
-   setChosen([]);setPowers({});setGroups(initialGroups());setAssignment({});
-   setDraftState('Local draft unavailable');
-  }
+  let saved=null;
+  try{const raw=window.localStorage.getItem(draftKey);if(raw)saved=JSON.parse(raw);}catch{}
+  const source=remoteDraft||saved;
+  applyDraft(source);
+  remoteApplied.current=remoteDraft?.updatedAt||'';
+  setDraftState(remoteDraft?'Shared draft restored':saved?'Device draft restored':'No saved draft');
   setStep('teams');setPicked('');setEditingTeam(null);setDraftLoaded(draftKey);
+ // A new legion/time is a distinct draft; avoid resetting for every cloud refresh.
  },[draftKey]);
  useEffect(()=>{
-  if(draftLoaded!==draftKey)return;
+  if(draftLoaded!==draftKey||!remoteDraft||remoteApplied.current===remoteDraft.updatedAt)return;
+  remoteApplied.current=remoteDraft.updatedAt;
+  const incoming=JSON.stringify({chosen:remoteDraft.chosen||[],powers:remoteDraft.powers||{},groups:remoteDraft.groups||initialGroups(),assignment:remoteDraft.assignment||{},mode:remoteDraft.mode||'stack',confirmed:!!remoteDraft.confirmed});
+  if(incoming===snapshotSignature){lastSaved.current=incoming;return;}
+  if(snapshotSignature!==lastSaved.current){
+   setDraftState('New shared draft available. Finish or review your unsaved edits.');
+   return;
+  }
+  applyDraft(remoteDraft);
+  setDraftState('Updated from another device');
+ },[draftKey,draftLoaded,remoteDraft?.updatedAt]);
+ useEffect(()=>{
+  if(draftLoaded!==draftKey||lastSaved.current===snapshotSignature)return;
+  lastSaved.current=snapshotSignature;
   try{
-   window.localStorage.setItem(draftKey,JSON.stringify({chosen,powers,groups,assignment,mode,confirmed,updatedAt:new Date().toISOString()}));
-   setDraftState('Saved on this device');
-  }catch{setDraftState('Could not save draft. Copy your assignments before leaving.');}
- },[draftKey,draftLoaded,chosen,powers,groups,assignment,mode,confirmed]);
+   window.localStorage.setItem(draftKey,JSON.stringify({...snapshot,updatedAt:new Date().toISOString()}));
+   setDraftState(syncReady?'Saving to shared workspace…':'Saved on this device · waiting for sync');
+  }catch{setDraftState('Could not save device backup.');}
+  if(syncReady&&onDraftChange){
+   onDraftChange(matchKey,{...snapshot,updatedAt:new Date().toISOString()});
+  }
+ },[draftKey,draftLoaded,snapshotSignature,syncReady]);
+ useEffect(()=>{
+  if(!syncReady||!onDraftChange||remoteDraft||draftLoaded!==draftKey||bootstrapped.current.has(matchKey))return;
+  const hasPlan=snapshot.chosen.length>0||snapshot.groups.some(g=>g.leader||g.members?.length)||Object.keys(snapshot.assignment).length>0;
+  if(!hasPlan)return;
+  bootstrapped.current.add(matchKey);
+  onDraftChange(matchKey,{...snapshot,updatedAt:new Date().toISOString()});
+  setDraftState('Sharing existing device draft');
+ },[syncReady,draftKey,draftLoaded,!!remoteDraft]);
   const selectedIds=chosen.filter(id=>pool.some(p=>String(p.id)===String(id)));
  const selectedPlayers=selectedIds.map(id=>byId.get(String(id))).filter(Boolean);
  const leaderCandidates=[...selectedPlayers].filter(p=>p.roles?.some?.(r=>/rally lead/i.test(String(r)))||p.rallyLeader||p.leaderProfile?.role==='leader');
