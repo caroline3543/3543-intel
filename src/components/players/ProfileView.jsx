@@ -1,7 +1,7 @@
 import { ProfileTalCapacity } from './ProfileTalCapacity.jsx';
 import {ProfileSheetImport} from './ProfileSheetImport.jsx';
 import {CopyPlayerId} from './CopyPlayerId.jsx';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { C, ALLIANCE_RANKS, TROOP_POWER_EVENTS } from '../../utils/constants.js';
 import { roleColor } from '../../utils/roles.js';
 import { fmtDateShort } from '../../utils/dates.js';
@@ -17,8 +17,10 @@ import { ProviderStatsSection } from './ProviderStatsSection.jsx';
 import { PlayerRankingsSection } from './PlayerRankingsSection.jsx';
 import { PlayerHistorySection } from './PlayerHistorySection.jsx';
 import { TroopPowerChart } from './TroopPowerChart.jsx';
-export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave}) {
+export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,players=[],cooperationPairs=[],onChangeCooperation}) {
   const panel=useRef(null);
+  const [partnerSearch,setPartnerSearch]=useState('');
+  const [partnerId,setPartnerId]=useState('');
   const close=useRef(onClose);close.current=onClose;
   useEffect(()=>{
     if(!open)return;
@@ -53,7 +55,24 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
       </header>
       {player.blacklisted&&<p style={{fontSize:14,color:C.red}}>Excluded from battle plans{player.blacklistReason?`: ${player.blacklistReason}`:''}</p>}
       <ProfileSection title="Alliance rank"><p style={{fontSize:14,color:C.icy,margin:'0 0 12px'}}>Tap a rank to set it. Tap again to clear.</p><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{ALLIANCE_RANKS.map(rank=><button key={rank} style={{...profileButton,color:player.allianceRank===rank?C.gold:C.icy,borderColor:player.allianceRank===rank?C.gold:C.border}} aria-pressed={player.allianceRank===rank} onClick={()=>setAllianceRank(rank)}>{rank}</button>)}</div></ProfileSection>
-      <ProfileTroops key={`troops:${player.id}`} player={player} onSave={onSave}/>
+      {onChangeCooperation&&<ProfileSection title="Works well with">
+       {cooperationPairs.filter(pair=>Array.isArray(pair)&&pair.map(String).includes(String(player.id))).map(pair=>{
+        const partner=players.find(p=>String(p.id)===String(pair.find(id=>String(id)!==String(player.id))));
+        return partner?<div key={partner.id} style={{display:'flex',gap:9,alignItems:'center',borderBottom:'1px solid '+C.border,padding:'8px 0'}}>
+         <span style={{flex:1,minWidth:0,fontSize:14,fontWeight:600,color:C.white,overflowWrap:'anywhere'}}>{partner.username||partner.alias||partner.fid}<span style={{fontSize:12,fontWeight:400,display:'block',color:C.icy}}>Shared with both profiles · Player ID {partner.fid||partner.id}</span></span>
+         <button type="button" style={{...profileButton,color:C.red}} onClick={()=>onChangeCooperation(player.id,partner.id,false)} aria-label={'Remove cooperation with '+(partner.username||partner.alias||partner.id)}>Remove</button>
+        </div>:null;
+       })}
+       <label style={{fontSize:13,color:C.icy,display:'block',marginTop:12,marginBottom:6}}>Add a player</label>
+       <input value={partnerSearch} onChange={e=>{setPartnerSearch(e.target.value);setPartnerId('');}} placeholder="Search name or Player ID" aria-label="Search cooperation partner" style={{...profileButton,width:'100%',boxSizing:'border-box',fontSize:16,textAlign:'left',marginBottom:8}}/>
+       <select value={partnerId} onChange={e=>setPartnerId(e.target.value)} aria-label="Choose cooperation partner" style={{...profileButton,width:'100%',fontSize:14,marginBottom:8}}>
+        <option value="">Choose a Member</option>
+        {players.filter(p=>String(p.id)!==String(player.id)&&(!partnerSearch||[p.username,p.alias,p.fid,p.id].some(v=>String(v||'').toLowerCase().includes(partnerSearch.trim().toLowerCase())))).sort((a,b)=>String(a.username||a.alias||'').localeCompare(String(b.username||b.alias||''))).slice(0,80).map(p=><option key={p.id} value={p.id}>{p.username||p.alias||p.fid} · {p.fid||p.id}</option>)}
+       </select>
+       <button type="button" disabled={!partnerId||cooperationPairs.some(pair=>Array.isArray(pair)&&pair.map(String).includes(String(player.id))&&pair.map(String).includes(String(partnerId)))} onClick={()=>{onChangeCooperation(player.id,partnerId,true);setPartnerId('');setPartnerSearch('')}} style={{...profileButton,width:'100%',background:partnerId?C.gold:C.section,color:partnerId?C.bg:C.icy}}>Add cooperation link</button>
+       <p style={{fontSize:12,color:C.icy,lineHeight:1.4,margin:'8px 0 0'}}>Add once. The relationship appears on both profiles and is used when generating new unlocked TAL teams.</p>
+      </ProfileSection>}
+            <ProfileTroops key={`troops:${player.id}`} player={player} onSave={onSave}/>
       <ProfileTalCapacity key={`tal-capacity:${player.id}`} player={player} onSave={onSave}/>
       <ProfileJoiners key={`heroes:${player.id}`} player={player} onSave={onSave}/>
       <ProfileRoles key={`roles:${player.id}`} player={player} roles={roles} onSave={onSave}/>
