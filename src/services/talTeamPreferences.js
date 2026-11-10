@@ -16,7 +16,8 @@ export function normaliseRallyPreferences(raw = {}) {
     if (seen.has(key)) return false;
     seen.add(key); return true;
   }).map(([a,b]) => [String(a), String(b)]);
-  return {players, pairs};
+  const groups=(Array.isArray(raw.groups)?raw.groups:[]).filter(g=>g&&typeof g.id==='string'&&Array.isArray(g.memberIds)&&g.memberIds.length>=2&&g.memberIds.every(id=>typeof id==='string'&&id));
+  return {players, pairs,groups};
 }
 export function joinerPreference(playerId, preferences) {
   const p = preferences?.players?.[String(playerId)] || {};
@@ -32,7 +33,8 @@ export function joinerPreferenceScore(playerId, teammateIds, preferences) {
   const traits = [p.reliable,p.strategy,p.voice,p.punctual].filter(Boolean).length;
   // A nudge within otherwise viable same-tier marches; never a substitute
   // for T11/T10 troop suitability, capacity or eligibility.
-  return (p.priority ? 4 : 0) + traits + relationshipMatches(playerId,teammateIds,preferences)*3;
+  const groups=(preferences?.groups||[]).filter(g=>g.memberIds.includes(String(playerId))&&g.memberIds.some(id=>teammateIds.map(String).includes(id))).length;
+  return (p.priority ? 4 : 0) + traits + relationshipMatches(playerId,teammateIds,preferences)*3 + groups*2;
 }
 
 /** Apply explicit match overrides without changing reusable defaults.
@@ -54,7 +56,7 @@ export function mergeRallyPreferences(shared = {}, overrides = {}) {
     .map(([a,b])=>pairKey(a,b)));
   const pairs = normaliseRallyPreferences({pairs:[...base.pairs,...(overrides?.pairs||[])]}).pairs
     .filter(([a,b])=>!removed.has(pairKey(a,b)));
-  return normaliseRallyPreferences({players:mergedPlayers,pairs});
+  return normaliseRallyPreferences({players:mergedPlayers,pairs,groups:base.groups});
 }
 export function withBattlePairOverride(current = {}, shared = {}, a, b, enabled) {
   const key=pairKey(a,b);
