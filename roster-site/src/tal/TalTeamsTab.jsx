@@ -36,11 +36,15 @@ function textOfTeams(groups,playersById) {
 }
 const initialGroups=()=>COLORS.map((c,i)=>({key:i+1,color:c.id,leader:null,members:[]}));
 const draftPrefix='caroline-3739-tal-teams-v1:';
-export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=false}){
+export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDraftChange,syncReady=false}){
  const legions=(value?.teams||[]).filter(t=>['GLR'].includes(String(t.host||'').toUpperCase()));
- const [legionId,setLegionId]=useState(legions[0]?.id||'');
+ const [legionId,setLegionId]=useState(()=>{
+  try{return JSON.parse(window.localStorage.getItem('caroline-3739-last-tal-match')||'null')?.legion||legions[0]?.id||''}catch{return legions[0]?.id||''}
+ });
  const selectedLegion=legions.find(t=>t.id===legionId)||legions[0];
- const [matchTime,setMatchTime]=useState('14:00');
+ const [matchTime,setMatchTime]=useState(()=>{
+  try{return JSON.parse(window.localStorage.getItem('caroline-3739-last-tal-match')||'null')?.time||'14:00'}catch{return '14:00'}
+ });
  const [step,setStep]=useState('teams');
  const [groups,setGroups]=useState(initialGroups);
  const [chosen,setChosen]=useState([]);
@@ -77,6 +81,10 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const teamRefs=useRef({});
  const matchKey=String(selectedLegion?.id||'unknown')+':'+matchTime;
  const draftKey=draftPrefix+matchKey;
+ useEffect(()=>{
+  if(!selectedLegion||!matchTime)return;
+  try{window.localStorage.setItem('caroline-3739-last-tal-match',JSON.stringify({legion:selectedLegion.id,time:matchTime}));}catch{}
+ },[selectedLegion?.id,matchTime]);
  const remoteDraft=drafts?.[matchKey];
  const lastSaved=useRef('');
  const bootstrapped=useRef(new Set());
@@ -164,6 +172,30 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const leaderCandidates=[...selectedPlayers].filter(p=>p.roles?.some?.(r=>/rally lead/i.test(String(r)))||p.rallyLeader||p.leaderProfile?.role==='leader');
  const powerOf=id=>valueNumber(powers[String(id)]??value?.records?.[id]?.troopPower);
  const teamPower=g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).reduce((sum,id)=>sum+(powerOf(id)||0),0);
+ const cohesionPairs=cooperationPairs.filter(pair=>Array.isArray(pair)&&pair.length===2&&pair[0]!==pair[1]).map(pair=>pair.map(String));
+ const languageOf=id=>{
+  const p=byId.get(String(id));return languageInfo(p).map(l=>l.toLowerCase());
+ };
+ const preferenceScore=candidateGroups=>{
+  let links=0,sharedLanguages=0;
+  for(const g of candidateGroups){
+   const ids=[g.leader,...g.members].filter(Boolean).map(String);
+   for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){
+    if(cohesionPairs.some(pair=>pair.includes(ids[i])&&pair.includes(ids[j])))links++;
+    const a=languageOf(ids[i]),b=languageOf(ids[j]);
+    if(a.length&&b.length&&a.some(l=>b.includes(l)))sharedLanguages++;
+   }
+  }
+  return {links,sharedLanguages};
+ };
+ const balanceInfo=(candidateGroups)=>{
+  const powers=candidateGroups.map(g=>[g.leader,...g.members].filter(Boolean).reduce((n,id)=>n+(powerOf(id)||0),0));
+  const mean=powers.reduce((a,b)=>a+b,0)/4;
+  const deviation=mean?Math.max(...powers.map(v=>Math.abs(v-mean)/mean))*100:0;
+  return {mean,deviation,powers};
+ };
+ const balanceStats=balanceInfo(groups);
+ const compatibilityStats=preferenceScore(groups);
  const allAssigned=groups.flatMap(g=>[g.leader,...g.members]).filter(Boolean).map(String);
  const missing=selectedIds.filter(id=>!allAssigned.includes(String(id)));
  const activePlayers=groups.flatMap(g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).map(id=>({id:String(id),g})));
@@ -210,13 +242,35 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
    const cap=Math.ceil(joiners.length/4);
    joiners.forEach(p=>{
     const eligible=next.filter(g=>g.members.length<cap);
-    const target=eligible.sort((a,b)=>a.members.reduce((n,id)=>n+(powerOf(id)||0),powerOf(a.leader)||0)-b.members.reduce((n,id)=>n+(powerOf(id)||0),powerOf(b.leader)||0)||a.members.length-b.members.length)[0];
-    target?.members.push(String(p.id));
+    eligible.sort((a,b)=>[a.leader,...a.members].reduce((n,id)=>n+(powerOf(id)||0),0)-[b.leader,...b.members].reduce((n,id)=>n+(powerOf(id)||0),0));
+    eligible[0]?.members.push(String(p.id));
    });
+   // Minimise max deviation first. Within the 5% target, prefer cooperation
+   // and shared language. Leaders remain fixed; each joiner appears only once.
+   const objective=(gs)=>{
+    const deviation=balanceInfo(gs).deviation;
+    const affinity=preferenceScore(gs);
+    return Math.max(0,deviation-5)*10000 + deviation*12 - affinity.links*28 - affinity.sharedLanguages*1.5;
+   };
+   let score=objective(next);
+   for(let pass=0;pass<40;pass++){
+    let best=null,bestScore=score;
+    for(let a=0;a<4;a++)for(let b=a+1;b<4;b++){
+     for(let ia=0;ia<next[a].members.length;ia++)for(let ib=0;ib<next[b].members.length;ib++){
+      const trial=next.map(g=>({...g,members:[...g.members]}));
+      [trial[a].members[ia],trial[b].members[ib]]=[trial[b].members[ib],trial[a].members[ia]];
+      const value=objective(trial);
+      if(value<bestScore-0.001){bestScore=value;best=trial;}
+     }
+    }
+    if(!best)break;
+    next=best;score=bestScore;
+   }
   }
-  if(groups.some(g=>g.leader||g.members.length)&&!window.confirm('Replace the current four team assignments? This preserves your participant selection and troop power, but replaces manual team and building allocations.'))return;
+   if(groups.some(g=>g.leader||g.members.length)&&!window.confirm('Replace the current four team assignments? This preserves your participant selection and troop power, but replaces manual team and building allocations.'))return;
   setGroups(next);setAssignment({});setConfirmed(false);setStep('teams');
-  setCopyMessage('Generated '+joiners.length+' joiners around '+(leaderStrategy==='manual'?'your four chosen leaders':'the four strongest players')+'. Review teams before locking.');
+  const outcome=balanceInfo(next),affinity=preferenceScore(next);
+  setCopyMessage('Generated '+joiners.length+' joiners around '+(leaderStrategy==='manual'?'your four chosen leaders':'the four strongest players')+'. Max deviation '+outcome.deviation.toFixed(1)+'%'+(outcome.deviation>5?' (5% target not achievable with this arrangement)':'')+' · '+affinity.links+' preferred cooperation pair(s) together.');
  }
   function moveMember(id,targetKey){
   const source=teamFor(id);if(!source||String(source.leader)===String(id))return;
@@ -351,6 +405,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
     </>}
     <section aria-label="Compare four teams" style={{margin:'5px 0 12px'}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><strong style={{fontSize:14}}>Team comparison</strong><span style={small}>{selectedIds.length} selected · {missing.length} unassigned</span></div>
+     {!missing.length&&allAssigned.length>0&&<div style={{...small,marginBottom:7,color:balanceStats.deviation<=5?C.green:C.gold}}>Max deviation {balanceStats.deviation.toFixed(1)}% · Target ±5% · {compatibilityStats.links} preferred pair(s) together</div>}
      <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6}}>
       {groups.map(g=>{const colour=COLORS.find(c=>c.id===g.color);return <button type="button" key={g.key} onClick={()=>{setFocusedTeam(g.color);teamRefs.current[g.key]?.scrollIntoView({behavior:'smooth',block:'center'});}} style={{...btn,padding:'8px 2px',minWidth:0,minHeight:66,borderColor:focusedTeam===g.color?colour.color:C.border,background:'#162B3D'}}>
        <span style={{display:'block',fontSize:12,color:colour.color,marginBottom:4}}>{colour.name}</span>
