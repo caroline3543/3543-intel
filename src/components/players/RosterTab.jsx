@@ -66,7 +66,7 @@ function compareRosterPlayers(a,b,field,direction,events) {
   return (av-bv)*order || fallback();
 }
 
-export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,roles,onSaveCustomRoles,onSavePlayer,onUpdatePlayers,onDeletePlayer,onGoToIntel,showToast,onLoadAlliance,legionPlan,onRefreshLegion,legionRefresh}) {
+export function RosterTab({initialPlayerId,onInitialPlayerOpened,onProfileClose,players,events,roles,onSaveCustomRoles,onSavePlayer,onUpdatePlayers,onDeletePlayer,onGoToIntel,showToast,onLoadAlliance,legionPlan,onRefreshLegion,legionRefresh}) {
   const [search,setSearch]=useState('');
   const [filters,setFilters]=useState({...EMPTY_FILTERS});
   const [filtersOpen,setFiltersOpen]=useState(false);
@@ -149,7 +149,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     {grouped?groups.filter(g=>g.members.length).map(group=><section key={group.name}><h3 style={{fontSize:16,color:C.icy}}>{group.name} · {group.members.length}</h3>{group.members.map(card)}</section>):displayed.map(card)}
     {visible.length>displayLimit&&<button type="button" style={{...button,width:'100%',marginTop:10,marginBottom:18,color:C.gold}} onClick={()=>setDisplayLimit(n=>n+30)}>Show 30 more · {visible.length-displayLimit} remaining</button>}
     {filtersOpen && <RosterFilters players={players} roles={roles} filters={filters} onChange={next=>{if(next.alliance!==filters.alliance){}setFilters(next);}} onClose={()=>setFiltersOpen(false)} count={visible.length}/>}
-    <ProfileView player={currentPlayer} roles={roles} open={profileOpen} onClose={()=>setProfileOpen(false)} onEdit={()=>{setProfileOpen(false);setEditingPlayer(currentPlayer);}} events={events} onOpenLeaderProfile={()=>setLeaderOpen(true)} onSave={savePlayer}/>
+    <ProfileView player={currentPlayer} roles={roles} open={profileOpen} onClose={()=>{setProfileOpen(false);onProfileClose?.();}} onEdit={()=>{setProfileOpen(false);setEditingPlayer(currentPlayer);}} events={events} onOpenLeaderProfile={()=>setLeaderOpen(true)} onSave={savePlayer}/>
     <RallyLeaderProfileSheet player={currentPlayer} open={leaderOpen} onClose={()=>setLeaderOpen(false)} onSave={savePlayer}/>
     <PlayerSheet open={!!editingPlayer} player={editingPlayer} roles={roles} onClose={()=>setEditingPlayer(null)} onSave={savePlayer} existingTags={[...new Set(players.map(p=>p.allianceTag).filter(Boolean))]} existingPlayers={players} onOpenExisting={openProfile} onGoToIntel={onGoToIntel}/>
     <RoleManagerSheet open={rolesOpen} onClose={()=>setRolesOpen(false)} roles={roles} onSaveCustomRoles={onSaveCustomRoles} players={players} onUpdatePlayers={onUpdatePlayers}/>
