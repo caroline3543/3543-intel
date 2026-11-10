@@ -138,7 +138,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
        <span style={{fontSize:12,color:C.icy}}>· GLR</span>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:7}}>
-       <span role="status" style={{fontSize:11,color:sync.issue?C.gold:'#B6C8D5'}}>{sync.issue?'Save issue':sync.ready?'On device':'Opening'}</span>
+       <span role="status" style={{fontSize:11,color:sync.issue?C.gold:'#B6C8D5'}}>{sync.issue?'Sync issue':sync.mode==='join'?'Review sync':sync.joined?(sync.syncing||sync.dirty?'Syncing':'Shared'):sync.ready?'Not shared':'Connecting'}</span>
        <button type="button" style={{...button,minHeight:44,minWidth:44,padding:7,background:'transparent',border:0}} aria-label="Workspace options" title="Workspace options" onClick={()=>setWorkspaceOpen(true)}><svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
       </div>
      </div>
@@ -164,7 +164,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='members'&&players.length>0&&<RosterTab initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
     {tab==='changes'&&<NameChanges players={players} plan={data.talPlan||newPlan()} onOpen={id=>{setInitialPlayerId(id);navigate('members');}}/>}
     {tab==='tal'&&<TalTab value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage}/>}
-    {tab==='teams'&&<TalTeamsTab value={data.talPlan} players={players}/>}
+    {tab==='teams'&&<TalTeamsTab value={data.talPlan} players={players} drafts={data.talMatchDrafts||{}} onDraftChange={(key,draft)=>setData(prev=>({...prev,talMatchDrafts:{...(prev.talMatchDrafts||{}),[key]:draft}}))}/>}
     </div>}
     </div>
     {workspaceOpen&&<WorkspaceOptions sync={sync} data={data} onPublish={publish} onJoin={join} onRetry={syncNow} onResolve={resolve} onClose={()=>setWorkspaceOpen(false)} onLogout={onLogout} onAlliance={()=>{setWorkspaceOpen(false);setImporting(true);}} onHelp={()=>{setWorkspaceOpen(false);setTourOpen(true);}}/>}
