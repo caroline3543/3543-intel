@@ -14,20 +14,20 @@ export function NameChanges({players,plan,onOpen}){
   return (!assignedOnly||legionForPlayer(plan,p.id))&&(!q||[...playerSearchFields(p),row.before,row.after].some(v=>String(v||'').toLocaleLowerCase().includes(q)));
  });
  return <section style={{padding:20}}>
-  <h2 style={{fontSize:24,margin:'0 0 8px'}}>Name changes</h2>
-  <p style={{fontSize:14,color:C.icy,lineHeight:1.5,margin:'0 0 14px'}}>Latest detected changes first. Times show when a refresh found the change, not when the player renamed.</p>
+  <h2 style={{fontSize:24,margin:'0 0 14px'}}>Name changes</h2>
+
   <PlayerSearch label="Search name changes" players={players} value={query} onChange={value=>{setQuery(value);setLimit(40);}}/>
   <label style={{display:'flex',alignItems:'center',gap:10,minHeight:44,color:C.icy,marginBottom:12,fontSize:14}}><input type="checkbox" checked={assignedOnly} onChange={e=>{setAssignedOnly(e.target.checked);setLimit(40);}} style={{width:22,height:22}}/>TAL players only</label>
   <p role="status" style={{fontSize:14,color:C.icy}}>{rows.length} {rows.length===1?'change':'changes'}</p>
   {rows.slice(0,limit).map(row=>{
    const p=players.find(p=>p.id===row.playerId),team=legionForPlayer(plan,p.id),alliance=allianceEvidence(p);
-   return <article key={row.id} style={{padding:14,borderRadius:12,background:C.card,border:`1px solid ${C.border}`,marginBottom:12}}>
+   return <article key={row.id} style={{padding:'12px 0',borderBottom:`1px solid #304455`,marginBottom:0}}>
     <button aria-label={`Open ${p.username||p.alias||p.fid}`} onClick={()=>onOpen(p.id)} style={{...button,width:'100%',textAlign:'left',padding:0,border:0,background:'none'}}>
-     <span style={{display:'block',fontSize:16,fontWeight:700,overflowWrap:'anywhere'}}>{row.before} → {row.after}</span>
+     <span style={{display:'block',fontSize:16,fontWeight:650,overflowWrap:'anywhere'}}>{row.before} → {row.after}</span>
      {p.username!==row.after&&<span style={{display:'block',fontSize:14,color:C.icy,marginTop:6}}>Now: {p.username}</span>}
      <span style={{display:'block',fontSize:14,color:C.icy,marginTop:6}}>{team?legionLabel(team):'No legion assigned'}{alliance.noAlliance?' · No alliance':alliance.tag?` · Last seen in ${alliance.tag}`:' · Alliance unknown'}</span>
-     <span style={{display:'block',fontSize:13,color:C.icy,marginTop:6}}>Detected: {utcChecked(row.at)}</span>
-     <span style={{display:'block',fontSize:14,color:C.gold,marginTop:8}}>View player ›</span>
+     <span style={{display:'block',fontSize:13,color:C.icy,marginTop:5}}>Detected: {utcChecked(row.at)}</span>
+     
     </button><CopyPlayerId fid={p.fid}/>
    </article>;
   })}
