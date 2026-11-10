@@ -130,8 +130,30 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   if(!sync.ready)return <p role="status" style={{padding:24,color:C.icy}}>Opening State 3739…</p>;
   return <main style={{maxWidth:480,margin:'0 auto',paddingBottom:'calc(140px + env(safe-area-inset-bottom, 0px))'}}>
     <div data-workspace-content="" inert={workspaceOpen?'':undefined} aria-hidden={workspaceOpen?'true':undefined}>
-    <header style={{padding:'14px 20px',borderBottom:`1px solid ${C.border}`}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><h1 style={{fontSize:22,margin:0}}>Caroline 3739</h1><p style={{fontSize:14,color:C.icy,margin:'5px 0 0'}}>{tab==='tal'?'TAL planner':tab==='teams'?'TAL Teams':tab==='changes'?'Name changes':`Members · ${players.length} players`}</p></div><button style={{...button,minWidth:44,padding:10}} aria-label="Workspace options" title="Workspace" onClick={()=>setWorkspaceOpen(true)}><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div><div style={{display:'flex',alignItems:'center',gap:8,marginTop:10,flexWrap:'wrap'}}><button style={{...button,minHeight:40,flex:1,padding:'8px 10px',color:C.gold}} onClick={refreshAll} aria-busy={!!apiProgress||!!legionRefresh} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'↻ Refresh roster'}</button><button style={{...button,minHeight:40,padding:'8px 10px',fontSize:13}} aria-expanded={dataActionsOpen} onClick={()=>setDataActionsOpen(v=>!v)}>Data actions {dataActionsOpen?'▴':'▾'}</button></div><div role="status" style={{fontSize:12,color:sync.issue?C.gold:C.icy,marginTop:7,lineHeight:1.4}}>{sync.syncing?'Saving locally…':sync.issue?'Local storage needs attention':sync.dirty?'Changes pending save':sync.checkedAt?`Saved locally ${new Date(sync.checkedAt).toISOString().slice(11,16)} UTC`:'Local workspace'}</div>{dataActionsOpen&&<div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginTop:10}}><button style={{...button,minHeight:40,padding:'8px 10px',fontSize:13}} disabled={sync.syncing||sync.mode==='join'||!!sync.conflicts?.length} aria-busy={!!sync.syncing} onClick={syncNow}>{sync.syncing?'Syncing…':sync.issue?'Retry sync':sync.dirty?'Check local save':'Check saved data'}</button><button style={{...button,minHeight:40,padding:'8px 10px',fontSize:13}} onClick={backup} disabled={exporting}>{exporting?'Exporting…':tab==='tal'?'Export TAL Excel':'Export roster Excel'}</button>{data.settings?.lastApiRefresh&&<span style={{fontSize:12,color:C.icy}}>API updated {new Date(data.settings.lastApiRefresh.at).toISOString().slice(0,16).replace('T',' ')} UTC{data.settings.lastApiRefresh.partial?' · Partial':''}</span>}</div>}{error&&<p role="alert" style={{color:C.red}}>{error}</p>}</header>
-    <div style={{padding:'8px 20px',fontSize:12,color:C.gold,background:C.section}}>State 3739 · GLR · Local copy. No inherited State 3573 data.</div>
+    <header style={{padding:'10px 20px 9px',borderBottom:'1px solid #26394B'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+      <div style={{display:'flex',alignItems:'baseline',gap:8,minWidth:0}}>
+       <span style={{fontSize:13,fontWeight:700,letterSpacing:'.02em',color:C.white}}>Caroline</span>
+       <span style={{fontSize:13,color:C.gold,fontVariantNumeric:'tabular-nums'}}>3739</span>
+       <span style={{fontSize:12,color:C.icy}}>· GLR</span>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:7}}>
+       <span role="status" style={{fontSize:11,color:sync.issue?C.gold:'#B6C8D5'}}>{sync.issue?'Save issue':sync.ready?'On device':'Opening'}</span>
+       <button type="button" style={{...button,minHeight:44,minWidth:44,padding:7,background:'transparent',border:0}} aria-label="Workspace options" title="Workspace options" onClick={()=>setWorkspaceOpen(true)}><svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+      </div>
+     </div>
+     {tab==='members'&&<div style={{display:'flex',alignItems:'center',gap:8,marginTop:5}}>
+      <button style={{...button,minHeight:40,flex:1,padding:'7px 10px',color:C.gold}} onClick={refreshAll} aria-busy={!!apiProgress||!!legionRefresh} disabled={!!apiProgress||!!legionRefresh}>{apiProgress?'Refreshing GLR…':'↻ Refresh GLR'}</button>
+      <button style={{...button,minHeight:40,padding:'7px 10px',fontSize:13}} aria-expanded={dataActionsOpen} onClick={()=>setDataActionsOpen(v=>!v)}>More {dataActionsOpen?'▴':'▾'}</button>
+     </div>}
+     {tab!=='members'&&<div style={{height:0}}/>}
+     {dataActionsOpen&&tab==='members'&&<div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:7}}>
+      <button style={{...button,fontSize:13}} onClick={backup} disabled={exporting}>{exporting?'Exporting…':'Export roster'}</button>
+      <button style={{...button,fontSize:13}} onClick={syncNow}>Check local save</button>
+      {data.settings?.lastApiRefresh&&<span style={{fontSize:12,color:C.icy,alignSelf:'center'}}>API updated {new Date(data.settings.lastApiRefresh.at).toISOString().slice(0,16).replace('T',' ')} UTC</span>}
+     </div>}
+     {error&&<p role="alert" style={{color:C.red,fontSize:13}}>{error}</p>}
+    </header>
     <WorkspaceAttention sync={sync} onReview={()=>setWorkspaceOpen(true)}/>
     {message&&<div role="status" style={{margin:'12px 20px 0',padding:10,color:C.icy,background:C.section,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>{message}<button style={button} onClick={()=>setMessage('')} aria-label="Dismiss message">✕</button></div>}
     <BottomNav tab={tab} onChange={navigate}/>
