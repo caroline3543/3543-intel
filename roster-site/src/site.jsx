@@ -13,7 +13,6 @@ import {useEffect,useRef,useState} from 'react';
 import {TalTab} from './tal/TalTab.jsx';
 import {TalTeamsTab} from './tal/TalTeamsTab.jsx';
 import {newPlan,createTeam} from './tal/planner.js';
-import {newPlayer} from '../../src/data/playerSchema.js';
 import {AllianceSetup,DEFAULT_ALLIANCES} from './components/AllianceSetup.jsx';
 import {QuickTour} from './components/QuickTour.jsx';
 import {readPreferences,savePreferences,tapFeedback} from './preferences.js';
@@ -49,11 +48,27 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const [dataActionsOpen,setDataActionsOpen]=useState(false);
   const lastAttention=useRef(null);
   const [initialPlayerId,setInitialPlayerId]=useState(null);
+  const talReturnScroll=useRef(null);
+  const [talProfileOpen,setTalProfileOpen]=useState(false);
+  function openTalPlayer(id){
+    talReturnScroll.current=window.scrollY;
+    setInitialPlayerId(id);
+    setTalProfileOpen(true);
+    setTab('members');
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  function returnFromTalProfile(){
+    if(!talProfileOpen)return;
+    setTalProfileOpen(false);
+    setTab('tal');
+    requestAnimationFrame(()=>window.scrollTo({top:talReturnScroll.current||0,behavior:'instant'}));
+    talReturnScroll.current=null;
+  }
   const [legionRefresh,setLegionRefresh]=useState(null);
   const [refreshingLab,setRefreshingLab]=useState(false);
   const labBusy=useRef(false);
   const refreshing=useRef(false),stopRefresh=useRef(false);
-  function navigate(id){setTab(id);window.scrollTo?.({top:0,behavior:'instant'});}
+  function navigate(id){setTalProfileOpen(false);talReturnScroll.current=null;setTab(id);window.scrollTo?.({top:0,behavior:'instant'});}
   useEffect(()=>()=>{stopRefresh.current=true;},[]);
   const [tourOpen,setTourOpen]=useState(!preferences.tutorialSeen);
   const [exporting,setExporting]=useState(false);
@@ -75,21 +90,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     const result=mergeAllianceProfiles(latest.current.players||[],rows,'3739');
     setData(prev=>({...prev,players:mergeAllianceProfiles(prev.players,rows,'3739').players,settings:{...prev.settings,lastApiRefresh:{at:new Date().toISOString(),scope:'Alliance roster',count:rows.length}}}));return {updated:result.updated.length,added:result.added.length};
   }
-  function createTalPlayer(fields,legionId){
-    const username=String(fields.username||'').trim(),fid=String(fields.fid||'').trim();
-    const allianceTag=String(fields.allianceTag||'').trim().toUpperCase();
-    const state=latest.current,team=state.talPlan?.teams?.find(t=>t.id===legionId&&String(t.host||'').toUpperCase()==='GLR');
-    if(!username||!team||state.talPlan?.locked||team.tournamentStatus==='eliminated')return false;
-    if((team.members||[]).length>=50||state.players.some(p=>fid&&String(p.fid)===fid||String(p.username||'').trim().toLowerCase()===username.toLowerCase()))return false;
-    const player=newPlayer({username,fid,allianceTag,stateId:'3739',profileLastUpdated:new Date().toISOString()});
-    setData(prev=>{
-      const target=prev.talPlan?.teams?.find(t=>t.id===legionId);
-      if(!target||(target.members||[]).length>=50||prev.players.some(p=>fid&&String(p.fid)===fid||String(p.username||'').trim().toLowerCase()===username.toLowerCase()))return prev;
-      return {...prev,players:[...prev.players,player],talPlan:{...prev.talPlan,teams:prev.talPlan.teams.map(t=>t.id===legionId?{...t,members:[...(t.members||[]),{id:player.id,role:'pending',registered:false}]}:t)}};
-    });
-    return true;
-  }
-    async function syncNow(){setMessage('Checking local copy…');const result=await retry();setMessage(result?.issue?result.issue:result?.conflicts?.length?'Edits need review.':result?.dirty||result?.syncing?'Changes are still syncing.':'Local changes saved.');}
+  async function syncNow(){setMessage('Checking local copy…');const result=await retry();setMessage(result?.issue?result.issue:result?.conflicts?.length?'Edits need review.':result?.dirty||result?.syncing?'Changes are still syncing.':'Local changes saved.');}
   async function refreshAll(){
     if(refreshing.current)return;refreshing.current=true;stopRefresh.current=false;let done=0,failed=0,updated=0;
     try{for(const tag of DEFAULT_ALLIANCES){if(stopRefresh.current)break;setApiProgress(`Refreshing [${tag}] · ${done+1}/${DEFAULT_ALLIANCES.length}`);try{const rows=allianceRows(await fetchMightpulseAlliance(3739,tag),'3739',tag);if(!rows.length)throw Error('No roster returned');importRoster(rows);updated+=rows.length;}catch(e){failed++;setMessage(`[${tag}]: ${e.message}`);if([401,403,429].includes(e.status)||[401,403,429].includes(e.providerStatus))break;}done++;}
@@ -176,9 +177,9 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {legionRefresh&&<div role="status" style={{padding:'12px 20px',color:C.icy}}>Refreshing players: {legionRefresh.done} of {legionRefresh.total}<button style={{...button,marginLeft:8}} onClick={()=>{stopRefresh.current=true;}}>Stop after this player</button></div>}
     {sync.mode!=='join'&&!sync.conflicts?.length&&<div>
     {tab==='members'&&!DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag))&&<AllianceSetup players={players} onLoad={importRoster}/>}
-    {tab==='members'&&players.length>0&&<RosterTab initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
+    {tab==='members'&&players.length>0&&<RosterTab initialPlayerId={initialPlayerId} onProfileClose={returnFromTalProfile} onInitialPlayerOpened={()=>setInitialPlayerId(null)} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
     {tab==='changes'&&<NameChanges players={players} plan={data.talPlan||newPlan()} onOpen={id=>{setInitialPlayerId(id);navigate('members');}}/>}
-    {tab==='tal'&&<TalTab value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onCreatePlayer={createTalPlayer} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage}/>}
+    {(tab==='tal'||talProfileOpen)&&<div style={{display:tab==='tal'?'block':'none'}}><TalTab value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onOpenPlayer={openTalPlayer} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage}/></div>}
     {tab==='teams'&&<TalTeamsTab value={data.talPlan} players={players} drafts={data.talMatchDrafts||{}} syncReady={sync.joined&&sync.mode==='active'&&!sync.conflicts?.length} onDraftChange={(key,draft)=>setData(prev=>({...prev,talMatchDrafts:{...(prev.talMatchDrafts||{}),[key]:draft}}))}/>}
     </div>}
     </div>
