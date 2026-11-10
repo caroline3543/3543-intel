@@ -1,6 +1,6 @@
 import {sharedData,mergeWorkspace,resolveConflicts,validateWorkspace,sameWorkspaceValue} from '../shared/workspace.js';
 const equal=sameWorkspaceValue;
-const meaningful=data=>Boolean(data?.players?.length||data?.events?.length||data?.customRoles?.length||data?.talPlan);
+const meaningful=data=>Boolean(data?.players?.length||data?.events?.length||data?.customRoles?.length||Object.keys(data?.talMatchDrafts||{}).length||Object.keys(data?.talPlan?.records||{}).length||data?.talPlan?.teams?.some(t=>t.members?.length||t.candidates?.length||t.slots?.length));
 export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onStatus=()=>{}}){
  let state={local:sharedData(initial),base:null,revision:0,joined:false,updatedAt:null,conflicts:[],mode:'connecting',issue:null,status:'Opening shared workspace…',ready:false,deviceBackup:null,syncing:false,checkedAt:null};
  let running=false,disposed=false,timer=null,persisting=Promise.resolve();
