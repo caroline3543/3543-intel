@@ -316,7 +316,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
         <p style={{...muted,margin:'0 0 10px'}}>Remove from {legionLabel(entryTeam)}? The Members profile and availability will remain.</p>
         <div style={{display:'flex',gap:8}}><button style={button} onClick={()=>setRemoveId('')}>Cancel</button><button style={{...button,color:C.red}} disabled={!editable} onClick={()=>{onChange?.({...value,teams:value.teams.map(t=>t.id===entryTeam.id?{...t,members:t.members.filter(m=>String(m.id)!==String(player.id)),candidates:(t.candidates||[]).filter(c=>String(c.id)!==String(player.id)),captain:t.captain===player.id?'':t.captain}:t)});setRemoveId('');setActionsId('');onMessage?.('Removed from legion. Members profile retained.');}}>Remove</button></div>
        </div>}
-      </article>;icle>;
+      </article>;
     })}
     {!roster.length&&<div style={{padding:18,background:C.card,borderRadius:12,color:C.icy,fontSize:14}}>No players match the current filters. <button style={{...button,marginTop:10,width:'100%'}} onClick={resetFilters}>Clear filters</button></div>}
     {roster.length>listLimit&&<button style={{...button,width:'100%',marginTop:8}} onClick={()=>setListLimit(n=>n+40)}>Show 40 more players</button>}
