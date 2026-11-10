@@ -345,21 +345,6 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDr
       {coreLock&&<button style={{...btn,color:C.gold,flexShrink:0}} onClick={lockCore}>Unlock core</button>}
      </div>
     </section>
-    {coreLock&&<>
-    <section style={{...panel,marginBottom:12}}>
-     <strong>Add to battle · Last-minute players</strong>
-     <p style={{...small,margin:'6px 0 10px'}}>Choose anyone from Members, even without recorded availability. Existing teams will not be regenerated.</p>
-     <input aria-label="Find last-minute player" placeholder="Search name or Player ID" value={lateSearch} onChange={e=>{setLateSearch(e.target.value);setLateId('');}} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:8}}/>
-     <select aria-label="Select last-minute player" value={lateId} onChange={e=>setLateId(e.target.value)} style={{...btn,width:'100%',fontSize:14,marginBottom:8}}>
-      <option value="">Choose unassigned player</option>
-      {battlePool.filter(p=>!allTeamIds.has(String(p.id))&&(!lateSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(lateSearch.toLowerCase())))).slice(0,80).map(p=><option key={p.id} value={p.id}>{name(p)}{languageInfo(p).length?' · '+languageInfo(p).join(', '):''}{norahInfo(p)?' · '+norahInfo(p):''}</option>)}
-     </select>
-     <div style={{display:'flex',alignItems:'center',gap:8}}>
-      <select aria-label="Destination colour team" value={lateTarget} onChange={e=>setLateTarget(e.target.value)} style={{...btn,flex:1}}>{COLORS.map(c=><option key={c.id} value={c.id}>{c.name} Team</option>)}</select>
-      <button style={{...btn,color:C.bg,background:lateId?C.gold:C.section}} disabled={!lateId} onClick={addLatePlayer}>Assign player</button>
-     </div>
-    </section>
-    </>}
     {!coreLock&&<>
     <section style={{...panel,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><strong>Legion participants</strong><span style={small}>{selectedIds.length} selected · {pool.length} available · {legionRoster.length} total</span></div>
@@ -466,6 +451,22 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDr
       </div>}
      </section>;
     })}
+    {coreLock&&<>
+    <section style={{...panel,marginBottom:12}}>
+     <strong>Add to battle · Last-minute players</strong>
+     <p style={{...small,margin:'6px 0 10px'}}>Choose anyone from Members, even without recorded availability. Existing teams will not be regenerated.</p>
+     <input aria-label="Find last-minute player" placeholder="Search name or Player ID" value={lateSearch} onChange={e=>{setLateSearch(e.target.value);setLateId('');}} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:8}}/>
+     <select aria-label="Select last-minute player" value={lateId} onChange={e=>setLateId(e.target.value)} style={{...btn,width:'100%',fontSize:14,marginBottom:8}}>
+      <option value="">Choose unassigned player</option>
+      {battlePool.filter(p=>!allTeamIds.has(String(p.id))&&(!lateSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(lateSearch.toLowerCase())))).slice(0,80).map(p=><option key={p.id} value={p.id}>{name(p)}{languageInfo(p).length?' · '+languageInfo(p).join(', '):''}{norahInfo(p)?' · '+norahInfo(p):''}</option>)}
+     </select>
+     <div style={{display:'flex',alignItems:'center',gap:8}}>
+      <select aria-label="Destination colour team" value={lateTarget} onChange={e=>setLateTarget(e.target.value)} style={{...btn,flex:1}}>{COLORS.map(c=><option key={c.id} value={c.id}>{c.name} Team</option>)}</select>
+      <button style={{...btn,color:C.bg,background:lateId?C.gold:C.section}} disabled={!lateId} onClick={addLatePlayer}>Assign player</button>
+     </div>
+    </section>
+    </>}
+
     {!coreLock&&<section style={{...panel,marginBottom:10}}>
      <strong style={{fontSize:14}}>3 · Finalise teams</strong>
      <p style={{...small,margin:'6px 0 10px'}}>{groups.some(g=>!g.leader)?'Four leaders are required.':missing.length?missing.length+' selected players still need a team.':'All selected players have a team. Review and lock when ready.'}</p>
@@ -485,7 +486,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDr
      const col=COLORS.find(c=>c.id===activeColour);
      const teamPlayers=activePlayers.filter(p=>p.g.color===activeColour);
      const unallocated=teamPlayers.filter(p=>!assignment[p.id]);
-     const moveWithin=(id,building)=>{assign(id,building);setDragId('');};
+     const moveWithin=(id,building)=>{if(!id)return;assign(id,building);setDragId('');setCopyMessage(name(byId.get(String(id))||{id})+' assigned to '+building+'.');};
      return <section style={{...panel,background:col.bg,borderColor:col.color+'77',marginBottom:12}}>
       <strong style={{color:col.color}}>{col.name} Team · {teamPlayers.length} players</strong>
       {unallocated.length>0&&<div style={{marginTop:10}}><p style={{...small,color:col.color,margin:'0 0 7px'}}>Unallocated · {unallocated.length}</p>{unallocated.map(({id})=><button key={id} draggable="true" onDragStart={e=>{e.dataTransfer.setData('text/plain',id);setDragId(id)}} onDragEnd={()=>setDragId('')} onClick={()=>setPicked(id)} style={{...btn,width:'100%',textAlign:'left',marginBottom:5,borderColor:picked===id?col.color:C.border}}>⠿ {name(byId.get(id)||{id})}</button>)}</div>}
@@ -507,7 +508,9 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDr
     </section>
    </>}
     <section style={{...panel,marginTop:8}}>
-     <button type="button" aria-expanded={copyOpen} style={{...btn,width:'100%',textAlign:'left',color:C.gold}} onClick={openTeamCopy}>{copyOpen?'Hide preview':'Preview copy teams'}</button>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}><strong style={{fontSize:14}}>Team instructions</strong><span style={small}>Complete current teams</span></div>
+     <button type="button" style={{...btn,width:'100%',background:allAssigned.length?C.gold:C.section,color:allAssigned.length?C.bg:C.icy,marginBottom:8}} disabled={!allAssigned.length} onClick={()=>copy(teamText)}>Copy teams</button>
+     <button type="button" aria-expanded={copyOpen} style={{...btn,width:'100%',textAlign:'left',color:C.gold}} onClick={openTeamCopy}>{copyOpen?'Hide editable preview':'Preview / Edit teams ▾'}</button>
      {copyOpen&&<div style={{marginTop:10}}>
       {copyStale&&<p role="status" style={{...small,color:C.gold}}>Team assignments have changed since the preview was generated. Refresh it to include the current complete teams.</p>}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
