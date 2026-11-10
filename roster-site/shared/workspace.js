@@ -1,15 +1,15 @@
-export const WORKSPACE_ID='3573-leaders';
+export const WORKSPACE_ID='3739-leaders';
 export const SHARED_KEYS=['players','events','customRoles','settings','talPlan','talTeamPreferences'];
 const plain=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
-export function sharedData(data){const out={};for(const key of SHARED_KEYS)if(data[key]!==undefined)out[key]=structuredClone(data[key]);return {...out,players:out.players||[],events:out.events||[],customRoles:out.customRoles||[],settings:{...out.settings,stateId:'3573'}};}
+export function sharedData(data){const out={};for(const key of SHARED_KEYS)if(data[key]!==undefined)out[key]=structuredClone(data[key]);return {...out,players:out.players||[],events:out.events||[],customRoles:out.customRoles||[],settings:{...out.settings,stateId:'3739'}};}
 export function validateWorkspace(data){
  if(!plain(data)||Object.keys(data).some(k=>!SHARED_KEYS.includes(k)))throw Error('Unrecognised workspace fields.');
- if(!Array.isArray(data.players)||data.players.length>5000||!Array.isArray(data.events)||!Array.isArray(data.customRoles)||!plain(data.settings)||data.settings.stateId!=='3573')throw Error('Invalid State 3573 workspace.');
+ if(!Array.isArray(data.players)||data.players.length>5000||!Array.isArray(data.events)||!Array.isArray(data.customRoles)||!plain(data.settings)||data.settings.stateId!=='3739')throw Error('Invalid State 3739 workspace.');
  const ids=new Set(),fids=new Set();
  for(const p of data.players){
   if(!plain(p)||typeof p.id!=='string'||!p.id||ids.has(p.id))throw Error('Player IDs must be unique.');ids.add(p.id);
   if(p.fid){const fid=String(p.fid).trim();if(!/^[1-9]\d{3,14}$/.test(fid)||fids.has(fid))throw Error('Game IDs must be valid and unique.');fids.add(fid);}
-  for(const source of [p.providerStats,p.providerDetails,...Object.values(p.providerRankings||{})])if(source?.stateId&&String(source.stateId)!=='3573')throw Error('A profile belongs to another state.');
+  for(const source of [p.providerStats,p.providerDetails,...Object.values(p.providerRankings||{})])if(source?.stateId&&String(source.stateId)!=='3739')throw Error('A profile belongs to another state.');
  }
  if(data.talTeamPreferences!=null){
   const prefs=data.talTeamPreferences;
