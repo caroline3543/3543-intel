@@ -1,6 +1,6 @@
 import {compareLabyrinth} from './labyrinth.js';
 export const DEFAULT_TIMES=['02:00','07:00','12:00','14:00','19:00'];
-export function newPlan(){return {name:'State 3573 TAL',step:'setup',deadline:'',times:[...DEFAULT_TIMES],timesConfirmed:false,minOverlap:2,targetCombatants:15,records:{},teams:[],locked:false};}
+export function newPlan(){return {name:'State 3739 TAL',step:'setup',deadline:'',times:[...DEFAULT_TIMES],timesConfirmed:false,minOverlap:2,targetCombatants:15,records:{},teams:[],locked:false};}
 export function record(plan,player){return {status:'pending',times:[],homeAlliance:player.allianceTag||'',note:'',troopPower:'',...plan.records?.[player.id]};}
 export function overlap(plan,player,team){const r=record(plan,player);return r.status==='available'?team.slots.filter(t=>r.times.includes(t)).length:0;}
 export function eligible(plan,player,team){return !!player&&!player.blacklisted&&team.slots.length===3&&overlap(plan,player,team)>=plan.minOverlap;}
