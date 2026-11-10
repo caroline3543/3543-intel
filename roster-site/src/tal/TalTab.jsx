@@ -336,7 +336,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       const editable=!value?.locked&&tournamentStatus(entryTeam)!=='eliminated';
       const revealed=swipeId===String(player.id);
       const selectedEditing=editingTimes===String(player.id);
-      const statusText=member?.registered?'Registered':member?'Needs registration':'Considering';
+      const statusText=member?.registered?'Registered in game':member?'Needs registration':'Considering';
       return <article key={player.id} onPointerDown={e=>onSwipeDown(e,String(player.id))} onPointerUp={e=>onSwipeUp(e,String(player.id),!!member&&editable)} onPointerCancel={()=>{gesture.current=null;}} style={{background:C.card,borderRadius:11,marginBottom:8,overflow:'hidden',touchAction:'pan-y'}}>
        {revealed&&member&&<div role="group" aria-label={'Registration action for '+(player.username||player.alias||'player')} style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',padding:'9px 11px',background:C.section}}>
         <button type="button" style={{...button,color:member.registered?C.gold:C.green,background:C.card}} disabled={!editable} onClick={()=>setRegistration(entryTeam,player.id,!member.registered)}>{member.registered?'Mark unregistered':'Confirm registered'}</button>
@@ -347,10 +347,10 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
          <PlayerAvatar player={player} size={44}/>
          <span style={{flex:1,minWidth:0}}>
           <span style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:7}}><strong style={{fontSize:16,overflowWrap:'anywhere'}}>{player.username||player.alias||'Unknown player'}</strong>{player.furnaceLevel&&<span style={{fontSize:12,color:C.gold}}>{player.furnaceLevel}</span>}</span>
-          <span style={{...muted,display:'block',marginTop:3}}>{status.tag||player.allianceTag||'Alliance unknown'} · {legionLabel(entryTeam)}</span>
+          <span style={{...muted,display:'block',marginTop:3}}>{String(status.tag||player.allianceTag||'').toUpperCase()===String(entryTeam.host||'').toUpperCase()?legionLabel(entryTeam):(status.tag||player.allianceTag||'Alliance unknown')+' · '+legionLabel(entryTeam)}</span>
          </span>
         </button>
-        <button type="button" title="Player actions" aria-label={'Actions for '+(player.username||player.alias||'player')} aria-expanded={actionsId===player.id} style={{...button,minWidth:44,padding:7,background:'transparent',border:0,fontSize:20}} onClick={()=>{setActionsId(actionsId===player.id?'':player.id);setSwipeId('');setRemoveId('')}}>•••</button>
+        <button type="button" title="Edit player planning actions" aria-label={'Edit planning options for '+(player.username||player.alias||'player')} aria-expanded={actionsId===player.id} style={{...button,minWidth:44,padding:7,background:'transparent',border:0,fontSize:20}} onClick={()=>{setActionsId(actionsId===player.id?'':player.id);setSwipeId('');setRemoveId('')}}>•••</button>
        </div>
        {(tierChips(player).length>0||gameLanguages(player).length>0)&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:5,padding:'0 11px 5px'}}>
         {tierChips(player).map(([key,label,color])=><span key={key} style={{fontSize:11,fontWeight:600,color,padding:'4px 7px',borderRadius:7,background:color+'17',border:'1px solid '+color+'3a'}}>{label} {player.troops[key]}</span>)}
