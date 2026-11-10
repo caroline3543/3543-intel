@@ -67,9 +67,9 @@ export function applyTalBulk(data,ids,action){
    }
    next.talTeamPreferences={...current,pairs};
   }else{
-   const groups=Array.isArray(data.talPreferredGroups)?data.talPreferredGroups:[];
+   const groups=Array.isArray(current.groups)?current.groups:[];
    const groupId=preview.ids.slice().sort().join(':');
-   if(!groups.some(g=>g.id===groupId))next.talPreferredGroups=[...groups,{id:groupId,memberIds:preview.ids}];
+   if(!groups.some(g=>g.id===groupId))next.talTeamPreferences={...current,groups:[...groups,{id:groupId,memberIds:preview.ids}]};
   }
  }
  return {data:next,preview};
