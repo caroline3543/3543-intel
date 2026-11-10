@@ -1,3 +1,4 @@
+import {TalBulkEditor} from './TalBulkEditor.jsx';
 import {TalSheetConnection} from './TalSheetConnection.jsx';
 import {useState} from 'react';
 import {Card,Hint,button,C} from './ui.jsx';
@@ -7,7 +8,7 @@ import {Availability} from './Availability.jsx';
 import {Legions} from './Legions.jsx';
 import {Review} from './Review.jsx';
 const steps=[['setup','Setup'],['times','Times'],['legions','Legions'],['review','Review']];
-export function TalTab({value,players,onChange,onMembers,onExport,onRefreshLab,refreshingLab,workspace,onImportSheet}){
+export function TalTab({value,players,onChange,onMembers,onExport,onRefreshLab,refreshingLab,workspace,onImportSheet,onBulkApply}){
  const plan={...newPlan(),...value};
  const [message,setMessage]=useState(''),[copyText,setCopyText]=useState('');
  function save(next){onChange(next);setMessage('');}
@@ -18,6 +19,7 @@ export function TalTab({value,players,onChange,onMembers,onExport,onRefreshLab,r
   <h2 style={{fontSize:24,margin:'0 0 8px'}}>Tundra Arms League</h2><Hint>Build a state team from any loaded alliance. Plan here; register in game.</Hint>
   <nav aria-label="TAL planning steps" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6,marginBottom:14}}>{steps.map(([id,label])=><button key={id} aria-current={plan.step===id?'step':undefined} style={{...button,padding:'10px 3px',fontSize:13,color:plan.step===id?C.gold:C.icy,borderColor:plan.step===id?C.gold:C.border}} onClick={()=>step(id)}>{label}</button>)}</nav>
   <Hint>{players.filter(p=>record(plan,p).status==='available').length} taking part · {plan.teams.reduce((n,t)=>n+t.members.length,0)} assigned · {plan.teams.length} legions{plan.locked?' · Plan locked':''}</Hint>
+  <TalBulkEditor data={workspace||{players,talPlan:plan}} onApply={onBulkApply}/>
   <TalSheetConnection data={workspace||{players,talPlan:plan}} onImport={onImportSheet} locked={plan.locked}/>
   {message&&<p role="status" style={{padding:12,background:C.card,borderRadius:10,fontSize:14,color:C.gold,lineHeight:1.5}}>{message}</p>}
   {plan.locked&&<Card><Hint>This plan is locked. You can review and export it.</Hint><button style={button} onClick={()=>onChange({...plan,locked:false})}>Unlock to edit</button></Card>}
