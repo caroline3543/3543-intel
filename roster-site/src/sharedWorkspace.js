@@ -62,6 +62,21 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
   }catch(e){state.mode='active';error(e);await persist();}
   finally{running=false;}
  }
+ async function seedFromDevice(){
+  if(disposed||running||state.mode!=='join'||state.remote?.revision!==0||meaningful(state.remote?.data))return;
+  const snapshot=structuredClone(state.local);
+  try{
+   validateWorkspace(snapshot);
+   running=true;state.syncing=true;state.status='Sharing this device\u2019s State 3739 roster…';emit();
+   const result=await request('POST',{revision:0,data:snapshot});
+   if(result.conflict){state.remote=result;state.status='Another leader published first. Review the shared copy.';emit();return;}
+   if(!Number.isSafeInteger(result.revision)||result.revision<1||!equal(result.data,snapshot))throw Error('Shared save could not be verified. Your device copy is kept.');
+   state.base=structuredClone(result.data);state.local=mergeWorkspace(snapshot,state.local,result.data).data;
+   state.revision=result.revision;state.updatedAt=result.updatedAt;state.joined=true;state.conflicts=[];delete state.remote;state.mode='active';state.issue=null;
+   state.status='Shared · all changes saved';await persist();emit();
+  }catch(e){error(e);}
+  finally{running=false;state.syncing=false;emit();}
+ }
  async function join(){
   if(!state.remote?.data||running)return;const previous=structuredClone(state);
   try{
@@ -74,7 +89,7 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
   catch(e){state=previous;error(e);}
  }
 
- return {initialize,sync,update,publish,join,resolve,getState:()=>structuredClone(state),dispose(){disposed=true;clearTimeout(timer);}};
+ return {initialize,sync,update,publish,join,seedFromDevice,resolve,getState:()=>structuredClone(state),dispose(){disposed=true;clearTimeout(timer);}};
 }
 export function workspaceCache(){
  const db=new Promise((resolve,reject)=>{const request=indexedDB.open('caroline-3739-workspace',1);request.onupgradeneeded=()=>request.result.createObjectStore('workspace');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
