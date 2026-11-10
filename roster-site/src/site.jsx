@@ -1,3 +1,4 @@
+import {applyTalBulk} from './tal/bulkActions.js';
 import {applyTalSheetSnapshot} from './tal/sheetSync.js';
 import {BattlePlanner} from './battle/BattlePlanner.jsx';
 import {SvsComparison} from './svs/SvsComparison.jsx';
@@ -144,7 +145,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='svs'&&<SvsComparison players={players}/>}
     {tab==='battle'&&<BattlePlanner onOpenMemberProfile={id=>{setInitialPlayerId(id);navigate('members');}} events={data.events||[]} players={players} plan={data.talPlan||newPlan()} sharedTeamPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('Reusable TAL teamwork preferences saved.');}} onMessage={setMessage} onUpdate={action=>{try{setData(prev=>({...prev,events:applyBattleAction(prev.events||[],action)}));return {ok:true};}catch(e){setMessage(e.message);return {ok:false,error:e.message};}}}/>}
     {tab==='changes'&&<NameChanges players={players} plan={data.talPlan||newPlan()} onOpen={id=>{setInitialPlayerId(id);navigate('members');}}/>}
-    {tab==='tal'&&<TalTab workspace={data} onImportSheet={snapshot=>{setData(prev=>applyTalSheetSnapshot(prev,snapshot));setMessage('Spreadsheet source records imported. Review legion and registration differences before applying battle changes.');}} onRefreshLab={refreshLab} refreshingLab={refreshingLab} value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onMembers={()=>setTab('members')} onExport={backup}/>}
+    {tab==='tal'&&<TalTab workspace={data} onBulkApply={(ids,action)=>{const result=applyTalBulk(latest.current,ids,action);setData(result.data);setMessage('Bulk changes saved for '+result.preview.ids.length+' players.');}} onImportSheet={snapshot=>{setData(prev=>applyTalSheetSnapshot(prev,snapshot));setMessage('Spreadsheet source records imported. Review legion and registration differences before applying battle changes.');}} onRefreshLab={refreshLab} refreshingLab={refreshingLab} value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onMembers={()=>setTab('members')} onExport={backup}/>}
     </div>}
     </div>
     {workspaceOpen&&<WorkspaceOptions sync={sync} data={data} onPublish={publish} onJoin={join} onRetry={syncNow} onResolve={resolve} onClose={()=>setWorkspaceOpen(false)} onLogout={onLogout} onAlliance={()=>{setWorkspaceOpen(false);setImporting(true);}} onHelp={()=>{setWorkspaceOpen(false);setTourOpen(true);}}/>}
