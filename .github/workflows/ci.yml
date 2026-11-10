@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, staging, feat/tal-team-generator-v9]
+    branches: [main, staging, feat/tal-team-generator-v9, design/caroline-3739-premium-pass]
   pull_request:
     branches: [main, staging]
 
