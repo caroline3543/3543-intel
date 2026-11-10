@@ -93,7 +93,9 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const selectedAdd=addSelected.filter(id=>addEligible.some(p=>String(p.id)===id));
  const remaining=team?Math.max(0,50-(team.members||[]).length):0;
  const countedAdd=batchStatus==='considering'?0:selectedAdd.length;
- const canBatch=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated'&&selectedAdd.length>0&&countedAdd<=remaining;
+ const combatantSlots=team?Math.max(0,30-(team.members||[]).filter(m=>m.role==='combatant').length):0;
+ const substituteSlots=team?Math.max(0,20-(team.members||[]).filter(m=>m.role==='substitute').length):0;
+ const canBatch=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated'&&selectedAdd.length>0&&countedAdd<=remaining&&(batchStatus!=='registered'||countedAdd<=combatantSlots+substituteSlots);
  const anyFilter=check!=='all'||timeFilters.length>0||registrationFilter!=='all'||search.trim();
  useEffect(()=>{try{window.sessionStorage.setItem('tal:selected-legion',effectiveSelection);}catch{}},[effectiveSelection]);
  function chooseLegion(id){setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setBatchStatus('needs');setTimeMerge('add');setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
@@ -122,7 +124,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     records[id]={...(records[id]||{}),times:updated,status:updated.length?'available':records[id]?.status||'pending'};
     availability[id]=updated;
   });
-  const nextMembers=considering?[...(team.members||[])]:[...(team.members||[]),...selectedAdd.map(id=>({id,role:'pending',registered:batchStatus==='registered'}))];
+  const nextMembers=considering?[...(team.members||[])]:[...(team.members||[]),...selectedAdd.map((id,i)=>({id,role:batchStatus==='registered'?(i<combatantSlots?'combatant':'substitute'):'pending',registered:batchStatus==='registered'}))];
   const nextCandidates=considering?[...(team.candidates||[]).filter(c=>!ids.has(String(c.id))),...selectedAdd.map(id=>({id,role:'candidate',registered:false}))]:(team.candidates||[]).filter(c=>!ids.has(String(c.id)));
   onChange?.({...value,records,availability,teams:(value?.teams||[]).map(t=>t.id===team.id?{...t,members:nextMembers,candidates:nextCandidates}:t)});
   setAddSelected([]);setAdding(false);setAddingReview(false);
@@ -130,7 +132,12 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  }
   function setRegistration(entryTeam,playerId,registered){
   if(!entryTeam||value?.locked||tournamentStatus(entryTeam)==='eliminated')return;
-  onChange?.({...value,teams:(value?.teams||[]).map(t=>t.id!==entryTeam.id?t:{...t,members:(t.members||[]).map(m=>String(m.id)===String(playerId)?{...m,registered}:m)})});
+  const combatants=(entryTeam.members||[]).filter(m=>m.role==='combatant').length;
+  const substitutes=(entryTeam.members||[]).filter(m=>m.role==='substitute').length;
+  const current=entryTeam.members?.find(m=>String(m.id)===String(playerId));
+  const nextRole=registered&&current?.role==='pending'?(combatants<30?'combatant':substitutes<20?'substitute':null):current?.role;
+  if(registered&&!nextRole){onMessage?.('Combatant and substitute places are full. Choose a role before confirming registration.');return;}
+  onChange?.({...value,teams:(value?.teams||[]).map(t=>t.id!==entryTeam.id?t:{...t,members:(t.members||[]).map(m=>String(m.id)===String(playerId)?{...m,role:nextRole,registered}:m)})});
   setSwipeId('');setActionsId('');
   onMessage?.(registered?'Registration confirmed.':'Registration marked pending.');
  }
