@@ -212,7 +212,6 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const canEdit=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated';
  return <section style={{padding:'12px 20px 32px'}}>
   <h2 style={{fontSize:22,margin:'0 0 12px'}}>TAL planner</h2>
-  <TalBulkEditor data={workspace||{players,talPlan:value}} onApply={onBulkApply}/>
   {!teams.length?<div style={{padding:16,background:C.section,borderRadius:12}}><strong>No legions assigned</strong><p style={{fontSize:14,color:C.icy,lineHeight:1.5}}>Saved TAL legion assignments will appear when available. Existing plan data is retained.</p></div>:<>
    <section aria-label="Choose TAL legion" style={{marginBottom:12}}>
     <div style={{fontSize:12,fontWeight:700,color:C.icy,marginBottom:8}}>LEGIONS</div>
@@ -228,10 +227,10 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
    </section>
    <section aria-label="Alliance readiness" style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:14}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-     <div><strong style={{fontSize:15}}>Alliance readiness</strong><div style={{...muted,marginTop:4}}>{matchLabel(team)}</div></div>
-     <strong style={{fontSize:19,color:C.green}}>{percent}%</strong>
+     <div><strong style={{fontSize:15}}>Host alliance</strong><div style={{...muted,marginTop:4}}>{ready} of {activeEntryCount} assigned players in the correct alliance</div></div>
+     <strong style={{fontSize:19,color:C.green}}>{activeEntryCount?percent+"%":"—"}</strong>
     </div>
-    <div role="progressbar" aria-label="Players in the correct host alliance" aria-valuemin={0} aria-valuemax={activeEntryCount||1} aria-valuenow={ready} style={{height:8,background:C.border,borderRadius:20,overflow:'hidden',margin:'12px 0 10px'}}><div style={{height:'100%',width:percent+'%',background:C.green}}/></div>
+    <div role="progressbar" aria-label="Assigned players in the correct host alliance" aria-valuemin={0} aria-valuemax={activeEntryCount||1} aria-valuenow={ready} style={{height:8,background:C.border,borderRadius:20,overflow:'hidden',margin:'12px 0 10px'}}><div style={{height:'100%',width:percent+'%',background:C.green}}/></div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:7}}>
      {[{id:'in-host',count:ready,label:'In alliance',color:C.green},{id:'move',count:move,label:'Need to move',color:C.gold},{id:'unknown',count:unverified,label:'Unverified',color:C.icy}].map(item=>
       <button key={item.id} type="button" aria-pressed={check===item.id} onClick={()=>chooseReadiness(item.id)} style={{...button,minWidth:0,minHeight:70,padding:8,textAlign:'left',borderColor:check===item.id?item.color:C.border,background:check===item.id?item.color+'17':C.section}}>
@@ -239,8 +238,8 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       </button>
      )}
     </div>
-    <button type="button" aria-expanded={previewOpen} onClick={()=>setPreviewOpen(v=>!v)} style={{...button,width:'100%',marginTop:10,textAlign:'left',display:'flex',justifyContent:'space-between',alignItems:'center',color:C.gold}}>
-     <span>Review move list ({move})</span><span aria-hidden="true">{previewOpen?'▴':'▾'}</span>
+    <button type="button" aria-expanded={previewOpen} disabled={!move} onClick={()=>setPreviewOpen(v=>!v)} style={{...button,width:'100%',marginTop:10,textAlign:'left',display:'flex',justifyContent:'space-between',alignItems:'center',color:C.gold}}>
+     <span>{move?"Review players to move ("+move+")":"No transfers needed"}</span><span aria-hidden="true">{previewOpen?'▴':'▾'}</span>
     </button>
     {previewOpen&&<div style={{marginTop:10}}>
       <p style={{...muted,margin:'0 0 8px'}}>Preview exactly what will be copied. Players are grouped by their current and destination alliances.</p>
@@ -256,18 +255,20 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     </div>}
    </section>}
    <section style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:12}} aria-label="Missing TAL information">
-    <strong style={{fontSize:15}}>Missing information</strong>
+    <strong style={{fontSize:15}}>Missing player information</strong>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
      <button type="button" aria-pressed={missingFilter==='tiers'} style={{...button,padding:9,textAlign:'left',minHeight:65,borderColor:missingFilter==='tiers'?C.gold:C.border}} onClick={()=>{setMissingFilter(v=>v==='tiers'?'':'tiers');setListLimit(40);focusPlayers();}}><strong style={{display:'block',fontSize:20,color:C.gold}}>{missingTroopPlayers.length}</strong><span style={muted}>Missing troop tiers</span></button>
-     <button type="button" aria-pressed={missingFilter==='availability'} style={{...button,padding:9,textAlign:'left',minHeight:65,borderColor:missingFilter==='availability'?C.gold:C.border}} onClick={()=>{setMissingFilter(v=>v==='availability'?'':'availability');setListLimit(40);focusPlayers();}}><strong style={{display:'block',fontSize:20,color:C.gold}}>{missingAvailabilityPlayers.length}</strong><span style={muted}>Availability not recorded</span></button>
+     <button type="button" aria-pressed={missingFilter==='availability'} style={{...button,padding:9,textAlign:'left',minHeight:65,borderColor:missingFilter==='availability'?C.gold:C.border}} onClick={()=>{setMissingFilter(v=>v==='availability'?'':'availability');setListLimit(40);focusPlayers();}}><strong style={{display:'block',fontSize:20,color:C.gold}}>{missingAvailabilityPlayers.length}</strong><span style={muted}>Missing availability</span></button>
     </div>
     {!!missingFilter&&<button type="button" style={{...button,width:'100%',marginTop:8,color:C.gold}} onClick={()=>setMissingFilter('')}>Show all players</button>}
    </section>
       <section ref={playersAnchor} id="tal-players" aria-label="TAL players" style={{scrollMarginTop:16}}>
-    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:10}}><h3 style={{fontSize:18,margin:0}}>Players</h3><span role="status" style={{fontSize:13,color:C.icy}}>{roster.length} of {entries.length} players</span></div>
-    <input aria-label="Search players" placeholder="Search name or player ID" value={search} onChange={e=>{setSearch(e.target.value);setListLimit(40);}} style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:10}}/>
+    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:10}}><h3 style={{fontSize:18,margin:0}}>Players</h3><span role="status" style={{fontSize:13,color:C.icy}}>{roster.length} of {entries.length} shown</span></div>
+    <TalBulkEditor data={workspace||{players,talPlan:value}} scopedIds={entries.map(e=>String(e.player.id))} scopeLabel={matchLabel(team)} onApply={onBulkApply}/>
+
+    <input aria-label="Search players" placeholder="Find a player by name or ID" value={search} onChange={e=>{setSearch(e.target.value);setListLimit(40);}} style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:10}}/>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:7,gap:8}}>
-     <strong style={{fontSize:12,color:C.icy}}>AVAILABLE · UTC</strong>
+     <strong style={{fontSize:12,color:C.icy}}>FILTER BY AVAILABLE TIME · UTC</strong>
      {!!timeFilters.length&&<button type="button" style={{border:0,background:'transparent',color:C.gold,fontSize:12,minHeight:32,cursor:'pointer'}} onClick={()=>{setTimeFilters([]);setListLimit(40);}}>Clear</button>}
     </div>
     <div role="group" aria-label="Filter available UTC times" style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:5,marginBottom:timeFilters.length>1?8:12}}>
