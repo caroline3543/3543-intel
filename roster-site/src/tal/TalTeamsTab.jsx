@@ -28,7 +28,7 @@ function textOfTeams(groups,playersById) {
 }
 const initialGroups=()=>COLORS.map((c,i)=>({key:i+1,color:c.id,leader:null,members:[]}));
 export function TalTeamsTab({value,players=[]}){
- const legions=(value?.teams||[]).filter(t=>['HOT','ARC','RKG'].includes(String(t.host||'').toUpperCase()));
+ const legions=(value?.teams||[]).filter(t=>['GLR'].includes(String(t.host||'').toUpperCase()));
  const [legionId,setLegionId]=useState(legions[0]?.id||'');
  const selectedLegion=legions.find(t=>t.id===legionId)||legions[0];
  const [matchTime,setMatchTime]=useState('14:00');
