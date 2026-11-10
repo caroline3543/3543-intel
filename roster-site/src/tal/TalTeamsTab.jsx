@@ -60,6 +60,27 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDr
  const [picked,setPicked]=useState('');
  const [activeColour,setActiveColour]=useState('blue');
  const [dragId,setDragId]=useState('');
+ const [hoverBuilding,setHoverBuilding]=useState('');
+ const [undoAssignment,setUndoAssignment]=useState(null);
+ const touchDrag=useRef(null);
+ const armTouch=(e,id)=>{
+  const touch=e.touches?.[0];if(!touch)return;
+  const ref={id:String(id),startX:touch.clientX,startY:touch.clientY,active:false,timer:null};
+  ref.timer=setTimeout(()=>{if(touchDrag.current===ref){ref.active=true;setDragId(String(id));}},350);
+  touchDrag.current=ref;
+ };
+ const moveTouch=e=>{
+  const ref=touchDrag.current,touch=e.touches?.[0];if(!ref||!touch)return;
+  if(!ref.active&&Math.hypot(touch.clientX-ref.startX,touch.clientY-ref.startY)>12){clearTimeout(ref.timer);touchDrag.current=null;return;}
+  if(ref.active){const el=document.elementFromPoint(touch.clientX,touch.clientY)?.closest('[data-tal-building]');setHoverBuilding(el?.dataset.talBuilding||'');}
+ };
+ const dropTouch=e=>{
+  const ref=touchDrag.current;touchDrag.current=null;if(!ref)return;clearTimeout(ref.timer);
+  if(ref.active){const touch=e.changedTouches?.[0];const el=touch&&document.elementFromPoint(touch.clientX,touch.clientY)?.closest('[data-tal-building]');const building=el?.dataset.talBuilding;
+   setDragId('');setHoverBuilding('');
+   if(building)assign(ref.id,building);
+  }
+ };
  const [preview,setPreview]=useState(false);
  const [copyMessage,setCopyMessage]=useState('');
  const [confirmed,setConfirmed]=useState(false);
@@ -294,7 +315,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDr
   const g=teamFor(id);if(!g)return;
   const colour=COLORS.find(c=>c.id===g.color);
   if(!colour?.buildings.includes(building)){setCopyMessage('This building belongs to another colour team. Reassign the player’s team first.');return;}
-  setAssignment(old=>({...old,[String(id)]:building}));
+  setAssignment(old=>{setUndoAssignment({id:String(id),before:old[String(id)]||null,after:building});return {...old,[String(id)]:building};});
   setPicked('');
  }
  function autoAssign(){
@@ -477,7 +498,11 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDr
    {step==='buildings'&&<>
     <section style={{...panel,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center'}}><strong>Initial assignments</strong><strong style={{color:assignedCount===activePlayers.length?C.green:C.gold}}>{assignedCount} / {activePlayers.length} assigned</strong></div>
-     <p style={{...small,margin:'6px 0 10px'}}>Drag players by their handle into another building in the same colour territory. On mobile you can also tap a player, then tap the destination building.</p>
+     <p style={{...small,margin:'6px 0 10px'}}>Tap a player, then tap a building to assign them. Or press and hold to drag between buildings.</p>
+     {undoAssignment&&<div role="status" style={{display:'flex',alignItems:'center',gap:8,background:C.section,borderRadius:8,padding:8,margin:'8px 0'}}>
+      <span style={{...small,flex:1}}>{name(byId.get(undoAssignment.id)||{id:undoAssignment.id})} → {undoAssignment.after}</span>
+      <button type="button" style={{...btn,minHeight:36,color:C.gold}} onClick={()=>{const u=undoAssignment;setAssignment(old=>{const n={...old};if(u.before)n[u.id]=u.before;else delete n[u.id];return n;});setUndoAssignment(null)}}>Undo</button>
+     </div>}
      <div style={{display:'flex',gap:7}}><button style={{...btn,flex:1,color:C.gold}} onClick={autoAssign} disabled={!activePlayers.length||coreLock}>Auto-allocate</button><button style={{...btn,flex:1}} disabled={coreLock} onClick={()=>{if(window.confirm('Clear every building assignment?'))setAssignment({});}}>Clear buildings</button></div>
      {!!missing.length&&<p style={{...small,color:C.gold,marginBottom:0}}>There are {missing.length} players missing from the four teams. Return to Colour teams to place them first.</p>}
     </section>
@@ -489,13 +514,13 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDr
      const moveWithin=(id,building)=>{if(!id)return;assign(id,building);setDragId('');setCopyMessage(name(byId.get(String(id))||{id})+' assigned to '+building+'.');};
      return <section style={{...panel,background:col.bg,borderColor:col.color+'77',marginBottom:12}}>
       <strong style={{color:col.color}}>{col.name} Team · {teamPlayers.length} players</strong>
-      {unallocated.length>0&&<div style={{marginTop:10}}><p style={{...small,color:col.color,margin:'0 0 7px'}}>Unallocated · {unallocated.length}</p>{unallocated.map(({id})=><button key={id} draggable="true" onDragStart={e=>{e.dataTransfer.setData('text/plain',id);setDragId(id)}} onDragEnd={()=>setDragId('')} onClick={()=>setPicked(id)} style={{...btn,width:'100%',textAlign:'left',marginBottom:5,borderColor:picked===id?col.color:C.border}}>⠿ {name(byId.get(id)||{id})}</button>)}</div>}
+      {unallocated.length>0&&<div style={{marginTop:10}}><p style={{...small,color:col.color,margin:'0 0 7px'}}>Unallocated · {unallocated.length}</p>{unallocated.map(({id})=><button key={id} onTouchStart={e=>armTouch(e,id)} onTouchMove={moveTouch} onTouchEnd={dropTouch} onTouchCancel={()=>{clearTimeout(touchDrag.current?.timer);touchDrag.current=null;setDragId('');setHoverBuilding('')}} draggable="true" onDragStart={e=>{e.dataTransfer.setData('text/plain',id);setDragId(id)}} onDragEnd={()=>setDragId('')} onClick={()=>setPicked(id)} style={{...btn,width:'100%',textAlign:'left',marginBottom:5,borderColor:picked===id?col.color:C.border}}>⠿ {name(byId.get(id)||{id})}</button>)}</div>}
       <div style={{display:'grid',gap:10,marginTop:12}}>
        {col.buildings.map(building=>{
         const placed=teamPlayers.filter(p=>assignment[p.id]===building);
-        return <div key={building} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();moveWithin(e.dataTransfer.getData('text/plain')||dragId,building)}} style={{background:C.bg+'aa',border:'1px dashed '+col.color+'99',borderRadius:11,padding:10,minHeight:96}}>
+        return <div key={building} data-tal-building={building} onDragOver={e=>{e.preventDefault();setHoverBuilding(building)}} onDragLeave={()=>setHoverBuilding(v=>v===building?'':v)} onDrop={e=>{e.preventDefault();moveWithin(e.dataTransfer.getData('text/plain')||dragId,building);setHoverBuilding('')}} style={{background:hoverBuilding===building?col.color+'32':C.bg+'aa',border:'2px dashed '+(hoverBuilding===building?col.color:col.color+'99'),borderRadius:11,padding:10,minHeight:96,transition:'background .15s,border-color .15s'}}>
          <button onClick={()=>picked&&moveWithin(picked,building)} disabled={!picked} style={{...btn,width:'100%',textAlign:'left',border:0,background:'transparent',padding:'4px 0',minHeight:30,color:col.color}}><strong>{building}</strong> · {placed.length}{picked?' · Tap to place selected player':''}</button>
-         {placed.length?placed.map(({id})=><button key={id} type="button" draggable="true" onDragStart={e=>{e.dataTransfer.setData('text/plain',id);setDragId(id)}} onDragEnd={()=>setDragId('')} onClick={()=>setPicked(picked===id?'':id)} style={{...btn,display:'flex',alignItems:'center',gap:8,width:'100%',marginTop:5,textAlign:'left',borderColor:picked===id?col.color:C.border}}><span aria-hidden>⠿</span><span style={{flex:1}}>{name(byId.get(id)||{id})}</span>{picked===id?'✓':''}</button>):<p style={small}>Drop a player here</p>}
+         {placed.length?placed.map(({id})=><button key={id} type="button" onTouchStart={e=>armTouch(e,id)} onTouchMove={moveTouch} onTouchEnd={dropTouch} onTouchCancel={()=>{clearTimeout(touchDrag.current?.timer);touchDrag.current=null;setDragId('');setHoverBuilding('')}} draggable="true" onDragStart={e=>{e.dataTransfer.setData('text/plain',id);setDragId(id)}} onDragEnd={()=>setDragId('')} onClick={()=>setPicked(picked===id?'':id)} style={{...btn,display:'flex',alignItems:'center',gap:8,width:'100%',marginTop:5,textAlign:'left',borderColor:picked===id?col.color:C.border}}><span aria-hidden>⠿</span><span style={{flex:1}}>{name(byId.get(id)||{id})}</span>{picked===id?'✓':''}</button>):<p style={small}>Drop a player here</p>}
         </div>;
        })}
       </div>
