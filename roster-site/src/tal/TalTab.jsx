@@ -1,3 +1,4 @@
+import {TalBulkEditor} from './TalBulkEditor.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {DEFAULT_TIMES} from './planner.js';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
@@ -25,7 +26,7 @@ function moveText(rows){
   (g.origin==='No alliance'?'No alliance → '+g.destination:g.origin+' → '+g.destination)+'\n'+g.players.sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'})).map(name=>'• '+name).join('\n')
  ).join('\n\n');
 }
-export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legionRefresh,onMessage}){
+export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legionRefresh,onMessage,workspace,onBulkApply}){
  const [selected,setSelected]=useState(()=>{try{return window.sessionStorage.getItem('tal:selected-legion')||'';}catch{return '';}});
  const [check,setCheck]=useState('all');
  const [search,setSearch]=useState('');
@@ -211,6 +212,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const canEdit=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated';
  return <section style={{padding:'12px 20px 32px'}}>
   <h2 style={{fontSize:22,margin:'0 0 12px'}}>TAL planner</h2>
+  <TalBulkEditor data={workspace||{players,talPlan:value}} onApply={onBulkApply}/>
   {!teams.length?<div style={{padding:16,background:C.section,borderRadius:12}}><strong>No legions assigned</strong><p style={{fontSize:14,color:C.icy,lineHeight:1.5}}>Saved TAL legion assignments will appear when available. Existing plan data is retained.</p></div>:<>
    <section aria-label="Choose TAL legion" style={{marginBottom:12}}>
     <div style={{fontSize:12,fontWeight:700,color:C.icy,marginBottom:8}}>LEGIONS</div>
