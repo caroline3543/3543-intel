@@ -1,3 +1,4 @@
+import {applyTalBulk} from './tal/bulkActions.js';
 import {withAutomaticRoles} from './tal/autoRoles.js';
 import {fetchMightpulseAlliance} from '../../src/services/mightpulseService.js';
 import {allianceRows} from '../../src/services/allianceImportService.js';
@@ -195,7 +196,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='members'&&!DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag))&&<AllianceSetup players={players} onLoad={importRoster}/>}
     {tab==='members'&&players.length>0&&<RosterTab initialPlayerId={initialPlayerId} onProfileClose={returnFromTalProfile} onInitialPlayerOpened={()=>setInitialPlayerId(null)} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} cooperationPairs={cooperationPairs} onChangeCooperation={changeCooperation} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
     {tab==='changes'&&<NameChanges players={players} plan={data.talPlan||newPlan()} onOpen={id=>{setInitialPlayerId(id);navigate('members');}}/>}
-    {(tab==='tal'||talProfileOpen)&&<div style={{display:tab==='tal'?'block':'none'}}><TalTab value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onOpenPlayer={openTalPlayer} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage}/></div>}
+    {(tab==='tal'||talProfileOpen)&&<div style={{display:tab==='tal'?'block':'none'}}><TalTab workspace={data} onBulkApply={(ids,action)=>{const result=applyTalBulk(latest.current,ids,action);setData(result.data);setMessage('Updated '+result.preview.ids.length+' players.');}} value={data.talPlan} players={players} onChange={talPlan=>setData(prev=>({...prev,talPlan}))} onOpenPlayer={openTalPlayer} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage}/></div>}
     {tab==='teams'&&<TalTeamsTab value={data.talPlan} players={players} cooperationPairs={cooperationPairs} drafts={data.talMatchDrafts||{}} syncReady={sync.joined&&sync.mode==='active'&&!sync.conflicts?.length} onDraftChange={(key,draft)=>setData(prev=>({...prev,talMatchDrafts:{...(prev.talMatchDrafts||{}),[key]:draft}}))}/>}
     </div>}
     </div>
