@@ -48,6 +48,7 @@ export function TalTeamsTab({value,players=[]}){
  const [confirmed,setConfirmed]=useState(false);
  const [locked,setLocked]=useState([]);
  const [manual,setManual]=useState(true);
+ const [editingTeam,setEditingTeam]=useState(null);
  const byId=useMemo(()=>new Map(players.map(p=>[String(p.id),p])),[players]);
  const pool=useMemo(()=>{
   if(!selectedLegion)return [];
@@ -141,8 +142,8 @@ export function TalTeamsTab({value,players=[]}){
  const assignmentText='INITIAL ASSIGNMENTS\n\n'+BUILDINGS.map(b=>'» '+b+': '+activePlayers.filter(({id})=>assignment[id]===b).map(({id})=>name(byId.get(id)||{id})).join(', ')).join('\n');
  const teamText=textOfTeams(groups,byId);
  return <section style={{padding:'14px 20px 35px'}}>
-  <h2 style={{fontSize:22,margin:'0 0 4px'}}>TAL Teams <span style={{fontSize:11,color:C.gold,verticalAlign:'middle'}}>PREVIEW</span></h2>
-  <p style={{...small,margin:'0 0 12px'}}>Build four colour teams, then assign every player to one of eight initial buildings. Changes here are not saved to the live roster.</p>
+  <h2 style={{fontSize:25,letterSpacing:'-.4px',margin:'0 0 8px'}}>TAL Teams</h2>
+  <p style={{...small,margin:'0 0 12px'}}>Build teams, then allocate every player to a building. Drafts aren't shared between devices.</p>
   {!legions.length?<p style={{...panel,...small}}>No legions in your TAL plan. Assign players in TAL Planner first.</p>:<>
    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
     <label style={small}>Legion<select value={selectedLegion?.id||''} onChange={e=>resetForMatch(e.target.value,matchTime)} style={{...btn,width:'100%',marginTop:5}}>{legions.map(t=><option value={t.id} key={t.id}>{legionLabel(t)}</option>)}</select></label>
@@ -172,33 +173,49 @@ export function TalTeamsTab({value,players=[]}){
      <strong>Generate teams</strong>
      <div style={{display:'flex',gap:8,marginTop:10}}>{[['stack','Power-stacked'],['balanced','Balanced']].map(([id,label])=><button key={id} style={{...btn,flex:1,borderColor:mode===id?C.gold:C.border,color:mode===id?C.gold:C.icy}} aria-pressed={mode===id} onClick={()=>setMode(id)}>{label}</button>)}</div>
      <button style={{...btn,width:'100%',marginTop:9,background:C.gold,color:C.bg}} onClick={generate}>Auto-generate four teams</button>
-     <p style={{...small,margin:'8px 0 0'}}>Uses four eligible rally leaders. You can also set each leader manually below, then move joiners between teams.</p>
+     
     </section>
     <div style={{...small,marginBottom:9}}>{selectedIds.length} participants · {missing.length} not yet placed in a team</div>
     {groups.map((g,i)=>{
      const col=COLORS.find(c=>c.id===g.color),ids=[g.leader,...g.members].filter(Boolean),ps=ids.map(id=>byId.get(id)).filter(Boolean),other=groups.flatMap(t=>[t.leader,...t.members].filter(Boolean)).map(String);
-     return <section key={g.key} style={{...panel,borderColor:col.color+'88',background:col.bg,marginBottom:10}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}>
-       <div style={{display:'flex',alignItems:'center',gap:7,minWidth:0}}><span style={{width:11,height:11,borderRadius:'50%',background:col.color,flexShrink:0}}/><strong style={{color:col.color}}>{col.name} Team</strong></div>
-       <select aria-label={'Colour for team '+g.key} value={g.color} onChange={e=>updateColour(g.key,e.target.value)} style={{...btn,minHeight:34,width:100,padding:5,fontSize:12}}>{COLORS.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+     const isEmpty=!g.leader&&!g.members.length,editing=editingTeam===g.key;
+     return <section key={g.key} style={{background:isEmpty?'#17293A':'#192E41',borderRadius:12,padding:'12px 12px 10px',marginBottom:9,borderLeft:'3px solid '+col.color}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+       <div style={{minWidth:0,display:'flex',alignItems:'center',gap:9}}><span style={{width:10,height:10,borderRadius:'50%',background:col.color,flexShrink:0}}/><strong style={{color:isEmpty?col.color:C.white,fontSize:16}}>{col.name} Team</strong></div>
+       <span style={{fontSize:13,fontVariantNumeric:'tabular-nums',fontWeight:600,color:ids.length?C.white:C.icy}}>{ids.length?powerFormat(teamPower(g))+' power':'0 players'}</span>
       </div>
-      <div style={{display:'flex',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginBottom:10}}>
-       <span style={small}>{ids.length} players · FC8 {ps.filter(p=>fcNumber(p)===8).length} · Helios {ps.filter(helios).length} · Norah {g.members.map(id=>byId.get(id)).filter(p=>p&&norah(p)).length}</span>
-       <strong style={{fontSize:15,color:col.color}}>{powerFormat(teamPower(g))}</strong>
-      </div>
-      <label style={{...small,display:'block'}}>Rally leader
-       <select value={g.leader||''} onChange={e=>changeLeader(g.key,e.target.value)} style={{...btn,width:'100%',marginTop:5}}>
-        <option value="">Choose a leader</option>
-        {selectedPlayers.filter(p=>String(p.id)===String(g.leader)||!other.includes(String(p.id))).map(p=><option key={p.id} value={p.id}>{name(p)} · {powerFormat(powerOf(p.id))}</option>)}
-       </select>
-      </label>
-      <div style={{marginTop:10}}>
-       {g.members.map(id=><div key={id} style={{display:'flex',alignItems:'center',gap:7,padding:'7px 0',borderTop:'1px solid '+C.border}}>
-        <span style={{fontSize:13,flex:1}}>{name(byId.get(String(id))||{id})}</span><span style={small}>{powerFormat(powerOf(id))}</span>
-        <select aria-label={'Move '+name(byId.get(String(id))||{id})} value={g.key} onChange={e=>moveMember(id,Number(e.target.value))} style={{...btn,width:60,padding:5,fontSize:12,minHeight:32}}>{groups.map(t=><option key={t.key} value={t.key}>{COLORS.find(c=>c.id===t.color)?.name}</option>)}</select>
+      {isEmpty&&!editing?<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:9}}>
+       <span style={{...small,fontSize:13}}>No leader assigned</span>
+       <button type="button" style={{...btn,minHeight:44,color:C.gold,background:'transparent',borderColor:'#415365'}} onClick={()=>setEditingTeam(g.key)}>Assign leader</button>
+      </div>:<>
+       {!!ids.length&&<div style={{display:'flex',flexWrap:'wrap',gap:13,margin:'9px 0',fontSize:12,color:'#CAD7E0'}}>
+        <span>{ids.length} players</span><span>FC8 {ps.filter(p=>fcNumber(p)===8).length}</span><span>Helios {ps.filter(helios).length}</span><span>Norah {g.members.map(id=>byId.get(id)).filter(p=>p&&norah(p)).length}</span>
+       </div>}
+       {g.leader&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'6px 0',fontSize:14}}><span style={{minWidth:0,overflowWrap:'anywhere'}}><span aria-hidden="true" style={{color:C.gold,marginRight:7}}>♛</span><strong>{name(byId.get(String(g.leader))||{id:g.leader})}</strong></span><span style={{...small,fontVariantNumeric:'tabular-nums'}}>{powerFormat(powerOf(g.leader))}</span></div>}
+       {g.members.map(id=><div key={id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:'1px solid #304355'}}>
+        <span style={{fontSize:14,flex:1,minWidth:0,overflowWrap:'anywhere'}}>{name(byId.get(String(id))||{id})}</span>
+        <span style={{...small,fontVariantNumeric:'tabular-nums'}}>{powerFormat(powerOf(id))}</span>
+        <select aria-label={'Move '+name(byId.get(String(id))||{id})+' to another team'} value={g.key} onChange={e=>moveMember(id,Number(e.target.value))} style={{...btn,width:82,padding:6,fontSize:12,minHeight:38}}>{groups.map(t=><option key={t.key} value={t.key}>{COLORS.find(c=>c.id===t.color)?.name}</option>)}</select>
        </div>)}
-      </div>
-      <label style={{...small,display:'block',marginTop:8}}>Add joiner<select value="" onChange={e=>{const id=e.target.value;if(!id)return;setGroups(old=>old.map(t=>t.key===g.key?{...t,members:[...t.members,id]}:t));}} style={{...btn,width:'100%',marginTop:4}}><option value="">Choose player…</option>{selectedPlayers.filter(p=>!other.includes(String(p.id))).map(p=><option key={p.id} value={p.id}>{name(p)}</option>)}</select></label>
+       <button type="button" aria-expanded={editing} style={{...btn,background:'transparent',border:0,color:C.gold,marginTop:8,padding:'8px 0',minHeight:44}} onClick={()=>setEditingTeam(editing?null:g.key)}>{editing?'Done editing':'Edit team'}</button>
+      </>}
+      {editing&&<div style={{borderTop:'1px solid #364B5E',paddingTop:10,display:'grid',gap:10}}>
+       <label style={small}>Team colour
+        <select aria-label={'Colour for team '+g.key} value={g.color} onChange={e=>updateColour(g.key,e.target.value)} style={{...btn,width:'100%',marginTop:5}}>{COLORS.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+       </label>
+       <label style={small}>Rally leader
+        <select value={g.leader||''} onChange={e=>{changeLeader(g.key,e.target.value);if(e.target.value)setEditingTeam(null)}} style={{...btn,width:'100%',marginTop:5}}>
+         <option value="">Choose a leader</option>
+         {selectedPlayers.filter(p=>String(p.id)===String(g.leader)||!other.includes(String(p.id))).map(p=><option key={p.id} value={p.id}>{name(p)} · {powerFormat(powerOf(p.id))}</option>)}
+        </select>
+       </label>
+       <label style={small}>Add joiner
+        <select value="" onChange={e=>{const id=e.target.value;if(!id)return;setGroups(old=>old.map(t=>t.key===g.key?{...t,members:[...t.members,id]}:t));}} style={{...btn,width:'100%',marginTop:5}}>
+         <option value="">Choose player…</option>
+         {selectedPlayers.filter(p=>!other.includes(String(p.id))).map(p=><option key={p.id} value={p.id}>{name(p)}</option>)}
+        </select>
+       </label>
+      </div>}
      </section>;
     })}
     <button style={{...btn,width:'100%',background:C.gold,color:C.bg,marginBottom:10}} disabled={missing.length>0||groups.some(g=>!g.leader)} onClick={()=>{setConfirmed(true);setStep('buildings')}}>Confirm teams · Assign buildings</button>
