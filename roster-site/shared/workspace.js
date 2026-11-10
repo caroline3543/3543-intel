@@ -1,5 +1,5 @@
 export const WORKSPACE_ID='3739-leaders';
-export const SHARED_KEYS=['players','events','customRoles','settings','talPlan','talTeamPreferences'];
+export const SHARED_KEYS=['players','events','customRoles','settings','talPlan','talTeamPreferences','talMatchDrafts'];
 const plain=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 export function sharedData(data){const out={};for(const key of SHARED_KEYS)if(data[key]!==undefined)out[key]=structuredClone(data[key]);return {...out,players:out.players||[],events:out.events||[],customRoles:out.customRoles||[],settings:{...out.settings,stateId:'3739'}};}
 export function validateWorkspace(data){
@@ -10,6 +10,13 @@ export function validateWorkspace(data){
   if(!plain(p)||typeof p.id!=='string'||!p.id||ids.has(p.id))throw Error('Player IDs must be unique.');ids.add(p.id);
   if(p.fid){const fid=String(p.fid).trim();if(!/^[1-9]\d{3,14}$/.test(fid)||fids.has(fid))throw Error('Game IDs must be valid and unique.');fids.add(fid);}
   for(const source of [p.providerStats,p.providerDetails,...Object.values(p.providerRankings||{})])if(source?.stateId&&String(source.stateId)!=='3739')throw Error('A profile belongs to another state.');
+ }
+ if(data.talMatchDrafts!=null){
+  if(!plain(data.talMatchDrafts)||Object.keys(data.talMatchDrafts).length>200)throw Error('Invalid TAL match drafts.');
+  for(const [key,draft] of Object.entries(data.talMatchDrafts)){
+   if(key.length>100||!plain(draft)||!Array.isArray(draft.groups)||draft.groups.length!==4||!Array.isArray(draft.chosen)||!plain(draft.powers)||!plain(draft.assignment))throw Error('Invalid match draft.');
+   if(draft.chosen.length>50||Object.keys(draft.assignment).length>50)throw Error('Too many selected match players.');
+  }
  }
  if(data.talTeamPreferences!=null){
   const prefs=data.talTeamPreferences;
