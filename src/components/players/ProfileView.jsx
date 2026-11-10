@@ -2,7 +2,7 @@ import { ProfileTalCapacity } from './ProfileTalCapacity.jsx';
 import {ProfileSheetImport} from './ProfileSheetImport.jsx';
 import {CopyPlayerId} from './CopyPlayerId.jsx';
 import { useEffect, useRef, useState } from 'react';
-import { C, ALLIANCE_RANKS, TROOP_POWER_EVENTS } from '../../utils/constants.js';
+import { C, ALLIANCE_RANKS, TROOP_POWER_EVENTS, LANGUAGES } from '../../utils/constants.js';
 import { roleColor } from '../../utils/roles.js';
 import { fmtDateShort } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
@@ -55,6 +55,17 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
       </header>
       {player.blacklisted&&<p style={{fontSize:14,color:C.red}}>Excluded from battle plans{player.blacklistReason?`: ${player.blacklistReason}`:''}</p>}
       <ProfileSection title="Alliance rank"><p style={{fontSize:14,color:C.icy,margin:'0 0 12px'}}>Tap a rank to set it. Tap again to clear.</p><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{ALLIANCE_RANKS.map(rank=><button key={rank} style={{...profileButton,color:player.allianceRank===rank?C.gold:C.icy,borderColor:player.allianceRank===rank?C.gold:C.border}} aria-pressed={player.allianceRank===rank} onClick={()=>setAllianceRank(rank)}>{rank}</button>)}</div></ProfileSection>
+      <ProfileSection title="TAL communication language">
+       <label style={{fontSize:13,color:C.icy,display:'block'}}>Preferred spoken language
+        <select aria-label="Preferred TAL communication language" value={player.communicationLanguage||''}
+          onChange={e=>onSave({...player,communicationLanguage:e.target.value})}
+          style={{...profileButton,display:'block',width:'100%',fontSize:14,margin:'8px 0 6px'}}>
+          <option value="">Use recorded game language</option>
+          {LANGUAGES.map(lang=><option key={lang} value={lang}>{lang}</option>)}
+        </select>
+       </label>
+       <p style={{fontSize:12,color:C.icy,lineHeight:1.45}}>For rally coordination. This may differ from a player's in-game display language.</p>
+      </ProfileSection>
       {onChangeCooperation&&<ProfileSection title="Works well with">
        {cooperationPairs.filter(pair=>Array.isArray(pair)&&pair.map(String).includes(String(player.id))).map(pair=>{
         const partner=players.find(p=>String(p.id)===String(pair.find(id=>String(id)!==String(player.id))));
