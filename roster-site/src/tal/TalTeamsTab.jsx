@@ -18,12 +18,20 @@ const valueNumber=n=>n!==''&&n!=null&&Number.isFinite(Number(String(n).replace(/
 const powerFormat=n=>n==null?'—':Number(n).toLocaleString('en-US');
 const fcNumber=p=>Number(String(p.furnaceLevel||'').match(/(?:FC|F)\s*(\d+)/i)?.[1]||0);
 const helios=p=>['infantry','lancer','marksman'].every(k=>/helios/i.test(String(p.troops?.[k]||'')));
-const norah=p=>Boolean(p.joinerHeroes?.some?.(h=>/norah/i.test(typeof h==='string'?h:h.name||'')&&((typeof h==='string')||Number(h.skillLevel||h.topRightSkill||0)>=5))||p.norahSkill5);
+const norahInfo=p=>{
+ const matches=(p?.joinerHeroes||[]).filter(h=>/norah/i.test(typeof h==='string'?h:h.hero||h.name||''));
+ if(p?.norahSkill5)return 'Norah · Skill 5';
+ if(matches.some(h=>typeof h==='object'&&Number(h.skillLevel||h.topRightSkill||0)>=5&&h.verified))return 'Norah · Skill 5';
+ return matches.length?'Norah':null;
+};
+const norah=p=>norahInfo(p)==='Norah · Skill 5';
+const languageInfo=p=>[...new Set([p?.gameLanguage,...(Array.isArray(p?.languages)?p.languages:[])].map(x=>typeof x==='string'?x:typeof x?.language==='string'?x.language:'').map(x=>x.trim()).filter(Boolean))];
 function textOfTeams(groups,playersById) {
  return groups.map(g=>{
-  const leader=playersById.get(String(g.leader));
-  const names=g.members.map(id=>name(playersById.get(String(id))||{id}));
-  return (g.color?COLORS.find(c=>c.id===g.color)?.name+' Team\n':'')+'Leader: '+(leader?name(leader):'Not assigned')+'\n* '+names.join(', ');
+  const leader=g.leader?name(playersById.get(String(g.leader))||{id:g.leader}):'Not assigned';
+  const label=(COLORS.find(c=>c.id===g.color)?.name||'Team').toUpperCase();
+  const joiners=g.members.map(id=>name(playersById.get(String(id))||{id}));
+  return label+' LEADER: '+leader+'\n'+joiners.join(', ');
  }).join('\n\n');
 }
 const initialGroups=()=>COLORS.map((c,i)=>({key:i+1,color:c.id,leader:null,members:[]}));
@@ -49,6 +57,15 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const [confirmed,setConfirmed]=useState(false);
  const [locked,setLocked]=useState([]);
  const [manual,setManual]=useState(true);
+ const [coreLock,setCoreLock]=useState(false);
+ const [coreSnapshot,setCoreSnapshot]=useState(null);
+ const [absentIds,setAbsentIds]=useState([]);
+ const [lateSearch,setLateSearch]=useState('');
+ const [lateId,setLateId]=useState('');
+ const [lateTarget,setLateTarget]=useState('blue');
+ const [copyDraft,setCopyDraft]=useState('');
+ const [copySource,setCopySource]=useState('');
+ const [copyOpen,setCopyOpen]=useState(false);
  const [editingTeam,setEditingTeam]=useState(null);
  const [draftLoaded,setDraftLoaded]=useState('');
  const [draftState,setDraftState]=useState('');
@@ -63,13 +80,13 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const byId=useMemo(()=>new Map(players.map(p=>[String(p.id),p])),[players]);
  const pool=useMemo(()=>{
   if(!selectedLegion)return [];
-  const ids=[...plannedMemberIds(selectedLegion)];
-  return ids.map(id=>byId.get(String(id))).filter(Boolean).filter(p=>{
-   const avail=value?.availability?.[p.id]??value?.availability?.[String(p.fid)]??value?.records?.[p.id]?.times??[];
+  return (selectedLegion.members||[]).map(m=>byId.get(String(m.id))).filter(Boolean).filter(p=>{
+   const avail=value?.availability?.[p.id]??value?.records?.[p.id]?.times??[];
    return Array.isArray(avail)&&avail.map(String).includes(matchTime);
   });
  },[selectedLegion,value,byId,matchTime]);
- const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,confirmed}),[chosen,powers,groups,assignment,mode,confirmed]);
+ const battlePool=useMemo(()=>players.filter(p=>!p.blacklisted),[players]);
+ const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,confirmed,coreLock,coreSnapshot,absentIds,copyDraft,copySource}),[chosen,powers,groups,assignment,mode,confirmed,coreLock,coreSnapshot,absentIds,copyDraft,copySource]);
  const snapshotSignature=JSON.stringify(snapshot);
  function applyDraft(saved){
   setChosen(Array.isArray(saved?.chosen)?saved.chosen.map(String):[]);
@@ -78,7 +95,9 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   setAssignment(saved?.assignment&&typeof saved.assignment==='object'?saved.assignment:{});
   setMode(saved?.mode==='balanced'?'balanced':'stack');
   setConfirmed(!!saved?.confirmed);
-  lastSaved.current=JSON.stringify({chosen:Array.isArray(saved?.chosen)?saved.chosen.map(String):[],powers:saved?.powers&&typeof saved.powers==='object'?saved.powers:{},groups:Array.isArray(saved?.groups)&&saved.groups.length===4?saved.groups:initialGroups(),assignment:saved?.assignment&&typeof saved.assignment==='object'?saved.assignment:{},mode:saved?.mode==='balanced'?'balanced':'stack',confirmed:!!saved?.confirmed});
+  setCoreLock(!!saved?.coreLock);setCoreSnapshot(saved?.coreSnapshot||null);setAbsentIds(Array.isArray(saved?.absentIds)?saved.absentIds:[]);
+  setCopyDraft(typeof saved?.copyDraft==='string'?saved.copyDraft:'');setCopySource(typeof saved?.copySource==='string'?saved.copySource:'');
+  lastSaved.current=JSON.stringify({chosen:Array.isArray(saved?.chosen)?saved.chosen.map(String):[],powers:saved?.powers&&typeof saved.powers==='object'?saved.powers:{},groups:Array.isArray(saved?.groups)&&saved.groups.length===4?saved.groups:initialGroups(),assignment:saved?.assignment&&typeof saved.assignment==='object'?saved.assignment:{},mode:saved?.mode==='balanced'?'balanced':'stack',confirmed:!!saved?.confirmed,coreLock:!!saved?.coreLock,coreSnapshot:saved?.coreSnapshot||null,absentIds:Array.isArray(saved?.absentIds)?saved.absentIds:[],copyDraft:typeof saved?.copyDraft==='string'?saved.copyDraft:'',copySource:typeof saved?.copySource==='string'?saved.copySource:''});
  }
  useEffect(()=>{
   let saved=null;
@@ -93,7 +112,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  useEffect(()=>{
   if(draftLoaded!==draftKey||!remoteDraft||remoteApplied.current===remoteDraft.updatedAt)return;
   remoteApplied.current=remoteDraft.updatedAt;
-  const incoming=JSON.stringify({chosen:remoteDraft.chosen||[],powers:remoteDraft.powers||{},groups:remoteDraft.groups||initialGroups(),assignment:remoteDraft.assignment||{},mode:remoteDraft.mode||'stack',confirmed:!!remoteDraft.confirmed});
+  const incoming=JSON.stringify({chosen:remoteDraft.chosen||[],powers:remoteDraft.powers||{},groups:remoteDraft.groups||initialGroups(),assignment:remoteDraft.assignment||{},mode:remoteDraft.mode||'stack',confirmed:!!remoteDraft.confirmed,coreLock:!!remoteDraft.coreLock,coreSnapshot:remoteDraft.coreSnapshot||null,absentIds:remoteDraft.absentIds||[],copyDraft:remoteDraft.copyDraft||'',copySource:remoteDraft.copySource||''});
   if(incoming===snapshotSignature){lastSaved.current=incoming;return;}
   if(snapshotSignature!==lastSaved.current){
    setDraftState('New shared draft available. Finish or review your unsaved edits.');
@@ -121,18 +140,19 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   onDraftChange(matchKey,{...snapshot,updatedAt:new Date().toISOString()});
   setDraftState('Sharing existing device draft');
  },[syncReady,draftKey,draftLoaded,!!remoteDraft]);
-  const selectedIds=chosen.filter(id=>pool.some(p=>String(p.id)===String(id)));
+  const selectedIds=[...new Set([...chosen,...groups.flatMap(g=>[g.leader,...g.members]).filter(Boolean)])].filter(id=>byId.has(String(id))&&battlePool.some(p=>String(p.id)===String(id)));
  const selectedPlayers=selectedIds.map(id=>byId.get(String(id))).filter(Boolean);
  const leaderCandidates=[...selectedPlayers].filter(p=>p.roles?.some?.(r=>/rally lead/i.test(String(r)))||p.rallyLeader||p.leaderProfile?.role==='leader');
  const powerOf=id=>valueNumber(powers[String(id)]??value?.records?.[id]?.troopPower);
- const teamPower=g=>[g.leader,...g.members].reduce((sum,id)=>sum+(powerOf(id)||0),0);
+ const teamPower=g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).reduce((sum,id)=>sum+(powerOf(id)||0),0);
  const allAssigned=groups.flatMap(g=>[g.leader,...g.members]).filter(Boolean).map(String);
  const missing=selectedIds.filter(id=>!allAssigned.includes(String(id)));
- const activePlayers=groups.flatMap(g=>[g.leader,...g.members].filter(Boolean).map(id=>({id:String(id),g})));
+ const activePlayers=groups.flatMap(g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).map(id=>({id:String(id),g})));
+ const allTeamIds=new Set(groups.flatMap(g=>[g.leader,...g.members].filter(Boolean).map(String));
  const assignedCount=activePlayers.filter(({id})=>assignment[id]).length;
  const teamFor=id=>groups.find(g=>String(g.leader)===String(id)||g.members.some(m=>String(m)===String(id)));
  function resetForMatch(nextLegion=legionId,nextTime=matchTime){setLegionId(nextLegion);setMatchTime(nextTime);setBulk('');setPicked('');setStep('teams');setLocked([]);setPreview(false);setEditingTeam(null);}
- function chooseAll(){setChosen(pool.map(p=>String(p.id)));}
+ function chooseAll(){setChosen(old=>[...new Set([...old,...pool.map(p=>String(p.id))])]);}
  function toggle(id){const key=String(id);setChosen(old=>old.includes(key)?old.filter(x=>x!==key):[...old,key]);}
  function saveBatch(){
   const lines=bulk.split(/\r?\n/).filter(s=>s.trim()),updates={},problems=[];
@@ -147,6 +167,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   setPowers(p=>({...p,...updates}));setCopyMessage('Updated '+Object.keys(updates).length+' troop power values in this preview.');setShowBulk(false);
  }
  function generate(){
+  if(coreLock){setCopyMessage('Core teams are locked. Unlock to regenerate; use Add to battle for last-minute players.');return;}
   if(selectedPlayers.length<4){setCopyMessage('Select at least four players before generating teams.');return;}
   const unknown=selectedPlayers.filter(p=>powerOf(p.id)===null);
   if(unknown.length){setCopyMessage('Enter troop power for '+unknown.length+' selected player'+(unknown.length===1?'':'s')+' before generating. Unknown power cannot be counted as zero.');return;}
@@ -182,6 +203,7 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   setConfirmed(false);
  }
  function updateColour(key,color){
+  if(coreLock){setCopyMessage('Unlock core teams before changing team colours.');return;}
   setGroups(old=>old.map(g=>{
    if(g.key===key)return {...g,color};
    if(g.color===color)return {...g,color:old.find(t=>t.key===key)?.color||g.color};
@@ -207,7 +229,21 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  }
  async function copy(text){try{await navigator.clipboard.writeText(text);setCopyMessage('Copied to clipboard.');}catch{setCopyMessage('Clipboard unavailable. Copy from the preview instead.');}}
  const assignmentText='INITIAL ASSIGNMENTS\n\n'+BUILDINGS.map(b=>'» '+b+': '+activePlayers.filter(({id})=>assignment[id]===b).map(({id})=>name(byId.get(id)||{id})).join(', ')).join('\n');
- const teamText=textOfTeams(groups,byId);
+ const teamText=textOfTeams(groups.map(g=>({...g,leader:absentIds.includes(String(g.leader))?null:g.leader,members:g.members.filter(id=>!absentIds.includes(String(id)))})),byId);
+ const copyStale=!!copySource&&copySource!==teamText;
+ function openTeamCopy(){if(!copyOpen&&!copyDraft){setCopyDraft(teamText);setCopySource(teamText)}setCopyOpen(v=>!v)}
+ function regenerateCopy(){setCopyDraft(teamText);setCopySource(teamText);setCopyMessage('Preview updated from current teams.');}
+ function lockCore(){if(coreLock){if(!window.confirm('Unlock the core? Auto-generation can replace the published team plan.'))return;setCoreLock(false);return;}
+  if(groups.some(g=>!g.leader)){setCopyMessage('Assign all four rally leaders before locking the core.');return;}
+  setCoreSnapshot(groups.map(g=>({...g,members:[...g.members]})));setCoreLock(true);setCopyMessage('Core locked. Existing teams will not be automatically redistributed.');}
+ function addLatePlayer(){const id=String(lateId);const target=groups.find(g=>g.color===lateTarget);if(!id||!target||!byId.has(id))return;
+  if(allTeamIds.has(id)){setCopyMessage('This player already has a team. Move them manually.');return;}
+  setChosen(old=>[...new Set([...old,id])]);setGroups(old=>old.map(g=>g.key===target.key?{...g,members:[...g.members,id]}:g));setLateId('');setLateSearch('');setCopyMessage('Player assigned to '+(COLORS.find(c=>c.id===lateTarget)?.name||'selected')+' team without reshuffling.');}
+ function markAbsent(id){if(groups.some(g=>String(g.leader)===String(id))&&!window.confirm('This is a rally leader. Mark absent and arrange a replacement leader?'))return;
+  setAbsentIds(old=>[...new Set([...old,String(id)])]);setAssignment(old=>{const n={...old};delete n[String(id)];return n;});}
+ function removeFromBattle(id){if(groups.some(g=>String(g.leader)===String(id))&&!window.confirm('Remove this rally leader? Assign a replacement before copying teams.'))return;
+  setGroups(old=>old.map(g=>({...g,leader:String(g.leader)===String(id)?null:g.leader,members:g.members.filter(m=>String(m)!==String(id))})));
+  setChosen(old=>old.filter(x=>String(x)!==String(id)));setAbsentIds(old=>old.filter(x=>String(x)!==String(id)));setAssignment(old=>{const n={...old};delete n[String(id)];return n;});}
  return <section style={{padding:'14px 20px 35px'}}>
   <h2 style={{fontSize:25,letterSpacing:'-.4px',margin:'0 0 8px'}}>TAL Teams</h2>
   <p style={{...small,margin:'0 0 10px'}}>Build teams, then allocate every player to a building.</p>
