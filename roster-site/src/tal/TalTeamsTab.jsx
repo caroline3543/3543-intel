@@ -47,6 +47,8 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const [powers,setPowers]=useState({});
  const [bulk,setBulk]=useState('');
  const [showBulk,setShowBulk]=useState(false);
+ const [playerSearch,setPlayerSearch]=useState('');
+ const [onlyAvailable,setOnlyAvailable]=useState(false);
  const [mode,setMode]=useState('stack');
  const [assignment,setAssignment]=useState({});
  const [picked,setPicked]=useState('');
@@ -76,16 +78,22 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const remoteDraft=drafts?.[matchKey];
  const lastSaved=useRef('');
  const bootstrapped=useRef(new Set());
+ const autoSelectionPending=useRef('');
  const remoteApplied=useRef('');
  const byId=useMemo(()=>new Map(players.map(p=>[String(p.id),p])),[players]);
- const pool=useMemo(()=>{
+ const legionRoster=useMemo(()=>{
   if(!selectedLegion)return [];
-  return (selectedLegion.members||[]).map(m=>byId.get(String(m.id))).filter(Boolean).filter(p=>{
-   const avail=value?.availability?.[p.id]??value?.records?.[p.id]?.times??[];
-   return Array.isArray(avail)&&avail.map(String).includes(matchTime);
-  });
- },[selectedLegion,value,byId,matchTime]);
- const battlePool=useMemo(()=>players.filter(p=>!p.blacklisted),[players]);
+  return [...plannedMemberIds(selectedLegion)].map(id=>byId.get(String(id))).filter(Boolean).sort((a,b)=>name(a).localeCompare(name(b),undefined,{sensitivity:'base'}));
+ },[selectedLegion,byId]);
+ const memberIds=new Set((selectedLegion?.members||[]).map(m=>String(m.id)));
+ const availabilityFor=p=>{
+  const raw=value?.availability?.[p.id]??value?.availability?.[String(p.fid)]??value?.records?.[p.id]?.times??[];
+  return Array.isArray(raw)?raw.map(String):[];
+ };
+ const availableForMatch=p=>memberIds.has(String(p.id))&&availabilityFor(p).includes(matchTime);
+ const pool=legionRoster.filter(availableForMatch);
+ const visibleRoster=legionRoster.filter(p=>(!onlyAvailable||availableForMatch(p))&&(!playerSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(playerSearch.trim().toLowerCase())))).sort((a,b)=>Number(availableForMatch(b))-Number(availableForMatch(a))||name(a).localeCompare(name(b),undefined,{sensitivity:'base'}));
+  const battlePool=useMemo(()=>players.filter(p=>!p.blacklisted),[players]);
  const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,confirmed,coreLock,coreSnapshot,absentIds,copyDraft,copySource}),[chosen,powers,groups,assignment,mode,confirmed,coreLock,coreSnapshot,absentIds,copyDraft,copySource]);
  const snapshotSignature=JSON.stringify(snapshot);
  function applyDraft(saved){
@@ -103,12 +111,19 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
   let saved=null;
   try{const raw=window.localStorage.getItem(draftKey);if(raw)saved=JSON.parse(raw);}catch{}
   const source=remoteDraft||saved;
-  applyDraft(source);
+  autoSelectionPending.current=source?'':draftKey;
+  applyDraft(source||{chosen:pool.map(p=>String(p.id))});
   remoteApplied.current=remoteDraft?.updatedAt||'';
-  setDraftState(remoteDraft?'Shared draft restored':saved?'Device draft restored':'No saved draft');
+  setDraftState(remoteDraft?'Shared draft restored':saved?'Device draft restored':'Available players selected for this time');
   setStep('teams');setPicked('');setEditingTeam(null);setDraftLoaded(draftKey);
  // A new legion/time is a distinct draft; avoid resetting for every cloud refresh.
  },[draftKey]);
+ useEffect(()=>{
+  // Only initialise a new draft when roster data arrives. Never overwrite saved edits.
+  if(autoSelectionPending.current!==draftKey||draftLoaded!==draftKey||!pool.length)return;
+  autoSelectionPending.current='';
+  setChosen(pool.map(p=>String(p.id)));
+ },[draftKey,draftLoaded,pool.map(p=>String(p.id)).join('|')]);
  useEffect(()=>{
   if(draftLoaded!==draftKey||!remoteDraft||remoteApplied.current===remoteDraft.updatedAt)return;
   remoteApplied.current=remoteDraft.updatedAt;
@@ -151,9 +166,11 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
  const allTeamIds=new Set(groups.flatMap(g=>[g.leader,...g.members].filter(Boolean)).map(String));
  const assignedCount=activePlayers.filter(({id})=>assignment[id]).length;
  const teamFor=id=>groups.find(g=>String(g.leader)===String(id)||g.members.some(m=>String(m)===String(id)));
- function resetForMatch(nextLegion=legionId,nextTime=matchTime){setLegionId(nextLegion);setMatchTime(nextTime);setBulk('');setPicked('');setStep('teams');setLocked([]);setPreview(false);setEditingTeam(null);}
- function chooseAll(){setChosen(old=>[...new Set([...old,...pool.map(p=>String(p.id))])]);}
- function toggle(id){const key=String(id);setChosen(old=>old.includes(key)?old.filter(x=>x!==key):[...old,key]);}
+ function resetForMatch(nextLegion=legionId,nextTime=matchTime){setLegionId(nextLegion);setMatchTime(nextTime);setBulk('');setPicked('');setPlayerSearch('');setOnlyAvailable(false);setStep('teams');setLocked([]);setPreview(false);setEditingTeam(null);}
+ function chooseAll(){if(coreLock)return;autoSelectionPending.current='';setChosen(pool.map(p=>String(p.id)));}
+ function toggle(id){const key=String(id);if(coreLock||!pool.some(p=>String(p.id)===key))return;
+  if(allTeamIds.has(key)){setCopyMessage('Remove this player from their team before deselecting.');return;}
+  autoSelectionPending.current='';setChosen(old=>old.includes(key)?old.filter(x=>x!==key):[...old,key]);}
  function saveBatch(){
   const lines=bulk.split(/\r?\n/).filter(s=>s.trim()),updates={},problems=[];
   for(const line of lines){
@@ -281,12 +298,25 @@ export function TalTeamsTab({value,players=[],drafts={},onDraftChange,syncReady=
      </div>
     </section>
     <section style={{...panel,marginBottom:12}}>
-     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><strong>Available player pool</strong><span style={small}>{selectedIds.length} selected · {pool.length} available</span></div>
-     <p style={{...small,margin:'6px 0'}}>Recorded availability is a suggestion. Use Add to battle above to include anyone at short notice.</p>
-     <button style={{...btn,marginBottom:8}} onClick={chooseAll}>Select all available</button>
-     <div style={{maxHeight:195,overflowY:'auto',borderTop:'1px solid '+C.border}}>
-      {pool.map(p=><label key={p.id} style={{display:'flex',alignItems:'center',gap:9,minHeight:40,borderBottom:'1px solid '+C.border,fontSize:13}}><input type="checkbox" checked={selectedIds.includes(String(p.id))} onChange={()=>toggle(p.id)} style={{width:18,height:18}}/><span style={{flex:1,overflowWrap:'anywhere'}}>{name(p)}</span><span style={{...small,whiteSpace:'nowrap'}}>{powerFormat(powerOf(p.id))}</span></label>)}
-      {!pool.length&&<p role="status" style={small}>{!players.length?'No GLR roster loaded. Open Members and load GLR first.':!selectedLegion?.members?.length?'No one is assigned to this legion. Add players in TAL Planner first.':'No selected players have recorded availability at '+matchTime+' UTC. Missing availability is not the same as unavailable. Update the poll records or choose another time.'}</p>}
+     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><strong>Legion participants</strong><span style={small}>{selectedIds.length} selected · {pool.length} available · {legionRoster.length} total</span></div>
+     <p style={{...small,margin:'6px 0 10px'}}>Only players available at {matchTime} UTC are selected by default. Others stay visible but greyed out. Use Add to battle for a last-minute override.</p>
+     <input aria-label="Search legion participants" placeholder="Search name or Player ID" value={playerSearch} onChange={e=>setPlayerSearch(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:8}}/>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
+      <label style={{...small,display:'flex',alignItems:'center',gap:7,cursor:'pointer'}}><input type="checkbox" checked={onlyAvailable} onChange={e=>setOnlyAvailable(e.target.checked)} style={{width:18,height:18,accentColor:C.gold}}/> Available only</label>
+      <button style={{...btn,minHeight:38,padding:'7px 10px'}} disabled={coreLock} onClick={chooseAll}>Reset to available</button>
+     </div>
+     <div style={{maxHeight:260,overflowY:'auto',borderTop:'1px solid '+C.border,overscrollBehavior:'contain'}}>
+      {visibleRoster.map(p=>{
+       const available=availableForMatch(p),assigned=allTeamIds.has(String(p.id)),checked=selectedIds.includes(String(p.id));
+       return <label key={p.id} style={{display:'flex',alignItems:'center',gap:9,minHeight:54,borderBottom:'1px solid '+C.border,opacity:available?1:0.46,cursor:available&&!coreLock&&!assigned?'pointer':'default'}}>
+        <input type="checkbox" aria-label={'Select '+name(p)} checked={checked} disabled={!available||coreLock||assigned} onChange={()=>toggle(p.id)} style={{width:19,height:19,flexShrink:0,accentColor:C.gold}}/>
+        <span style={{flex:1,minWidth:0}}>
+         <span style={{fontSize:13,fontWeight:600,display:'block',overflowWrap:'anywhere'}}>{name(p)}</span>
+         <span style={{...small,display:'block',marginTop:2}}>{available?'Available at '+matchTime+' UTC':availabilityFor(p).length?availabilityFor(p).join(' · ')+' UTC':'Availability unknown'}{!memberIds.has(String(p.id))?' · Considering':''}{assigned&&!available?' · Battle override':''}</span>
+        </span>
+        <span style={{...small,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{powerFormat(powerOf(p.id))}</span>
+       </label>})}
+      {!visibleRoster.length&&<p role="status" style={{...small,padding:10}}>{legionRoster.length?'No matching players. Clear search or turn off Available only.':'No players in this legion yet. Add them in TAL Planner.'}</p>}
      </div>
     </section>
     <section style={{...panel,marginBottom:12}}>
