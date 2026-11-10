@@ -13,7 +13,7 @@ export default async function handler(req,res){
  const base=process.env.GAME_API_URL,key=process.env.GAME_API_PUBLIC_KEY,token=process.env.GAME_SITE_TOKEN;
  if(!base||!key||!token)return respond(res,503,{error:'Shared storage is not configured.'});
  try{
-  const response=await fetch(`${base.replace(/\/$/,'')}/functions/v1/caroline3739-seed`,{method:'POST',headers:{'Content-Type':'application/json',apikey:key,Authorization:`Bearer ${key}`,'x-caroline-site-key':token},body:JSON.stringify(body),signal:AbortSignal.timeout(25000)});
+  const response=await fetch(`${base.replace(/\/$/,'')}/functions/v1/caroline3739-roster`,{method:'POST',headers:{'Content-Type':'application/json',apikey:key,Authorization:`Bearer ${key}`,'x-caroline-site-key':token},body:JSON.stringify(body),signal:AbortSignal.timeout(25000)});
   const result=await response.json();return compressed(res,response.status,result);
  }catch{return respond(res,502,{error:'Shared storage is unavailable. Edits are saved on this device.'});}
 }
