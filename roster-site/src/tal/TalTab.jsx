@@ -101,7 +101,7 @@ export function TalTab({value,players,onChange,onCreatePlayer,onRefreshLegion,le
   event.preventDefault();
   if(!canEdit||!onCreatePlayer)return;
   const username=newName.trim(),fid=newFid.trim(),allianceTag=newHomeAlliance.trim().toUpperCase();
-  if(!username){setNewError('Enter the player's in-game name.');return;}
+  if(!username){setNewError("Enter the player's in-game name.");return;}
   if(fid&&!/^[1-9]\d{3,14}$/.test(fid)){setNewError('Enter a valid numeric game ID or leave it blank.');return;}
   if(allianceTag&&!/^[A-Z0-9_-]{2,10}$/.test(allianceTag)){setNewError('Enter a valid alliance tag or leave it blank.');return;}
   const existing=players.find(p=>fid&&String(p.fid||'')===fid||(p.username||'').trim().toLowerCase()===username.toLowerCase());
