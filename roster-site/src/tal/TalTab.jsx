@@ -42,7 +42,7 @@ export function TalTab({value,players,onChange,onRefreshLegion,legionRefresh,onM
  const [copying,setCopying]=useState(false);
  const [listLimit,setListLimit]=useState(40);
  const playersAnchor=useRef(null);
- const teams=(value?.teams||[]).filter(t=>['HOT','ARC','RKG'].includes(String(t.host||'').toUpperCase()));
+ const teams=(value?.teams||[]).filter(t=>['GLR'].includes(String(t.host||'').toUpperCase()));
  const team=teams.find(t=>t.id===selected);
  const effectiveSelection=team?selected:'';
  const shownTeams=team?[team]:teams;
