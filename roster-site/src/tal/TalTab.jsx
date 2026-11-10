@@ -81,7 +81,7 @@ export function TalTab({value,players,onChange,onCreatePlayer,onRefreshLegion,le
   return compareNames(a.player,b.player);
  });
  const movePreview=moveText(entries);
- const addCandidates=team?players.filter(p=>!plannedMemberIds(team).has(p.id)&&(!addQuery||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(addQuery.toLowerCase())))&&matchesTime(p)).sort(compareNames).slice(0,30):[];
+ const addCandidates=team?players.filter(p=>!plannedMemberIds(team).has(p.id)&&(!addQuery||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(addQuery.toLowerCase()))) ).sort(compareNames).slice(0,50):[];
  const anyFilter=check!=='all'||timeFilters.length>0||registrationFilter!=='all'||search.trim();
  useEffect(()=>{try{window.sessionStorage.setItem('tal:selected-legion',effectiveSelection);}catch{}},[effectiveSelection]);
  function chooseLegion(id){setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddMode('existing');setRemoveId('');setActionsId('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
@@ -102,7 +102,7 @@ export function TalTab({value,players,onChange,onCreatePlayer,onRefreshLegion,le
   if(!canEdit||!onCreatePlayer)return;
   const username=newName.trim(),fid=newFid.trim(),allianceTag=newHomeAlliance.trim().toUpperCase();
   if(!username){setNewError('Enter the player's in-game name.');return;}
-  if(fid&&!/^[1-9]\\d{3,14}$/.test(fid)){setNewError('Enter a valid numeric game ID or leave it blank.');return;}
+  if(fid&&!/^[1-9]\d{3,14}$/.test(fid)){setNewError('Enter a valid numeric game ID or leave it blank.');return;}
   if(allianceTag&&!/^[A-Z0-9_-]{2,10}$/.test(allianceTag)){setNewError('Enter a valid alliance tag or leave it blank.');return;}
   const existing=players.find(p=>fid&&String(p.fid||'')===fid||(p.username||'').trim().toLowerCase()===username.toLowerCase());
   if(existing){setNewError('A matching Members profile already exists. Search for that player instead.');setAddMode('existing');setAddQuery(fid||username);return;}
@@ -198,7 +198,7 @@ export function TalTab({value,players,onChange,onCreatePlayer,onRefreshLegion,le
       {registrationFilter!=='all'&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12,color:C.gold}} onClick={()=>setRegistrationFilter('all')}>{registrationFilter==='registered'?'Registered':'Needs registration'} ×</button>}
       {search&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12}} onClick={()=>setSearch('')}>Clear search ×</button>}
     </div>}
-    {team&&<button style={{...button,width:'100%',marginBottom:10,color:C.gold}} disabled={!canEdit} onClick={()=>{setAdding(v=>!v);setRemoveId('');}}>{adding?'Close player picker':'+ Add players'}</button>}
+    {teams.length>0&&<button type="button" style={{...button,width:'100%',marginBottom:10,color:C.gold,background:'#243B4F'}} disabled={!!value?.locked||(!team&&teams.every(t=>tournamentStatus(t)==='eliminated'))} onClick={()=>{if(!team){const target=teams.find(t=>tournamentStatus(t)!=='eliminated');if(!target)return;chooseLegion(target.id);setAdding(true);}else{setAdding(v=>!v);}setRemoveId('');}}>{adding?'Close add players':'+ Add players to TAL'}</button>}
     {adding&&team&&<section aria-label="Add TAL player" style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
      <div role="group" aria-label="Player source" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
       <button type="button" aria-pressed={addMode==='existing'} style={{...button,color:addMode==='existing'?C.gold:C.icy,borderColor:addMode==='existing'?C.gold:C.border}} onClick={()=>{setAddMode('existing');setNewError('')}}>From Members</button>
