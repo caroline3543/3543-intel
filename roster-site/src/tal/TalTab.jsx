@@ -233,35 +233,41 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       {registrationFilter!=='all'&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12,color:C.gold}} onClick={()=>setRegistrationFilter('all')}>{registrationFilter==='registered'?'Registered':'Needs registration'} ×</button>}
       {search&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12}} onClick={()=>setSearch('')}>Clear search ×</button>}
     </div>}
-    {teams.length>0&&<button type="button" style={{...button,width:'100%',marginBottom:10,color:C.gold,background:'#243B4F'}} disabled={!!value?.locked||(!team&&teams.every(t=>tournamentStatus(t)==='eliminated'))} onClick={()=>{if(!team){const target=teams.find(t=>tournamentStatus(t)!=='eliminated');if(!target)return;chooseLegion(target.id);setAdding(true);}else{setAdding(v=>!v);}setRemoveId('');}}>{adding?'Close add players':'+ Add players to TAL'}</button>}
-    {adding&&team&&<section aria-label="Add TAL player" style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
-     <div role="group" aria-label="Player source" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
-      <button type="button" aria-pressed={addMode==='existing'} style={{...button,color:addMode==='existing'?C.gold:C.icy,borderColor:addMode==='existing'?C.gold:C.border}} onClick={()=>{setAddMode('existing');setNewError('')}}>From Members</button>
-      <button type="button" aria-pressed={addMode==='new'} style={{...button,color:addMode==='new'?C.gold:C.icy,borderColor:addMode==='new'?C.gold:C.border}} onClick={()=>{setAddMode('new');setNewError('')}}>New player</button>
+    {teams.length>0&&<button type="button" style={{...button,width:'100%',marginBottom:10,color:C.gold,background:'#243B4F'}} disabled={!!value?.locked||(!team&&teams.every(t=>tournamentStatus(t)==='eliminated'))} onClick={()=>{if(!team){const target=teams.find(t=>tournamentStatus(t)!=='eliminated');if(!target)return;chooseLegion(target.id);setAdding(true);}else{setAdding(v=>!v);}setRemoveId('');}}>{adding?'Close add players':'+ Add from Members'}</button>}
+    {adding&&team&&<section aria-label="Add TAL players from Members" style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
+     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}>
+      <strong style={{fontSize:16}}>Add from Members</strong><span style={muted}>{remaining} spaces left</span>
      </div>
-     {addMode==='existing'?<>
-      <label style={{...muted,display:'block',marginBottom:6}}>Find an existing player</label>
-      <input aria-label="Find player to add" value={addQuery} onChange={e=>setAddQuery(e.target.value)} placeholder="Name or player ID" style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:10}}/>
-      {addCandidates.map(p=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:'1px solid '+C.border}}>
-       <PlayerAvatar player={p} size={38}/><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14,overflowWrap:'anywhere'}}>{p.username||p.alias||'Unknown'}</strong><div style={muted}>{availabilityFor(p).join(' · ')||'Times not confirmed'}</div></div>
-       <button type="button" style={{...button,padding:'6px 10px',color:C.gold}} disabled={!canEdit||teams.some(t=>t.id!==team.id&&(t.members||[]).some(m=>m.id===p.id))} onClick={()=>addPlayer(p)}>Add</button>
-      </div>)}
-      {!addCandidates.length&&<p style={muted}>No matching profiles. Choose New player to create one.</p>}
-     </>:<form onSubmit={createTalPlayer} style={{display:'grid',gap:12}}>
-      <p style={{...muted,margin:0}}>Create a Members profile and add it to {legionLabel(team)} in one step.</p>
-      <label style={{fontSize:13,color:C.icy}}>In-game username <span style={{color:C.gold}}>*</span>
-       <input required autoComplete="off" maxLength={120} value={newName} onChange={e=>{setNewName(e.target.value);setNewError('')}} placeholder="Player name" style={{...button,width:'100%',marginTop:5,fontSize:16}}/>
-      </label>
-      <label style={{fontSize:13,color:C.icy}}>Player ID · optional
-       <input inputMode="numeric" autoComplete="off" value={newFid} onChange={e=>{setNewFid(e.target.value.replace(/[^0-9]/g,''));setNewError('')}} placeholder="Numeric game ID" style={{...button,width:'100%',marginTop:5,fontSize:16}}/>
-      </label>
-      <label style={{fontSize:13,color:C.icy}}>Current alliance · optional
-       <input autoCapitalize="characters" autoComplete="off" maxLength={10} value={newHomeAlliance} onChange={e=>{setNewHomeAlliance(e.target.value);setNewError('')}} placeholder="GLR or another alliance" style={{...button,width:'100%',marginTop:5,fontSize:16}}/>
-      </label>
-      {newError&&<p role="alert" style={{color:C.gold,fontSize:13,margin:0}}>{newError}</p>}
-      <button type="submit" disabled={!canEdit||!newName.trim()} style={{...button,background:C.gold,color:C.bg,width:'100%'}}>Create and add to {legionLabel(team)}</button>
-      <p style={{...muted,margin:0}}>Registration and availability remain pending until confirmed. The player can be edited later in Members.</p>
-     </form>}
+     <input aria-label="Search Members to add" value={addSearch} onChange={e=>{setAddSearch(e.target.value);setAddingReview(false);}} placeholder="Search name or player ID" style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:12}}/>
+     <strong style={{fontSize:13,color:C.icy}}>Available times · UTC</strong>
+     <div role="group" aria-label="Filter Members by available time" style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:5,margin:'8px 0'}}>
+      {times.map(t=><button key={t} type="button" aria-pressed={addTimes.includes(t)} onClick={()=>{setAddTimes(old=>old.includes(t)?old.filter(x=>x!==t):[...old,t]);setAddingReview(false);}} style={{...button,minWidth:0,padding:3,minHeight:44,fontSize:11,color:addTimes.includes(t)?C.green:C.icy,borderColor:addTimes.includes(t)?C.green:C.border}}>{t}</button>)}
+     </div>
+     <div role="group" aria-label="How availability times must match" style={{display:'flex',gap:8,marginBottom:10}}>
+      {[['any','Any selected time'],['all','All selected times']].map(([id,label])=><button type="button" aria-pressed={addRule===id} key={id} style={{...button,flex:1,padding:7,fontSize:12,color:addRule===id?C.gold:C.icy,borderColor:addRule===id?C.gold:C.border}} onClick={()=>{setAddRule(id);setAddingReview(false);}}>{label}</button>)}
+     </div>
+     <p style={{...muted,margin:'0 0 10px'}}>{addTimes.length?'Players with matching recorded availability.':'All unassigned Members, including people with unknown availability.'} Players in other legions cannot be selected.</p>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
+      <span role="status" style={{...muted}}>{addEligible.length} eligible · {selectedAdd.length} selected</span>
+      <div style={{display:'flex',gap:6}}>
+       <button type="button" style={{...button,padding:'7px 9px',minHeight:38,fontSize:12}} onClick={()=>setAddSelected(addEligible.map(p=>String(p.id)))}>Select matches</button>
+       <button type="button" style={{...button,padding:'7px 9px',minHeight:38,fontSize:12}} onClick={()=>setAddSelected([])}>Clear</button>
+      </div>
+     </div>
+     <div style={{maxHeight:310,overflowY:'auto',overscrollBehavior:'contain'}}>
+      {addMatches.map(p=>{const blocked=otherAssigned.has(String(p.id)),checked=selectedAdd.includes(String(p.id));return <label key={p.id} style={{display:'flex',alignItems:'center',gap:10,minHeight:55,padding:'6px 0',borderBottom:'1px solid '+C.border,opacity:blocked?.55:1,cursor:blocked?'not-allowed':'pointer'}}>
+       <input type="checkbox" disabled={blocked||!canEdit} checked={checked} onChange={e=>{const id=String(p.id);setAddSelected(old=>e.target.checked?[...new Set([...old,id])]:old.filter(v=>v!==id));setAddingReview(false);}} style={{height:21,width:21,flexShrink:0,accentColor:C.gold}}/>
+       <PlayerAvatar player={p} size={36}/><span style={{flex:1,minWidth:0}}><strong style={{fontSize:14,display:'block',overflowWrap:'anywhere'}}>{p.username||p.alias||p.fid}</strong><span style={muted}>{blocked?'Assigned to another legion':availabilityFor(p).join(' · ')||'Availability unknown'}</span></span>
+      </label>})}
+      {!addMatches.length&&<p style={{...muted,padding:'12px 0'}}>No matching Members. Create or import profiles in Members first.</p>}
+     </div>
+     {!!selectedAdd.length&&<div style={{margin:'12px 0',color:selectedAdd.length>remaining?C.red:C.icy,fontSize:13}}>{selectedAdd.length} selected · {remaining} spaces left{selectedAdd.length>remaining?' · Reduce the selection before continuing.':''}</div>}
+     {addingReview&&<div role="region" aria-label="Review batch addition" style={{padding:10,background:C.section,borderRadius:9,margin:'10px 0'}}>
+      <strong style={{fontSize:14}}>Confirm {selectedAdd.length} players</strong>
+      <p style={{...muted}}>They will be added as pending, not marked registered. Availability will be preserved.</p>
+      <div style={{fontSize:13,maxHeight:125,overflowY:'auto'}}>{selectedAdd.map(id=><div key={id}>{players.find(p=>String(p.id)===id)?.username||id}</div>)}</div>
+     </div>}
+     <button type="button" disabled={!canBatch} style={{...button,width:'100%',background:canBatch?C.gold:C.section,color:canBatch?C.bg:C.icy,marginTop:10}} onClick={()=>addingReview?batchAddPlayers():setAddingReview(true)}>{addingReview?'Confirm add '+selectedAdd.length+' players':'Review '+selectedAdd.length+' selected'}</button>
     </section>}
     {roster.slice(0,listLimit).map(({team:entryTeam,player,check:status,member})=>{
       const available=availabilityFor(player),isMove=status.status==='move',isCorrect=status.status==='in-host';
