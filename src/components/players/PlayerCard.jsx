@@ -60,19 +60,19 @@ export function PlayerCard({player,onClick,onDelete,missingCount,onToggleRallyLe
   const leader=player.roles?.includes('Rally Lead');
   const heroes=(player.joinerHeroes||[]).filter(h=>h.skillLevel>=5);
   const power=player.power??player.providerStats?.power;
-  return <article style={{background:isSelected?C.gold+'18':C.card,border:`1px solid ${isSelected?C.gold:C.border}`,borderRadius:12,marginBottom:8,padding:12}}>
+  return <article style={{background:isSelected?C.gold+'13':'transparent',borderBottom:`1px solid ${isSelected?C.gold:'#304254'}`,borderRadius:0,marginBottom:0,padding:'11px 1px 12px'}}>
     <div style={{display:'flex',gap:10,alignItems:'center'}}>
       <button onClick={onClick} aria-label={bulkMode?`${isSelected?'Deselect':'Select'} ${name}`:`Open ${name}`} aria-pressed={bulkMode?isSelected:undefined} style={{display:'flex',alignItems:'center',gap:10,flex:1,minWidth:0,textAlign:'left',border:0,background:'none',padding:0,minHeight:48,color:C.white,cursor:'pointer'}}>
         {bulkMode?<span aria-hidden="true" style={{fontSize:22,color:isSelected?C.gold:C.icy}}>{isSelected?'☑':'☐'}</span>:<PlayerAvatar player={player} size={44}/>}
         <span style={{flex:1,minWidth:0}}>
-          <span style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}><span style={{fontSize:17,fontWeight:700,minWidth:0,overflowWrap:'anywhere',lineHeight:1.4}}>{name}</span>{player.furnaceLevel&&<span style={{fontSize:12,color:C.gold,flexShrink:0}}>{player.furnaceLevel}</span>}</span>
+          <span style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}><span style={{fontSize:16,fontWeight:650,minWidth:0,overflowWrap:'anywhere',lineHeight:1.32}}>{name}</span>{player.furnaceLevel&&<span style={{fontSize:12,color:C.gold,flexShrink:0}}>{player.furnaceLevel}</span>}</span>
           <span style={{display:'block',fontSize:13,color:C.icy,marginTop:3}}>{player.allianceTag?`[${player.allianceTag}]`:'Alliance unknown'}{' · '}{sortDetail && sortField!=='furnace' ? `${sortDetail.label} ${sortDetail.value}` : power!=null ? `City power ${compact(power)}` : 'City power not recorded'}</span>
         </span>
       </button>
       {!bulkMode && <button style={control} aria-label={`Options for ${name}`} aria-expanded={menu} onClick={()=>setMenu(!menu)}>•••</button>}
     </div>
-    <div aria-label="Troop tiers" style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{[['Inf','infantry',C.inf],['Lan','lancer',C.lan],['Mar','marksman',C.mar]].map(([label,key,color])=>{const tier=player.troops?.[key]||'Unknown';const helios=/^Helios/i.test(tier);const unknown=tier==='Unknown';return <span key={key} title={`${label}: ${tier}`} style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:13,color:unknown?C.icy:C.white,background:C.section,borderRadius:6,padding:'5px 7px',border:`1px solid ${helios?'#c49447':'transparent'}`,boxSizing:'border-box',lineHeight:1.35}}>{helios&&<span aria-hidden="true" style={{color:'#efc16c',fontSize:13}}>☀</span>}<span style={{color,fontWeight:600}}>{label}</span><span style={{color:helios?'#f0d09b':unknown?C.icy:C.white,fontWeight:helios?600:400}}>{tier}</span></span>;})}</div>
-    <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginTop:8}}>
+    <div aria-label="Troop tiers" style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:7}}>{[['Inf','infantry',C.inf],['Lan','lancer',C.lan],['Mar','marksman',C.mar]].map(([label,key,color])=>{const tier=player.troops?.[key]||'Unknown';const helios=/^Helios/i.test(tier);const unknown=tier==='Unknown';return <span key={key} title={`${label}: ${tier}`} style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:13,color:unknown?C.icy:C.white,background:'#1A3041',borderRadius:5,padding:'4px 7px',border:'none',boxSizing:'border-box',lineHeight:1.35}}>{helios&&<span aria-hidden="true" style={{color:'#efc16c',fontSize:13}}>☀</span>}<span style={{color,fontWeight:600}}>{label}</span><span style={{color:helios?'#f0d09b':unknown?C.icy:C.white,fontWeight:helios?600:400}}>{tier}</span></span>;})}</div>
+    <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginTop:5}}>
       {player.blacklisted?<span style={{fontSize:13,color:C.red}}>Excluded from battle plans</span>:leader?<span style={{fontSize:13,color:C.gold}}>Rally leader</span>:null}
       {heroes.length>0&&<span style={{fontSize:13,color:C.icy}}>{heroes.length} Skill 5 joiner {heroes.length===1?'hero':'heroes'}</span>}
       {missingCount>0&&<button style={{...control,color:C.gold}} onClick={onOpenFields}>Review {missingCount} {missingCount===1?'field':'fields'}</button>}
