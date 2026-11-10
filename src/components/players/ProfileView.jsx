@@ -65,10 +65,12 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
        })}
        <label style={{fontSize:13,color:C.icy,display:'block',marginTop:12,marginBottom:6}}>Add a player</label>
        <input value={partnerSearch} onChange={e=>{setPartnerSearch(e.target.value);setPartnerId('');}} placeholder="Search name or Player ID" aria-label="Search cooperation partner" style={{...profileButton,width:'100%',boxSizing:'border-box',fontSize:16,textAlign:'left',marginBottom:8}}/>
-       <select value={partnerId} onChange={e=>setPartnerId(e.target.value)} aria-label="Choose cooperation partner" style={{...profileButton,width:'100%',fontSize:14,marginBottom:8}}>
-        <option value="">Choose a Member</option>
-        {players.filter(p=>String(p.id)!==String(player.id)&&(!partnerSearch||[p.username,p.alias,p.fid,p.id].some(v=>String(v||'').toLowerCase().includes(partnerSearch.trim().toLowerCase())))).sort((a,b)=>String(a.username||a.alias||'').localeCompare(String(b.username||b.alias||''))).slice(0,80).map(p=><option key={p.id} value={p.id}>{p.username||p.alias||p.fid} · {p.fid||p.id}</option>)}
-       </select>
+       {partnerSearch.trim()&&<div role="listbox" aria-label="Matching members" style={{border:'1px solid '+C.border,borderRadius:10,marginBottom:8,maxHeight:260,overflowY:'auto'}}>
+        {players.filter(p=>String(p.id)!==String(player.id)&&[p.username,p.alias,p.fid,p.id,...(p.pastUsernames||[])].some(v=>String(v||'').toLowerCase().includes(partnerSearch.trim().toLowerCase()))).sort((a,b)=>String(a.username||a.alias||'').localeCompare(String(b.username||b.alias||''))).slice(0,12).map(p=><button type="button" role="option" aria-selected={partnerId===String(p.id)} key={p.id} onClick={()=>{setPartnerId(String(p.id));setPartnerSearch(p.username||p.alias||p.fid||String(p.id));}} style={{...profileButton,width:'100%',textAlign:'left',display:'block',minHeight:48,border:0,borderBottom:'1px solid '+C.border,color:partnerId===String(p.id)?C.gold:C.white}}>
+          <strong>{p.username||p.alias||p.fid}</strong><span style={{display:'block',fontSize:12,color:C.icy}}>[{p.allianceTag||'?'}] · {p.fid||'ID unknown'}</span>
+         </button>)}
+        {!players.some(p=>String(p.id)!==String(player.id)&&[p.username,p.alias,p.fid,p.id,...(p.pastUsernames||[])].some(v=>String(v||'').toLowerCase().includes(partnerSearch.trim().toLowerCase())))&&<p style={{padding:10,color:C.icy,fontSize:13}}>No matches. Try the Player ID.</p>}
+       </div>}
        <button type="button" disabled={!partnerId||cooperationPairs.some(pair=>Array.isArray(pair)&&pair.map(String).includes(String(player.id))&&pair.map(String).includes(String(partnerId)))} onClick={()=>{onChangeCooperation(player.id,partnerId,true);setPartnerId('');setPartnerSearch('')}} style={{...profileButton,width:'100%',background:partnerId?C.gold:C.section,color:partnerId?C.bg:C.icy}}>Add cooperation link</button>
        <p style={{fontSize:12,color:C.icy,lineHeight:1.4,margin:'8px 0 0'}}>Add once. The relationship appears on both profiles and is used when generating new unlocked TAL teams.</p>
       </ProfileSection>}
