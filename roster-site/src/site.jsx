@@ -167,7 +167,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='teams'&&<TalTeamsTab value={data.talPlan} players={players} drafts={data.talMatchDrafts||{}} syncReady={sync.joined&&sync.mode==='active'&&!sync.conflicts?.length} onDraftChange={(key,draft)=>setData(prev=>({...prev,talMatchDrafts:{...(prev.talMatchDrafts||{}),[key]:draft}}))}/>}
     </div>}
     </div>
-    {workspaceOpen&&<WorkspaceOptions sync={sync} data={data} onPublish={publish} onJoin={join} onRetry={syncNow} onResolve={resolve} onClose={()=>setWorkspaceOpen(false)} onLogout={onLogout} onAlliance={()=>{setWorkspaceOpen(false);setImporting(true);}} onHelp={()=>{setWorkspaceOpen(false);setTourOpen(true);}}/>}
+    {workspaceOpen&&<WorkspaceOptions sync={sync} data={data} onPublish={publish} onJoin={join} onSeed={seedFromDevice} onRetry={syncNow} onResolve={resolve} onClose={()=>setWorkspaceOpen(false)} onLogout={onLogout} onAlliance={()=>{setWorkspaceOpen(false);setImporting(true);}} onHelp={()=>{setWorkspaceOpen(false);setTourOpen(true);}}/>}
     {tourOpen&&!workspaceOpen&&<QuickTour haptics={preferences.haptics} onHapticsChange={haptics=>onPreferencesChange({haptics})} onClose={()=>{onPreferencesChange({tutorialSeen:true});setTourOpen(false);}}/>}
     {importing&&<AllianceImportPanel stateId="3739" players={players} onImport={importRoster} onClose={()=>setImporting(false)}/>}
     {deleting&&<DeleteConfirmModal message="Remove this player from the roster? Their game account is unaffected." onCancel={()=>setDeleting(null)} onConfirm={()=>{setData(prev=>({...prev,players:prev.players.filter(p=>p.id!==deleting)}));setDeleting(null);}}/>}
