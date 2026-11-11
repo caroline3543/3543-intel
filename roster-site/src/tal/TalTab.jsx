@@ -1,4 +1,4 @@
-import {TalBulkEditor} from './TalBulkEditor.jsx';
+import {LANGUAGES} from '../../../src/utils/constants.js';
 import {useEffect,useRef,useState} from 'react';
 import {DEFAULT_TIMES} from './planner.js';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
@@ -52,6 +52,17 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [tournamentConfirm,setTournamentConfirm]=useState('');
  const [copying,setCopying]=useState(false);
  const [listLimit,setListLimit]=useState(40);
+ const [selecting,setSelecting]=useState(false);
+ const [bulkSelected,setBulkSelected]=useState([]);
+ const [bulkPanel,setBulkPanel]=useState('');
+ const [bulkTimeMode,setBulkTimeMode]=useState('add');
+ const [bulkTimes,setBulkTimes]=useState([]);
+ const [bulkRegistration,setBulkRegistration]=useState('registered');
+ const [bulkLanguage,setBulkLanguage]=useState('English');
+ const [bulkLanguageMode,setBulkLanguageMode]=useState('add');
+ const [bulkTeamId,setBulkTeamId]=useState('');
+ const [bulkReview,setBulkReview]=useState(false);
+ const [bulkError,setBulkError]=useState('');
  const [missingFilter,setMissingFilter]=useState('');
  const playersAnchor=useRef(null);
  const teams=(value?.teams||[]).filter(t=>['GLR'].includes(String(t.host||'').toUpperCase()));
@@ -110,7 +121,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const canBatch=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated'&&selectedAdd.length>0&&countedAdd<=remaining&&(batchStatus!=='registered'||countedAdd<=combatantSlots+substituteSlots);
  const anyFilter=check!=='all'||timeFilters.length>0||registrationFilter!=='all'||search.trim()||!!missingFilter;
  useEffect(()=>{try{window.sessionStorage.setItem('tal:selected-legion',effectiveSelection);}catch{}},[effectiveSelection]);
- function chooseLegion(id){setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setBatchStatus('needs');setTimeMerge('add');setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
+ function chooseLegion(id){setSelecting(false);setBulkSelected([]);setBulkPanel('');setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setBatchStatus('needs');setTimeMerge('add');setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
  function focusPlayers(){playersAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'});}
  function chooseReadiness(next){setCheck(current=>current===next?'all':next);setListLimit(40);focusPlayers();}
  function resetFilters(){setCheck('all');setSearch('');setTimeFilters([]);setRegistrationFilter('all');setListLimit(40);}
@@ -209,7 +220,34 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   catch{onMessage?.('Copy failed. Try again.');}
   finally{setCopying(false);}
  }
- const canEdit=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated';
+ const selectedBulkIds=bulkSelected.filter(id=>entries.some(e=>String(e.player.id)===id));
+ const selectedBulkCount=selectedBulkIds.length;
+ const filteredIds=roster.map(e=>String(e.player.id));
+ function beginBulkPanel(kind){
+  setBulkPanel(kind);setBulkReview(false);setBulkError('');
+  if(kind==='times'){setBulkTimeMode('add');setBulkTimes([]);}
+  if(kind==='language')setBulkLanguageMode('add');
+  if(kind==='legion'&&!bulkTeamId)setBulkTeamId(team?.id||teams[0]?.id||'');
+ }
+ function actionForSelection(){
+  if(bulkPanel==='times')return {type:'availability',mode:bulkTimeMode,times:bulkTimes};
+  if(bulkPanel==='registration')return {type:'registration',value:bulkRegistration};
+  if(bulkPanel==='language')return {type:'language',mode:bulkLanguageMode,language:bulkLanguage};
+  if(bulkPanel==='legion')return {type:'allocate',teamId:bulkTeamId};
+  if(bulkPanel==='cooperation')return {type:'teamwork',mode:'group'};
+  if(bulkPanel==='remove')return {type:'remove',confirm:true};
+  return null;
+ }
+ function commitBulk(){
+  if(!selectedBulkCount||!onBulkApply||value?.locked)return;
+  const action=actionForSelection();if(!action)return;
+  if(!bulkReview){setBulkReview(true);return;}
+  try{
+   onBulkApply(selectedBulkIds,action);
+   setBulkSelected([]);setSelecting(false);setBulkPanel('');setBulkReview(false);setBulkError('');
+  }catch(e){setBulkError(e.message||'Unable to save changes.');setBulkReview(false);}
+ }
+  const canEdit=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated';
  return <section style={{padding:'12px 20px 32px'}}>
   <h2 style={{fontSize:22,margin:'0 0 12px'}}>TAL planner</h2>
   {!teams.length?<div style={{padding:16,background:C.section,borderRadius:12}}><strong>No legions assigned</strong><p style={{fontSize:14,color:C.icy,lineHeight:1.5}}>Saved TAL legion assignments will appear when available. Existing plan data is retained.</p></div>:<>
@@ -263,8 +301,9 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     {!!missingFilter&&<button type="button" style={{...button,width:'100%',marginTop:8,color:C.gold}} onClick={()=>setMissingFilter('')}>Show all players</button>}
    </section>
       <section ref={playersAnchor} id="tal-players" aria-label="TAL players" style={{scrollMarginTop:16}}>
-    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:10}}><h3 style={{fontSize:18,margin:0}}>Players</h3><span role="status" style={{fontSize:13,color:C.icy}}>{roster.length} of {entries.length} shown</span></div>
-    <TalBulkEditor data={workspace||{players,talPlan:value}} scopedIds={entries.map(e=>String(e.player.id))} scopeLabel={matchLabel(team)} onApply={onBulkApply}/>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}><h3 style={{fontSize:18,margin:0}}>Players <span style={{...muted,fontWeight:400}}>{roster.length} of {entries.length}</span></h3><button type="button" style={{...button,color:C.gold,minWidth:75}} aria-pressed={selecting} onClick={()=>{setSelecting(v=>!v);setBulkSelected([]);setBulkPanel('');setBulkReview(false)}}>{selecting?'Done':'Select'}</button></div>
+    {selecting&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}><strong style={{fontSize:13}}>{selectedBulkCount} selected</strong><div style={{display:'flex',gap:6}}><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected(old=>[...new Set([...old,...filteredIds])])}>Select all shown</button><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected([])}>Clear</button></div></div>}
+
 
     <input aria-label="Search players" placeholder="Find a player by name or ID" value={search} onChange={e=>{setSearch(e.target.value);setListLimit(40);}} style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:10}}/>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:7,gap:8}}>
@@ -337,38 +376,39 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       const revealed=swipeId===String(player.id);
       const selectedEditing=editingTimes===String(player.id);
       const statusText=member?.registered?'Registered in game':member?'Needs registration':'Considering';
-      return <article key={player.id} onPointerDown={e=>onSwipeDown(e,String(player.id))} onPointerUp={e=>onSwipeUp(e,String(player.id),!!member&&editable)} onPointerCancel={()=>{gesture.current=null;}} style={{background:C.card,borderRadius:11,marginBottom:8,overflow:'hidden',touchAction:'pan-y'}}>
-       {revealed&&member&&<div role="group" aria-label={'Registration action for '+(player.username||player.alias||'player')} style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',padding:'9px 11px',background:C.section}}>
+      const chosen=selectedBulkIds.includes(String(player.id));
+      return <article key={player.id} onClick={e=>{if(selecting&&!e.target.closest('[data-bulk-ignore]')){const id=String(player.id);setBulkSelected(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setBulkReview(false);}}} onPointerDown={e=>{if(!selecting)onSwipeDown(e,String(player.id))}} onPointerUp={e=>{if(!selecting)onSwipeUp(e,String(player.id),!!member&&editable)}} onPointerCancel={()=>{gesture.current=null;}} style={{background:chosen&&selecting?C.section:C.card,border:'1px solid '+(chosen&&selecting?C.gold:C.border),borderRadius:11,marginBottom:8,overflow:'hidden',touchAction:'pan-y',cursor:selecting?'pointer':'default'}}>
+       {!selecting&&revealed&&member&&<div role="group" aria-label={'Registration action for '+(player.username||player.alias||'player')} style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',padding:'9px 11px',background:C.section}}>
         <button type="button" style={{...button,color:member.registered?C.gold:C.green,background:C.card}} disabled={!editable} onClick={()=>setRegistration(entryTeam,player.id,!member.registered)}>{member.registered?'Mark unregistered':'Confirm registered'}</button>
         <button type="button" aria-label="Close swipe actions" style={{...button,minWidth:44,padding:8}} onClick={()=>setSwipeId('')}>✕</button>
        </div>}
-       <div style={{display:'flex',alignItems:'center',gap:6,padding:'10px 10px 5px'}}>
-        <button type="button" title="Open Members profile" aria-label={'Open profile for '+(player.username||player.alias||'player')} style={{display:'flex',alignItems:'center',flex:1,minWidth:0,gap:10,padding:'4px 0',textAlign:'left',background:'transparent',border:0,color:C.white,cursor:'pointer',minHeight:48}} onClick={()=>{setSwipeId('');setActionsId('');onOpenPlayer?.(player.id)}}>
+       <div style={{display:'flex',alignItems:'center',gap:6,padding:'10px 10px 5px'}}>{selecting&&<span aria-hidden="true" style={{height:24,width:24,borderRadius:'50%',background:chosen?C.gold:C.bg,border:'2px solid '+(chosen?C.gold:C.icy),flexShrink:0,display:'grid',placeItems:'center',color:C.bg,fontWeight:800}}>{chosen?'✓':''}</span>}
+        <button type="button" title="Open Members profile" aria-label={'Open profile for '+(player.username||player.alias||'player')} style={{display:'flex',alignItems:'center',flex:1,minWidth:0,gap:10,padding:'4px 0',textAlign:'left',background:'transparent',border:0,color:C.white,cursor:'pointer',minHeight:48}} onClick={()=>{if(selecting){const id=String(player.id);setBulkSelected(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setBulkReview(false);return;}setSwipeId('');setActionsId('');onOpenPlayer?.(player.id)}}>
          <PlayerAvatar player={player} size={44}/>
          <span style={{flex:1,minWidth:0}}>
           <span style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:7}}><strong style={{fontSize:16,overflowWrap:'anywhere'}}>{player.username||player.alias||'Unknown player'}</strong>{player.furnaceLevel&&<span style={{fontSize:12,color:C.gold}}>{player.furnaceLevel}</span>}</span>
           <span style={{...muted,display:'block',marginTop:3}}>{String(status.tag||player.allianceTag||'').toUpperCase()===String(entryTeam.host||'').toUpperCase()?legionLabel(entryTeam):(status.tag||player.allianceTag||'Alliance unknown')+' · '+legionLabel(entryTeam)}</span>
          </span>
         </button>
-        <button type="button" title="Edit player planning actions" aria-label={'Edit planning options for '+(player.username||player.alias||'player')} aria-expanded={actionsId===player.id} style={{...button,minWidth:44,padding:7,background:'transparent',border:0,fontSize:20}} onClick={()=>{setActionsId(actionsId===player.id?'':player.id);setSwipeId('');setRemoveId('')}}>•••</button>
+        {!selecting&&<button type="button" title="Edit player planning actions" aria-label={'Edit planning options for '+(player.username||player.alias||'player')} aria-expanded={actionsId===player.id} style={{...button,minWidth:44,padding:7,background:'transparent',border:0,fontSize:20}} onClick={()=>{setActionsId(actionsId===player.id?'':player.id);setSwipeId('');setRemoveId('')}}>•••</button>}
        </div>
        {(tierChips(player).length>0||gameLanguages(player).length>0)&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:5,padding:'0 11px 5px'}}>
         {tierChips(player).map(([key,label,color])=><span key={key} style={{fontSize:11,fontWeight:600,color,padding:'4px 7px',borderRadius:7,background:color+'17',border:'1px solid '+color+'3a'}}>{label} {player.troops[key]}</span>)}
         {gameLanguages(player).map(language=><span key={language} style={{fontSize:11,color:C.icy,padding:'4px 7px',borderRadius:7,background:C.section}}>{language}</span>)}
        </div>}
               <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'2px 11px 10px'}}>
-        <button type="button" aria-label={'Edit availability for '+(player.username||player.alias||'player')} onClick={()=>beginEditTimes(player)} style={{border:0,background:'transparent',padding:'7px 0',color:C.icy,cursor:'pointer',fontSize:12,textAlign:'left',minHeight:38}}>UTC: {available.length?available.join(' · '):'Unknown'} <span aria-hidden="true" style={{color:C.gold}}>✎</span></button>
+        <button type="button" disabled={selecting} aria-label={'Edit availability for '+(player.username||player.alias||'player')} onClick={()=>beginEditTimes(player)} style={{border:0,background:'transparent',padding:'7px 0',color:C.icy,cursor:'pointer',fontSize:12,textAlign:'left',minHeight:38}}>UTC: {available.length?available.join(' · '):'Unknown'} <span aria-hidden="true" style={{color:C.gold}}>✎</span></button>
         <span style={{marginLeft:'auto',fontSize:12,fontWeight:600,color:member?.registered?C.green:member?C.gold:C.icy}}>{statusText}</span>
        </div>
        {(isMove||shownStat)&&<div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'0 11px 10px',color:isMove?C.gold:C.icy,fontSize:12}}>{isMove&&<span>Move {status.tag||'No alliance'} → {entryTeam.host}</span>}{shownStat&&<span>{shownStat}</span>}</div>}
-       {actionsId===player.id&&<div style={{padding:'8px 11px 12px',background:C.section,display:'grid',gap:5}}>
+       {!selecting&&actionsId===player.id&&<div style={{padding:'8px 11px 12px',background:C.section,display:'grid',gap:5}}>
         {!member&&editable&&<><button type="button" style={{...button,textAlign:'left',color:C.gold}} onClick={()=>promoteCandidate(entryTeam,player.id,false)}>Move to needs registration</button><button type="button" style={{...button,textAlign:'left',color:C.green}} onClick={()=>promoteCandidate(entryTeam,player.id,true)}>Confirm registered in game</button></>}
         {member&&<button type="button" style={{...button,textAlign:'left',color:member.registered?C.gold:C.green}} disabled={!editable} onClick={()=>setRegistration(entryTeam,player.id,!member.registered)}>{member.registered?'Mark registration pending':'Confirm registered'}</button>}
         <button type="button" style={{...button,textAlign:'left'}} onClick={()=>beginEditTimes(player)}>Edit available times</button>
         <button type="button" style={{...button,textAlign:'left'}} onClick={()=>{setActionsId('');onOpenPlayer?.(player.id)}}>Open Members profile</button>
         {member&&<button type="button" style={{...button,textAlign:'left',color:C.red}} disabled={!editable} onClick={()=>setRemoveId(player.id)}>Remove from legion…</button>}
        </div>}
-       {selectedEditing&&<section aria-label={'Edit availability for '+(player.username||player.alias||'player')} style={{padding:'12px 11px',background:C.section}}>
+       {!selecting&&selectedEditing&&<section aria-label={'Edit availability for '+(player.username||player.alias||'player')} style={{padding:'12px 11px',background:C.section}}>
         <strong style={{fontSize:14}}>Available times · UTC</strong>
         <p style={{...muted,margin:'6px 0 10px'}}>Tap a time to cycle: Unknown → Available → Unavailable.</p>
         <div role="group" aria-label="Set time preferences" style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:5}}>
@@ -378,7 +418,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
         </div>
         <div style={{display:'flex',gap:8,marginTop:12}}><button style={{...button,flex:1}} onClick={()=>setEditingTimes('')}>Cancel</button><button style={{...button,flex:1,background:C.gold,color:C.bg}} disabled={!!value?.locked} onClick={()=>saveTimes(player)}>Save times</button></div>
        </section>}
-       {removeId===player.id&&member&&<div style={{padding:'10px 11px',background:C.section}}>
+       {!selecting&&removeId===player.id&&member&&<div style={{padding:'10px 11px',background:C.section}}>
         <p style={{...muted,margin:'0 0 10px'}}>Remove from {legionLabel(entryTeam)}? The Members profile and availability will remain.</p>
         <div style={{display:'flex',gap:8}}><button style={button} onClick={()=>setRemoveId('')}>Cancel</button><button style={{...button,color:C.red}} disabled={!editable} onClick={()=>{onChange?.({...value,teams:value.teams.map(t=>t.id===entryTeam.id?{...t,members:t.members.filter(m=>String(m.id)!==String(player.id)),candidates:(t.candidates||[]).filter(c=>String(c.id)!==String(player.id)),captain:t.captain===player.id?'':t.captain}:t)});setRemoveId('');setActionsId('');onMessage?.('Removed from legion. Members profile retained.');}}>Remove</button></div>
        </div>}
