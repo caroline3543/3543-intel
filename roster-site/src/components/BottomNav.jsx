@@ -11,7 +11,7 @@ export function BottomNav({tab,onChange}){
    const current=tab===id;
    return <button key={id} type="button" aria-current={current?'page':undefined} aria-label={id==='tal'?'TAL Planner':id==='teams'?'Teams':id==='changes'?'Name changes':label} onClick={()=>onChange(id)} style={{minHeight:52,minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,padding:'5px 2px',border:0,borderRadius:8,background:'transparent',color:current?C.gold:'#B8C8D5',fontSize:11,fontWeight:current?700:500,cursor:'pointer'}}>
     <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={current?'2.2':'1.85'} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path}/>{id==='members'&&<circle cx="9" cy="7" r="4"/>}</svg>
-    <span style={{lineHeight:1.15,textAlign:'center',lineHeight:1.1}}>{label}</span>
+    <span style={{textAlign:'center',lineHeight:1.1}}>{label}</span>
    </button>;
   })}
  </nav>;
