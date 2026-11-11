@@ -60,12 +60,13 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [bulkRegistration,setBulkRegistration]=useState('registered');
  const [bulkLanguage,setBulkLanguage]=useState('English');
  const [bulkLanguageMode,setBulkLanguageMode]=useState('add');
- const [bulkTeamId,setBulkTeamId]=useState('');
+ const [bulkHost,setBulkHost]=useState('GLR');
+ const [bulkLegionNumber,setBulkLegionNumber]=useState('1');
  const [bulkReview,setBulkReview]=useState(false);
  const [bulkError,setBulkError]=useState('');
  const [missingFilter,setMissingFilter]=useState('');
  const playersAnchor=useRef(null);
- const teams=(value?.teams||[]).filter(t=>['GLR'].includes(String(t.host||'').toUpperCase()));
+ const teams=(value?.teams||[]);
  const team=teams.find(t=>t.id===selected);
  const effectiveSelection=team?selected:'';
  const shownTeams=team?[team]:teams;
@@ -227,13 +228,13 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   setBulkPanel(kind);setBulkReview(false);setBulkError('');
   if(kind==='times'){setBulkTimeMode('add');setBulkTimes([]);}
   if(kind==='language')setBulkLanguageMode('add');
-  if(kind==='legion'&&!bulkTeamId)setBulkTeamId(team?.id||teams[0]?.id||'');
+  if(kind==='legion'){setBulkHost(team?.host||teams[0]?.host||'GLR');setBulkLegionNumber(String(team?.number||1));}
  }
  function actionForSelection(){
   if(bulkPanel==='times')return {type:'availability',mode:bulkTimeMode,times:bulkTimes};
   if(bulkPanel==='registration')return {type:'registration',value:bulkRegistration};
   if(bulkPanel==='language')return {type:'language',mode:bulkLanguageMode,language:bulkLanguage};
-  if(bulkPanel==='legion')return {type:'allocate',teamId:bulkTeamId};
+  if(bulkPanel==='legion')return {type:'allocate',host:bulkHost,number:Number(bulkLegionNumber)};
   if(bulkPanel==='cooperation')return {type:'teamwork',mode:'group'};
   if(bulkPanel==='remove')return {type:'remove',confirm:true};
   return null;
@@ -302,7 +303,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
    </section>
       <section ref={playersAnchor} id="tal-players" aria-label="TAL players" style={{scrollMarginTop:16}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}><h3 style={{fontSize:18,margin:0}}>Players <span style={{...muted,fontWeight:400}}>{roster.length} of {entries.length}</span></h3><button type="button" style={{...button,color:C.gold,minWidth:75}} aria-pressed={selecting} onClick={()=>{setSelecting(v=>!v);setBulkSelected([]);setBulkPanel('');setBulkReview(false)}}>{selecting?'Done':'Select'}</button></div>
-    {selecting&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}><strong style={{fontSize:13}}>{selectedBulkCount} selected</strong><div style={{display:'flex',gap:6}}><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected(old=>[...new Set([...old,...filteredIds])])}>Select all shown</button><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected([])}>Clear</button></div></div>}
+    {selecting&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}><strong style={{fontSize:13}}>{selectedBulkCount} selected</strong><div style={{display:'flex',gap:6}}><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected(old=>[...new Set([...old,...filteredIds])])}>Select all matching</button><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected([])}>Clear</button></div></div>}
 
 
     <input aria-label="Search players" placeholder="Find a player by name or ID" value={search} onChange={e=>{setSearch(e.target.value);setListLimit(40);}} style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:10}}/>
@@ -452,7 +453,11 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      {bulkPanel==='legion'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}>
       <strong style={{fontSize:14}}>Allocate to a legion</strong>
       <p style={muted}>Choose the host alliance and legion number.</p>
-      <select aria-label="Select host alliance and legion" value={bulkTeamId||team?.id||''} onChange={e=>{setBulkTeamId(e.target.value);setBulkReview(false)}} style={{...button,width:'100%',fontSize:15}}>{(value?.teams||[]).map(t=><option key={t.id} value={t.id}>{t.host||'Alliance'} · Legion {t.number||t.legionNumber||1}</option>)}</select>
+      <label style={{fontSize:12,color:C.icy,display:'block'}}>Host alliance<select aria-label="Host alliance" value={bulkHost} onChange={e=>{setBulkHost(e.target.value);setBulkReview(false)}} style={{...button,width:'100%',fontSize:15,margin:'5px 0 10px'}}>
+       {[...new Set(['GLR',...(value?.teams||[]).map(t=>String(t.host||'').toUpperCase()),...players.map(p=>String(p.allianceTag||'').toUpperCase())].filter(Boolean))].sort().map(a=><option key={a} value={a}>{a}</option>)}
+      </select></label>
+      <div style={{fontSize:12,color:C.icy,marginBottom:6}}>Legion number</div>
+      <div role="group" aria-label="Choose legion number" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{['1','2'].map(n=><button type="button" key={n} aria-pressed={bulkLegionNumber===n} style={{...button,color:bulkLegionNumber===n?C.gold:C.icy,borderColor:bulkLegionNumber===n?C.gold:C.border}} onClick={()=>{setBulkLegionNumber(n);setBulkReview(false)}}>{bulkLegionNumber===n?'✓ ':''}Legion {n}</button>)}</div>
      </div>}
      {bulkPanel==='cooperation'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}><strong style={{fontSize:14}}>Works well together</strong><p style={muted}>Create one shared cooperation group for {selectedBulkCount} players. This will appear on each player's Members profile and help future team generation.</p>{selectedBulkCount<2&&<p style={{color:C.gold,fontSize:12}}>Select at least two players.</p>}</div>}
      {bulkPanel==='language'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}>
@@ -463,7 +468,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      </div>}
      {bulkPanel==='remove'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}><strong style={{fontSize:14,color:C.red}}>Remove from TAL?</strong><p style={muted}>Remove {selectedBulkCount} players from their TAL legions. Members profiles and saved availability will remain.</p></div>}
      {['times','registration','legion','cooperation','language','remove'].includes(bulkPanel)&&<>
-      {bulkReview&&<p role="status" style={{fontSize:13,color:bulkPanel==='remove'?C.red:C.gold,lineHeight:1.5}}>Review: {selectedBulkCount} selected players · {bulkPanel==='times'?(bulkTimeMode==='add'?'Add ':'Remove ')+bulkTimes.join(', ')+' UTC':bulkPanel==='registration'?bulkRegistration:bulkPanel==='legion'?(value?.teams||[]).find(t=>String(t.id)===String(bulkTeamId))?.host+' · Legion '+((value?.teams||[]).find(t=>String(t.id)===String(bulkTeamId))?.number||1):bulkPanel==='cooperation'?'One shared cooperation group':bulkPanel==='language'?(bulkLanguageMode==='add'?'Add ':'Remove ')+bulkLanguage:'Remove from TAL only'}</p>}
+      {bulkReview&&<p role="status" style={{fontSize:13,color:bulkPanel==='remove'?C.red:C.gold,lineHeight:1.5}}>Review: {selectedBulkCount} selected players · {bulkPanel==='times'?(bulkTimeMode==='add'?'Add ':'Remove ')+bulkTimes.join(', ')+' UTC':bulkPanel==='registration'?bulkRegistration:bulkPanel==='legion'?bulkHost+' · Legion '+bulkLegionNumber:bulkPanel==='cooperation'?'One shared cooperation group':bulkPanel==='language'?(bulkLanguageMode==='add'?'Add ':'Remove ')+bulkLanguage:'Remove from TAL only'}</p>}
       {bulkError&&<p role="alert" style={{fontSize:13,color:C.red}}>{bulkError}</p>}
       <button type="button" disabled={!!value?.locked||!onBulkApply||!selectedBulkCount||(bulkPanel==='times'&&!bulkTimes.length)||(bulkPanel==='cooperation'&&selectedBulkCount<2)} style={{...button,width:'100%',marginTop:9,background:bulkPanel==='remove'?C.red:C.gold,color:C.bg}} onClick={commitBulk}>{bulkReview?'Confirm '+selectedBulkCount+' players':'Review '+selectedBulkCount+' players'}</button>
       <button type="button" style={{...button,width:'100%',marginTop:6}} onClick={()=>{setBulkPanel('more');setBulkReview(false)}}>Back</button>
