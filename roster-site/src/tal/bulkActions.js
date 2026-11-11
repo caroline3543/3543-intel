@@ -74,6 +74,8 @@ export function applyTalBulk(data,ids,action){
      role=combatants<30?'combatant':substitutes<20?'substitute':null;
      if(!role)throw Error('There are no combatant or substitute slots for '+(p.username||p.fid)+'.');
     }
+    if(action.value==='registered'&&role==='combatant'&&existing.filter(m=>m.role==='combatant').length>=30)throw Error('All 30 combatant slots are full in '+found.host+' Legion '+found.number+'.');
+    if(action.value==='registered'&&role==='substitute'&&existing.filter(m=>m.role==='substitute').length>=20)throw Error('All 20 substitute slots are full in '+found.host+' Legion '+found.number+'.');
     plan.teams=plan.teams.map(t=>t.id!==found.id?t:{...t,candidates:t.candidates.filter(m=>String(m.id)!==id),members:[...existing,{...current,role,registered:action.value==='registered'}]});
    }else{
     plan=setRecord(plan,p,{sheetRegistration:action.value==='verified'?'Verified':'Pending verification',registrationStatus:action.value});
