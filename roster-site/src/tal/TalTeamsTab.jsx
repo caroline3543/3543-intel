@@ -36,7 +36,7 @@ function textOfTeams(groups,playersById) {
 }
 const initialGroups=()=>COLORS.map((c,i)=>({key:i+1,color:c.id,leader:null,members:[]}));
 const draftPrefix='caroline-3739-tal-teams-v1:';
-export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDraftChange,syncReady=false}){
+export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGroups=[],drafts={},onDraftChange,syncReady=false}){
  const legions=(value?.teams||[]).filter(t=>['GLR'].includes(String(t.host||'').toUpperCase()));
  const [legionId,setLegionId]=useState(()=>{
   try{return JSON.parse(window.localStorage.getItem('caroline-3739-last-tal-match')||'null')?.legion||legions[0]?.id||''}catch{return legions[0]?.id||''}
@@ -193,7 +193,12 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],drafts={},onDr
  const leaderCandidates=[...selectedPlayers].filter(p=>p.roles?.some?.(r=>/rally lead/i.test(String(r)))||p.rallyLeader||p.leaderProfile?.role==='leader');
  const powerOf=id=>valueNumber(powers[String(id)]??value?.records?.[id]?.troopPower);
  const teamPower=g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).reduce((sum,id)=>sum+(powerOf(id)||0),0);
- const cohesionPairs=cooperationPairs.filter(pair=>Array.isArray(pair)&&pair.length===2&&pair[0]!==pair[1]).map(pair=>pair.map(String));
+ const groupPairs=cooperationGroups.filter(g=>Array.isArray(g?.ids)&&g.ids.length>1).flatMap(g=>{
+  const ids=[...new Set(g.ids.map(String))],pairs=[];
+  for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)pairs.push([ids[i],ids[j]]);
+  return pairs;
+ });
+ const cohesionPairs=[...cooperationPairs.filter(pair=>Array.isArray(pair)&&pair.length===2&&pair[0]!==pair[1]).map(pair=>pair.map(String)),...groupPairs];
  const languageOf=id=>{
   const p=byId.get(String(id));return languageInfo(p).map(l=>l.toLowerCase());
  };
