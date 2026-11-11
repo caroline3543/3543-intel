@@ -384,7 +384,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   setChosen(old=>old.filter(x=>String(x)!==String(id)));setAbsentIds(old=>old.filter(x=>String(x)!==String(id)));setAssignment(old=>{const n={...old};delete n[String(id)];return n;});}
  return <section style={{padding:'14px 20px 35px'}}>
   <h2 style={{fontSize:25,letterSpacing:'-.4px',margin:'0 0 8px'}}>TAL Teams</h2>
-  <p style={{...small,margin:'0 0 10px'}}>{coreLock?'Update live teams without reshuffling the core.':'Choose participants, generate teams, review, then lock your battle plan.'}</p>
+  <p style={{...small,margin:'0 0 10px'}}>Choose participants, then regenerate all teams or add unassigned players.</p>
   {!legions.length?<p style={{...panel,...small}}>No legions in your TAL plan. Assign players in TAL Planner first.</p>:<>
    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
     <label style={small}>Legion<select value={selectedLegion?.id||''} onChange={e=>resetForMatch(e.target.value,matchTime)} style={{...btn,width:'100%',marginTop:5}}>{legions.map(t=><option value={t.id} key={t.id}>{legionLabel(t)}</option>)}</select></label>
@@ -398,24 +398,23 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
    {step==='teams'&&<>
     <section style={{background:'#183044',borderRadius:12,padding:12,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-      <span><strong style={{fontSize:15}}>{coreLock?'Battle mode · Core locked':'1 · Prepare teams'}</strong><span style={{...small,display:'block',marginTop:4}}>{coreLock?'Your existing team allocations are protected. You can still make individual changes.':'Select participants, check power, then generate. Lock only when the teams are ready.'}</span></span>
-      {coreLock&&<button style={{...btn,color:C.gold,flexShrink:0}} onClick={lockCore}>Unlock core</button>}
+      <span><strong style={{fontSize:15}}>1 · Prepare teams</strong><span style={{...small,display:'block',marginTop:4}}>Select participants, check power and choose how to generate.</span></span>
      </div>
     </section>
-    {!coreLock&&<>
+    <>
     <section style={{...panel,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><strong>Legion participants</strong><span style={small}>{selectedIds.length} selected · {pool.length} available · {legionRoster.length} total</span></div>
      <p style={{...small,margin:'6px 0 10px'}}>Only players available at {matchTime} UTC are selected by default. Others stay visible but greyed out. Use Add to battle for a last-minute override.</p>
      <input aria-label="Search legion participants" placeholder="Search name or Player ID" value={playerSearch} onChange={e=>setPlayerSearch(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:8}}/>
      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
       <label style={{...small,display:'flex',alignItems:'center',gap:7,cursor:'pointer'}}><input type="checkbox" checked={onlyAvailable} onChange={e=>setOnlyAvailable(e.target.checked)} style={{width:18,height:18,accentColor:C.gold}}/> Available only</label>
-      <button style={{...btn,minHeight:38,padding:'7px 10px'}} disabled={coreLock} onClick={chooseAll}>Reset to available</button>
+      <button style={{...btn,minHeight:38,padding:'7px 10px'}} onClick={chooseAll}>Reset to available</button>
      </div>
      <div style={{maxHeight:260,overflowY:'auto',borderTop:'1px solid '+C.border,overscrollBehavior:'contain'}}>
       {visibleRoster.map(p=>{
        const available=availableForMatch(p),assigned=allTeamIds.has(String(p.id)),checked=selectedIds.includes(String(p.id));
-       return <label key={p.id} style={{display:'flex',alignItems:'center',gap:9,minHeight:54,borderBottom:'1px solid '+C.border,opacity:available?1:0.46,cursor:available&&!coreLock&&!assigned?'pointer':'default'}}>
-        <input type="checkbox" aria-label={'Select '+name(p)} checked={checked} disabled={!available||coreLock||assigned} onChange={()=>toggle(p.id)} style={{width:19,height:19,flexShrink:0,accentColor:C.gold}}/>
+       return <label key={p.id} style={{display:'flex',alignItems:'center',gap:9,minHeight:54,borderBottom:'1px solid '+C.border,opacity:available?1:0.46,cursor:available?'pointer':'default'}}>
+        <input type="checkbox" aria-label={'Select '+name(p)} checked={checked} disabled={!available} onChange={()=>toggle(p.id)} style={{width:19,height:19,flexShrink:0,accentColor:C.gold}}/>
         <span style={{flex:1,minWidth:0}}>
          <span style={{fontSize:13,fontWeight:600,display:'block',overflowWrap:'anywhere'}}>{name(p)}</span>
          <span style={{...small,display:'block',marginTop:2}}>{available?'Available at '+matchTime+' UTC':availabilityFor(p).length?availabilityFor(p).join(' · ')+' UTC':'Availability unknown'}{!memberIds.has(String(p.id))?' · Considering':''}{assigned&&!available?' · Battle override':''}</span>
@@ -440,13 +439,18 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
      </div>
      {leaderStrategy==='manual'&&<p style={{...small,margin:'0 0 8px'}}>Assign one leader in each colour team below first. Auto-generate will keep those four leaders in place.</p>}
      <div style={{display:'flex',gap:8,marginTop:10}}>{[['stack','Power-stacked'],['balanced','Balanced']].map(([id,label])=><button key={id} style={{...btn,flex:1,borderColor:mode===id?C.gold:C.border,color:mode===id?C.gold:C.icy}} aria-pressed={mode===id} onClick={()=>setMode(id)}>{label}</button>)}</div>
-     <button style={{...btn,width:'100%',marginTop:9,background:C.gold,color:C.bg}} onClick={generate}>Generate four teams · {selectedPlayers.length} selected</button>
+      <div style={{display:'grid',gap:8,marginTop:10}}>
+       <button style={{...btn,width:'100%',background:C.gold,color:C.bg}} onClick={generate}>Regenerate all teams · {selectedPlayers.length} selected</button>
+       <button style={{...btn,width:'100%',color:missing.length?C.gold:C.icy}} disabled={!missing.length} onClick={addUnassigned}>Add {missing.length} unassigned player{missing.length===1?'':'s'} · Keep existing teams</button>
+      </div>
+      <p style={{...small,margin:'8px 0 0'}}>Regenerate all may reshuffle teams. Add unassigned preserves current team members and leaders.</p>
      {generationError&&<p role="alert" style={{fontSize:13,color:C.gold,lineHeight:1.5,margin:'9px 0 0'}}>{generationError}</p>}
      
     </section>
     </>}
     <section aria-label="Compare four teams" style={{margin:'5px 0 12px'}}>
-     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><strong style={{fontSize:14}}>Team comparison</strong><span style={small}>{selectedIds.length} selected · {missing.length} unassigned</span></div>
+     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><strong style={{fontSize:14}}>Team comparison</strong><span style={small}>{selectedIds.length} selected · {pool.length} available</span></div>
+     <div role="status" style={{...small,color:assignmentsValid?C.green:C.gold,marginBottom:8}}>{assignedSummary}{missing.length?' · Missing: '+missing.map(id=>name(byId.get(String(id))||{id})).join(', '):''}</div>
      {!missing.length&&allAssigned.length>0&&<div style={{...small,marginBottom:7,color:balanceStats.deviation<=5?C.green:C.gold}}>Max deviation {balanceStats.deviation.toFixed(1)}% · Target ±5% · {compatibilityStats.links} preferred pair(s) together</div>}
      <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6}}>
       {groups.map(g=>{const colour=COLORS.find(c=>c.id===g.color);return <button type="button" key={g.key} onClick={()=>{setFocusedTeam(g.color);teamRefs.current[g.key]?.scrollIntoView({behavior:'smooth',block:'center'});}} style={{...btn,padding:'8px 2px',minWidth:0,minHeight:66,borderColor:focusedTeam===g.color?colour.color:C.border,background:'#162B3D'}}>
@@ -508,7 +512,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
       </div>}
      </section>;
     })}
-    {coreLock&&<>
+    <>
     <section style={{...panel,marginBottom:12}}>
      <strong>Add to battle · Last-minute players</strong>
      <p style={{...small,margin:'6px 0 10px'}}>Choose anyone from Members, even without recorded availability. Existing teams will not be regenerated.</p>
@@ -524,12 +528,11 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     </section>
     </>}
 
-    {!coreLock&&<section style={{...panel,marginBottom:10}}>
+    <section style={{...panel,marginBottom:10}}>
      <strong style={{fontSize:14}}>3 · Finalise teams</strong>
-     <p style={{...small,margin:'6px 0 10px'}}>{groups.some(g=>!g.leader)?'Four leaders are required.':missing.length?missing.length+' selected players still need a team.':'All selected players have a team. Review and lock when ready.'}</p>
-     <button style={{...btn,width:'100%',background:C.gold,color:C.bg,marginBottom:8}} disabled={!allAssigned.length||missing.length>0||groups.some(g=>!g.leader)} onClick={()=>{setConfirmed(true);setStep('buildings')}}>Confirm teams · Assign buildings</button>
-     <button style={{...btn,width:'100%',color:!allAssigned.length||missing.length||groups.some(g=>!g.leader)?C.icy:C.gold}} disabled={!allAssigned.length||missing.length>0||groups.some(g=>!g.leader)} onClick={lockCore}>Lock core teams · Enter battle mode</button>
-    </section>}
+     <p style={{...small,margin:'6px 0 10px'}}>{groups.some(g=>!g.leader)?'Four leaders are required.':missing.length?missing.length+' selected players still need a team.':'All selected players have a team. You can assign buildings now.'}</p>
+     <button style={{...btn,width:'100%',background:C.gold,color:C.bg,marginBottom:8}} disabled={!assignmentsValid} onClick={()=>{setConfirmed(true);setStep('buildings')}}>Confirm teams · Assign buildings</button>
+    </section>
    </>}
    {step==='buildings'&&<>
     <section style={{...panel,marginBottom:12}}>
@@ -539,7 +542,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
       <span style={{...small,flex:1}}>{name(byId.get(undoAssignment.id)||{id:undoAssignment.id})} → {undoAssignment.after}</span>
       <button type="button" style={{...btn,minHeight:36,color:C.gold}} onClick={()=>{const u=undoAssignment;setAssignment(old=>{const n={...old};if(u.before)n[u.id]=u.before;else delete n[u.id];return n;});setUndoAssignment(null)}}>Undo</button>
      </div>}
-     <div style={{display:'flex',gap:7}}><button style={{...btn,flex:1,color:C.gold}} onClick={autoAssign} disabled={!activePlayers.length||coreLock}>Auto-allocate</button><button style={{...btn,flex:1}} disabled={coreLock} onClick={()=>{if(window.confirm('Clear every building assignment?'))setAssignment({});}}>Clear buildings</button></div>
+     <div style={{display:'flex',gap:7}}><button style={{...btn,flex:1,color:C.gold}} onClick={autoAssign} disabled={!activePlayers.length}>Auto-allocate</button><button style={{...btn,flex:1}} onClick={()=>{if(window.confirm('Clear every building assignment?'))setAssignment({});}}>Clear buildings</button></div>
      {!!missing.length&&<p style={{...small,color:C.gold,marginBottom:0}}>There are {missing.length} players missing from the four teams. Return to Colour teams to place them first.</p>}
     </section>
     <div style={{display:'flex',overflowX:'auto',gap:7,marginBottom:12,paddingBottom:5}}>{COLORS.map(c=><button key={c.id} onClick={()=>{setActiveColour(c.id);setPicked('')}} style={{...btn,flex:'0 0 105px',borderColor:activeColour===c.id?c.color:C.border,background:activeColour===c.id?c.bg:C.section,color:activeColour===c.id?c.color:C.icy}}>{c.name} · {activePlayers.filter(p=>p.g.color===c.id).length}</button>)}</div>
