@@ -23,7 +23,7 @@ export function previewTalBulk(data,ids,action){
   ?action.mode==='group'?'One shared cooperation group will be recorded for '+players.length+' selected players.':'Two-way working relationships will be added.'
   :action.type==='availability'?action.mode+' '+action.times.join(', ')+' UTC for '+players.length+' players.'
   :action.type==='registration'?players.length+' players will be marked '+action.value+'.'
-  :action.type==='allocate'?players.length+' players will be moved to '+(data.talPlan.teams.find(t=>String(t.id)===String(action.teamId))?.host||'the selected')+' legion '+(data.talPlan.teams.find(t=>String(t.id)===String(action.teamId))?.number||'')+'.':action.type==='remove'?players.length+' players will be removed from TAL, not Members.':players.length+' players will '+(action.mode==='remove'?'lose':'receive')+' '+action.language+' in their communication languages.';
+  :action.type==='allocate'?players.length+' players will be moved to '+String(action.host).toUpperCase()+' Legion '+action.number+'.':action.type==='remove'?players.length+' players will be removed from TAL, not Members.':players.length+' players will '+(action.mode==='remove'?'lose':'receive')+' '+action.language+' in their communication languages.';
  return {ids:players.map(p=>String(p.id)),count,summary,players:players.map(p=>({id:p.id,name:p.username||p.alias||p.fid||'Unknown',fid:p.fid}))};
 }
 export function applyTalBulk(data,ids,action){
