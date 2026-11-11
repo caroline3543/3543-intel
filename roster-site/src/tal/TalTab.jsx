@@ -377,7 +377,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       const selectedEditing=editingTimes===String(player.id);
       const statusText=member?.registered?'Registered in game':member?'Needs registration':'Considering';
       const chosen=selectedBulkIds.includes(String(player.id));
-      return <article key={player.id} onClick={e=>{if(selecting&&!e.target.closest('[data-bulk-ignore]')){const id=String(player.id);setBulkSelected(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setBulkReview(false);}}} onPointerDown={e=>{if(!selecting)onSwipeDown(e,String(player.id))}} onPointerUp={e=>{if(!selecting)onSwipeUp(e,String(player.id),!!member&&editable)}} onPointerCancel={()=>{gesture.current=null;}} style={{background:chosen&&selecting?C.section:C.card,border:'1px solid '+(chosen&&selecting?C.gold:C.border),borderRadius:11,marginBottom:8,overflow:'hidden',touchAction:'pan-y',cursor:selecting?'pointer':'default'}}>
+      return <article key={player.id} onClick={e=>{if(selecting&&!e.target.closest('button,input,select,textarea,[data-bulk-ignore]')){const id=String(player.id);setBulkSelected(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setBulkReview(false);}}} onPointerDown={e=>{if(!selecting)onSwipeDown(e,String(player.id))}} onPointerUp={e=>{if(!selecting)onSwipeUp(e,String(player.id),!!member&&editable)}} onPointerCancel={()=>{gesture.current=null;}} style={{background:chosen&&selecting?C.section:C.card,border:'1px solid '+(chosen&&selecting?C.gold:C.border),borderRadius:11,marginBottom:8,overflow:'hidden',touchAction:'pan-y',cursor:selecting?'pointer':'default'}}>
        {!selecting&&revealed&&member&&<div role="group" aria-label={'Registration action for '+(player.username||player.alias||'player')} style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',padding:'9px 11px',background:C.section}}>
         <button type="button" style={{...button,color:member.registered?C.gold:C.green,background:C.card}} disabled={!editable} onClick={()=>setRegistration(entryTeam,player.id,!member.registered)}>{member.registered?'Mark unregistered':'Confirm registered'}</button>
         <button type="button" aria-label="Close swipe actions" style={{...button,minWidth:44,padding:8}} onClick={()=>setSwipeId('')}>✕</button>
@@ -426,6 +426,50 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     })}
     {!roster.length&&<div style={{padding:18,background:C.card,borderRadius:12,color:C.icy,fontSize:14}}>No players match the current filters. <button style={{...button,marginTop:10,width:'100%'}} onClick={resetFilters}>Clear filters</button></div>}
     {roster.length>listLimit&&<button style={{...button,width:'100%',marginTop:8}} onClick={()=>setListLimit(n=>n+40)}>Show 40 more players</button>}
+    {selecting&&<div role="region" aria-label="Bulk player actions" style={{position:'sticky',bottom:80,zIndex:25,background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:12,marginTop:10,boxShadow:'0 -9px 28px '+C.bg+'bb'}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}><strong style={{fontSize:14}}>{selectedBulkCount} selected</strong><button type="button" style={{...button,minHeight:34,padding:'5px 9px',fontSize:12}} onClick={()=>{setSelecting(false);setBulkSelected([]);setBulkPanel('')}}>Done</button></div>
+     <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:7}}>
+      {[['times','◷','Times'],['registration','✓','Registration'],['more','•••','More']].map(([id,icon,label])=><button type="button" key={id} disabled={!selectedBulkCount} aria-pressed={bulkPanel===id} style={{...button,minWidth:0,padding:'9px 4px',borderColor:bulkPanel===id?C.gold:C.border,color:bulkPanel===id?C.gold:C.icy,background:bulkPanel===id?C.gold+'17':C.section,display:'grid',justifyItems:'center',gap:4}} onClick={()=>bulkPanel===id?setBulkPanel(''):beginBulkPanel(id)}><span style={{fontSize:18,lineHeight:1}}>{icon}</span><span style={{fontSize:12}}>{label}</span></button>)}
+     </div>
+     {bulkPanel==='more'&&<div style={{display:'grid',gap:5,marginTop:10,background:C.section,borderRadius:10,padding:7}}>
+      {[['legion','Allocate to a legion'],['cooperation','Works well together'],['language','Edit languages'],['remove','Remove from TAL']].map(([id,label])=><button type="button" key={id} style={{...button,textAlign:'left',border:0,color:id==='remove'?C.red:C.white}} onClick={()=>beginBulkPanel(id)}>{label} <span style={{float:'right'}}>›</span></button>)}
+     </div>}
+     {bulkPanel==='times'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}>
+      <strong style={{fontSize:14}}>Edit available times · UTC</strong>
+      <div role="group" aria-label="Add or remove available times" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7,margin:'10px 0'}}>
+       {[['add','Add times'],['remove','Remove times']].map(([id,label])=><button type="button" key={id} aria-pressed={bulkTimeMode===id} style={{...button,color:bulkTimeMode===id?(id==='add'?C.green:C.gold):C.icy,borderColor:bulkTimeMode===id?(id==='add'?C.green:C.gold):C.border}} onClick={()=>{setBulkTimeMode(id);setBulkReview(false)}}>{bulkTimeMode===id?'✓ ':''}{label}</button>)}
+      </div>
+      <div role="status" style={{...muted,color:bulkTimeMode==='add'?C.green:C.gold,marginBottom:8}}>{bulkTimeMode==='add'?'Adding selected times':'Removing selected times'}</div>
+      <div role="group" aria-label="UTC times to update" style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:5}}>
+       {times.map(t=><button type="button" key={t} aria-pressed={bulkTimes.includes(t)} style={{...button,minWidth:0,padding:'8px 2px',fontSize:11,color:bulkTimes.includes(t)?C.gold:C.icy,borderColor:bulkTimes.includes(t)?C.gold:C.border}} onClick={()=>{setBulkTimes(old=>old.includes(t)?old.filter(x=>x!==t):[...old,t]);setBulkReview(false)}}>{t}</button>)}
+      </div>
+      <p style={muted}>{bulkTimeMode==='add'?'Existing times will be kept.':'Other recorded times will be kept.'}</p>
+     </div>}
+     {bulkPanel==='registration'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}>
+      <strong style={{fontSize:14}}>Change registration status</strong>
+      <div style={{display:'grid',gap:7,marginTop:8}}>{[['registered','Registered in game'],['needs','Needs registration'],['considering','Considering for team']].map(([id,label])=><label key={id} style={{display:'flex',alignItems:'center',gap:9,fontSize:14,minHeight:38}}><input type="radio" name="bulk-talt-status" checked={bulkRegistration===id} onChange={()=>{setBulkRegistration(id);setBulkReview(false)}} style={{width:18,height:18,accentColor:C.gold}}/>{label}</label>)}</div>
+     </div>}
+     {bulkPanel==='legion'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}>
+      <strong style={{fontSize:14}}>Allocate to a legion</strong>
+      <p style={muted}>Choose the host alliance and legion number.</p>
+      <select aria-label="Select host alliance and legion" value={bulkTeamId||team?.id||''} onChange={e=>{setBulkTeamId(e.target.value);setBulkReview(false)}} style={{...button,width:'100%',fontSize:15}}>{(value?.teams||[]).map(t=><option key={t.id} value={t.id}>{t.host||'Alliance'} · Legion {t.number||t.legionNumber||1}</option>)}</select>
+     </div>}
+     {bulkPanel==='cooperation'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}><strong style={{fontSize:14}}>Works well together</strong><p style={muted}>Create one shared cooperation group for {selectedBulkCount} players. This will appear on each player's Members profile and help future team generation.</p>{selectedBulkCount<2&&<p style={{color:C.gold,fontSize:12}}>Select at least two players.</p>}</div>}
+     {bulkPanel==='language'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}>
+      <strong style={{fontSize:14}}>Edit languages</strong>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7,margin:'10px 0'}}>{[['add','Add language'],['remove','Remove language']].map(([id,label])=><button type="button" key={id} aria-pressed={bulkLanguageMode===id} onClick={()=>{setBulkLanguageMode(id);setBulkReview(false)}} style={{...button,color:bulkLanguageMode===id?C.gold:C.icy,borderColor:bulkLanguageMode===id?C.gold:C.border}}>{bulkLanguageMode===id?'✓ ':''}{label}</button>)}</div>
+      <select aria-label="Communication language" value={bulkLanguage} onChange={e=>{setBulkLanguage(e.target.value);setBulkReview(false)}} style={{...button,width:'100%',fontSize:15}}>{LANGUAGES.map(l=><option key={l} value={l}>{l}</option>)}</select>
+      <p style={muted}>The player's game-interface language will not change.</p>
+     </div>}
+     {bulkPanel==='remove'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}><strong style={{fontSize:14,color:C.red}}>Remove from TAL?</strong><p style={muted}>Remove {selectedBulkCount} players from their TAL legions. Members profiles and saved availability will remain.</p></div>}
+     {['times','registration','legion','cooperation','language','remove'].includes(bulkPanel)&&<>
+      {bulkReview&&<p role="status" style={{fontSize:13,color:bulkPanel==='remove'?C.red:C.gold,lineHeight:1.5}}>Review: {selectedBulkCount} selected players · {bulkPanel==='times'?(bulkTimeMode==='add'?'Add ':'Remove ')+bulkTimes.join(', ')+' UTC':bulkPanel==='registration'?bulkRegistration:bulkPanel==='legion'?(value?.teams||[]).find(t=>String(t.id)===String(bulkTeamId))?.host+' · Legion '+((value?.teams||[]).find(t=>String(t.id)===String(bulkTeamId))?.number||1):bulkPanel==='cooperation'?'One shared cooperation group':bulkPanel==='language'?(bulkLanguageMode==='add'?'Add ':'Remove ')+bulkLanguage:'Remove from TAL only'}</p>}
+      {bulkError&&<p role="alert" style={{fontSize:13,color:C.red}}>{bulkError}</p>}
+      <button type="button" disabled={!!value?.locked||!onBulkApply||!selectedBulkCount||(bulkPanel==='times'&&!bulkTimes.length)||(bulkPanel==='cooperation'&&selectedBulkCount<2)} style={{...button,width:'100%',marginTop:9,background:bulkPanel==='remove'?C.red:C.gold,color:C.bg}} onClick={commitBulk}>{bulkReview?'Confirm '+selectedBulkCount+' players':'Review '+selectedBulkCount+' players'}</button>
+      <button type="button" style={{...button,width:'100%',marginTop:6}} onClick={()=>{setBulkPanel('more');setBulkReview(false)}}>Back</button>
+     </>}
+    </div>}
+
    </section>
   </>}
  </section>;
