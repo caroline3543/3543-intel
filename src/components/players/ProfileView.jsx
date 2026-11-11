@@ -17,7 +17,7 @@ import { ProviderStatsSection } from './ProviderStatsSection.jsx';
 import { PlayerRankingsSection } from './PlayerRankingsSection.jsx';
 import { PlayerHistorySection } from './PlayerHistorySection.jsx';
 import { TroopPowerChart } from './TroopPowerChart.jsx';
-export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,players=[],cooperationPairs=[],onChangeCooperation}) {
+export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,players=[],cooperationPairs=[],cooperationGroups=[],onChangeCooperation}) {
   const panel=useRef(null);
   const [partnerSearch,setPartnerSearch]=useState('');
   const [partnerId,setPartnerId]=useState('');
@@ -67,6 +67,14 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
        <p style={{fontSize:12,color:C.icy,lineHeight:1.45}}>For rally coordination. This may differ from a player's in-game display language.</p>
       </ProfileSection>
       {onChangeCooperation&&<ProfileSection title="Works well with">
+       {cooperationGroups.filter(g=>Array.isArray(g?.ids)&&g.ids.map(String).includes(String(player.id))).map(g=>{
+        const teammates=(g.ids||[]).filter(id=>String(id)!==String(player.id)).map(id=>players.find(p=>String(p.id)===String(id))).filter(Boolean);
+        return <div key={g.id||g.ids.join(':')} style={{background:C.section,borderRadius:10,padding:10,marginBottom:8}}>
+         <strong style={{fontSize:13,color:C.gold}}>Cooperation group · {g.ids.length} players</strong>
+         <p style={{fontSize:13,color:C.white,margin:'5px 0'}}>{teammates.map(p=>p.username||p.alias||p.fid||p.id).join(', ')}</p>
+         <span style={{fontSize:12,color:C.icy}}>This group is shared with every member.</span>
+        </div>;
+       })}
        {cooperationPairs.filter(pair=>Array.isArray(pair)&&pair.map(String).includes(String(player.id))).map(pair=>{
         const partner=players.find(p=>String(p.id)===String(pair.find(id=>String(id)!==String(player.id))));
         return partner?<div key={partner.id} style={{display:'flex',gap:9,alignItems:'center',borderBottom:'1px solid '+C.border,padding:'8px 0'}}>
