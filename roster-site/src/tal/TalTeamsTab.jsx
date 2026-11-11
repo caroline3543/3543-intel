@@ -63,25 +63,43 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const [dragId,setDragId]=useState('');
  const [hoverBuilding,setHoverBuilding]=useState('');
  const [undoAssignment,setUndoAssignment]=useState(null);
- const touchDrag=useRef(null);
- const armTouch=(e,id)=>{
-  const touch=e.touches?.[0];if(!touch)return;
-  const ref={id:String(id),startX:touch.clientX,startY:touch.clientY,active:false,timer:null};
-  ref.timer=setTimeout(()=>{if(touchDrag.current===ref){ref.active=true;setDragId(String(id));}},350);
-  touchDrag.current=ref;
+ const dragRef=useRef(null);
+ const [dragPoint,setDragPoint]=useState(null);
+ const targetAt=(x,y)=>document.elementFromPoint(x,y)?.closest('[data-tal-building]')?.dataset.talBuilding||'';
+ const cancelDrag=()=>{if(dragRef.current?.timer)clearTimeout(dragRef.current.timer);dragRef.current=null;setDragId('');setDragPoint(null);setHoverBuilding('');};
+ const dragStart=(e,id)=>{
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  e.stopPropagation();
+  const d={id:String(id),pointerId:e.pointerId,type:e.pointerType,x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,active:false,timer:null};
+  dragRef.current=d;e.currentTarget.setPointerCapture?.(e.pointerId);
+  if(e.pointerType!=='mouse')d.timer=setTimeout(()=>{if(dragRef.current!==d)return;d.active=true;setDragId(d.id);setDragPoint({x:d.x,y:d.y});navigator.vibrate?.(12);},220);
  };
- const moveTouch=e=>{
-  const ref=touchDrag.current,touch=e.touches?.[0];if(!ref||!touch)return;
-  if(!ref.active&&Math.hypot(touch.clientX-ref.startX,touch.clientY-ref.startY)>12){clearTimeout(ref.timer);touchDrag.current=null;return;}
-  if(ref.active){const el=document.elementFromPoint(touch.clientX,touch.clientY)?.closest('[data-tal-building]');setHoverBuilding(el?.dataset.talBuilding||'');}
- };
- const dropTouch=e=>{
-  const ref=touchDrag.current;touchDrag.current=null;if(!ref)return;clearTimeout(ref.timer);
-  if(ref.active){const touch=e.changedTouches?.[0];const el=touch&&document.elementFromPoint(touch.clientX,touch.clientY)?.closest('[data-tal-building]');const building=el?.dataset.talBuilding;
-   setDragId('');setHoverBuilding('');
-   if(building)assign(ref.id,building);
+ const dragMove=e=>{
+  const d=dragRef.current;if(!d||d.pointerId!==e.pointerId)return;
+  d.x=e.clientX;d.y=e.clientY;const delta=Math.hypot(d.x-d.sx,d.y-d.sy);
+  if(!d.active){
+   if(d.type==='mouse'&&delta>5){d.active=true;setDragId(d.id);}
+   else if(d.type!=='mouse'&&delta>12){cancelDrag();return;}
+   else return;
   }
+  e.preventDefault();setDragPoint({x:d.x,y:d.y});setHoverBuilding(targetAt(d.x,d.y));
+  if(d.y>window.innerHeight-75)window.scrollBy(0,14);else if(d.y<85)window.scrollBy(0,-14);
  };
+ const dragEnd=e=>{
+  const d=dragRef.current;if(!d||d.pointerId!==e.pointerId)return;
+  const building=d.active?targetAt(e.clientX,e.clientY):'';
+  if(d.active){
+   if(building){assign(d.id,building);setCopyMessage(name(byId.get(d.id)||{id:d.id})+' moved to '+building+'.');}
+   else setCopyMessage('Move cancelled. Assignments unchanged.');
+  }
+  cancelDrag();
+ };
+ const dragHandle=id=>({onPointerDown:e=>dragStart(e,id),onPointerMove:dragMove,onPointerUp:dragEnd,onPointerCancel:cancelDrag});
+ const handleStyle={width:52,minWidth:52,minHeight:60,alignSelf:'stretch',display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid '+C.border,borderRadius:9,background:C.section,color:C.icy,fontSize:25,touchAction:'none',userSelect:'none',WebkitUserSelect:'none',WebkitTouchCallout:'none',cursor:'grab',padding:0};
+ const dragCard=(id,col)=><div key={id} style={{display:'flex',alignItems:'stretch',gap:8,width:'100%',minHeight:64,marginTop:6,padding:5,border:'1px solid '+(picked===id?col.color:C.border),borderRadius:11,background:C.card,userSelect:'none',WebkitUserSelect:'none',WebkitTouchCallout:'none',opacity:dragId===id?0.45:1}}>
+  <button type="button" {...dragHandle(id)} title="Hold and drag" aria-label={'Drag '+name(byId.get(String(id))||{id})+' to a building'} style={handleStyle}>⠿</button>
+  <button type="button" onClick={()=>setPicked(picked===id?'':id)} style={{...btn,flex:1,minWidth:0,minHeight:60,textAlign:'left',border:0,background:'transparent',padding:'8px 6px',fontSize:15,overflowWrap:'anywhere',userSelect:'none',WebkitUserSelect:'none'}}>{name(byId.get(String(id))||{id})}{picked===id?' ✓':''}</button>
+ </div>;
  const [preview,setPreview]=useState(false);
  const [copyMessage,setCopyMessage]=useState('');
  const [confirmed,setConfirmed]=useState(false);
@@ -393,6 +411,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   setGroups(old=>old.map(g=>({...g,leader:String(g.leader)===String(id)?null:g.leader,members:g.members.filter(m=>String(m)!==String(id))})));
   setChosen(old=>old.filter(x=>String(x)!==String(id)));setAbsentIds(old=>old.filter(x=>String(x)!==String(id)));setAssignment(old=>{const n={...old};delete n[String(id)];return n;});}
  return <section style={{padding:'14px 20px 35px'}}>
+  {dragId&&dragPoint&&<div aria-hidden="true" style={{position:'fixed',left:dragPoint.x+12,top:dragPoint.y-35,zIndex:9999,pointerEvents:'none',background:C.section,border:'2px solid '+C.gold,color:C.white,borderRadius:11,padding:'14px 18px',boxShadow:'0 12px 26px #0008',maxWidth:'min(280px,80vw)',fontSize:15,fontWeight:700,overflowWrap:'anywhere'}}>{name(byId.get(dragId)||{id:dragId})}</div>}
   <h2 style={{fontSize:25,letterSpacing:'-.4px',margin:'0 0 8px'}}>TAL Teams</h2>
   <p style={{...small,margin:'0 0 10px'}}>Choose participants, then regenerate all teams or add unassigned players.</p>
   {!legions.length?<p style={{...panel,...small}}>No legions in your TAL plan. Assign players in TAL Planner first.</p>:<>
@@ -549,7 +568,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
    {step==='buildings'&&<>
     <section style={{...panel,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center'}}><strong>Initial assignments</strong><strong style={{color:assignedCount===activePlayers.length?C.green:C.gold}}>{assignedCount} / {activePlayers.length} assigned</strong></div>
-     <p style={{...small,margin:'6px 0 10px'}}>Tap a player, then tap a building to assign them. Or press and hold to drag between buildings.</p>
+     <p style={{...small,margin:'6px 0 10px'}}>Hold the six-dot handle and drag a player to a building. Or tap their name, then tap a building.</p>
      {undoAssignment&&<div role="status" style={{display:'flex',alignItems:'center',gap:8,background:C.section,borderRadius:8,padding:8,margin:'8px 0'}}>
       <span style={{...small,flex:1}}>{name(byId.get(undoAssignment.id)||{id:undoAssignment.id})} → {undoAssignment.after}</span>
       <button type="button" style={{...btn,minHeight:36,color:C.gold}} onClick={()=>{const u=undoAssignment;setAssignment(old=>{const n={...old};if(u.before)n[u.id]=u.before;else delete n[u.id];return n;});setUndoAssignment(null)}}>Undo</button>
@@ -565,13 +584,13 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
      const moveWithin=(id,building)=>{if(!id)return;assign(id,building);setDragId('');setCopyMessage(name(byId.get(String(id))||{id})+' assigned to '+building+'.');};
      return <section style={{...panel,background:col.bg,borderColor:col.color+'77',marginBottom:12}}>
       <strong style={{color:col.color}}>{col.name} Team · {teamPlayers.length} players</strong>
-      {unallocated.length>0&&<div style={{marginTop:10}}><p style={{...small,color:col.color,margin:'0 0 7px'}}>Unallocated · {unallocated.length}</p>{unallocated.map(({id})=><button key={id} onTouchStart={e=>armTouch(e,id)} onTouchMove={moveTouch} onTouchEnd={dropTouch} onTouchCancel={()=>{clearTimeout(touchDrag.current?.timer);touchDrag.current=null;setDragId('');setHoverBuilding('')}} draggable="true" onDragStart={e=>{e.dataTransfer.setData('text/plain',id);setDragId(id)}} onDragEnd={()=>setDragId('')} onClick={()=>setPicked(id)} style={{...btn,width:'100%',textAlign:'left',marginBottom:5,borderColor:picked===id?col.color:C.border}}>⠿ {name(byId.get(id)||{id})}</button>)}</div>}
+      {unallocated.length>0&&<div style={{marginTop:10}}><p style={{...small,color:col.color,margin:'0 0 7px'}}>Unallocated · {unallocated.length}</p>{unallocated.map(({id})=>dragCard(id,col))}</div>}
       <div style={{display:'grid',gap:10,marginTop:12}}>
        {col.buildings.map(building=>{
         const placed=teamPlayers.filter(p=>assignment[p.id]===building);
-        return <div key={building} data-tal-building={building} onDragOver={e=>{e.preventDefault();setHoverBuilding(building)}} onDragLeave={()=>setHoverBuilding(v=>v===building?'':v)} onDrop={e=>{e.preventDefault();moveWithin(e.dataTransfer.getData('text/plain')||dragId,building);setHoverBuilding('')}} style={{background:hoverBuilding===building?col.color+'32':C.bg+'aa',border:'2px dashed '+(hoverBuilding===building?col.color:col.color+'99'),borderRadius:11,padding:10,minHeight:96,transition:'background .15s,border-color .15s'}}>
-         <button onClick={()=>picked&&moveWithin(picked,building)} disabled={!picked} style={{...btn,width:'100%',textAlign:'left',border:0,background:'transparent',padding:'4px 0',minHeight:30,color:col.color}}><strong>{building}</strong> · {placed.length}{picked?' · Tap to place selected player':''}</button>
-         {placed.length?placed.map(({id})=><button key={id} type="button" onTouchStart={e=>armTouch(e,id)} onTouchMove={moveTouch} onTouchEnd={dropTouch} onTouchCancel={()=>{clearTimeout(touchDrag.current?.timer);touchDrag.current=null;setDragId('');setHoverBuilding('')}} draggable="true" onDragStart={e=>{e.dataTransfer.setData('text/plain',id);setDragId(id)}} onDragEnd={()=>setDragId('')} onClick={()=>setPicked(picked===id?'':id)} style={{...btn,display:'flex',alignItems:'center',gap:8,width:'100%',marginTop:5,textAlign:'left',borderColor:picked===id?col.color:C.border}}><span aria-hidden>⠿</span><span style={{flex:1}}>{name(byId.get(id)||{id})}</span>{picked===id?'✓':''}</button>):<p style={small}>Drop a player here</p>}
+        return <div key={building} data-tal-building={building} onDragOver={e=>{e.preventDefault();setHoverBuilding(building)}} onDragLeave={()=>setHoverBuilding(v=>v===building?'':v)} onDrop={e=>{e.preventDefault();moveWithin(e.dataTransfer.getData('text/plain')||dragId,building);setHoverBuilding('')}} style={{background:hoverBuilding===building?col.color+'32':C.bg+'aa',border:'2px dashed '+(hoverBuilding===building?col.color:col.color+'99'),borderRadius:11,padding:12,minHeight:128,transition:'background .15s,border-color .15s'}}>
+         <button onClick={()=>picked&&moveWithin(picked,building)} disabled={!picked} style={{...btn,width:'100%',textAlign:'left',border:0,background:'transparent',padding:'4px 0',minHeight:48,color:col.color}}><strong>{building}</strong> · {placed.length}{picked?' · Tap to place selected player':''}</button>
+         {placed.length?placed.map(({id})=>dragCard(id,col)):<p style={small}>Drop a player here</p>}
         </div>;
        })}
       </div>
