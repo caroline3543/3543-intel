@@ -133,7 +133,34 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   if(!sync.ready)return <p role="status" style={{padding:24,color:C.icy}}>Opening shared workspace…</p>;
   return <main style={{maxWidth:480,margin:'0 auto',paddingBottom:'calc(140px + env(safe-area-inset-bottom, 0px))'}}>
     <div data-workspace-content="" inert={workspaceOpen?'':undefined} aria-hidden={workspaceOpen?'true':undefined}>
-    <header style={{padding:20,borderBottom:`1px solid ${C.border}`}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><h1 style={{fontSize:22,margin:0}}>3573 · Caroline</h1><p style={{fontSize:14,color:C.icy,margin:'5px 0 0'}}>{tab==='tal'?'TAL planner':tab==='teams'?'Teams':tab==='battle'?'Battle planner':tab==='svs'?'SvS comparison':tab==='changes'?'Name changes':`Members · ${players.length} players`}</p></div><button style={{...button,minWidth:44,padding:10}} aria-label="Workspace options" title="Workspace" onClick={()=>setWorkspaceOpen(true)}><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div><div style={{display:'flex',gap:8,marginTop:14}}><button style={{...button,flex:1,color:C.gold}} onClick={refreshAll} aria-busy={!!apiProgress||!!legionRefresh} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button><button style={{...button,minWidth:44,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={backup} disabled={exporting} aria-label={tab==='tal'?'Download TAL plan as Excel':'Download roster as Excel'} title={tab==='tal'?'Download TAL plan (.xlsx)':'Download roster as Excel (.xlsx)'}>{exporting?<span aria-hidden="true">…</span>:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>}</button></div><div style={{display:'flex',alignItems:'center',gap:8,marginTop:8,flexWrap:'wrap'}}><button style={{...button,padding:'8px 10px',fontSize:13}} disabled={sync.syncing||sync.mode==='join'||!!sync.conflicts?.length} aria-busy={!!sync.syncing} onClick={syncNow}>{sync.syncing?'Syncing…':sync.issue?'Retry sync':sync.dirty?'Sync changes':'Sync now'}</button><span role="status" style={{fontSize:13,color:sync.issue?C.gold:C.icy,lineHeight:1.5}}>{sync.syncing?'Checking shared workspace…':sync.issue?'Sync needs attention':sync.dirty?'Changes waiting to sync':sync.checkedAt?`Synced ${new Date(sync.checkedAt).toISOString().slice(11,19)} UTC`:'Shared workspace'}</span></div>{data.settings?.lastApiRefresh&&<p style={{fontSize:12,color:C.icy,lineHeight:1.5,marginBottom:0}}>API: {data.settings.lastApiRefresh.scope} · {new Date(data.settings.lastApiRefresh.at).toISOString().slice(0,16).replace('T',' ')} UTC{data.settings.lastApiRefresh.partial?' · Partial refresh':''}</p>}{error&&<p role="alert" style={{color:C.red}}>{error}</p>}</header>
+    {tab==='members'?<header style={{padding:'13px 16px 8px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+        <div style={{minWidth:0}}><h1 style={{margin:0,fontSize:19,letterSpacing:'-.025em',fontWeight:750}}>3573 · Caroline</h1><p style={{margin:'3px 0 0',fontSize:12,color:C.icy}}>{players.length} players</p></div>
+        <div style={{display:'flex',alignItems:'center',gap:7}}>
+          <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:sync.issue?C.gold:C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
+            <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:sync.issue?C.gold:sync.syncing?'#E6BF7B':sync.dirty?'#E6BF7B':'#72CBA9'}}/>
+            {sync.issue?'Sync issue':sync.syncing?'Syncing':sync.dirty?'Unsynced':'Shared'}
+          </button>
+          <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
+            <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
+              <strong style={{fontSize:13,marginBottom:2}}>Workspace actions</strong>
+              <button style={button} onClick={refreshAll} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button>
+              <button style={button} disabled={exporting} onClick={backup}>{exporting?'Exporting…':'Export roster as Excel'}</button>
+              <button style={button} disabled={sync.syncing||sync.mode==='join'||!!sync.conflicts?.length} onClick={syncNow}>{sync.syncing?'Syncing…':sync.issue?'Retry sync':sync.dirty?'Sync changes':'Check sync'}</button>
+              <button style={button} onClick={()=>setWorkspaceOpen(true)}>Workspace settings</button>
+              {data.settings?.lastApiRefresh&&<span style={{fontSize:11,color:C.icy,lineHeight:1.4}}>API updated {new Date(data.settings.lastApiRefresh.at).toISOString().slice(0,16).replace('T',' ')} UTC</span>}
+            </div>
+          </details>
+        </div>
+      </div>
+      {error&&<p role="alert" style={{fontSize:12,color:C.red,margin:'8px 0 0'}}>{error}</p>}
+    </header>:<header style={{padding:'12px 16px 10px',borderBottom:'1px solid '+C.border}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+        <div><h1 style={{fontSize:19,margin:0}}>3573 · Caroline</h1><p style={{fontSize:12,color:C.icy,margin:'4px 0 0'}}>{tab==='tal'?'TAL Planner':tab==='teams'?'Teams':tab==='changes'?'Name Changes':tab==='battle'?'Battle planner':'SvS comparison'}</p></div>
+        <button aria-label="Workspace options" style={{...button,minWidth:44,padding:8}} onClick={()=>setWorkspaceOpen(true)}>•••</button>
+      </div>
+      {error&&<p role="alert" style={{color:C.red}}>{error}</p>}
+    </header>}
     <WorkspaceAttention sync={sync} onReview={()=>setWorkspaceOpen(true)}/>
     {message&&<div role="status" style={{margin:'12px 20px 0',padding:10,color:C.icy,background:C.section,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>{message}<button style={button} onClick={()=>setMessage('')} aria-label="Dismiss message">✕</button></div>}
     <BottomNav tab={tab} onChange={navigate}/>
