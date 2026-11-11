@@ -56,6 +56,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const [mode,setMode]=useState('balanced');
  const [leaderStrategy,setLeaderStrategy]=useState('power');
  const [generationError,setGenerationError]=useState('');
+ const [generationSuccess,setGenerationSuccess]=useState('');
  const [assignment,setAssignment]=useState({});
  const [picked,setPicked]=useState('');
  const [activeColour,setActiveColour]=useState('blue');
@@ -256,6 +257,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   setPowers(p=>({...p,...updates}));setCopyMessage('Updated '+Object.keys(updates).length+' troop power values in this preview.');setShowBulk(false);
  }
  function clearTeams(){
+  setGenerationSuccess('');
   if(!groups.some(g=>g.leader||g.members.length)&&!Object.keys(assignment).length){
    setCopyMessage('Teams are already empty. Your player selection and troop power remain available.');
    return;
@@ -264,10 +266,11 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   setGroups(initialGroups());setAssignment({});setAbsentIds([]);setConfirmed(false);
   setCopyDraft('');setCopySource('');setCopyOpen(false);setEditingTeam(null);
   setGenerationError('');setStep('teams');
-  setCopyMessage('Teams cleared. '+selectedIds.length+' selected participants and their troop power were kept. Use Regenerate all teams to start again.');
+  setGenerationSuccess('All four teams cleared. '+selectedIds.length+' selected participants and their troop power are preserved.');
+  setCopyMessage('Teams cleared. Selected participants and troop power are preserved.');
  }
  function generate(){
-  setGenerationError('');
+  setGenerationError('');setGenerationSuccess('');
   if(selectedPlayers.length<4){setGenerationError('Select at least four available players.');return;}
   const unknown=selectedPlayers.filter(p=>powerOf(p.id)===null);
   if(unknown.length){setGenerationError('Missing troop power for '+unknown.length+' player'+(unknown.length===1?'':'s')+': '+unknown.slice(0,3).map(name).join(', ')+(unknown.length>3?'…':'')+'. Enter power before generating.');return;}
@@ -309,16 +312,15 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     next=best;currentScore=bestScore;
    }
   }
-   if(groups.some(g=>g.leader||g.members.length)&&!window.confirm('Replace the current four team assignments? This preserves your participant selection and troop power, but replaces manual team and building allocations.'))return;
   const ids=next.flatMap(g=>[g.leader,...g.members]).filter(Boolean).map(String);
   if(ids.length!==selectedIds.length||new Set(ids).size!==selectedIds.length||ids.some(id=>!selectedSet.has(id))){setGenerationError('Could not assign every selected player exactly once. Existing assignments were preserved.');return;}
   setGroups(next);setAssignment({});setAbsentIds([]);setConfirmed(false);setStep('teams');
   const outcome=balanceInfo(next),affinity=preferenceScore(next);
-  setGenerationError('');
+  setGenerationError('');setGenerationSuccess(selectedIds.length+' of '+selectedIds.length+' selected players assigned across four teams.');
   setCopyMessage(selectedIds.length+' of '+selectedIds.length+' selected players assigned across four teams. Max power deviation '+outcome.deviation.toFixed(1)+'%'+(outcome.deviation>5?' (above 5% target)':'')+'. '+affinity.links+' cooperation pairs together.');
  }
   function addUnassigned(){
-  setGenerationError('');
+  setGenerationError('');setGenerationSuccess('');
   if(groups.some(g=>!g.leader)){setGenerationError('Assign four team leaders first, or choose Regenerate all teams.');return;}
   if(extraAssignments.length||duplicateAssignments.length){setGenerationError('Existing teams contain duplicate or deselected players. Use Regenerate all teams to repair the assignments.');return;}
   const newcomers=missing.map(id=>byId.get(String(id))).filter(Boolean);
@@ -339,7 +341,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   }
   const ids=next.flatMap(g=>[g.leader,...g.members]).filter(Boolean).map(String);
   if(ids.length!==selectedIds.length||new Set(ids).size!==selectedIds.length||ids.some(id=>!selectedSet.has(id))){setGenerationError('Unable to place every selected player exactly once. Existing teams are unchanged.');return;}
-  setGroups(next);setConfirmed(false);
+  setGroups(next);setConfirmed(false);setGenerationSuccess(ids.length+' of '+selectedIds.length+' selected players assigned. Added '+newcomers.length+' without changing existing teams.');
   setCopyMessage('Added '+newcomers.length+' players without reshuffling existing teams. '+ids.length+' of '+selectedIds.length+' selected players assigned.');
  }
   function moveMember(id,targetKey){
@@ -454,6 +456,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
       </div>
       <p style={{...small,margin:'8px 0 0'}}>Regenerate all may reshuffle teams. Add unassigned preserves current team members and leaders.</p>
      {generationError&&<p role="alert" style={{fontSize:13,color:C.gold,lineHeight:1.5,margin:'9px 0 0'}}>{generationError}</p>}
+     {generationSuccess&&<p role="status" style={{fontSize:13,color:C.green,lineHeight:1.5,margin:'9px 0 0'}}>✓ {generationSuccess}</p>}
      
     </section>
     </>
