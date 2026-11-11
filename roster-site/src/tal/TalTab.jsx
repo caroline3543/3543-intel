@@ -13,18 +13,23 @@ const numeric=value=>{const n=Number(value);return value===null||value===undefin
 const compact=n=>n==null?'Not recorded':Number(n).toLocaleString('en-US',{notation:'compact',maximumFractionDigits:1});
 const tournamentStatus=t=>t.tournamentStatus==='eliminated'||t.eliminated===true?'eliminated':'active';
 const matchLabel=team=>team?legionLabel(team):'All legions';
-function moveText(rows){
- const groups=new Map();
- for(const {team,player,check} of rows){
-  if(check.status!=='move'||!player)continue;
-  const origin=check.tag||'No alliance',destination=team.host;
-  const key=origin+'|'+destination;
+function moveText(rows,{time=null,availabilityFor=null}={}){
+ const groups=new Map(),seen=new Set();
+ for(const {team,player,check,member} of rows){
+  if(!member||!player||!team?.host||!['move','unknown'].includes(check.status))continue;
+  if(time!==null&&(!availabilityFor||!availabilityFor(player).includes(time)))continue;
+  const id=String(player.id),destination=String(team.host).trim();
+  const origin=check.status==='unknown'?'unknown alliance':check.tag?String(check.tag).trim():'no alliance';
+  const key=origin.toLowerCase()+'|'+destination.toLowerCase();
   if(!groups.has(key))groups.set(key,{origin,destination,players:[]});
-  groups.get(key).players.push(player.username||player.alias||String(player.fid||'Unknown player'));
+  if(seen.has(key+'|'+id))continue;
+  seen.add(key+'|'+id);
+  groups.get(key).players.push(player.username||player.alias||String(player.fid||player.id));
  }
- return [...groups.values()].sort((a,b)=>a.destination.localeCompare(b.destination)||a.origin.localeCompare(b.origin)).map(g=>
-  (g.origin==='No alliance'?'No alliance → '+g.destination:g.origin+' → '+g.destination)+'\n'+g.players.sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'})).map(name=>'• '+name).join('\n')
- ).join('\n\n');
+ return [...groups.values()].sort((a,b)=>a.destination.localeCompare(b.destination)||a.origin.localeCompare(b.origin)).map(g=>{
+  const prefix=time===null?'Players who need to move':'Players available at '+time.slice(0,2)+'UTC who need to move';
+  return prefix+' from '+g.origin+' to '+g.destination+':\n'+g.players.sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base',numeric:true})).map(playerName=>'• '+playerName).join('\n');
+ }).join('\n\n');
 }
 export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legionRefresh,onMessage,workspace,onBulkApply}){
  const [selected,setSelected]=useState(()=>{try{return window.sessionStorage.getItem('tal:selected-legion')||'';}catch{return '';}});
@@ -49,6 +54,8 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [removeId,setRemoveId]=useState('');
  const [actionsId,setActionsId]=useState('');
  const [previewOpen,setPreviewOpen]=useState(false);
+ const [availablePreviewOpen,setAvailablePreviewOpen]=useState(false);
+ const [copyTime,setCopyTime]=useState('12:00');
  const [tournamentConfirm,setTournamentConfirm]=useState('');
  const [copying,setCopying]=useState(false);
  const [listLimit,setListLimit]=useState(40);
@@ -109,7 +116,11 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   if(sort==='joiner')return comparePriority(a.player,b.player);
   return compareNames(a.player,b.player);
  });
+ const selectedCopyTime=times.includes(copyTime)?copyTime:times[0];
  const movePreview=moveText(entries);
+ const availableMovePreview=moveText(entries,{time:selectedCopyTime,availabilityFor});
+ const moveCopyCount=entries.filter(e=>e.member&&['move','unknown'].includes(e.check.status)).length;
+ const availableMoveCount=entries.filter(e=>e.member&&['move','unknown'].includes(e.check.status)&&availabilityFor(e.player).includes(selectedCopyTime)).length;
  const otherAssigned=new Set(teams.filter(t=>t.id!==team?.id).flatMap(t=>[...plannedMemberIds(t)].map(String)));
  const alreadyHere=new Set(team?[...plannedMemberIds(team)].map(String):[]);
  const addMatches=team?players.filter(p=>!alreadyHere.has(String(p.id))&&!p.blacklisted&&(!addSearch||[p.username,p.alias,p.fid,p.id].some(v=>String(v||'').toLowerCase().includes(addSearch.trim().toLowerCase())))).sort(compareNames):[];
@@ -214,10 +225,10 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   setTournamentConfirm('');
   onMessage?.(next==='eliminated'?legionLabel(team)+' marked eliminated. Roster and history preserved.':legionLabel(team)+' restored to active. Verify the match record.');
  }
- async function copyMovePreview(){
-  if(!movePreview)return;
+ async function copyMovePreview(text,label){
+  if(!text)return;
   setCopying(true);
-  try{await navigator.clipboard.writeText(movePreview);onMessage?.('Copied the reviewed move list.');}
+  try{await navigator.clipboard.writeText(text);onMessage?.(label+' copied.');}
   catch{onMessage?.('Copy failed. Try again.');}
   finally{setCopying(false);}
  }
@@ -277,13 +288,37 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       </button>
      )}
     </div>
-    <button type="button" aria-expanded={previewOpen} disabled={!move} onClick={()=>setPreviewOpen(v=>!v)} style={{...button,width:'100%',marginTop:10,textAlign:'left',display:'flex',justifyContent:'space-between',alignItems:'center',color:C.gold}}>
-     <span>{move?"Review players to move ("+move+")":"No transfers needed"}</span><span aria-hidden="true">{previewOpen?'▴':'▾'}</span>
-    </button>
-    {previewOpen&&<div style={{marginTop:10}}>
-      <p style={{...muted,margin:'0 0 8px'}}>Preview exactly what will be copied. Players are grouped by their current and destination alliances.</p>
-      {movePreview?<><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:13,lineHeight:1.6,padding:12,borderRadius:10,background:C.section,maxHeight:300,overflowY:'auto',margin:'0 0 8px'}}>{movePreview}</pre><button type="button" style={{...button,width:'100%',color:C.gold}} disabled={copying} onClick={copyMovePreview}>{copying?'Copying…':'Copy reviewed list ('+move+')'}</button></>:<p style={muted}>No players need to move in this view.</p>}
-     </div>}
+    <div style={{display:'grid',gap:12,marginTop:14}}>
+     <div style={{borderTop:'1px solid '+C.border,paddingTop:12}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:5}}>
+       <strong style={{fontSize:14}}>Players who need to move</strong><span style={muted}>{moveCopyCount} players</span>
+      </div>
+      <p style={{...muted,margin:'0 0 10px'}}>Grouped by current alliance and destination. Includes confirmed no-alliance and unknown-alliance players.</p>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+       <button type="button" disabled={!movePreview||copying} style={{...button,color:movePreview?C.gold:C.icy}} onClick={()=>copyMovePreview(movePreview,'Move list')}>Copy list</button>
+       <button type="button" aria-expanded={previewOpen} style={{...button,color:C.gold}} onClick={()=>setPreviewOpen(v=>!v)}>{previewOpen?'Hide preview ▴':'Preview ▾'}</button>
+      </div>
+      {previewOpen&&<div style={{marginTop:9}}>
+       {movePreview?<pre aria-label="Move list preview" style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:13,lineHeight:1.6,padding:12,borderRadius:10,background:C.section,maxHeight:300,overflowY:'auto',margin:0}}>{movePreview}</pre>:<p style={muted}>No players need to move.</p>}
+      </div>}
+     </div>
+     <div style={{borderTop:'1px solid '+C.border,paddingTop:12}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:5}}>
+       <strong style={{fontSize:14}}>Available players who need to move</strong><span style={muted}>{availableMoveCount} players</span>
+      </div>
+      <p style={{...muted,margin:'0 0 10px'}}>Only players who recorded availability at this event time.</p>
+      <label style={{...muted,display:'block',marginBottom:10}}>Event time · UTC
+       <select aria-label="Copy list event time" value={selectedCopyTime} onChange={e=>setCopyTime(e.target.value)} style={{...button,display:'block',width:'100%',marginTop:5,fontSize:15}}>{times.map(t=><option key={t} value={t}>{t} UTC</option>)}</select>
+      </label>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+       <button type="button" disabled={!availableMovePreview||copying} style={{...button,color:availableMovePreview?C.gold:C.icy}} onClick={()=>copyMovePreview(availableMovePreview,'Available move list')}>Copy list</button>
+       <button type="button" aria-expanded={availablePreviewOpen} style={{...button,color:C.gold}} onClick={()=>setAvailablePreviewOpen(v=>!v)}>{availablePreviewOpen?'Hide preview ▴':'Preview ▾'}</button>
+      </div>
+      {availablePreviewOpen&&<div style={{marginTop:9}}>
+       {availableMovePreview?<pre aria-label="Available move list preview" style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:13,lineHeight:1.6,padding:12,borderRadius:10,background:C.section,maxHeight:300,overflowY:'auto',margin:0}}>{availableMovePreview}</pre>:<p style={muted}>No available players need to move at {selectedCopyTime} UTC.</p>}
+      </div>}
+     </div>
+    </div>
    </section>
    {team&&<section style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:14}}>
     <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}><strong style={{fontSize:15}}>{legionLabel(team)} · {tournamentStatus(team)==='eliminated'?'Eliminated':'Active'}</strong><button type="button" style={{...button,fontSize:12,padding:'7px 9px',minHeight:36}} onClick={()=>setTournamentConfirm(tournamentConfirm?'':'open')}>{tournamentStatus(team)==='eliminated'?'Correct result':'Record a loss'}</button></div>
