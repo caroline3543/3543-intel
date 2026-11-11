@@ -125,35 +125,30 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     {name:'Joiners',members:displayed.filter(p=>!p.roles?.includes('Rally Lead')&&!p.blacklisted)},
     {name:'Excluded from battle plans',members:displayed.filter(p=>p.blacklisted)},
   ];
-  return <div style={{padding:'12px 16px 0'}}>
+  return <div style={{padding:'5px 16px 0'}}>
     {players.length>0 && <>
-      <p style={{fontSize:13,color:C.icy,margin:'0 0 12px'}}>Latest roster fetch: {lastFetch?new Date(lastFetch).toISOString().slice(0,16).replace('T',' ')+' UTC':'Not recorded'}</p>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'3px 0 8px'}}><h2 style={{fontSize:20,letterSpacing:'-.03em',margin:0}}>Members</h2><button style={{background:'transparent',border:0,color:C.gold,fontSize:12,fontWeight:650,minHeight:38,padding:'5px 0 5px 10px'}} aria-expanded={optionsOpen} onClick={()=>setOptionsOpen(v=>!v)}>☷ Options</button></div>
       <PlayerSearch label="Search roster" players={players} value={search} onChange={setSearch} onSelect={p=>{setSearch(p.fid||p.username||p.alias);openProfile(p);}}/>
-      <div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:6,marginBottom:10}}>
-        {[['','All alliances'],...allianceTags.map(tag=>[tag,`[${tag}]`])].map(([tag,label])=><button key={tag||'all'} aria-pressed={filters.alliance===tag} onClick={()=>{setFilters({...filters,alliance:filters.alliance===tag?'':tag});}} style={{...button,flexShrink:0,color:filters.alliance===tag?C.gold:C.icy,borderColor:filters.alliance===tag?C.gold:C.border}}>{label}{tag?` · ${players.filter(p=>p.allianceTag===tag).length}`:''}</button>)}
+      <div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,marginBottom:6,alignItems:'center',scrollbarWidth:'none'}}><span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Alliance</span>
+        {[['','All'],...allianceTags.map(tag=>[tag,tag])].map(([tag,label])=><button key={tag||'all'} aria-pressed={filters.alliance===tag} onClick={()=>{setFilters({...filters,alliance:filters.alliance===tag?'':tag});}} style={{background:filters.alliance===tag?'#45351F':'#182A3F',color:filters.alliance===tag?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{tag?` · ${players.filter(p=>p.allianceTag===tag).length}`:''}</button>)}
       </div>
-      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
-        <button style={button} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button>
-        <button style={button} onClick={()=>selecting?stopSelection():setSelecting(true)}>{selecting?'Done':'Select'}</button>
-        <button style={{...button,marginLeft:'auto'}} onClick={()=>setOptionsOpen(v=>!v)}>Options {optionsOpen?'▴':'▾'}</button>
-      </div>
-      <div role="group" aria-label="Sort roster" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:10,scrollbarWidth:'thin'}}>
-        {PRIMARY_SORTS.map(([id,label])=><button key={id} aria-pressed={sort===id} onClick={()=>changeSort(id)} style={{...button,flexShrink:0,minHeight:38,padding:'8px 10px',fontSize:12,background:sort===id?C.gold:C.section,color:sort===id?C.bg:C.icy,borderColor:sort===id?C.gold:C.border}}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
-        <button onClick={()=>setMoreSorts(v=>!v)} style={{...button,flexShrink:0,minHeight:38,padding:'8px 10px',fontSize:12,background:extraSelected?C.gold:C.section,color:extraSelected?C.bg:C.icy}}>{extraSelected?EXTRA_SORTS.find(([id])=>id===sort)?.[1]:'More'} {extraSelected?(sortDirection==='asc'?'↑':'↓'):'⌄'}</button>
+      <div role="group" aria-label="Sort roster" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,scrollbarWidth:'none',alignItems:'center'}}><span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Sort</span>
+        {PRIMARY_SORTS.map(([id,label])=><button key={id} aria-pressed={sort===id} onClick={()=>changeSort(id)} style={{background:sort===id?'#45351F':'#182A3F',color:sort===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',minHeight:35,fontSize:12,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
+        <button onClick={()=>setMoreSorts(v=>!v)} style={{background:extraSelected?'#45351F':'#182A3F',color:extraSelected?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',minHeight:35,fontSize:12,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{extraSelected?EXTRA_SORTS.find(([id])=>id===sort)?.[1]:'More'} {extraSelected?(sortDirection==='asc'?'↑':'↓'):'⌄'}</button>
       </div>
       {moreSorts&&<div role="group" aria-label="More sorting options" style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:7,marginBottom:10,padding:10,borderRadius:12,background:C.card}}>
         {EXTRA_SORTS.map(([id,label])=><button key={id} style={{...button,background:sort===id?C.gold:C.section,color:sort===id?C.bg:C.icy,fontSize:12}} onClick={()=>changeSort(id)}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
       </div>}
-      {optionsOpen&&<div style={{display:'grid',gap:8,padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
-        <div style={{fontSize:14,fontWeight:700}}>Roster options</div>
+      {optionsOpen&&<div style={{display:'grid',gap:9,padding:12,background:'#15273A',borderRadius:12,marginBottom:10}}>
+        <div style={{fontSize:14,fontWeight:700}}>Roster options</div><div style={{display:'flex',gap:7}}><button style={{...button,flex:1}} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button><button style={{...button,flex:1}} onClick={()=>selecting?stopSelection():setSelecting(true)}>{selecting?'Done selecting':'Select players'}</button></div>
         <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:13,color:C.icy}}>Show player IDs <input type="checkbox" checked={showIds} onChange={e=>setShowIds(e.target.checked)} style={{width:20,height:20,accentColor:C.gold}}/></label>
         <button style={button} onClick={()=>{setGrouped(!grouped);setOptionsOpen(false);}}>{grouped?'Show one list':'Group by role'}</button>
         <button style={button} onClick={()=>{setFieldsOpen(true);setOptionsOpen(false);}}>Update player details</button>
         <button style={button} onClick={copyRoster} disabled={!visible.length}>Copy filtered roster ({visible.length})</button>
       </div>}
-      {sort==='progression' && <p style={{fontSize:13,color:C.icy}}>Average per-troop tier power from recorded Infantry, Lancer and Marksman. Incomplete records sort last. Troop quantity and combat buffs are excluded.</p>}
-      {(sort==='labyrinth'||sort==='labyrinthScore') && <p style={{fontSize:13,color:C.icy}}>State Labyrinth {sort==='labyrinth'?'rank':'score'} from Whiteout Stats. Missing values appear last.</p>}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}><span role="status" style={{color:C.icy,fontSize:14}}>{visible.length} of {players.length} players</span>{(filterCount>0||search) && <button style={button} onClick={()=>{setSearch('');setFilters({...EMPTY_FILTERS});}}>Clear filters</button>}</div>
+      {sort==='progression' && <p style={{fontSize:12,color:C.icy}}>Average per-troop tier power from recorded Infantry, Lancer and Marksman. Incomplete records sort last. Troop quantity and combat buffs are excluded.</p>}
+      {(sort==='labyrinth'||sort==='labyrinthScore') && <p style={{fontSize:12,color:C.icy}}>State Labyrinth {sort==='labyrinth'?'rank':'score'} from Whiteout Stats. Missing values appear last.</p>}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}><span role="status" style={{color:C.icy,fontSize:12}}>Showing {displayed.length} of {visible.length} players</span>{(filterCount>0||search) && <button style={button} onClick={()=>{setSearch('');setFilters({...EMPTY_FILTERS});}}>Clear filters</button>}</div>
       {selecting && <section style={{padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
         <div role="status" style={{fontSize:14,marginBottom:8}}>{selected.size} selected across this roster</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={button} onClick={()=>setSelected(prev=>new Set([...prev,...visible.map(p=>p.id)]))}>Select shown</button><button style={button} onClick={()=>setSelected(new Set())}>Clear selection</button><button style={{...button,color:C.gold}} disabled={!selected.size} onClick={()=>setEditingSelection(!editingSelection)}>Update selected</button></div>
@@ -164,7 +159,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     {players.length>0&&!visible.length && <p style={{textAlign:'center',padding:24,color:C.icy}}>No players match. Clear filters or try another search.</p>}
     {grouped?groups.filter(g=>g.members.length).map(group=><section key={group.name}><h3 style={{fontSize:16,color:C.icy}}>{group.name} · {group.members.length}</h3>{group.members.map(card)}</section>):displayed.map(card)}
     {visibleCount<visible.length&&<div ref={loadRef} role="status" style={{textAlign:'center',padding:18,color:C.icy,fontSize:13}}>Showing {displayed.length} of {visible.length} · More players load as you scroll <button style={{...button,marginLeft:8}} onClick={()=>setVisibleCount(n=>Math.min(n+20,visible.length))}>Load more</button></div>}
-    {filtersOpen && <RosterFilters players={players} roles={roles} filters={filters} onChange={next=>{if(next.alliance!==filters.alliance){}setFilters(next);}} onClose={()=>setFiltersOpen(false)} count={visible.length}/>}
+    {filtersOpen && <RosterFilters players={players} roles={roles} filters={filters} onChange={next=>setFilters(next)} onClose={()=>setFiltersOpen(false)} count={visible.length}/>}
     <ProfileView player={currentPlayer} players={players} teamworkPreferences={teamworkPreferences} onSaveTeamworkPreferences={onSaveTeamworkPreferences} roles={roles} open={profileOpen} onClose={()=>setProfileOpen(false)} onEdit={()=>{setProfileOpen(false);setEditingPlayer(currentPlayer);}} events={events} onOpenLeaderProfile={()=>setLeaderOpen(true)} onSave={savePlayer}/>
     <RallyLeaderProfileSheet player={currentPlayer} open={leaderOpen} onClose={()=>setLeaderOpen(false)} onSave={savePlayer}/>
     <PlayerSheet open={!!editingPlayer} player={editingPlayer} roles={roles} onClose={()=>setEditingPlayer(null)} onSave={savePlayer} existingTags={[...new Set(players.map(p=>p.allianceTag).filter(Boolean))]} existingPlayers={players} onOpenExisting={openProfile} onGoToIntel={onGoToIntel}/>
