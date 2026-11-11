@@ -255,6 +255,17 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   if(problems.length){setCopyMessage('Review unmatched or invalid: '+problems.slice(0,5).join(', '));return;}
   setPowers(p=>({...p,...updates}));setCopyMessage('Updated '+Object.keys(updates).length+' troop power values in this preview.');setShowBulk(false);
  }
+ function clearTeams(){
+  if(!groups.some(g=>g.leader||g.members.length)&&!Object.keys(assignment).length){
+   setCopyMessage('Teams are already empty. Your player selection and troop power remain available.');
+   return;
+  }
+  if(!window.confirm('Clear all four teams and building assignments? Your selected participants and troop power will be kept.'))return;
+  setGroups(initialGroups());setAssignment({});setAbsentIds([]);setConfirmed(false);
+  setCopyDraft('');setCopySource('');setCopyOpen(false);setEditingTeam(null);
+  setGenerationError('');setStep('teams');
+  setCopyMessage('Teams cleared. '+selectedIds.length+' selected participants and their troop power were kept. Use Regenerate all teams to start again.');
+ }
  function generate(){
   setGenerationError('');
   if(selectedPlayers.length<4){setGenerationError('Select at least four available players.');return;}
@@ -267,39 +278,35 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   const leads=leaderStrategy==='manual'?manualLeaders:sorted.slice(0,4).map(p=>String(p.id));
   const used=new Set(leads);
   const joiners=sorted.filter(p=>!used.has(String(p.id)));
-  const next=initialGroups().map((g,i)=>({...g,leader:leads[i]}));
+  let next=initialGroups().map((g,i)=>({...g,leader:leads[i]}));
+  const teamTotal=g=>[g.leader,...g.members].filter(Boolean).reduce((total,id)=>total+(powerOf(id)||0),0);
   if(mode==='stack'){
-   joiners.forEach((p,index)=>{
-    const groupIndex=Math.min(3,Math.floor(index/(Math.ceil(joiners.length/4)||1)));
-    next[groupIndex].members.push(String(p.id));
-   });
+   joiners.forEach((p,index)=>next[Math.min(3,Math.floor(index/Math.max(1,Math.ceil(joiners.length/4))))].members.push(String(p.id)));
   }else{
-   const cap=Math.ceil(joiners.length/4);
-   joiners.forEach(p=>{
-    const eligible=next.filter(g=>g.members.length<cap);
-    eligible.sort((a,b)=>[a.leader,...a.members].reduce((n,id)=>n+(powerOf(id)||0),0)-[b.leader,...b.members].reduce((n,id)=>n+(powerOf(id)||0),0));
-    eligible[0]?.members.push(String(p.id));
-   });
-   // Minimise max deviation first. Within the 5% target, prefer cooperation
-   // and shared language. Leaders remain fixed; each joiner appears only once.
-   const objective=(gs)=>{
-    const deviation=balanceInfo(gs).deviation;
-    const affinity=preferenceScore(gs);
-    return Math.max(0,deviation-5)*10000 + deviation*12 - affinity.links*28 - affinity.sharedLanguages*1.5;
+   const targetSize=Math.ceil(selectedPlayers.length/4);
+   for(const p of joiners){
+    const eligible=next.filter(g=>g.members.length+1<targetSize);
+    const candidates=eligible.length?eligible:next;
+    candidates.sort((a,b)=>teamTotal(a)-teamTotal(b)||a.members.length-b.members.length||a.key-b.key);
+    candidates[0].members.push(String(p.id));
+   }
+   const objective=gs=>{
+    const deviation=balanceInfo(gs).deviation,affinity=preferenceScore(gs);
+    return Math.max(0,deviation-5)*10000+deviation*12-affinity.links*28-affinity.sharedLanguages*1.5;
    };
-   let score=objective(next);
-   for(let pass=0;pass<40;pass++){
-    let best=null,bestScore=score;
+   let currentScore=objective(next);
+   for(let pass=0;pass<25;pass++){
+    let bestScore=currentScore,best=null;
     for(let a=0;a<4;a++)for(let b=a+1;b<4;b++){
      for(let ia=0;ia<next[a].members.length;ia++)for(let ib=0;ib<next[b].members.length;ib++){
       const trial=next.map(g=>({...g,members:[...g.members]}));
       [trial[a].members[ia],trial[b].members[ib]]=[trial[b].members[ib],trial[a].members[ia]];
-      const value=objective(trial);
-      if(value<bestScore-0.001){bestScore=value;best=trial;}
+      const score=objective(trial);
+      if(score<bestScore-0.001){bestScore=score;best=trial;}
      }
     }
     if(!best)break;
-    next=best;score=bestScore;
+    next=best;currentScore=bestScore;
    }
   }
    if(groups.some(g=>g.leader||g.members.length)&&!window.confirm('Replace the current four team assignments? This preserves your participant selection and troop power, but replaces manual team and building allocations.'))return;
@@ -307,7 +314,8 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   if(ids.length!==selectedIds.length||new Set(ids).size!==selectedIds.length||ids.some(id=>!selectedSet.has(id))){setGenerationError('Could not assign every selected player exactly once. Existing assignments were preserved.');return;}
   setGroups(next);setAssignment({});setAbsentIds([]);setConfirmed(false);setStep('teams');
   const outcome=balanceInfo(next),affinity=preferenceScore(next);
-  setCopyMessage('Generated '+joiners.length+' joiners around '+(leaderStrategy==='manual'?'your four chosen leaders':'the four strongest players')+'. Max deviation '+outcome.deviation.toFixed(1)+'%'+(outcome.deviation>5?' (5% target not achievable with this arrangement)':'')+' · '+affinity.links+' preferred cooperation pair(s) together.');
+  setGenerationError('');
+  setCopyMessage(selectedIds.length+' of '+selectedIds.length+' selected players assigned across four teams. Max power deviation '+outcome.deviation.toFixed(1)+'%'+(outcome.deviation>5?' (above 5% target)':'')+'. '+affinity.links+' cooperation pairs together.');
  }
   function addUnassigned(){
   setGenerationError('');
@@ -442,12 +450,13 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
       <div style={{display:'grid',gap:8,marginTop:10}}>
        <button style={{...btn,width:'100%',background:C.gold,color:C.bg}} onClick={generate}>Regenerate all teams · {selectedPlayers.length} selected</button>
        <button style={{...btn,width:'100%',color:missing.length?C.gold:C.icy}} disabled={!missing.length} onClick={addUnassigned}>Add {missing.length} unassigned player{missing.length===1?'':'s'} · Keep existing teams</button>
+       <button style={{...btn,width:'100%',color:C.red}} onClick={clearTeams}>Clear teams · Start from scratch</button>
       </div>
       <p style={{...small,margin:'8px 0 0'}}>Regenerate all may reshuffle teams. Add unassigned preserves current team members and leaders.</p>
      {generationError&&<p role="alert" style={{fontSize:13,color:C.gold,lineHeight:1.5,margin:'9px 0 0'}}>{generationError}</p>}
      
     </section>
-    </>}
+    </>
     <section aria-label="Compare four teams" style={{margin:'5px 0 12px'}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:8}}><strong style={{fontSize:14}}>Team comparison</strong><span style={small}>{selectedIds.length} selected · {pool.length} available</span></div>
      <div role="status" style={{...small,color:assignmentsValid?C.green:C.gold,marginBottom:8}}>{assignedSummary}{missing.length?' · Missing: '+missing.map(id=>name(byId.get(String(id))||{id})).join(', '):''}</div>
@@ -526,7 +535,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
       <button style={{...btn,color:C.bg,background:lateId?C.gold:C.section}} disabled={!lateId} onClick={addLatePlayer}>Assign player</button>
      </div>
     </section>
-    </>}
+    </>
 
     <section style={{...panel,marginBottom:10}}>
      <strong style={{fontSize:14}}>3 · Finalise teams</strong>
