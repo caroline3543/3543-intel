@@ -440,12 +440,12 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  return <section style={{padding:'8px 12px 26px',maxWidth:800,margin:'0 auto'}}>
   {!legions.length?<p style={{...panel,...small}}>No TAL legions yet. Assign players in Registration first.</p>:<>
    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,margin:'2px 0 12px'}}>
-    <div style={{minWidth:0}}><h2 style={{fontSize:20,letterSpacing:'-.3px',margin:0,lineHeight:1.2}}>Team preparation</h2><span style={{...small,fontSize:11}}>{legionLabel(selectedLegion)}</span></div>
+    <div style={{minWidth:0}}><h2 style={{fontSize:20,letterSpacing:'-.3px',margin:0,lineHeight:1.2}}>Team preparation</h2><span style={{...small,fontSize:11}}>Match attendance and troop power</span></div>
     <span role="status" style={{fontSize:11,color:draftState.startsWith('Could not')?C.gold:C.icy,maxWidth:'45%',textAlign:'right',lineHeight:1.3}}>{draftState}</span>
    </div>
-   <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8,marginBottom:12}}>
-    <label style={{...small,fontSize:11}}>Match date<input type="date" aria-label="TAL match date" value={matchDate} onChange={e=>setMatchDate(e.target.value)} style={{...btn,display:'block',width:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 6px',colorScheme:'dark'}}/></label>
-    <label style={{...small,fontSize:11}}>UTC time<select value={matchTime} onChange={e=>resetForMatch(selectedLegion?.id,e.target.value)} style={{...btn,display:'block',width:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 6px'}}>{(value?.times||DEFAULT_TIMES).map(t=><option key={t}>{t}</option>)}</select></label>
+   <div aria-label="Match date and time" style={{display:'grid',gridTemplateColumns:'minmax(0,1fr)',gap:8,marginBottom:12}}>
+    <label style={{...small,fontSize:11,display:'block',minWidth:0}}>Match date<input type="date" aria-label="TAL match date" value={matchDate} onChange={e=>setMatchDate(e.target.value)} style={{...btn,display:'block',width:'100%',maxWidth:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 10px',colorScheme:'dark'}}/></label>
+    <label style={{...small,fontSize:11,display:'block',minWidth:0}}>Match time · UTC<select aria-label="Match time UTC" value={matchTime} onChange={e=>resetForMatch(selectedLegion?.id,e.target.value)} style={{...btn,display:'block',width:'100%',maxWidth:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 10px'}}>{(value?.times||DEFAULT_TIMES).map(t=><option key={t}>{t}</option>)}</select></label>
    </div>
    <section aria-label="Match availability" style={{...panel,padding:11,marginBottom:10}}>
     <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
