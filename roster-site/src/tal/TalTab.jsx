@@ -32,22 +32,24 @@ function moveText(rows,{time=null,availabilityFor=null}={}){
   return prefix+' from '+g.origin+' to '+g.destination+':\n'+g.players.sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base',numeric:true})).map(playerName=>'• '+playerName).join('\n');
  }).join('\n\n');
 }
+function savedTalSection(){try{const section=window.sessionStorage.getItem('tal:3573:last-section');if(section==='registration'||section==='prep')return JSON.parse(window.sessionStorage.getItem('tal:3573:filters:'+section)||'null')||{};}catch{}return {};}
+function savedTalScroll(section){try{return Number(window.sessionStorage.getItem('tal:3573:scroll:'+section))||0;}catch{return 0;}}
 export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legionRefresh,onMessage,workspace,onBulkApply}){
+ const initialSection=useRef(savedTalSection());
  const [selected,setSelected]=useState(()=>{try{return window.sessionStorage.getItem('tal:selected-legion')||'';}catch{return '';}});
- const [check,setCheck]=useState('all');
- const [search,setSearch]=useState('');
- const [timeFilters,setTimeFilters]=useState([]);
- const [timeMode,setTimeMode]=useState('any');
- const [sort,setSort]=useState('name');
- const [sortDirection,setSortDirection]=useState('asc');
- const [registrationFilter,setRegistrationFilter]=useState('all');
+ const [check,setCheck]=useState(initialSection.current.check||'all');
+ const [search,setSearch]=useState(initialSection.current.search||'');
+ const [timeFilters,setTimeFilters]=useState(Array.isArray(initialSection.current.timeFilters)?initialSection.current.timeFilters:[]);
+ const [timeMode,setTimeMode]=useState(initialSection.current.timeMode||'any');
+ const [sort,setSort]=useState(initialSection.current.sort||'name');
+ const [sortDirection,setSortDirection]=useState(initialSection.current.sortDirection||'asc');
+ const [registrationFilter,setRegistrationFilter]=useState(initialSection.current.registrationFilter||'all');
  const [talView,setTalView]=useState(()=>{try{const saved=window.sessionStorage.getItem('tal:3573:last-section');return saved==='registration'||saved==='prep'?saved:'home';}catch{return 'home';}});
  const sectionSnapshots=useRef({registration:null,prep:null});
- const sectionScroll=useRef({registration:0,prep:0});
- const [sectionNavigationReady,setSectionNavigationReady]=useState(false);
- const [roleFilter,setRoleFilter]=useState('all');
+ const sectionScroll=useRef({registration:savedTalScroll('registration'),prep:savedTalScroll('prep')});
+ const [roleFilter,setRoleFilter]=useState(initialSection.current.roleFilter||'all');
  const switchSort=field=>{if(sort===field)setSortDirection(d=>d==='asc'?'desc':'asc');else{setSort(field);setSortDirection(field==='name'||field==='labyrinth'?'asc':'desc');}setListLimit(40);};
- const [filtersOpen,setFiltersOpen]=useState(false);
+ const [filtersOpen,setFiltersOpen]=useState(!!initialSection.current.filtersOpen);
  const [adding,setAdding]=useState(false);
  const [addQuery,setAddQuery]=useState('');
  const [addSearch,setAddSearch]=useState('');
@@ -71,7 +73,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [copyTime,setCopyTime]=useState('12:00');
  const [tournamentConfirm,setTournamentConfirm]=useState('');
  const [copying,setCopying]=useState(false);
- const [listLimit,setListLimit]=useState(40);
+ const [listLimit,setListLimit]=useState(initialSection.current.listLimit||40);
  const [selecting,setSelecting]=useState(false);
  const [bulkSelected,setBulkSelected]=useState([]);
  const [bulkPanel,setBulkPanel]=useState('');
@@ -84,7 +86,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [bulkLegionNumber,setBulkLegionNumber]=useState('1');
  const [bulkReview,setBulkReview]=useState(false);
  const [bulkError,setBulkError]=useState('');
- const [missingFilter,setMissingFilter]=useState('');
+ const [missingFilter,setMissingFilter]=useState(initialSection.current.missingFilter||'');
  const playersAnchor=useRef(null);
  const teams=(value?.teams||[]);
  const team=teams.find(t=>t.id===selected);
@@ -186,15 +188,13 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
    try{sectionScroll.current[next]=Number(window.sessionStorage.getItem('tal:3573:scroll:'+next))||0;}catch{}
    try{window.sessionStorage.setItem('tal:3573:last-section',next);}catch{}
   }
-  setSectionNavigationReady(true);
   setTalView(next);
  }
  useEffect(()=>{
-  if(talView==='home'||!sectionNavigationReady)return;
-  const y=sectionScroll.current[talView]||0;
+  const y=talView==='home'?0:sectionScroll.current[talView]||0;
   const frame=requestAnimationFrame(()=>window.scrollTo({top:y,behavior:'instant'}));
   return()=>cancelAnimationFrame(frame);
- },[talView,sectionNavigationReady]);
+ },[talView]);
  useEffect(()=>{
   if(talView==='home')return;
   try{window.sessionStorage.setItem('tal:3573:filters:'+talView,JSON.stringify(snapshotSection()));}catch{}
