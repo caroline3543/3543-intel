@@ -480,6 +480,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
      {showBulk&&<div style={{marginBottom:10}}><textarea aria-label="Paste troop power" placeholder={'Erth, 8997\nVanellope, 4717'} value={bulk} onChange={e=>setBulk(e.target.value)} rows={5} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,resize:'vertical'}}/><button style={{...btn,width:'100%',marginTop:6,color:C.gold}} onClick={saveBatch}>Validate and apply</button></div>}
      <div style={{maxHeight:185,overflowY:'auto'}}>{selectedPlayers.map(p=><label key={p.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,fontSize:13}}><span style={{flex:1,minWidth:0,overflowWrap:'anywhere'}}>{name(p)}</span><input type="number" inputMode="numeric" min="0" aria-label={'Troop power for '+name(p)} value={powers[String(p.id)]??value?.records?.[p.id]?.troopPower??''} onChange={e=>setPowers(old=>({...old,[String(p.id)]:e.target.value}))} placeholder="Power" style={{...btn,width:105,minHeight:38,fontSize:16}}/></label>)}</div>
     </section>
+    </>
    </>}
   </>}
  </section>;
