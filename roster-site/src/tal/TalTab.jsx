@@ -2,6 +2,7 @@ import {LANGUAGES} from '../../../src/utils/constants.js';
 import {useEffect,useRef,useState} from 'react';
 import {DEFAULT_TIMES} from './planner.js';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
+import {PlayerSearch} from '../../../src/components/players/PlayerSearch.jsx';
 import {plannedMemberIds,allianceCheck,legionLabel} from '../../../src/services/talRosterService.js';
 import {comparePriority} from '../../../src/components/players/PlayerCard.jsx';
 import {C} from '../../../src/utils/constants.js';
@@ -38,9 +39,11 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [timeFilters,setTimeFilters]=useState([]);
  const [timeMode,setTimeMode]=useState('any');
  const [sort,setSort]=useState('name');
+ const [sortDirection,setSortDirection]=useState('asc');
  const [registrationFilter,setRegistrationFilter]=useState('all');
  const [talView,setTalView]=useState('registration');
  const [roleFilter,setRoleFilter]=useState('all');
+ const switchSort=field=>{if(sort===field)setSortDirection(d=>d==='asc'?'desc':'asc');else{setSort(field);setSortDirection(field==='name'||field==='labyrinth'?'asc':'desc');}setListLimit(40);};
  const [filtersOpen,setFiltersOpen]=useState(false);
  const [adding,setAdding]=useState(false);
  const [addQuery,setAddQuery]=useState('');
@@ -117,11 +120,11 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const gameLanguages=player=>[...new Set([player.gameLanguage,...(Array.isArray(player.languages)?player.languages:[])].filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))];
  const tierChips=player=>[['infantry','Inf',C.inf],['lancer','Lan',C.lan],['marksman','Mar',C.mar]].filter(([key])=>player.troops?.[key]&&String(player.troops[key]).toLowerCase()!=='unknown');
  const roster=entries.filter(e=>(check==='all'||e.check.status===check)&&matchesSearch(e.player)&&matchesTime(e.player)&&(!missingFilter||(missingFilter==='tiers'?missingTroopTypes(e.player).length:missingAvailability(e.player)))&&(registrationFilter==='all'||registrationFilter==='unregistered'&&e.member&&!e.member.registered||registrationFilter==='registered'&&e.member?.registered)&&(roleFilter==='all'||(roleFilter==='matchmaking'?!!e.member?.matchmakingOnly:e.member?.role===roleFilter))).sort((a,b)=>{
-  if(sort==='troop'){const score=p=>numeric(value?.records?.[p.id]?.troopPower);const av=score(a.player),bv=score(b.player);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:bv-av||compareNames(a.player,b.player);}
-  if(sort==='city'){const av=numeric(a.player.power??a.player.providerStats?.power),bv=numeric(b.player.power??b.player.providerStats?.power);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:bv-av||compareNames(a.player,b.player);}
-  if(sort==='labyrinth'){const av=numeric(a.player.providerRankings?.labyrinth?.rank),bv=numeric(b.player.providerRankings?.labyrinth?.rank);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:av-bv||compareNames(a.player,b.player);}
-  if(sort==='joiner')return comparePriority(a.player,b.player);
-  return compareNames(a.player,b.player);
+  if(sort==='troop'){const score=p=>numeric(value?.records?.[p.id]?.troopPower);const av=score(a.player),bv=score(b.player);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
+  if(sort==='city'){const av=numeric(a.player.power??a.player.providerStats?.power),bv=numeric(b.player.power??b.player.providerStats?.power);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
+  if(sort==='labyrinth'){const av=numeric(a.player.providerRankings?.labyrinth?.rank),bv=numeric(b.player.providerRankings?.labyrinth?.rank);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
+  if(sort==='joiner')return comparePriority(a.player,b.player)*(sortDirection==='asc'?1:-1);
+  return compareNames(a.player,b.player)*(sortDirection==='asc'?1:-1);
  });
  const selectedCopyTime=times.includes(copyTime)?copyTime:times[0];
  const movePreview=moveText(entries);
@@ -334,8 +337,8 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   }catch(e){setBulkError(e.message||'Unable to save changes.');setBulkReview(false);}
  }
   const canEdit=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated';
- return <section style={{padding:'12px 20px 32px'}}>
-  <h2 style={{fontSize:22,margin:'0 0 12px'}}>TAL planner</h2>
+ return <section style={{padding:'5px 16px 32px'}}>
+  <h2 style={{fontSize:20,letterSpacing:'-.03em',margin:'3px 0 8px'}}>TAL Planner</h2>
   <div role="group" aria-label="TAL planner sections" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:5,padding:5,marginBottom:14,background:C.section,border:'1px solid '+C.border,borderRadius:15}}>
    {[['registration','Registration'],['prep','TAL Prep']].map(([id,label])=><button type="button" key={id} aria-pressed={talView===id} onClick={()=>{setTalView(id);setAdding(false);setActionsId('');setSelecting(false);setBulkSelected([]);setRoleFilter('all');setMissingFilter('');}} style={{...button,borderRadius:11,borderColor:talView===id?C.gold:'transparent',background:talView===id?C.card:'transparent',color:talView===id?C.white:C.icy,minHeight:46,fontSize:14}}>{label}</button>)}
   </div>
@@ -439,12 +442,15 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     {selecting&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}><strong style={{fontSize:13}}>{selectedBulkCount} selected</strong><div style={{display:'flex',gap:6}}><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected(old=>[...new Set([...old,...filteredIds])])}>Select all matching</button><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected([])}>Clear</button></div></div>}
 
 
-    <input aria-label="Search players" placeholder="Find a player by name or ID" value={search} onChange={e=>{setSearch(e.target.value);setListLimit(40);}} style={{...button,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:10}}/>
-    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-     <div role="group" aria-label="Filter TAL roles" style={{display:'flex',gap:5,flex:1,minWidth:0,overflowX:'auto',scrollbarWidth:'none'}}>
-      {[['all','All'],['combatant','Combatants'],['substitute','Subs']].map(([id,label])=><button key={id} type="button" aria-pressed={roleFilter===id} onClick={()=>{setRoleFilter(id);setListLimit(40);}} style={{...button,flexShrink:0,minHeight:44,padding:'7px 10px',fontSize:12,borderRadius:11,color:roleFilter===id?C.gold:C.icy,borderColor:roleFilter===id?C.gold:C.border,background:roleFilter===id?C.gold+'16':C.section}}>{label}</button>)}
-     </div>
-     <button type="button" aria-expanded={filtersOpen} aria-controls="tal-advanced-filters" onClick={()=>setFiltersOpen(v=>!v)} style={{...button,flexShrink:0,minHeight:44,fontSize:12,borderColor:filtersOpen?C.gold:C.border,color:filtersOpen?C.gold:C.icy}}>☷ Filters{timeFilters.length||registrationFilter!=='all'||roleFilter==='matchmaking'||sort!=='name'?' •':''}</button>
+    <PlayerSearch label="Search TAL players" placeholder="Search username, nickname or ID" players={entries.map(e=>e.player)} value={search} onChange={v=>{setSearch(v);setListLimit(40)}} onSelect={p=>{setSearch(p.fid||p.username||p.alias||String(p.id));setListLimit(40)}}/>
+    <div role="group" aria-label="Filter TAL roles" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:5,marginBottom:4,alignItems:'center',scrollbarWidth:'none'}}>
+     <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Status</span>
+     {[['all','All'],['combatant','Combatants'],['substitute','Substitutes'],['matchmaking','Matchmaking only']].map(([id,label])=><button key={id} type="button" aria-pressed={roleFilter===id} onClick={()=>{setRoleFilter(id);setListLimit(40)}} style={{background:roleFilter===id?'#45351F':'#182A3F',color:roleFilter===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}</button>)}
+    </div>
+    <div role="group" aria-label="Sort TAL players" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,alignItems:'center',scrollbarWidth:'none'}}>
+     <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Sort</span>
+     {[['name','Name'],['city','City power'],['labyrinth','Labyrinth'],['troop','Troop strength']].map(([id,label])=><button type="button" key={id} aria-pressed={sort===id} onClick={()=>switchSort(id)} style={{background:sort===id?'#45351F':'#182A3F',color:sort===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
+     <button type="button" aria-expanded={filtersOpen} aria-controls="tal-advanced-filters" onClick={()=>setFiltersOpen(v=>!v)} style={{background:filtersOpen?'#45351F':'#182A3F',color:filtersOpen?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>More filters{timeFilters.length||registrationFilter!=='all'||missingFilter?' •':''} ⌄</button>
     </div>
     {filtersOpen&&<section id="tal-advanced-filters" aria-label="Advanced player filters" style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:11,marginBottom:10}}>
      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:7}}>
@@ -459,7 +465,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      </div>}
      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
       <label style={{minWidth:0,fontSize:12,color:C.icy}}>In-game registration<select aria-label="Filter registration" value={registrationFilter} onChange={e=>{setRegistrationFilter(e.target.value);setListLimit(40);}} style={{...button,width:'100%',minWidth:0,marginTop:5,padding:'8px 6px',fontSize:13}}><option value="all">All</option><option value="unregistered">Needs registration</option><option value="registered">Registered</option></select></label>
-      <label style={{minWidth:0,fontSize:12,color:C.icy}}>Sort by<select aria-label="Sort players" value={sort} onChange={e=>setSort(e.target.value)} style={{...button,width:'100%',minWidth:0,marginTop:5,padding:'8px 6px',fontSize:13}}><option value="name">Name A–Z</option><option value="troop">TAL troop power</option><option value="city">City power</option><option value="labyrinth">Labyrinth rank</option><option value="joiner">Joiner strength</option></select></label>
+      <label style={{minWidth:0,fontSize:12,color:C.icy}}>Sort by<select aria-label="Sort players" value={sort} onChange={e=>{setSort(e.target.value);setSortDirection(e.target.value==='name'||e.target.value==='labyrinth'?'asc':'desc')}} style={{...button,width:'100%',minWidth:0,marginTop:5,padding:'8px 6px',fontSize:13}}><option value="name">Name A–Z</option><option value="troop">TAL troop power</option><option value="city">City power</option><option value="labyrinth">Labyrinth rank</option><option value="joiner">Joiner strength</option></select></label>
      </div>
      <label style={{display:'flex',gap:10,alignItems:'center',minHeight:44,fontSize:13,color:C.icy}}><input type="checkbox" checked={roleFilter==='matchmaking'} onChange={e=>{setRoleFilter(e.target.checked?'matchmaking':'all');setListLimit(40);}} style={{width:21,height:21,accentColor:C.gold}}/>Matchmaking only</label>
      <button type="button" style={{...button,width:'100%',marginTop:6,fontSize:12}} onClick={()=>{resetFilters();setFiltersOpen(false)}}>Clear all filters</button>
