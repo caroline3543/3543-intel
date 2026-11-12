@@ -437,63 +437,65 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  function removeFromBattle(id){if(groups.some(g=>String(g.leader)===String(id))&&!window.confirm('Remove this rally leader? Assign a replacement before copying teams.'))return;
   setGroups(old=>old.map(g=>({...g,leader:String(g.leader)===String(id)?null:g.leader,members:g.members.filter(m=>String(m)!==String(id))})));
   setChosen(old=>old.filter(x=>String(x)!==String(id)));setAbsentIds(old=>old.filter(x=>String(x)!==String(id)));setAssignment(old=>{const n={...old};delete n[String(id)];return n;});}
- return <section style={{padding:'14px 20px 35px'}}>
-  {dragId&&dragPoint&&<div aria-hidden="true" style={{position:'fixed',left:dragPoint.x+12,top:dragPoint.y-35,zIndex:9999,pointerEvents:'none',background:C.section,border:'2px solid '+C.gold,color:C.white,borderRadius:11,padding:'14px 18px',boxShadow:'0 12px 26px #0008',maxWidth:'min(280px,80vw)',fontSize:15,fontWeight:700,overflowWrap:'anywhere'}}>{name(byId.get(dragId)||{id:dragId})}</div>}
-  <h2 style={{fontSize:25,letterSpacing:'-.4px',margin:'0 0 8px'}}>TAL Teams</h2>
-  <p style={{...small,margin:'0 0 10px'}}>Registered combatants start first. Substitutes cover shortages and enter after 3 minutes.</p>
-  {!legions.length?<p style={{...panel,...small}}>No legions in your TAL plan. Assign players in TAL Planner first.</p>:<>
-   <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8,marginBottom:12}}>
-    <label style={small}>Match date · UTC<input type="date" aria-label="TAL match date" value={matchDate} onChange={e=>setMatchDate(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',marginTop:5,colorScheme:'dark'}}/></label>
-    <label style={small}>Match time · UTC<select value={matchTime} onChange={e=>resetForMatch(selectedLegion?.id,e.target.value)} style={{...btn,width:'100%',marginTop:5}}>{(value?.times||DEFAULT_TIMES).map(t=><option key={t}>{t}</option>)}</select></label>
+ return <section style={{padding:'8px 12px 26px',maxWidth:800,margin:'0 auto'}}>
+  {!legions.length?<p style={{...panel,...small}}>No TAL legions yet. Assign players in Registration first.</p>:<>
+   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,margin:'2px 0 12px'}}>
+    <div style={{minWidth:0}}><h2 style={{fontSize:20,letterSpacing:'-.3px',margin:0,lineHeight:1.2}}>Team preparation</h2><span style={{...small,fontSize:11}}>{legionLabel(selectedLegion)}</span></div>
+    <span role="status" style={{fontSize:11,color:draftState.startsWith('Could not')?C.gold:C.icy,maxWidth:'45%',textAlign:'right',lineHeight:1.3}}>{draftState}</span>
    </div>
-   <div role="status" style={{fontSize:12,color:draftState.startsWith('Could not')?C.gold:'#B5C8D6',marginBottom:9}}>{draftState}</div>
-   <p style={{...small,margin:'0 0 12px'}}>Prepare participants and troop power. Team generation is not yet available.</p>
-   {step==='teams'&&<>
-    <section style={{...panel,marginBottom:12}}>
-     <strong style={{fontSize:17}}>Team preparation</strong>
-     <p style={{...small,margin:'6px 0 12px'}}>Registered combatants enter at 0:00. Substitutes enter at 3:00+. Absent players are excluded from this match only.</p>
-     <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
-      {[{label:'Combatants available',count:combatantPool.length,note:'0:00 entry',color:'#83C7FF'},{label:'Substitutes available',count:substitutePool.length,note:'3:00+ entry',color:'#F6CB65'}].map(item=><div key={item.label} style={{background:C.section,border:'1px solid '+C.border,borderRadius:12,padding:11}}><span style={{...small,color:item.color}}>{item.note}</span><div style={{fontSize:26,fontWeight:750,color:C.white,margin:'4px 0'}}>{item.count}</div><span style={small}>{item.label}</span></div>)}
-     </div>
-     <p style={{...small,margin:'10px 0 0'}}>{absentIds.length} marked absent · {selectedIds.length} selected for this match</p>
-    </section>
-    <section style={{...panel,marginBottom:12}}>
-     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}><strong style={{fontSize:16}}>Players</strong><button type="button" style={{...btn,minHeight:38}} onClick={()=>setShowBulk(v=>!v)}>{showBulk?'Close batch paste':'Batch paste power'}</button></div>
-     <input aria-label="Search players" placeholder="Search name or Player ID" value={playerSearch} onChange={e=>setPlayerSearch(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:10}}/>
-     <div role="group" aria-label="Filter participants" style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
-      {[['all','All'],['combatant','Combatants'],['substitute','Substitutes'],['absent','Absent']].map(([key,label])=><button key={key} type="button" aria-pressed={roleFilter===key} style={{...btn,minHeight:39,background:roleFilter===key?'#314B63':C.section,borderColor:roleFilter===key?C.gold:C.border,color:roleFilter===key?C.white:C.icy}} onClick={()=>setRoleFilter(key)}>{label}</button>)}
-     </div>
-     {showBulk&&<div style={{marginBottom:12}}><p style={small}>Paste one player per line: Username, Troop power. Values apply to this match only.</p><textarea aria-label="Paste troop power" placeholder={'LOVE, 4250\nMaliD, 3880'} value={bulk} onChange={e=>setBulk(e.target.value)} rows={5} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16}}/><button type="button" style={{...btn,width:'100%',marginTop:6}} onClick={saveBatch}>Validate and apply</button></div>}
-     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}><span style={small}>Power is saved to this match, not player profiles.</span><button type="button" style={{...btn,minHeight:38}} onClick={chooseAll}>Reset selection</button></div>
-     {visibleRoster.filter(p=>roleFilter==='all'||roleFilter==='absent'&&absentIds.includes(String(p.id))||roleFilter==='combatant'&&isCombatant(p.id)&&!absentIds.includes(String(p.id))||roleFilter==='substitute'&&isSubstitute(p.id)&&!absentIds.includes(String(p.id))).map(p=>{
-      const id=String(p.id),absent=absentIds.includes(id),available=availableForMatch(p)&&isEligible(id),checked=effectiveIds.includes(id),role=isCombatant(id)?'Combatant · 0:00':isSubstitute(id)?'Substitute · 3:00+':isMatchmakingOnly(id)?'Matchmaking only':'Not registered';
-      return <div key={id} style={{padding:'11px 0',borderBottom:'1px solid '+C.border,opacity:absent?.65:1}}>
-       <div style={{display:'flex',gap:9,alignItems:'center'}}>
-        <input type="checkbox" aria-label={'Select '+name(p)} checked={checked} disabled={!available||absent} onChange={()=>toggle(id)} style={{width:20,height:20,flexShrink:0,accentColor:C.gold}}/>
-        <div style={{flex:1,minWidth:0}}>
-         <div style={{fontSize:14,fontWeight:650,overflowWrap:'anywhere'}}>{name(p)}{absent&&<span style={{...small,color:C.gold}}> · Absent</span>}</div>
-         <span style={{...small,color:isCombatant(id)?'#83C7FF':isSubstitute(id)?'#F6CB65':C.icy}}>{role}</span>
-         <span style={{...small,display:'block'}}>{available?'Available · '+matchTime+' UTC':availabilityFor(p).length?'Not available at '+matchTime+' UTC':'Availability unknown'}</span>
-        </div>
-        <input type="number" inputMode="numeric" min="0" aria-label={'Troop power for '+name(p)} value={powers[id]??''} onChange={e=>setPowers(old=>({...old,[id]:e.target.value}))} placeholder="Power" style={{...btn,width:88,minWidth:0,minHeight:44,fontSize:16,boxSizing:'border-box'}}/>
-        <button type="button" aria-label={'Attendance options for '+name(p)} aria-expanded={attendanceMenu===id} onClick={()=>setAttendanceMenu(v=>v===id?'':id)} style={{...btn,minWidth:42,minHeight:44,fontSize:19,padding:5}}>•••</button>
+   <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8,marginBottom:12}}>
+    <label style={{...small,fontSize:11}}>Match date<input type="date" aria-label="TAL match date" value={matchDate} onChange={e=>setMatchDate(e.target.value)} style={{...btn,display:'block',width:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 6px',colorScheme:'dark'}}/></label>
+    <label style={{...small,fontSize:11}}>UTC time<select value={matchTime} onChange={e=>resetForMatch(selectedLegion?.id,e.target.value)} style={{...btn,display:'block',width:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 6px'}}>{(value?.times||DEFAULT_TIMES).map(t=><option key={t}>{t}</option>)}</select></label>
+   </div>
+   <section aria-label="Match availability" style={{...panel,padding:11,marginBottom:10}}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
+     {[{label:'Combatants available',count:combatantPool.length,note:'0:00 entry',color:'#83C7FF'},{label:'Substitutes available',count:substitutePool.length,note:'3:00+ entry',color:'#F6CB65'}].map(item=><div key={item.label} style={{background:C.section,borderRadius:10,padding:'10px 11px',minWidth:0}}>
+      <span style={{...small,fontSize:11,color:item.color}}>{item.note}</span><div style={{fontSize:24,fontWeight:750,lineHeight:1.2,margin:'3px 0'}}>{item.count}</div><span style={{...small,fontSize:11}}>{item.label}</span>
+     </div>)}
+    </div>
+    <div style={{display:'flex',justifyContent:'space-between',gap:8,marginTop:9,color:C.icy,fontSize:11}}><span>{selectedIds.length} selected</span><span>{absentIds.length} absent</span></div>
+   </section>
+   <section aria-label="Match participants and power" style={{...panel,padding:'12px 11px',marginBottom:10}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}>
+     <strong style={{fontSize:16}}>Players</strong><button type="button" style={{...btn,minHeight:40,padding:'7px 10px',fontSize:12}} onClick={()=>setShowBulk(v=>!v)}>{showBulk?'Close paste':'Batch paste'}</button>
+    </div>
+    <input aria-label="Search players" placeholder="Search name or Player ID" value={playerSearch} onChange={e=>setPlayerSearch(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,minHeight:44,marginBottom:9}}/>
+    <div role="group" aria-label="Filter participants" style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:8}}>
+     {[['all','All'],['combatant','Combatants'],['substitute','Substitutes'],['absent','Absent']].map(([key,label])=><button key={key} type="button" aria-pressed={roleFilter===key} style={{...btn,minHeight:39,padding:'7px 9px',fontSize:12,background:roleFilter===key?'#314B63':C.section,borderColor:roleFilter===key?C.gold:C.border,color:roleFilter===key?C.white:C.icy}} onClick={()=>setRoleFilter(key)}>{label}</button>)}
+    </div>
+    {showBulk&&<div style={{marginBottom:10}}><p style={{...small,fontSize:11}}>Paste Username, Troop power on separate lines.</p><textarea aria-label="Paste troop power" placeholder={'LOVE, 4250\nMaliD, 3880'} value={bulk} onChange={e=>setBulk(e.target.value)} rows={4} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16}}/><button type="button" style={{...btn,width:'100%',marginTop:6,minHeight:44}} onClick={saveBatch}>Apply power</button></div>}
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:3}}>
+     <span style={{...small,fontSize:11}}>Match-specific troop power</span>
+     <button type="button" style={{border:0,background:'transparent',color:C.icy,fontSize:11,textDecoration:'underline',padding:'8px 2px',minHeight:36,cursor:'pointer'}} onClick={chooseAll}>Reset selection</button>
+    </div>
+    {visibleRoster.filter(p=>roleFilter==='all'||roleFilter==='absent'&&absentIds.includes(String(p.id))||roleFilter==='combatant'&&isCombatant(p.id)&&!absentIds.includes(String(p.id))||roleFilter==='substitute'&&isSubstitute(p.id)&&!absentIds.includes(String(p.id))).map(p=>{
+     const id=String(p.id),absent=absentIds.includes(id),available=availableForMatch(p)&&isEligible(id),checked=effectiveIds.includes(id);
+     const role=isCombatant(id)?'Combatant · 0:00':isSubstitute(id)?'Substitute · 3:00+':isMatchmakingOnly(id)?'Matchmaking only':'Not registered';
+     return <div key={id} style={{borderBottom:'1px solid '+C.border,padding:'10px 0',opacity:absent?.65:1}}>
+      <div style={{display:'flex',gap:7,alignItems:'center',minWidth:0}}>
+       <input type="checkbox" aria-label={'Select '+name(p)} checked={checked} disabled={!available||absent} onChange={()=>toggle(id)} style={{width:20,height:20,flex:'0 0 20px',accentColor:C.gold,margin:0}}/>
+       <div style={{flex:'1 1 0',minWidth:0}}>
+        <div style={{fontSize:14,fontWeight:650,lineHeight:1.25,overflowWrap:'anywhere'}}>{name(p)}{absent&&<span style={{color:C.gold,fontSize:11}}> · Absent</span>}</div>
+        <div style={{fontSize:11,lineHeight:1.45,color:isCombatant(id)?'#83C7FF':isSubstitute(id)?'#F6CB65':C.icy,marginTop:3}}>{role}</div>
+        <div style={{fontSize:11,lineHeight:1.4,color:C.icy}}>{available?'Available · '+matchTime+' UTC':availabilityFor(p).length?'Unavailable · '+matchTime+' UTC':'Availability unknown'}</div>
        </div>
-       {attendanceMenu===id&&<div style={{display:'flex',justifyContent:'flex-end',marginTop:7}}><button type="button" style={{...btn,minHeight:44,color:absent?'#83C7FF':C.gold}} onClick={()=>{setAbsentIds(old=>absent?old.filter(x=>x!==id):[...new Set([...old,id])]);setAttendanceMenu('')}}>{absent?'Mark attending':'Mark absent for this match'}</button></div>}
-      </div>;
-     })}
-     {!visibleRoster.length&&<p style={small}>No matching players.</p>}
-    </section>
-    <section style={{...panel,marginBottom:12}}>
-     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}><strong>Match troop power</strong><span style={small}>{Object.values(powers).filter(v=>valueNumber(v)!==null).length} recorded</span></div>
-     <p style={{...small,margin:'7px 0 10px'}}>Power is stored separately for each match. Copy values from an earlier match when preparing a new one.</p>
-     <button type="button" style={{...btn,width:'100%',minHeight:44}} onClick={()=>{
-      const prior=Object.entries(drafts||{}).filter(([key,d])=>key.startsWith(String(selectedLegion?.id)+':')&&key!==matchKey&&d?.powers&&Object.keys(d.powers).length).sort((a,b)=>String(b[1]?.updatedAt||'').localeCompare(String(a[1]?.updatedAt||'')))[0];
-      if(!prior){setCopyMessage('No previous shared match with troop power was found.');return;}
-      setPowers(old=>({...prior[1].powers,...old}));setCopyMessage('Previous match power copied. Existing values were kept.');
-     }}>Use previous match's troop power</button>
-     {copyMessage&&<p role="status" style={{...small,color:C.gold,margin:'9px 0 0'}}>{copyMessage}</p>}
-    </section>
-   </>}
+       <input type="number" inputMode="numeric" min="0" aria-label={'Troop power for '+name(p)} value={powers[id]??''} onChange={e=>setPowers(old=>({...old,[id]:e.target.value}))} placeholder="Power" style={{...btn,flex:'0 0 72px',width:72,minWidth:0,minHeight:44,padding:'7px 5px',fontSize:14,boxSizing:'border-box',fontWeight:400}}/>
+       <button type="button" aria-label={'Attendance options for '+name(p)} aria-expanded={attendanceMenu===id} onClick={()=>setAttendanceMenu(v=>v===id?'':id)} style={{border:'none',background:'transparent',color:C.icy,flex:'0 0 36px',width:36,height:44,fontSize:19,cursor:'pointer',padding:0}}>⋯</button>
+      </div>
+      {attendanceMenu===id&&<div style={{display:'flex',justifyContent:'flex-end',marginTop:6}}><button type="button" style={{...btn,minHeight:44,fontSize:12,color:absent?'#83C7FF':C.gold}} onClick={()=>{setAbsentIds(old=>absent?old.filter(x=>x!==id):[...new Set([...old,id])]);setAttendanceMenu('')}}>{absent?'Mark attending':'Mark absent for this match'}</button></div>}
+     </div>;
+    })}
+    {!visibleRoster.filter(p=>roleFilter==='all'||roleFilter==='absent'&&absentIds.includes(String(p.id))||roleFilter==='combatant'&&isCombatant(p.id)&&!absentIds.includes(String(p.id))||roleFilter==='substitute'&&isSubstitute(p.id)&&!absentIds.includes(String(p.id))).length&&<p style={{...small,padding:'12px 0'}}>No players match this filter.</p>}
+   </section>
+   <section aria-label="Carry forward match power" style={{...panel,padding:11}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><strong style={{fontSize:13}}>Troop power</strong><span style={{...small,fontSize:11}}>{Object.values(powers).filter(v=>valueNumber(v)!==null).length} recorded</span></div>
+    <button type="button" style={{...btn,width:'100%',marginTop:9,minHeight:44,fontSize:12}} onClick={()=>{
+     const prior=Object.entries(drafts||{}).filter(([key,d])=>key.startsWith(String(selectedLegion?.id)+':')&&key!==matchKey&&d?.powers&&Object.keys(d.powers).length).sort((a,b)=>String(b[1]?.updatedAt||'').localeCompare(String(a[1]?.updatedAt||'')))[0];
+     if(!prior){setCopyMessage('No previous shared match with troop power was found.');return;}
+     setPowers(old=>({...prior[1].powers,...old}));setCopyMessage('Previous match power copied. Existing values were kept.');
+    }}>Use previous match's power</button>
+    {copyMessage&&<p role="status" style={{...small,fontSize:11,color:C.gold,margin:'8px 0 0'}}>{copyMessage}</p>}
+   </section>
   </>}
  </section>;
 }
