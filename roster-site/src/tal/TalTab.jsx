@@ -524,11 +524,11 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      {id:'availability',label:'Availability missing',list:missingAvailabilityPlayers,detail:'No event times recorded'}
     ].map(item=><div key={item.id} style={{background:C.section,border:'1px solid '+C.border,borderRadius:11,marginTop:7,overflow:'hidden'}}>
      <button type="button" aria-expanded={attentionOpen===item.id} onClick={()=>setAttentionOpen(v=>v===item.id?'':item.id)} style={{background:'transparent',border:0,width:'100%',display:'flex',alignItems:'center',gap:11,textAlign:'left',padding:12,minHeight:56,color:C.white,cursor:'pointer'}}>
-      <span style={{fontSize:20,color:C.gold}}>◇</span><span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13}}>{item.label}</strong><span style={muted}>{item.list.length} player{item.list.length===1?'':'s'}{item.list.length===1?' · '+(item.list[0]?.username||item.list[0]?.alias||item.list[0]?.fid||'Player'):''}</span></span><span style={{color:C.icy}}>{attentionOpen===item.id?'⌃':'⌄'}</span>
+      <span style={{fontSize:20,color:C.gold}}>◇</span><span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13}}>{item.label}</strong><span style={muted}>{item.list.length} player{item.list.length===1?'':'s'}{item.list.length===1?' · '+(item.list[0]?.player?.username||item.list[0]?.player?.alias||item.list[0]?.player?.fid||'Player'):''}</span></span><span style={{color:C.icy}}>{attentionOpen===item.id?'⌃':'⌄'}</span>
      </button>
      {attentionOpen===item.id&&<div style={{padding:'0 12px 12px',borderTop:'1px solid '+C.border}}>
       <p style={{...muted,margin:'9px 0'}}>{item.detail}</p>
-      {item.list.length?item.list.map(p=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,justifyContent:'space-between',padding:'5px 0'}}><span style={{fontSize:13,overflow:'hidden',textOverflow:'ellipsis'}}>{p.username||p.alias||p.fid||p.id}</span><button type="button" style={{...button,minHeight:40,padding:'7px 11px',fontSize:12}} onClick={()=>onOpenPlayer?.(p.id)}>Edit player →</button></div>):<p style={{...muted,color:C.green}}>All information complete.</p>}
+      {item.list.length?item.list.map(({player:p})=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,justifyContent:'space-between',padding:'5px 0'}}><span style={{fontSize:13,overflow:'hidden',textOverflow:'ellipsis'}}>{p.username||p.alias||p.fid||p.id}</span><button type="button" style={{...button,minHeight:40,padding:'7px 11px',fontSize:12}} onClick={()=>onOpenPlayer?.(p.id)}>Edit player →</button></div>):<p style={{...muted,color:C.green}}>All information complete.</p>}
      </div>}
     </div>)}
    </section>}
