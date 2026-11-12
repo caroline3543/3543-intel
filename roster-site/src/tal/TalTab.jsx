@@ -530,7 +530,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
        </div>}
        {talView==='registration'&&member&&!selecting&&<div style={{padding:'0 11px 12px'}}>
         <button type="button" aria-label={'Manage TAL status for '+(player.username||player.alias||'player')} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)} style={{...button,width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,background:C.section,color:editable?C.gold:C.icy,minHeight:48}}>⚙ Manage TAL status</button>
-       </div>
+       </div>}
        {(isMove||shownStat)&&<div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'0 11px 10px',color:isMove?C.gold:C.icy,fontSize:12}}>{isMove&&<span>Move {status.tag||'No alliance'} → {entryTeam.host}</span>}{shownStat&&<span>{shownStat}</span>}</div>}
        {!selecting&&actionsId===player.id&&<div style={{padding:'8px 11px 12px',background:C.section,display:'grid',gap:5}}>
         {!member&&editable&&<><button type="button" style={{...button,textAlign:'left',color:C.gold}} onClick={()=>promoteCandidate(entryTeam,player.id,false)}>Move to needs registration</button><button type="button" style={{...button,textAlign:'left',color:C.green}} onClick={()=>promoteCandidate(entryTeam,player.id,true)}>Confirm registered in game</button></>}
