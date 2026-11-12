@@ -26,12 +26,14 @@ const norahInfo=p=>{
 };
 const norah=p=>norahInfo(p)==='Norah · Skill 5';
 const languageInfo=p=>p?.communicationLanguage?[String(p.communicationLanguage).trim()]:[...new Set([p?.gameLanguage,...(Array.isArray(p?.languages)?p.languages:[])].map(x=>typeof x==='string'?x:typeof x?.language==='string'?x.language:'').map(x=>x.trim()).filter(Boolean))];
-function textOfTeams(groups,playersById) {
+function textOfTeams(groups,playersById,entryLabel=()=>null) {
  return groups.map(g=>{
   const leader=g.leader?name(playersById.get(String(g.leader))||{id:g.leader}):'Not assigned';
   const label=(COLORS.find(c=>c.id===g.color)?.name||'Team').toUpperCase();
-  const joiners=g.members.map(id=>name(playersById.get(String(id))||{id}));
-  return label+' LEADER: '+leader+'\n'+joiners.join(', ');
+  const ids=[g.leader,...g.members].filter(Boolean).map(String);
+  const starters=ids.filter(id=>entryLabel(id)!=='3:00+').map(id=>name(playersById.get(id)||{id}));
+  const substitutes=ids.filter(id=>entryLabel(id)==='3:00+').map(id=>name(playersById.get(id)||{id}));
+  return label+' TEAM\nLeader: '+leader+'\nSTART 0:00: '+(starters.join(', ')||'None')+(substitutes.length?'\nJOIN 3:00+: '+substitutes.join(', '):'');
  }).join('\n\n');
 }
 const initialGroups=()=>COLORS.map((c,i)=>({key:i+1,color:c.id,leader:null,members:[]}));
@@ -98,7 +100,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const handleStyle={width:52,minWidth:52,minHeight:60,alignSelf:'stretch',display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid '+C.border,borderRadius:9,background:C.section,color:C.icy,fontSize:25,touchAction:'none',userSelect:'none',WebkitUserSelect:'none',WebkitTouchCallout:'none',cursor:'grab',padding:0};
  const dragCard=(id,col)=><div key={id} style={{display:'flex',alignItems:'stretch',gap:8,width:'100%',minHeight:64,marginTop:6,padding:5,border:'1px solid '+(picked===id?col.color:C.border),borderRadius:11,background:C.card,userSelect:'none',WebkitUserSelect:'none',WebkitTouchCallout:'none',opacity:dragId===id?0.45:1}}>
   <button type="button" {...dragHandle(id)} title="Hold and drag" aria-label={'Drag '+name(byId.get(String(id))||{id})+' to a building'} style={handleStyle}>⠿</button>
-  <button type="button" onClick={()=>setPicked(picked===id?'':id)} style={{...btn,flex:1,minWidth:0,minHeight:60,textAlign:'left',border:0,background:'transparent',padding:'8px 6px',fontSize:15,overflowWrap:'anywhere',userSelect:'none',WebkitUserSelect:'none'}}>{name(byId.get(String(id))||{id})}{picked===id?' ✓':''}</button>
+  <button type="button" onClick={()=>setPicked(picked===id?'':id)} style={{...btn,flex:1,minWidth:0,minHeight:60,textAlign:'left',border:0,background:'transparent',padding:'8px 6px',fontSize:15,overflowWrap:'anywhere',userSelect:'none',WebkitUserSelect:'none'}}>{name(byId.get(String(id))||{id})}{isSubstitute(id)?' · 3:00+':''}{picked===id?' ✓':''}</button>
  </div>;
  const [preview,setPreview]=useState(false);
  const [copyMessage,setCopyMessage]=useState('');
@@ -139,7 +141,17 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   return Array.isArray(raw)?raw.map(String):[];
  };
  const availableForMatch=p=>memberIds.has(String(p.id))&&availabilityFor(p).includes(matchTime);
- const pool=legionRoster.filter(availableForMatch);
+ const memberById=new Map((selectedLegion?.members||[]).map(m=>[String(m.id),m]));
+ const registrationRole=id=>memberById.get(String(id))?.role||'pending';
+ const isCombatant=id=>registrationRole(id)==='combatant';
+ const isSubstitute=id=>registrationRole(id)==='substitute';
+ const isMatchmakingOnly=id=>!!memberById.get(String(id))?.matchmakingOnly;
+ const isEligible=id=>!!memberById.get(String(id))?.registered&&!isMatchmakingOnly(id)&&(isCombatant(id)||isSubstitute(id));
+ const pool=legionRoster.filter(p=>availableForMatch(p)&&isEligible(p.id));
+ const combatantPool=pool.filter(p=>isCombatant(p.id));
+ const substitutePool=pool.filter(p=>isSubstitute(p.id));
+ const substituteNeed=Math.max(0,30-Math.min(30,combatantPool.length));
+ const preferredIds=[...combatantPool.slice(0,30),...substitutePool.slice(0,substituteNeed)].map(p=>String(p.id));
  const visibleRoster=legionRoster.filter(p=>(!onlyAvailable||availableForMatch(p))&&(!playerSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(playerSearch.trim().toLowerCase())))).sort((a,b)=>Number(availableForMatch(b))-Number(availableForMatch(a))||name(a).localeCompare(name(b),undefined,{sensitivity:'base'}));
   const battlePool=useMemo(()=>players.filter(p=>!p.blacklisted),[players]);
  const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource}),[chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource]);
@@ -161,7 +173,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   try{const raw=window.localStorage.getItem(draftKey);if(raw)saved=JSON.parse(raw);}catch{}
   const source=remoteDraft||saved;
   autoSelectionPending.current=source?'':draftKey;
-  applyDraft(source||{chosen:pool.map(p=>String(p.id))});
+  applyDraft(source||{chosen:preferredIds});
   remoteApplied.current=remoteDraft?.updatedAt||'';
   setDraftState(remoteDraft?'Shared draft restored':saved?'Device draft restored':'Available players selected for this time');
   setStep('teams');setPicked('');setEditingTeam(null);setGenerationError('');setDraftLoaded(draftKey);
@@ -171,7 +183,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   // Only initialise a new draft when roster data arrives. Never overwrite saved edits.
   if(autoSelectionPending.current!==draftKey||draftLoaded!==draftKey||!pool.length)return;
   autoSelectionPending.current='';
-  setChosen(pool.map(p=>String(p.id)));
+  setChosen(preferredIds);
  },[draftKey,draftLoaded,pool.map(p=>String(p.id)).join('|')]);
  useEffect(()=>{
   if(draftLoaded!==draftKey||!remoteDraft||remoteApplied.current===remoteDraft.updatedAt)return;
@@ -204,8 +216,10 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   onDraftChange(matchKey,{...snapshot,updatedAt:new Date().toISOString()});
   setDraftState('Sharing existing device draft');
  },[syncReady,draftKey,draftLoaded,!!remoteDraft]);
-  const selectedIds=[...new Set(chosen.map(String))].filter(id=>byId.has(String(id))&&battlePool.some(p=>String(p.id)===String(id)));
- const selectedPlayers=selectedIds.map(id=>byId.get(String(id))).filter(Boolean);
+  const selectedIds=[...new Set(chosen.map(String))].filter(id=>byId.has(String(id))&&isEligible(id)&&battlePool.some(p=>String(p.id)===String(id)));
+ const combatantsSelected=selectedIds.filter(isCombatant).slice(0,30);
+ const effectiveIds=[...combatantsSelected,...selectedIds.filter(isSubstitute).slice(0,Math.max(0,30-combatantsSelected.length))];
+ const selectedPlayers=effectiveIds.map(id=>byId.get(String(id))).filter(Boolean);
  const leaderCandidates=[...selectedPlayers].filter(p=>p.roles?.some?.(r=>/rally lead/i.test(String(r)))||p.rallyLeader||p.leaderProfile?.role==='leader');
  const powerOf=id=>valueNumber(powers[String(id)]??value?.records?.[id]?.troopPower);
  const teamPower=g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).reduce((sum,id)=>sum+(powerOf(id)||0),0);
@@ -239,18 +253,18 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const balanceStats=balanceInfo(groups);
  const compatibilityStats=preferenceScore(groups);
  const allAssigned=groups.flatMap(g=>[g.leader,...g.members]).filter(Boolean).map(String);
- const selectedSet=new Set(selectedIds);
- const missing=selectedIds.filter(id=>!allAssigned.includes(String(id)));
+ const selectedSet=new Set(effectiveIds);
+ const missing=effectiveIds.filter(id=>!allAssigned.includes(String(id)));
  const duplicateAssignments=[...new Set(allAssigned.filter((id,index)=>allAssigned.indexOf(id)!==index))];
  const extraAssignments=[...new Set(allAssigned.filter(id=>!selectedSet.has(id)))];
- const assignmentsValid=allAssigned.length===selectedIds.length&&!missing.length&&!duplicateAssignments.length&&!extraAssignments.length&&groups.every(g=>!!g.leader);
- const assignedSummary=assignmentsValid?selectedIds.length+' of '+selectedIds.length+' selected players assigned':allAssigned.length+' assigned · '+missing.length+' unassigned'+(duplicateAssignments.length?' · '+duplicateAssignments.length+' duplicated':'')+(extraAssignments.length?' · '+extraAssignments.length+' deselected still assigned':'');
+ const assignmentsValid=allAssigned.length===effectiveIds.length&&!missing.length&&!duplicateAssignments.length&&!extraAssignments.length&&groups.every(g=>!!g.leader);
+ const assignedSummary=assignmentsValid?effectiveIds.length+' of '+effectiveIds.length+' eligible players assigned':allAssigned.length+' assigned · '+missing.length+' unassigned'+(duplicateAssignments.length?' · '+duplicateAssignments.length+' duplicated':'')+(extraAssignments.length?' · '+extraAssignments.length+' deselected still assigned':'');
  const activePlayers=groups.flatMap(g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).map(id=>({id:String(id),g})));
  const allTeamIds=new Set(groups.flatMap(g=>[g.leader,...g.members].filter(Boolean)).map(String));
  const assignedCount=activePlayers.filter(({id})=>assignment[id]).length;
  const teamFor=id=>groups.find(g=>String(g.leader)===String(id)||g.members.some(m=>String(m)===String(id)));
  function resetForMatch(nextLegion=legionId,nextTime=matchTime){setLegionId(nextLegion);setMatchTime(nextTime);setGenerationError('');setBulk('');setPicked('');setPlayerSearch('');setOnlyAvailable(false);setStep('teams');setLocked([]);setPreview(false);setEditingTeam(null);}
- function chooseAll(){autoSelectionPending.current='';setChosen(pool.map(p=>String(p.id)));}
+ function chooseAll(){autoSelectionPending.current='';setChosen(preferredIds);setGenerationError('');}
  function toggle(id){
   const key=String(id);if(!pool.some(p=>String(p.id)===key))return;
   autoSelectionPending.current='';
@@ -289,7 +303,8 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  }
  function generate(){
   setGenerationError('');setGenerationSuccess('');
-  if(selectedPlayers.length<4){setGenerationError('Select at least four available players.');return;}
+  if(selectedPlayers.length<4){setGenerationError('Select at least four registered players who can attend.');return;}
+  setChosen(effectiveIds);
   const unknown=selectedPlayers.filter(p=>powerOf(p.id)===null);
   if(unknown.length){setGenerationError('Missing troop power for '+unknown.length+' player'+(unknown.length===1?'':'s')+': '+unknown.slice(0,3).map(name).join(', ')+(unknown.length>3?'…':'')+'. Enter power before generating.');return;}
   const sorted=[...selectedPlayers].sort((a,b)=>powerOf(b.id)-powerOf(a.id));
@@ -331,11 +346,11 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
    }
   }
   const ids=next.flatMap(g=>[g.leader,...g.members]).filter(Boolean).map(String);
-  if(ids.length!==selectedIds.length||new Set(ids).size!==selectedIds.length||ids.some(id=>!selectedSet.has(id))){setGenerationError('Could not assign every selected player exactly once. Existing assignments were preserved.');return;}
+  if(ids.length!==effectiveIds.length||new Set(ids).size!==effectiveIds.length||ids.some(id=>!selectedSet.has(id))){setGenerationError('Could not assign every selected player exactly once. Existing assignments were preserved.');return;}
   setGroups(next);setAssignment({});setAbsentIds([]);setConfirmed(false);setStep('teams');
   const outcome=balanceInfo(next),affinity=preferenceScore(next);
-  setGenerationError('');setGenerationSuccess(selectedIds.length+' of '+selectedIds.length+' selected players assigned across four teams.');
-  setCopyMessage(selectedIds.length+' of '+selectedIds.length+' selected players assigned across four teams. Max power deviation '+outcome.deviation.toFixed(1)+'%'+(outcome.deviation>5?' (above 5% target)':'')+'. '+affinity.links+' cooperation pairs together.');
+  setGenerationError('');setGenerationSuccess(effectiveIds.length+' of '+effectiveIds.length+' eligible players assigned across four teams.');
+  setCopyMessage(effectiveIds.length+' of '+effectiveIds.length+' eligible players assigned across four teams. Max power deviation '+outcome.deviation.toFixed(1)+'%'+(outcome.deviation>5?' (above 5% target)':'')+'. '+affinity.links+' cooperation pairs together.');
  }
   function addUnassigned(){
   setGenerationError('');setGenerationSuccess('');
@@ -358,9 +373,9 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
    next[ranked[0].i].members.push(id);
   }
   const ids=next.flatMap(g=>[g.leader,...g.members]).filter(Boolean).map(String);
-  if(ids.length!==selectedIds.length||new Set(ids).size!==selectedIds.length||ids.some(id=>!selectedSet.has(id))){setGenerationError('Unable to place every selected player exactly once. Existing teams are unchanged.');return;}
-  setGroups(next);setConfirmed(false);setGenerationSuccess(ids.length+' of '+selectedIds.length+' selected players assigned. Added '+newcomers.length+' without changing existing teams.');
-  setCopyMessage('Added '+newcomers.length+' players without reshuffling existing teams. '+ids.length+' of '+selectedIds.length+' selected players assigned.');
+  if(ids.length!==effectiveIds.length||new Set(ids).size!==effectiveIds.length||ids.some(id=>!selectedSet.has(id))){setGenerationError('Unable to place every selected player exactly once. Existing teams are unchanged.');return;}
+  setGroups(next);setConfirmed(false);setGenerationSuccess(ids.length+' of '+effectiveIds.length+' eligible players assigned. Added '+newcomers.length+' without changing existing teams.');
+  setCopyMessage('Added '+newcomers.length+' players without reshuffling existing teams. '+ids.length+' of '+effectiveIds.length+' eligible players assigned.');
  }
   function moveMember(id,targetKey){
   const source=teamFor(id);if(!source||String(source.leader)===String(id))return;
@@ -381,27 +396,33 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  }
  function assign(id,building){
   const g=teamFor(id);if(!g)return;
+  if(!isEligible(id)){setCopyMessage('Only registered playing members may be placed in buildings.');return;}
   const colour=COLORS.find(c=>c.id===g.color);
   if(!colour?.buildings.includes(building)){setCopyMessage('This building belongs to another colour team. Reassign the player’s team first.');return;}
   setAssignment(old=>{setUndoAssignment({id:String(id),before:old[String(id)]||null,after:building});return {...old,[String(id)]:building};});
   setPicked('');
+  if(isSubstitute(id))setCopyMessage('Substitute '+name(byId.get(String(id))||{id})+' enters at 3:00+, not at the start.');
  }
  function autoAssign(){
   const next={};
   groups.forEach(g=>{
    const [first,second]=COLORS.find(c=>c.id===g.color).buildings;
-   if(g.leader)next[String(g.leader)]=first;
-   g.members.forEach((id,i)=>next[String(id)]=(i%2===0?first:second));
+   if(g.leader&&isEligible(g.leader))next[String(g.leader)]=first;
+   g.members.filter(isEligible).forEach((id,i)=>next[String(id)]=(i%2===0?first:second));
   });
   setAssignment(next);setCopyMessage('Assigned everyone to a building within their colour area.');
  }
  async function copy(text){try{await navigator.clipboard.writeText(text);setCopyMessage('Copied to clipboard.');}catch{setCopyMessage('Clipboard unavailable. Copy from the preview instead.');}}
- const assignmentText='INITIAL ASSIGNMENTS\n\n'+BUILDINGS.map(b=>'» '+b+': '+activePlayers.filter(({id})=>assignment[id]===b).map(({id})=>name(byId.get(id)||{id})).join(', ')).join('\n');
- const teamText=textOfTeams(groups.map(g=>({...g,leader:absentIds.includes(String(g.leader))?null:g.leader,members:g.members.filter(id=>!absentIds.includes(String(id)))})),byId);
+ const assignmentText='INITIAL ASSIGNMENTS\n\n'+BUILDINGS.map(b=>'» '+b+': '+activePlayers.filter(({id})=>assignment[id]===b).map(({id})=>name(byId.get(id)||{id})+(isSubstitute(id)?' (3:00+)':'')).join(', ')).join('\n');
+ const teamText=textOfTeams(groups.map(g=>({...g,leader:absentIds.includes(String(g.leader))?null:g.leader,members:g.members.filter(id=>!absentIds.includes(String(id)))})),byId,id=>isSubstitute(id)?'3:00+':'0:00');
+ const fullBattlePlan='⚔️ TAL · '+legionLabel(selectedLegion)+' · '+matchTime+' UTC\n\n'+teamText+'\n\n'+assignmentText+'\n\nCombatants enter immediately. Assigned substitutes enter after 3 minutes.';
  const copyStale=!!copySource&&copySource!==teamText;
  function openTeamCopy(){if(!copyOpen&&!copyDraft){setCopyDraft(teamText);setCopySource(teamText)}setCopyOpen(v=>!v)}
  function regenerateCopy(){setCopyDraft(teamText);setCopySource(teamText);setCopyMessage('Preview updated from current teams.');}
  function addLatePlayer(){const id=String(lateId);const target=groups.find(g=>g.color===lateTarget);if(!id||!target||!byId.has(id))return;
+  if(!isEligible(id)){setCopyMessage('Register this player for a playing role in TAL Registration first.');return;}
+  const activeIds=groups.flatMap(g=>[g.leader,...g.members]).filter(Boolean).filter(x=>!absentIds.includes(String(x)));
+  if(isSubstitute(id)&&activeIds.filter(isSubstitute).length>=Math.max(0,30-activeIds.filter(isCombatant).length)){setCopyMessage('No additional substitutes needed. Combatants take priority.');return;}
   if(allTeamIds.size>=50){setCopyMessage('The 50-player battle roster is full. Remove someone before adding a late arrival.');return;}
   if(allTeamIds.has(id)){setCopyMessage('This player already has a team. Move them manually.');return;}
   setChosen(old=>[...new Set([...old,id])]);setGroups(old=>old.map(g=>g.key===target.key?{...g,members:[...g.members,id]}:g));setLateId('');setLateSearch('');setCopyMessage('Player assigned to '+(COLORS.find(c=>c.id===lateTarget)?.name||'selected')+' team without reshuffling.');}
@@ -413,7 +434,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  return <section style={{padding:'14px 20px 35px'}}>
   {dragId&&dragPoint&&<div aria-hidden="true" style={{position:'fixed',left:dragPoint.x+12,top:dragPoint.y-35,zIndex:9999,pointerEvents:'none',background:C.section,border:'2px solid '+C.gold,color:C.white,borderRadius:11,padding:'14px 18px',boxShadow:'0 12px 26px #0008',maxWidth:'min(280px,80vw)',fontSize:15,fontWeight:700,overflowWrap:'anywhere'}}>{name(byId.get(dragId)||{id:dragId})}</div>}
   <h2 style={{fontSize:25,letterSpacing:'-.4px',margin:'0 0 8px'}}>TAL Teams</h2>
-  <p style={{...small,margin:'0 0 10px'}}>Choose participants, then regenerate all teams or add unassigned players.</p>
+  <p style={{...small,margin:'0 0 10px'}}>Registered combatants start first. Substitutes cover shortages and enter after 3 minutes.</p>
   {!legions.length?<p style={{...panel,...small}}>No legions in your TAL plan. Assign players in TAL Planner first.</p>:<>
    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
     <label style={small}>Legion<select value={selectedLegion?.id||''} onChange={e=>resetForMatch(e.target.value,matchTime)} style={{...btn,width:'100%',marginTop:5}}>{legions.map(t=><option value={t.id} key={t.id}>{legionLabel(t)}</option>)}</select></label>
@@ -433,7 +454,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     <>
     <section style={{...panel,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><strong>Legion participants</strong><span style={small}>{selectedIds.length} selected · {pool.length} available · {legionRoster.length} total</span></div>
-     <p style={{...small,margin:'6px 0 10px'}}>Only players available at {matchTime} UTC are selected by default. Others stay visible but greyed out. Use Add to battle for a last-minute override.</p>
+     <p style={{...small,margin:'6px 0 10px'}}>{combatantPool.length} combatants available · {substituteNeed} substitute slots needed · {substitutePool.length} substitutes available. Matchmaking-only players remain excluded.</p>
      <input aria-label="Search legion participants" placeholder="Search name or Player ID" value={playerSearch} onChange={e=>setPlayerSearch(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16,marginBottom:8}}/>
      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
       <label style={{...small,display:'flex',alignItems:'center',gap:7,cursor:'pointer'}}><input type="checkbox" checked={onlyAvailable} onChange={e=>setOnlyAvailable(e.target.checked)} style={{width:18,height:18,accentColor:C.gold}}/> Available only</label>
@@ -441,12 +462,12 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
      </div>
      <div style={{maxHeight:260,overflowY:'auto',borderTop:'1px solid '+C.border,overscrollBehavior:'contain'}}>
       {visibleRoster.map(p=>{
-       const available=availableForMatch(p),assigned=allTeamIds.has(String(p.id)),checked=selectedIds.includes(String(p.id));
+       const available=availableForMatch(p)&&isEligible(p.id),assigned=allTeamIds.has(String(p.id)),checked=effectiveIds.includes(String(p.id));
        return <label key={p.id} style={{display:'flex',alignItems:'center',gap:9,minHeight:54,borderBottom:'1px solid '+C.border,opacity:available?1:0.46,cursor:available?'pointer':'default'}}>
         <input type="checkbox" aria-label={'Select '+name(p)} checked={checked} disabled={!available} onChange={()=>toggle(p.id)} style={{width:19,height:19,flexShrink:0,accentColor:C.gold}}/>
         <span style={{flex:1,minWidth:0}}>
          <span style={{fontSize:13,fontWeight:600,display:'block',overflowWrap:'anywhere'}}>{name(p)}</span>
-         <span style={{...small,display:'block',marginTop:2}}>{available?'Available at '+matchTime+' UTC':availabilityFor(p).length?availabilityFor(p).join(' · ')+' UTC':'Availability unknown'}{!memberIds.has(String(p.id))?' · Considering':''}{assigned&&!available?' · Battle override':''}</span>
+         <span style={{...small,display:'block',marginTop:2}}>{isMatchmakingOnly(p.id)?'Matchmaking only · Excluded':!isEligible(p.id)?'Not registered to play':isSubstitute(p.id)?'Substitute · 3:00+':'Combatant · 0:00'} · {available?'Available at '+matchTime+' UTC':availabilityFor(p).length?availabilityFor(p).join(' · ')+' UTC':'Availability unknown'}{!memberIds.has(String(p.id))?' · Considering':''}{assigned&&!available?' · Battle override':''}</span>
         </span>
         <span style={{...small,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{powerFormat(powerOf(p.id))}</span>
        </label>})}
@@ -568,7 +589,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
    {step==='buildings'&&<>
     <section style={{...panel,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center'}}><strong>Initial assignments</strong><strong style={{color:assignedCount===activePlayers.length?C.green:C.gold}}>{assignedCount} / {activePlayers.length} assigned</strong></div>
-     <p style={{...small,margin:'6px 0 10px'}}>Hold the six-dot handle and drag a player to a building. Or tap their name, then tap a building.</p>
+     <p style={{...small,margin:'6px 0 10px'}}>Drag players within their colour area using the six-dot handles, or tap a player then a building. Substitutes marked 3:00+ are delayed.</p>
      {undoAssignment&&<div role="status" style={{display:'flex',alignItems:'center',gap:8,background:C.section,borderRadius:8,padding:8,margin:'8px 0'}}>
       <span style={{...small,flex:1}}>{name(byId.get(undoAssignment.id)||{id:undoAssignment.id})} → {undoAssignment.after}</span>
       <button type="button" style={{...btn,minHeight:36,color:C.gold}} onClick={()=>{const u=undoAssignment;setAssignment(old=>{const n={...old};if(u.before)n[u.id]=u.before;else delete n[u.id];return n;});setUndoAssignment(null)}}>Undo</button>
@@ -599,12 +620,12 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     <section style={{...panel,marginBottom:12}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><strong>Copy initial assignments</strong><span style={small}>{assignedCount===activePlayers.length&&missing.length===0?'Ready':'Allocate every player first'}</span></div>
      <pre style={{whiteSpace:'pre-wrap',fontFamily:'inherit',fontSize:13,lineHeight:1.7,overflowWrap:'anywhere',margin:'12px 0'}}>{assignmentText}</pre>
-     <button style={{...btn,width:'100%',background:assignedCount===activePlayers.length&&missing.length===0?C.gold:C.section,color:assignedCount===activePlayers.length&&missing.length===0?C.bg:C.icy}} disabled={!activePlayers.length||assignedCount!==activePlayers.length||missing.length>0} onClick={()=>copy(assignmentText)}>Copy initial assignments</button>
+     <button style={{...btn,width:'100%',background:assignedCount===activePlayers.length&&missing.length===0?C.gold:C.section,color:assignedCount===activePlayers.length&&missing.length===0?C.bg:C.icy}} disabled={!activePlayers.length||assignedCount!==activePlayers.length||missing.length>0} onClick={()=>copy(fullBattlePlan)}>Copy complete battle plan</button>
     </section>
    </>}
     <section style={{...panel,marginTop:8}}>
      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}><strong style={{fontSize:14}}>Team instructions</strong><span style={small}>Complete current teams</span></div>
-     <button type="button" style={{...btn,width:'100%',background:allAssigned.length?C.gold:C.section,color:allAssigned.length?C.bg:C.icy,marginBottom:8}} disabled={!allAssigned.length} onClick={()=>copy(teamText)}>Copy teams</button>
+     <button type="button" style={{...btn,width:'100%',background:allAssigned.length?C.gold:C.section,color:allAssigned.length?C.bg:C.icy,marginBottom:8}} disabled={!allAssigned.length} onClick={()=>copy(fullBattlePlan)}>Copy complete battle plan</button>
      <button type="button" aria-expanded={copyOpen} style={{...btn,width:'100%',textAlign:'left',color:C.gold}} onClick={openTeamCopy}>{copyOpen?'Hide editable preview':'Preview / Edit teams ▾'}</button>
      {copyOpen&&<div style={{marginTop:10}}>
       {copyStale&&<p role="status" style={{...small,color:C.gold}}>Team assignments have changed since the preview was generated. Refresh it to include the current complete teams.</p>}
