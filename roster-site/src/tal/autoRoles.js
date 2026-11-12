@@ -7,7 +7,8 @@ export function compareLegionStrength(plan,a,b){
  return compareLabyrinth(a,b)||String(a.id).localeCompare(String(b.id));
 }
 export function allocateLegionRoles(plan,players){
- if(!plan||plan.locked||plan.autoRoles===false)return plan;
+ // Existing registration assignments are deliberate. Auto allocation requires explicit opt-in.
+ if(!plan||plan.locked||plan.autoRoles!=='requested')return plan;
  const byId=new Map(players.map(p=>[p.id,p]));let changed=false;
  const teams=plan.teams.map(t=>{
   const sorted=[...t.members].sort((a,b)=>compareLegionStrength(plan,byId.get(a.id)||{id:a.id},byId.get(b.id)||{id:b.id}));
