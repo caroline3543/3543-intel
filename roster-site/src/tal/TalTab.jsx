@@ -132,7 +132,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const missingAvailabilityPlayers=entries.filter(e=>missingAvailability(e.player));
  const gameLanguages=player=>[...new Set([player.gameLanguage,...(Array.isArray(player.languages)?player.languages:[])].filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))];
  const tierChips=player=>[['infantry','Inf',C.inf],['lancer','Lan',C.lan],['marksman','Mar',C.mar]].filter(([key])=>player.troops?.[key]&&String(player.troops[key]).toLowerCase()!=='unknown');
- const roster=entries.filter(e=>(check==='all'||e.check.status===check)&&matchesSearch(e.player)&&matchesTime(e.player)&&(!missingFilter||(missingFilter==='tiers'?missingTroopTypes(e.player).length:missingAvailability(e.player)))&&(registrationFilter==='all'||registrationFilter==='unregistered'&&e.member&&!e.member.registered||registrationFilter==='registered'&&e.member?.registered)&&(roleFilter==='all'||(roleFilter==='matchmaking'?!!e.member?.matchmakingOnly:e.member?.role===roleFilter))).sort((a,b)=>{
+ const roster=entries.filter(e=>(check==='all'||e.check.status===check)&&matchesSearch(e.player)&&matchesTime(e.player)&&(!missingFilter||(missingFilter==='any'?(missingTroopTypes(e.player).length>0||missingAvailability(e.player)):missingFilter==='tiers'?missingTroopTypes(e.player).length:missingAvailability(e.player)))&&(registrationFilter==='all'||registrationFilter==='unregistered'&&e.member&&!e.member.registered||registrationFilter==='registered'&&e.member?.registered)&&(roleFilter==='all'||(roleFilter==='matchmaking'?!!e.member?.matchmakingOnly:e.member?.role===roleFilter))).sort((a,b)=>{
   if(sort==='troop'){const score=p=>numeric(value?.records?.[p.id]?.troopPower);const av=score(a.player),bv=score(b.player);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='city'){const av=numeric(a.player.power??a.player.providerStats?.power),bv=numeric(b.player.power??b.player.providerStats?.power);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='labyrinth'){const av=numeric(a.player.providerRankings?.labyrinth?.rank),bv=numeric(b.player.providerRankings?.labyrinth?.rank);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
@@ -207,7 +207,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   if(talView==='home')return;
   try{window.sessionStorage.setItem('tal:3573:filters:'+talView,JSON.stringify(snapshotSection()));}catch{}
  },[talView,check,search,timeFilters,timeMode,sort,sortDirection,registrationFilter,roleFilter,missingFilter,filtersOpen,listLimit]);
- function chooseLegion(id){setRoleFilter('all');setSelecting(false);setBulkSelected([]);setBulkPanel('');setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setBatchStatus('needs');setTimeMerge('add');setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
+ function chooseLegion(id){setPrepOptionsOpen(false);setRoleFilter('all');setSelecting(false);setBulkSelected([]);setBulkPanel('');setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setBatchStatus('needs');setTimeMerge('add');setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
  function focusPlayers(){playersAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'});}
  function chooseReadiness(next){setCheck(current=>current===next?'all':next);setListLimit(40);focusPlayers();}
  function resetFilters(){setCheck('all');setSearch('');setTimeFilters([]);setRegistrationFilter('all');setRoleFilter('all');setMissingFilter('');setListLimit(40);}
@@ -552,10 +552,16 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
 
 
     <PlayerSearch label="Search TAL players" placeholder="Search username, nickname or ID" players={entries.map(e=>e.player)} value={search} onChange={v=>{setSearch(v);setListLimit(40)}} onSelect={p=>{setSearch(p.fid||p.username||p.alias||String(p.id));setListLimit(40)}}/>
-    <div role="group" aria-label="Filter TAL roles" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:5,marginBottom:4,alignItems:'center',scrollbarWidth:'none'}}>
+    {talView==='prep'?<div role="group" aria-label="Filter alliance readiness" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:6,marginBottom:4,alignItems:'center',scrollbarWidth:'none'}}>
+     <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Prep</span>
+     {[['all','All players'],['move','Need to move'],['in-host','In alliance'],['missing','Missing info']].map(([id,label])=>{
+      const active=id==='missing'?!!missingFilter:check===id&&!missingFilter;
+      return <button type="button" key={id} aria-pressed={active} onClick={()=>{setRoleFilter('all');if(id==='missing'){setCheck('all');setMissingFilter(old=>old?'':'any');}else{setMissingFilter('');setCheck(id);}setListLimit(40);}} style={{background:active?'#45351F':'#182A3F',color:active?'#F2C47A':C.icy,border:0,borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}</button>
+     })}
+    </div>:<div role="group" aria-label="Filter TAL roles" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:5,marginBottom:4,alignItems:'center',scrollbarWidth:'none'}}>
      <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Status</span>
      {[['all','All'],['combatant','Combatants'],['substitute','Substitutes'],['matchmaking','Matchmaking only']].map(([id,label])=><button key={id} type="button" aria-pressed={roleFilter===id} onClick={()=>{setRoleFilter(id);setListLimit(40)}} style={{background:roleFilter===id?'#45351F':'#182A3F',color:roleFilter===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}</button>)}
-    </div>
+    </div>}
     <div role="group" aria-label="Sort TAL players" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,alignItems:'center',scrollbarWidth:'none'}}>
      <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Sort</span>
      {[['name','Name'],['city','City power'],['labyrinth','Labyrinth'],['troop','Troop strength']].map(([id,label])=><button type="button" key={id} aria-pressed={sort===id} onClick={()=>switchSort(id)} style={{background:sort===id?'#45351F':'#182A3F',color:sort===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
@@ -585,7 +591,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       {roleFilter!=='all'&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12,color:C.gold}} onClick={()=>setRoleFilter('all')}>{roleFilter==='matchmaking'?'Matchmaking only':roleFilter==='combatant'?'Combatants':'Substitutes'} ×</button>}
       {registrationFilter!=='all'&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12,color:C.gold}} onClick={()=>setRegistrationFilter('all')}>{registrationFilter==='registered'?'Registered':'Needs registration'} ×</button>}
       {search&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12}} onClick={()=>setSearch('')}>Clear search ×</button>}
-      {missingFilter&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12,color:C.gold}} onClick={()=>setMissingFilter('')}>{missingFilter==='tiers'?'Missing troop tiers':'Missing availability'} ×</button>}
+      {missingFilter&&<button style={{...button,minHeight:34,padding:'5px 9px',fontSize:12,color:C.gold}} onClick={()=>setMissingFilter('')}>{missingFilter==='tiers'?'Missing troop tiers':missingFilter==='any'?'Missing information':'Missing availability'} ×</button>}
     </div>}
 
     {adding&&team&&<section aria-label="Add TAL players from Members" style={{background:C.card,borderRadius:12,padding:12,marginBottom:12}}>
@@ -656,16 +662,16 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
         {tierChips(player).map(([key,label,color])=><span key={key} style={{fontSize:12,color:C.icy,padding:'5px 7px',borderRadius:6,background:'#0E1C2F'}}><span style={{color}}>{label}</span> {player.troops[key]}</span>)}
         {gameLanguages(player).map(language=><span key={language} style={{fontSize:11,color:C.icy,padding:'4px 7px',borderRadius:7,background:C.section}}>{language}</span>)}
        </div>}
-       {member&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:6,padding:'5px 12px 2px'}}>
+       {member&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:5,padding:talView==='prep'?'2px 12px 0':'5px 12px 2px'}}>
         <span style={{fontSize:11,border:'1px solid '+(member.role==='combatant'?C.green:C.border),borderRadius:16,padding:'5px 8px',color:member.role==='combatant'?C.green:C.icy,background:'#0E1C2F'}}>{member.role==='combatant'?'Combatant':member.role==='substitute'?'Substitute':'Role unassigned'}</span>
         <span style={{fontSize:11,border:'1px solid '+(member.registered?C.green:C.gold),borderRadius:16,padding:'5px 8px',color:member.registered?C.green:C.gold,background:'#0E1C2F'}}>{member.registered?'Registered':'Needs registration'}</span>
         {member.matchmakingOnly&&<span style={{fontSize:11,border:'1px solid '+C.gold,borderRadius:8,padding:'4px 7px',color:C.gold,background:C.gold+'13'}}>Matchmaking only</span>}
        </div>}
-       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,flexWrap:'wrap',padding:'4px 12px 9px'}}>
-        <button type="button" disabled={selecting} aria-label={'Edit availability for '+(player.username||player.alias||'player')} onClick={()=>beginEditTimes(player)} style={{border:0,background:'transparent',padding:'5px 0',color:C.icy,cursor:'pointer',fontSize:12,textAlign:'left',minHeight:44,flex:'1 1 145px'}}>UTC: {available.length?available.join(' · '):'Unknown'} <span aria-hidden="true" style={{color:C.gold}}>✎</span></button>
+       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,flexWrap:'wrap',padding:talView==='prep'?'1px 12px 3px':'4px 12px 9px'}}>
+        <button type="button" disabled={selecting} aria-label={'Edit availability for '+(player.username||player.alias||'player')} onClick={()=>beginEditTimes(player)} style={{border:0,background:'transparent',padding:'3px 0',color:C.icy,cursor:'pointer',fontSize:12,textAlign:'left',minHeight:talView==='prep'?34:44,flex:'1 1 145px'}}>UTC: {available.length?available.join(' · '):'Unknown'} <span aria-hidden="true" style={{color:C.gold}}>✎</span></button>
         {talView==='registration'&&member&&!selecting&&<button type="button" aria-label={'Manage TAL status for '+(player.username||player.alias||'player')} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)} style={{...button,minHeight:44,minWidth:100,padding:'8px 10px',fontSize:12,background:C.section,color:editable?C.gold:C.icy}}>Edit status</button>}
        </div>
-       {(isMove||shownStat)&&<div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'0 12px 10px',color:isMove?C.gold:C.icy,fontSize:12}}>{isMove&&<span>Move {status.tag||'No alliance'} → {entryTeam.host}</span>}{shownStat&&<span>{shownStat}</span>}</div>}
+       {(isMove||shownStat)&&<div style={{display:'flex',gap:8,flexWrap:'wrap',padding:talView==='prep'?'0 12px 8px':'0 12px 10px',color:isMove?C.gold:C.icy,fontSize:12}}>{isMove&&<span>Move {status.tag||'No alliance'} → {entryTeam.host}</span>}{shownStat&&<span>{shownStat}</span>}</div>}
        {!selecting&&actionsId===player.id&&<div style={{padding:'8px 11px 12px',background:C.section,display:'grid',gap:5}}>
         {!member&&editable&&<><button type="button" style={{...button,textAlign:'left',color:C.gold}} onClick={()=>promoteCandidate(entryTeam,player.id,false)}>Move to needs registration</button><button type="button" style={{...button,textAlign:'left',color:C.green}} onClick={()=>promoteCandidate(entryTeam,player.id,true)}>Confirm registered in game</button></>}
         {member&&<button type="button" style={{...button,textAlign:'left',color:C.gold}} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)}>Manage TAL status</button>}
