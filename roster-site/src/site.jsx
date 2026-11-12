@@ -154,12 +154,26 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
         </div>
       </div>
       {error&&<p role="alert" style={{fontSize:12,color:C.red,margin:'8px 0 0'}}>{error}</p>}
-    </header>:<header style={{padding:'12px 16px 10px',borderBottom:'1px solid '+C.border}}>
+    </header>:<header style={{padding:'13px 16px 8px'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-        <div><h1 style={{fontSize:19,margin:0}}>3573 · Caroline</h1><p style={{fontSize:12,color:C.icy,margin:'4px 0 0'}}>{tab==='tal'?'TAL Planner':tab==='teams'?'Teams':tab==='changes'?'Name Changes':tab==='battle'?'Battle planner':'SvS comparison'}</p></div>
-        <button aria-label="Workspace options" style={{...button,minWidth:44,padding:8}} onClick={()=>setWorkspaceOpen(true)}>•••</button>
+        <div style={{minWidth:0}}><h1 style={{margin:0,fontSize:19,letterSpacing:'-.025em',fontWeight:750}}>3573 · Caroline</h1><p style={{margin:'3px 0 0',fontSize:12,color:C.icy}}>{tab==='tal'?'TAL Planner':tab==='teams'?'Teams':tab==='changes'?'Name Changes':tab==='battle'?'Battle planner':'SvS comparison'}</p></div>
+        <div style={{display:'flex',alignItems:'center',gap:7}}>
+          <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:sync.issue?C.gold:C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
+            <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:sync.issue?C.gold:sync.syncing?'#E6BF7B':sync.dirty?'#E6BF7B':'#72CBA9'}}/>
+            {sync.issue?'Sync issue':sync.syncing?'Syncing':sync.dirty?'Unsynced':'Shared'}
+          </button>
+          <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
+            <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
+              <strong style={{fontSize:13,marginBottom:2}}>Workspace actions</strong>
+              <button style={button} onClick={refreshAll} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button>
+              <button style={button} disabled={exporting} onClick={backup}>{exporting?'Exporting…':'Export roster as Excel'}</button>
+              <button style={button} disabled={sync.syncing||sync.mode==='join'||!!sync.conflicts?.length} onClick={syncNow}>{sync.syncing?'Syncing…':sync.issue?'Retry sync':sync.dirty?'Sync changes':'Check sync'}</button>
+              <button style={button} onClick={()=>setWorkspaceOpen(true)}>Workspace settings</button>
+            </div>
+          </details>
+        </div>
       </div>
-      {error&&<p role="alert" style={{color:C.red}}>{error}</p>}
+      {error&&<p role="alert" style={{fontSize:12,color:C.red,margin:'8px 0 0'}}>{error}</p>}
     </header>}
     <WorkspaceAttention sync={sync} onReview={()=>setWorkspaceOpen(true)}/>
     {message&&<div role="status" style={{margin:'12px 20px 0',padding:10,color:C.icy,background:C.section,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>{message}<button style={button} onClick={()=>setMessage('')} aria-label="Dismiss message">✕</button></div>}
