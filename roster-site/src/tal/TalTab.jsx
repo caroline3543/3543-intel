@@ -76,6 +76,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [resetError,setResetError]=useState('');
  const [resetChecking,setResetChecking]=useState(false);
  const [previewOpen,setPreviewOpen]=useState(false);
+ const [prepOptionsOpen,setPrepOptionsOpen]=useState(false);
  const [availablePreviewOpen,setAvailablePreviewOpen]=useState(false);
  const [copyTime,setCopyTime]=useState('12:00');
  const [tournamentConfirm,setTournamentConfirm]=useState('');
@@ -489,56 +490,44 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     {team&&<div style={{...muted,marginTop:5}}>{registrationMembers.length} assigned / {50*legionCount} places</div>}
    </section>}
    {talView==='prep'&&<>
-   <section aria-label="Alliance readiness" style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:14}}>
+   <section aria-label="Alliance readiness" style={{background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:12,marginBottom:12}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-     <div><strong style={{fontSize:15}}>Host alliance</strong><div style={{...muted,marginTop:4}}>{ready} of {activeEntryCount} assigned players in the correct alliance</div></div>
+     <div><strong style={{fontSize:15}}>Alliance readiness</strong><div style={{...muted,marginTop:4}}>{ready} of {activeEntryCount} assigned players in the correct alliance</div></div>
      <strong style={{fontSize:19,color:C.green}}>{activeEntryCount?percent+"%":"—"}</strong>
     </div>
     <div role="progressbar" aria-label="Assigned players in the correct host alliance" aria-valuemin={0} aria-valuemax={activeEntryCount||1} aria-valuenow={ready} style={{height:8,background:C.border,borderRadius:20,overflow:'hidden',margin:'12px 0 10px'}}><div style={{height:'100%',width:percent+'%',background:C.green}}/></div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:7}}>
-     {[{id:'in-host',count:ready,label:'In alliance',color:C.green},{id:'move',count:move,label:'Need to move',color:C.gold},{id:'unknown',count:unverified,label:'Unverified',color:C.icy}].map(item=>
-      <button key={item.id} type="button" aria-pressed={check===item.id} onClick={()=>chooseReadiness(item.id)} style={{...button,minWidth:0,minHeight:70,padding:8,textAlign:'left',borderColor:check===item.id?item.color:C.border,background:check===item.id?item.color+'17':C.section}}>
-       <strong style={{display:'block',fontSize:19,color:item.color}}>{item.count}</strong><span style={{display:'block',fontSize:11,color:C.icy,marginTop:3}}>{item.label}</span>
-      </button>
-     )}
-    </div>
-    <div style={{display:'grid',gap:12,marginTop:14}}>
-     <div style={{borderTop:'1px solid '+C.border,paddingTop:12}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:5}}>
-       <strong style={{fontSize:14}}>Players who need to move</strong><span style={muted}>{moveCopyCount} players</span>
-      </div>
-      <p style={{...muted,margin:'0 0 10px'}}>Grouped by current alliance and destination. Includes confirmed no-alliance and unknown-alliance players.</p>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-       <button type="button" disabled={!movePreview||copying} style={{...button,color:movePreview?C.gold:C.icy}} onClick={()=>copyMovePreview(movePreview,'Move list')}>Copy list</button>
-       <button type="button" aria-expanded={previewOpen} style={{...button,color:C.gold}} onClick={()=>setPreviewOpen(v=>!v)}>{previewOpen?'Hide preview ▴':'Preview ▾'}</button>
-      </div>
-      {previewOpen&&<div style={{marginTop:9}}>
-       {movePreview?<pre aria-label="Move list preview" style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:13,lineHeight:1.6,padding:12,borderRadius:10,background:C.section,maxHeight:300,overflowY:'auto',margin:0}}>{movePreview}</pre>:<p style={muted}>No players need to move.</p>}
-      </div>}
-     </div>
-     <div style={{borderTop:'1px solid '+C.border,paddingTop:12}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:5}}>
-       <strong style={{fontSize:14}}>Available players who need to move</strong><span style={muted}>{availableMoveCount} players</span>
-      </div>
-      <p style={{...muted,margin:'0 0 10px'}}>Only players who recorded availability at this event time.</p>
-      <label style={{...muted,display:'block',marginBottom:10}}>Event time · UTC
-       <select aria-label="Copy list event time" value={selectedCopyTime} onChange={e=>setCopyTime(e.target.value)} style={{...button,display:'block',width:'100%',marginTop:5,fontSize:15}}>{times.map(t=><option key={t} value={t}>{t} UTC</option>)}</select>
-      </label>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-       <button type="button" disabled={!availableMovePreview||copying} style={{...button,color:availableMovePreview?C.gold:C.icy}} onClick={()=>copyMovePreview(availableMovePreview,'Available move list')}>Copy list</button>
-       <button type="button" aria-expanded={availablePreviewOpen} style={{...button,color:C.gold}} onClick={()=>setAvailablePreviewOpen(v=>!v)}>{availablePreviewOpen?'Hide preview ▴':'Preview ▾'}</button>
-      </div>
-      {availablePreviewOpen&&<div style={{marginTop:9}}>
-       {availableMovePreview?<pre aria-label="Available move list preview" style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:13,lineHeight:1.6,padding:12,borderRadius:10,background:C.section,maxHeight:300,overflowY:'auto',margin:0}}>{availableMovePreview}</pre>:<p style={muted}>No available players need to move at {selectedCopyTime} UTC.</p>}
-      </div>}
-     </div>
+    <div style={{display:'flex',justifyContent:'space-between',gap:7}}>
+     {[{id:'in-host',count:ready,label:'In alliance',color:C.green},{id:'move',count:move,label:'Need to move',color:C.gold},{id:'unknown',count:unverified,label:'Unverified',color:C.icy}].map(item=><button type="button" key={item.id} aria-pressed={check===item.id} onClick={()=>chooseReadiness(item.id)} style={{flex:1,minWidth:0,border:check===item.id?'1px solid '+item.color:'1px solid transparent',borderRadius:10,background:'transparent',minHeight:56,padding:5,textAlign:'center',cursor:'pointer'}}><strong style={{fontSize:18,display:'block',color:item.color}}>{item.count}</strong><span style={{fontSize:11,color:C.icy}}>{item.label}</span></button>)}
     </div>
    </section>
-   {team&&<section style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:14}}>
-    <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}><strong style={{fontSize:15}}>{legionLabel(team)} · {tournamentStatus(team)==='eliminated'?'Eliminated':'Active'}</strong><button type="button" style={{...button,fontSize:12,padding:'7px 9px',minHeight:36}} onClick={()=>setTournamentConfirm(tournamentConfirm?'':'open')}>{tournamentStatus(team)==='eliminated'?'Correct result':'Record a loss'}</button></div>
-    {tournamentStatus(team)==='eliminated'&&<p style={{...muted,margin:'8px 0 0'}}>This legion is eliminated. Its roster and match history remain visible. Player assignments are read-only.</p>}
-    {tournamentConfirm&&<div style={{marginTop:10}}>
-     <p style={{...muted,margin:'0 0 10px'}}>{tournamentStatus(team)==='eliminated'?'Restore this legion to active? Only do this to correct an incorrect result.':'Confirm this legion lost its match? It will be marked eliminated, and its roster will remain available for review.'}</p>
+   <section aria-label="Alliance move lists" style={{background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:'5px 12px',marginBottom:12}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:9,padding:'8px 0'}}>
+     <strong style={{fontSize:13}}>Event time · UTC</strong>
+     <select aria-label="Copy list event time" value={selectedCopyTime} onChange={e=>setCopyTime(e.target.value)} style={{...button,borderRadius:10,minHeight:42,fontSize:13,maxWidth:'65%'}}>{times.map(t=><option key={t} value={t}>{t} UTC</option>)}</select>
+    </div>
+    {[
+      {name:'Players who need to move',count:moveCopyCount,description:'All availability times',open:previewOpen,toggle:()=>setPreviewOpen(v=>!v),text:movePreview,copyLabel:'Move list'},
+      {name:'Available players who need to move',count:availableMoveCount,description:selectedCopyTime+' UTC',open:availablePreviewOpen,toggle:()=>setAvailablePreviewOpen(v=>!v),text:availableMovePreview,copyLabel:'Available move list'}
+    ].map(item=><div key={item.name} style={{borderTop:'1px solid '+C.border,padding:'10px 0'}}>
+      <div style={{display:'flex',gap:9,alignItems:'center'}}>
+       <button type="button" aria-expanded={item.open} onClick={item.toggle} style={{flex:1,minWidth:0,minHeight:48,textAlign:'left',background:'transparent',border:0,color:C.white,padding:'5px 0',cursor:'pointer'}}>
+        <strong style={{fontSize:13,display:'block'}}>{item.name}</strong>
+        <span style={{...muted,display:'block',marginTop:3}}>{item.count} players · {item.description} {item.open?'▴':'›'}</span>
+       </button>
+       <button type="button" disabled={!item.text||copying} style={{...button,color:item.text?C.gold:C.icy,borderRadius:10,minHeight:42,fontSize:12,padding:'6px 12px'}} onClick={()=>copyMovePreview(item.text,item.copyLabel)}>Copy</button>
+      </div>
+      {item.open&&<div style={{marginTop:8}}>{item.text?<pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:12,lineHeight:1.55,padding:11,borderRadius:10,background:C.section,maxHeight:290,overflowY:'auto',margin:0}}>{item.text}</pre>:<p style={muted}>No players to move.</p>}</div>}
+    </div>)}
+   </section>
+
+   {team&&<section aria-label="Tournament options" style={{marginBottom:12}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+      {tournamentStatus(team)==='eliminated'?<span style={{...muted,color:C.gold}}>Eliminated · roster is read-only</span>:<span style={muted}>Tournament management</span>}
+      <button type="button" aria-expanded={prepOptionsOpen} onClick={()=>setPrepOptionsOpen(v=>!v)} style={{...button,minHeight:40,borderRadius:10,fontSize:12}}>⋯ Options</button>
+    </div>
+    {prepOptionsOpen&&<div style={{background:C.section,borderRadius:11,padding:8,marginTop:7}}><button type="button" style={{...button,width:'100%',textAlign:'left',fontSize:13}} onClick={()=>{setTournamentConfirm('open');setPrepOptionsOpen(false)}}>{tournamentStatus(team)==='eliminated'?'Correct tournament result…':'Record a loss…'}</button></div>}
+    {tournamentConfirm&&<div style={{background:C.section,borderRadius:11,padding:12,marginTop:7}}>
+     <p style={muted}>{tournamentStatus(team)==='eliminated'?'Restore this legion to active?':'Confirm this legion lost its match? Its roster remains available for review.'}</p>
      <div style={{display:'flex',gap:8}}><button style={button} onClick={()=>setTournamentConfirm('')}>Cancel</button><button style={{...button,color:tournamentStatus(team)==='eliminated'?C.gold:C.red}} disabled={!!value?.locked} onClick={confirmTournamentResult}>{tournamentStatus(team)==='eliminated'?'Restore active':'Confirm loss'}</button></div>
     </div>}
    </section>}
