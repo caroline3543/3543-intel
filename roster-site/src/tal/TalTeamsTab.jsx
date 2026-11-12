@@ -397,6 +397,8 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  function assign(id,building){
   const g=teamFor(id);if(!g)return;
   if(!isEligible(id)){setCopyMessage('Only registered playing members may be placed in buildings.');return;}
+  const currentTeamPlayers=groups.flatMap(g=>[g.leader,...g.members]).filter(Boolean).filter(x=>!absentIds.includes(String(x)));
+  if(isSubstitute(id)&&currentTeamPlayers.filter(isSubstitute).length>Math.max(0,30-currentTeamPlayers.filter(isCombatant).length)){setCopyMessage('Combatants fill the opening roster. Remove excess substitutes before placing this player.');return;}
   const colour=COLORS.find(c=>c.id===g.color);
   if(!colour?.buildings.includes(building)){setCopyMessage('This building belongs to another colour team. Reassign the player’s team first.');return;}
   setAssignment(old=>{setUndoAssignment({id:String(id),before:old[String(id)]||null,after:building});return {...old,[String(id)]:building};});
@@ -408,7 +410,8 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   groups.forEach(g=>{
    const [first,second]=COLORS.find(c=>c.id===g.color).buildings;
    if(g.leader&&isEligible(g.leader))next[String(g.leader)]=first;
-   g.members.filter(isEligible).forEach((id,i)=>next[String(id)]=(i%2===0?first:second));
+   const validMembers=g.members.filter(id=>isEligible(id)&&!absentIds.includes(String(id))&&(!isSubstitute(id)||activePlayers.filter(p=>isSubstitute(p.id)).length<=Math.max(0,30-activePlayers.filter(p=>isCombatant(p.id)).length)));
+   validMembers.forEach((id,i)=>next[String(id)]=(i%2===0?first:second));
   });
   setAssignment(next);setCopyMessage('Assigned everyone to a building within their colour area.');
  }
