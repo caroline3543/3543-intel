@@ -1,4 +1,5 @@
 import {LANGUAGES} from '../../../src/utils/constants.js';
+import {TalTeamsTab} from './TalTeamsTab.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {DEFAULT_TIMES} from './planner.js';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
@@ -32,9 +33,9 @@ function moveText(rows,{time=null,availabilityFor=null}={}){
   return prefix+' from '+g.origin+' to '+g.destination+':\n'+g.players.sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base',numeric:true})).map(playerName=>'• '+playerName).join('\n');
  }).join('\n\n');
 }
-function savedTalSection(){try{const section=window.sessionStorage.getItem('tal:3573:last-section');if(section==='registration'||section==='prep')return JSON.parse(window.sessionStorage.getItem('tal:3573:filters:'+section)||'null')||{};}catch{}return {};}
+function savedTalSection(){try{const section=window.sessionStorage.getItem('tal:3573:last-section');if(section==='registration'||section==='prep'||section==='teams')return JSON.parse(window.sessionStorage.getItem('tal:3573:filters:'+section)||'null')||{};}catch{}return {};}
 function savedTalScroll(section){try{return Number(window.sessionStorage.getItem('tal:3573:scroll:'+section))||0;}catch{return 0;}}
-export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legionRefresh,onMessage,workspace,onBulkApply,sync,onCheckSync,onReset}){
+export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legionRefresh,onMessage,workspace,onBulkApply,sync,onCheckSync,onReset,teamDrafts={},onTeamDraftChange}){
  const initialSection=useRef(savedTalSection());
  const [selected,setSelected]=useState(()=>{try{return window.sessionStorage.getItem('tal:selected-legion')||'';}catch{return '';}});
  const [check,setCheck]=useState(initialSection.current.check||'all');
@@ -44,9 +45,9 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [sort,setSort]=useState(initialSection.current.sort||'name');
  const [sortDirection,setSortDirection]=useState(initialSection.current.sortDirection||'asc');
  const [registrationFilter,setRegistrationFilter]=useState(initialSection.current.registrationFilter||'all');
- const [talView,setTalView]=useState(()=>{try{const saved=window.sessionStorage.getItem('tal:3573:last-section');return saved==='registration'||saved==='prep'?saved:'home';}catch{return 'home';}});
- const sectionSnapshots=useRef({registration:null,prep:null});
- const sectionScroll=useRef({registration:savedTalScroll('registration'),prep:savedTalScroll('prep')});
+ const [talView,setTalView]=useState(()=>{try{const saved=window.sessionStorage.getItem('tal:3573:last-section');return saved==='registration'||saved==='prep'||saved==='teams'?saved:'registration';}catch{return 'home';}});
+ const sectionSnapshots=useRef({registration:null,prep:null,teams:null});
+ const sectionScroll=useRef({registration:savedTalScroll('registration'),prep:savedTalScroll('prep'),teams:savedTalScroll('teams')});
  const [roleFilter,setRoleFilter]=useState(initialSection.current.roleFilter||'all');
  const switchSort=field=>{if(sort===field)setSortDirection(d=>d==='asc'?'desc':'asc');else{setSort(field);setSortDirection(field==='name'||field==='labyrinth'?'asc':'desc');}setListLimit(40);};
  const [filtersOpen,setFiltersOpen]=useState(!!initialSection.current.filtersOpen);
@@ -95,6 +96,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [bulkReview,setBulkReview]=useState(false);
  const [bulkError,setBulkError]=useState('');
  const [missingFilter,setMissingFilter]=useState(initialSection.current.missingFilter||'');
+ const [attentionOpen,setAttentionOpen]=useState('');
  const playersAnchor=useRef(null);
  const teams=(value?.teams||[]);
  const team=teams.find(t=>t.id===selected);
@@ -132,7 +134,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const missingAvailabilityPlayers=entries.filter(e=>missingAvailability(e.player));
  const gameLanguages=player=>[...new Set([player.gameLanguage,...(Array.isArray(player.languages)?player.languages:[])].filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))];
  const tierChips=player=>[['infantry','Inf',C.inf],['lancer','Lan',C.lan],['marksman','Mar',C.mar]].filter(([key])=>player.troops?.[key]&&String(player.troops[key]).toLowerCase()!=='unknown');
- const roster=entries.filter(e=>(check==='all'||e.check.status===check)&&matchesSearch(e.player)&&matchesTime(e.player)&&(!missingFilter||(missingFilter==='any'?(missingTroopTypes(e.player).length>0||missingAvailability(e.player)):missingFilter==='tiers'?missingTroopTypes(e.player).length:missingAvailability(e.player)))&&(registrationFilter==='all'||registrationFilter==='unregistered'&&e.member&&!e.member.registered||registrationFilter==='registered'&&e.member?.registered)&&(roleFilter==='all'||(roleFilter==='matchmaking'?!!e.member?.matchmakingOnly:e.member?.role===roleFilter))).sort((a,b)=>{
+ const roster=entries.filter(e=>(check==='all'||e.check.status===check)&&matchesSearch(e.player)&&matchesTime(e.player)&&(!missingFilter||(missingFilter==='any'?(missingTroopTypes(e.player).length>0||missingAvailability(e.player)):missingFilter==='tiers'?missingTroopTypes(e.player).length:missingAvailability(e.player)))&&(registrationFilter==='all'||registrationFilter==='unregistered'&&e.member&&!e.member.registered||registrationFilter==='registered'&&e.member?.registered)&&(roleFilter==='all'||(roleFilter==='matchmaking'?!!e.member?.matchmakingOnly:roleFilter==='unallocated'?!e.member||e.member.role==='pending'||!['combatant','substitute'].includes(e.member.role):e.member?.role===roleFilter))).sort((a,b)=>{
   if(sort==='troop'){const score=p=>numeric(value?.records?.[p.id]?.troopPower);const av=score(a.player),bv=score(b.player);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='city'){const av=numeric(a.player.power??a.player.providerStats?.power),bv=numeric(b.player.power??b.player.providerStats?.power);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='labyrinth'){const av=numeric(a.player.providerRankings?.labyrinth?.rank),bv=numeric(b.player.providerRankings?.labyrinth?.rank);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
@@ -179,7 +181,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   setFiltersOpen(!!next.filtersOpen);setListLimit(next.listLimit||40);
  }
  function navigateSection(next){
-  if(!['home','registration','prep'].includes(next)||next===talView)return;
+  if(!['home','registration','prep','teams'].includes(next)||next===talView)return;
   if(talView!=='home'){
    const snapshot=snapshotSection();
    sectionSnapshots.current[talView]=snapshot;
@@ -431,31 +433,11 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  }
 
  return <section style={{padding:'5px 16px 32px'}}>
-  {talView==='home'?<section aria-label="TAL Planner workflows">
-    <h2 style={{fontSize:20,letterSpacing:'-.03em',margin:'3px 0 6px'}}>TAL Planner</h2>
-    <p style={{...muted,margin:'0 0 16px',fontSize:13}}>Choose what you want to manage.</p>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10}}>
-     <button type="button" onClick={()=>navigateSection('registration')} style={{minWidth:0,minHeight:166,display:'flex',flexDirection:'column',alignItems:'flex-start',justifyContent:'space-between',gap:10,padding:14,background:'#15273A',border:'1px solid #274056',borderRadius:15,textAlign:'left',cursor:'pointer',color:C.white}}>
-      <span aria-hidden="true" style={{fontSize:24,color:C.gold}}>☑</span>
-      <span style={{fontWeight:750,fontSize:16}}>Registration</span>
-      <span style={{fontSize:12,lineHeight:1.45,color:C.icy}}>Player roles, substitutes and in-game registration</span>
-      <span style={{fontSize:12,color:C.gold}}>{registrationCount} confirmed · Open ›</span>
-     </button>
-     <button type="button" onClick={()=>navigateSection('prep')} style={{minWidth:0,minHeight:166,display:'flex',flexDirection:'column',alignItems:'flex-start',justifyContent:'space-between',gap:10,padding:14,background:'#15273A',border:'1px solid #274056',borderRadius:15,textAlign:'left',cursor:'pointer',color:C.white}}>
-      <span aria-hidden="true" style={{fontSize:24,color:C.gold}}>☷</span>
-      <span style={{fontWeight:750,fontSize:16}}>TAL Prep</span>
-      <span style={{fontSize:12,lineHeight:1.45,color:C.icy}}>Availability, alliance moves and readiness</span>
-      <span style={{fontSize:12,color:C.gold}}>Open preparation ›</span>
-     </button>
-    </div>
-   </section>:<div aria-label="TAL Planner destination" style={{marginBottom:12}}>
-     <button type="button" onClick={()=>navigateSection('home')} style={{background:'transparent',border:0,color:C.icy,padding:'7px 0',minHeight:36,fontSize:12,cursor:'pointer'}}>‹ TAL Planner</button>
-     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-      <h2 style={{fontSize:20,letterSpacing:'-.03em',margin:'0'}}>{talView==='registration'?'Registration':'TAL Prep'}</h2>
-      <button type="button" onClick={()=>navigateSection(talView==='registration'?'prep':'registration')} style={{...button,minHeight:40,padding:'8px 12px',fontSize:12,background:'#182A3F',color:C.gold,borderRadius:22,border:'1px solid transparent'}}>{talView==='registration'?'TAL Prep →':'← Registration'}</button>
-     </div>
-   </div>}
-  {talView!=='home'&&<>
+  <nav aria-label="TAL Planner sections" style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:6,margin:'5px 0 14px'}}>
+   {[['registration','Registration'],['prep','TAL Prep'],['teams','Teams']].map(([id,label])=><button key={id} type="button" aria-current={talView===id?'page':undefined} onClick={()=>navigateSection(id)} style={{...button,minWidth:0,minHeight:46,padding:'8px 4px',fontSize:12,borderRadius:11,background:talView===id?'#2A4057':'#172638',borderColor:talView===id?C.gold:C.border,color:talView===id?C.white:C.icy}}>{label}</button>)}
+  </nav>
+  {talView==='teams'&&<TalTeamsTab value={value} players={players} selectedLegionId={effectiveSelection} drafts={teamDrafts} onDraftChange={onTeamDraftChange} syncReady={!!(sync?.joined&&sync?.mode==='active'&&!sync?.issue&&!sync?.conflicts?.length)}/>}
+  {talView!=='home'&&talView!=='teams'&&<>
   {!teams.length?<div style={{padding:16,background:C.section,borderRadius:12}}><strong>No legions assigned</strong><p style={{fontSize:14,color:C.icy,lineHeight:1.5}}>Saved TAL legion assignments will appear when available. Existing plan data is retained.</p></div>:<>
    <section aria-label="Choose TAL legion" style={{marginBottom:10}}>
     <label style={{...muted,display:'block',marginBottom:5,fontWeight:700}} htmlFor="tal-legion-select">LEGION</label>
@@ -532,13 +514,23 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     </div>}
    </section>}
    </>}
-   {talView==='prep'&&<section style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:12}} aria-label="Missing TAL information">
-    <strong style={{fontSize:15}}>Missing player information</strong>
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
-     <button type="button" aria-pressed={missingFilter==='tiers'} style={{...button,padding:9,textAlign:'left',minHeight:65,borderColor:missingFilter==='tiers'?C.gold:C.border}} onClick={()=>{setMissingFilter(v=>v==='tiers'?'':'tiers');setListLimit(40);focusPlayers();}}><strong style={{display:'block',fontSize:20,color:C.gold}}>{missingTroopPlayers.length}</strong><span style={muted}>Missing troop tiers</span></button>
-     <button type="button" aria-pressed={missingFilter==='availability'} style={{...button,padding:9,textAlign:'left',minHeight:65,borderColor:missingFilter==='availability'?C.gold:C.border}} onClick={()=>{setMissingFilter(v=>v==='availability'?'':'availability');setListLimit(40);focusPlayers();}}><strong style={{display:'block',fontSize:20,color:C.gold}}>{missingAvailabilityPlayers.length}</strong><span style={muted}>Missing availability</span></button>
+   {talView==='registration'&&<section aria-label="Needs attention" style={{background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:12,marginBottom:12}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}>
+      <div><strong style={{fontSize:16}}>Needs attention</strong><div style={{...muted,marginTop:3}}>Complete missing player information</div></div>
+      <span style={{fontSize:12,color:C.gold}}>{missingTroopPlayers.length+missingAvailabilityPlayers.length} issues</span>
     </div>
-    {!!missingFilter&&<button type="button" style={{...button,width:'100%',marginTop:8,color:C.gold}} onClick={()=>setMissingFilter('')}>Show all players</button>}
+    {[
+     {id:'tiers',label:'Troop tiers missing',list:missingTroopPlayers,detail:'Infantry, Lancer or Marksman tier not recorded'},
+     {id:'availability',label:'Availability missing',list:missingAvailabilityPlayers,detail:'No event times recorded'}
+    ].map(item=><div key={item.id} style={{background:C.section,border:'1px solid '+C.border,borderRadius:11,marginTop:7,overflow:'hidden'}}>
+     <button type="button" aria-expanded={attentionOpen===item.id} onClick={()=>setAttentionOpen(v=>v===item.id?'':item.id)} style={{background:'transparent',border:0,width:'100%',display:'flex',alignItems:'center',gap:11,textAlign:'left',padding:12,minHeight:56,color:C.white,cursor:'pointer'}}>
+      <span style={{fontSize:20,color:C.gold}}>◇</span><span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13}}>{item.label}</strong><span style={muted}>{item.list.length} player{item.list.length===1?'':'s'}{item.list.length===1?' · '+(item.list[0]?.username||item.list[0]?.alias||item.list[0]?.fid||'Player'):''}</span></span><span style={{color:C.icy}}>{attentionOpen===item.id?'⌃':'⌄'}</span>
+     </button>
+     {attentionOpen===item.id&&<div style={{padding:'0 12px 12px',borderTop:'1px solid '+C.border}}>
+      <p style={{...muted,margin:'9px 0'}}>{item.detail}</p>
+      {item.list.length?item.list.map(p=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,justifyContent:'space-between',padding:'5px 0'}}><span style={{fontSize:13,overflow:'hidden',textOverflow:'ellipsis'}}>{p.username||p.alias||p.fid||p.id}</span><button type="button" style={{...button,minHeight:40,padding:'7px 11px',fontSize:12}} onClick={()=>onOpenPlayer?.(p.id)}>Edit player →</button></div>):<p style={{...muted,color:C.green}}>All information complete.</p>}
+     </div>}
+    </div>)}
    </section>}
       <section ref={playersAnchor} id="tal-players" aria-label="TAL players" style={{scrollMarginTop:16}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
@@ -560,7 +552,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      })}
     </div>:<div role="group" aria-label="Filter TAL roles" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:5,marginBottom:4,alignItems:'center',scrollbarWidth:'none'}}>
      <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Status</span>
-     {[['all','All'],['combatant','Combatants'],['substitute','Substitutes'],['matchmaking','Matchmaking only']].map(([id,label])=><button key={id} type="button" aria-pressed={roleFilter===id} onClick={()=>{setRoleFilter(id);setListLimit(40)}} style={{background:roleFilter===id?'#45351F':'#182A3F',color:roleFilter===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}</button>)}
+     {[['all','All'],['combatant','Combatants'],['substitute','Substitutes'],['unallocated','Unallocated'],['matchmaking','Matchmaking only']].map(([id,label])=><button key={id} type="button" aria-pressed={roleFilter===id} onClick={()=>{setRoleFilter(id);setListLimit(40)}} style={{background:roleFilter===id?'#45351F':'#182A3F',color:roleFilter===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}</button>)}
     </div>}
     <div role="group" aria-label="Sort TAL players" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,alignItems:'center',scrollbarWidth:'none'}}>
      <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Sort</span>
