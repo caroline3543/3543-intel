@@ -527,7 +527,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
         <button type="button" style={{...button,color:C.gold,background:C.card}} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)}>Manage TAL status</button>
         <button type="button" aria-label="Close swipe actions" style={{...button,minWidth:44,padding:8}} onClick={()=>setSwipeId('')}>✕</button>
        </div>}
-       <div style={{display:'flex',alignItems:'center',gap:6,padding:'10px 10px 5px'}}>{selecting&&<span aria-hidden="true" style={{height:24,width:24,borderRadius:'50%',background:chosen?C.gold:C.bg,border:'2px solid '+(chosen?C.gold:C.icy),flexShrink:0,display:'grid',placeItems:'center',color:C.bg,fontWeight:800}}>{chosen?'✓':''}</span>}
+       <div style={{display:'flex',alignItems:'center',gap:6,padding:'8px 10px 3px'}}>{selecting&&<span aria-hidden="true" style={{height:24,width:24,borderRadius:'50%',background:chosen?C.gold:C.bg,border:'2px solid '+(chosen?C.gold:C.icy),flexShrink:0,display:'grid',placeItems:'center',color:C.bg,fontWeight:800}}>{chosen?'✓':''}</span>}
         <button type="button" title="Open Members profile" aria-label={'Open profile for '+(player.username||player.alias||'player')} style={{display:'flex',alignItems:'center',flex:1,minWidth:0,gap:10,padding:'4px 0',textAlign:'left',background:'transparent',border:0,color:C.white,cursor:'pointer',minHeight:48}} onClick={()=>{if(selecting){const id=String(player.id);setBulkSelected(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setBulkReview(false);return;}setSwipeId('');setActionsId('');onOpenPlayer?.(player.id)}}>
          <PlayerAvatar player={player} size={44}/>
          <span style={{flex:1,minWidth:0}}>
@@ -537,22 +537,20 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
         </button>
         {!selecting&&<button type="button" title="Edit player planning actions" aria-label={'Edit planning options for '+(player.username||player.alias||'player')} aria-expanded={actionsId===player.id} style={{...button,minWidth:44,padding:7,background:'transparent',border:0,fontSize:20}} onClick={()=>{setActionsId(actionsId===player.id?'':player.id);setSwipeId('');setRemoveId('')}}>•••</button>}
        </div>
-       {(tierChips(player).length>0||gameLanguages(player).length>0)&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:5,padding:'0 11px 5px'}}>
-        {tierChips(player).map(([key,label,color])=><span key={key} style={{fontSize:11,fontWeight:600,color,padding:'4px 7px',borderRadius:7,background:color+'17',border:'1px solid '+color+'3a'}}>{label} {player.troops[key]}</span>)}
+       {(tierChips(player).length>0||gameLanguages(player).length>0)&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:5,padding:'0 11px 3px'}}>
+        {tierChips(player).map(([key,label,color])=><span key={key} style={{fontSize:11,fontWeight:600,color,padding:'3px 6px',borderRadius:7,background:color+'17',border:'1px solid '+color+'3a'}}>{label} {player.troops[key]}</span>)}
         {gameLanguages(player).map(language=><span key={language} style={{fontSize:11,color:C.icy,padding:'4px 7px',borderRadius:7,background:C.section}}>{language}</span>)}
        </div>}
-              <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'2px 11px 10px'}}>
-        <button type="button" disabled={selecting} aria-label={'Edit availability for '+(player.username||player.alias||'player')} onClick={()=>beginEditTimes(player)} style={{border:0,background:'transparent',padding:'7px 0',color:C.icy,cursor:'pointer',fontSize:12,textAlign:'left',minHeight:38}}>UTC: {available.length?available.join(' · '):'Unknown'} <span aria-hidden="true" style={{color:C.gold}}>✎</span></button>
-        <span style={{marginLeft:'auto',fontSize:12,fontWeight:600,color:member?.registered?C.green:member?C.gold:C.icy}}>{statusText}</span>
-       </div>
-       {member&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:6,padding:'0 11px 10px'}}>
+       {member&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:6,padding:'3px 11px 2px'}}>
         <span style={{fontSize:11,border:'1px solid '+(member.role==='combatant'?C.green:C.border),borderRadius:8,padding:'4px 7px',color:member.role==='combatant'?C.green:C.icy,background:C.section}}>{member.role==='combatant'?'Combatant':member.role==='substitute'?'Substitute':'Role unassigned'}</span>
+        <span style={{fontSize:11,border:'1px solid '+(member.registered?C.green:C.gold),borderRadius:8,padding:'4px 7px',color:member.registered?C.green:C.gold,background:C.section}}>{member.registered?'Registered':'Needs registration'}</span>
         {member.matchmakingOnly&&<span style={{fontSize:11,border:'1px solid '+C.gold,borderRadius:8,padding:'4px 7px',color:C.gold,background:C.gold+'13'}}>Matchmaking only</span>}
        </div>}
-       {talView==='registration'&&member&&!selecting&&<div style={{padding:'0 11px 12px'}}>
-        <button type="button" aria-label={'Manage TAL status for '+(player.username||player.alias||'player')} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)} style={{...button,width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,background:C.section,color:editable?C.gold:C.icy,minHeight:48}}>⚙ Manage TAL status</button>
-       </div>}
-       {(isMove||shownStat)&&<div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'0 11px 10px',color:isMove?C.gold:C.icy,fontSize:12}}>{isMove&&<span>Move {status.tag||'No alliance'} → {entryTeam.host}</span>}{shownStat&&<span>{shownStat}</span>}</div>}
+       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,flexWrap:'wrap',padding:'2px 11px 7px'}}>
+        <button type="button" disabled={selecting} aria-label={'Edit availability for '+(player.username||player.alias||'player')} onClick={()=>beginEditTimes(player)} style={{border:0,background:'transparent',padding:'5px 0',color:C.icy,cursor:'pointer',fontSize:12,textAlign:'left',minHeight:44,flex:'1 1 145px'}}>UTC: {available.length?available.join(' · '):'Unknown'} <span aria-hidden="true" style={{color:C.gold}}>✎</span></button>
+        {talView==='registration'&&member&&!selecting&&<button type="button" aria-label={'Manage TAL status for '+(player.username||player.alias||'player')} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)} style={{...button,minHeight:44,minWidth:100,padding:'8px 10px',fontSize:12,background:C.section,color:editable?C.gold:C.icy}}>Edit status</button>}
+       </div>
+       {(isMove||shownStat)&&<div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'0 11px 9px',color:isMove?C.gold:C.icy,fontSize:12}}>{isMove&&<span>Move {status.tag||'No alliance'} → {entryTeam.host}</span>}{shownStat&&<span>{shownStat}</span>}</div>}
        {!selecting&&actionsId===player.id&&<div style={{padding:'8px 11px 12px',background:C.section,display:'grid',gap:5}}>
         {!member&&editable&&<><button type="button" style={{...button,textAlign:'left',color:C.gold}} onClick={()=>promoteCandidate(entryTeam,player.id,false)}>Move to needs registration</button><button type="button" style={{...button,textAlign:'left',color:C.green}} onClick={()=>promoteCandidate(entryTeam,player.id,true)}>Confirm registered in game</button></>}
         {member&&<button type="button" style={{...button,textAlign:'left',color:C.gold}} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)}>Manage TAL status</button>}
