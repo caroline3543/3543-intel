@@ -277,8 +277,26 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   setStatusApply({role:false,matchmakingOnly:false,registered:false});
   setStatusError('');setBulkPanel('');setBulkReview(false);
  }
+ function statusCapacityMessage(){
+  if(!statusEditor||!statusApply.role)return '';
+  const ids=new Set((statusEditor.kind==='single'?[statusEditor.playerId]:statusEditor.ids).map(String));
+  for(const t of teams){
+   const current=(t.members||[]);
+   if(!current.some(m=>ids.has(String(m.id))))continue;
+   const beforeCombatants=current.filter(m=>m.role==='combatant').length;
+   const beforeSubstitutes=current.filter(m=>m.role==='substitute').length;
+   const proposed=current.map(m=>ids.has(String(m.id))?{...m,role:statusDraft.role}:m);
+   const nextCombatants=proposed.filter(m=>m.role==='combatant').length;
+   const nextSubstitutes=proposed.filter(m=>m.role==='substitute').length;
+   if(nextCombatants>30&&nextCombatants>beforeCombatants)return legionLabel(t)+': '+beforeCombatants+' combatants already assigned. This change would make '+nextCombatants+' (maximum 30).';
+   if(nextSubstitutes>20&&nextSubstitutes>beforeSubstitutes)return legionLabel(t)+': '+beforeSubstitutes+' substitutes already assigned. This change would make '+nextSubstitutes+' (maximum 20).';
+  }
+  return '';
+ }
+ const capacityError=statusCapacityMessage();
  function saveStatusEditor(){
   if(!statusEditor||value?.locked)return;
+  if(capacityError){setStatusError(capacityError);return;}
   const targets=statusEditor.kind==='single'?[statusEditor.playerId]:statusEditor.ids;
   if(statusEditor.kind==='bulk'&&!Object.values(statusApply).some(Boolean)){setStatusError('Choose at least one setting to update.');return;}
   const ids=new Set(targets.map(String));
@@ -297,7 +315,10 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   for(const t of nextTeams){
    const combatants=(t.members||[]).filter(m=>m.role==='combatant').length;
    const substitutes=(t.members||[]).filter(m=>m.role==='substitute').length;
-   if(combatants>30||substitutes>20){setStatusError(legionLabel(t)+': '+(combatants>30?'Combatants exceed 30':'Substitutes exceed 20')+'. Choose another roster role.');return;}
+   const previous=teams.find(item=>item.id===t.id);
+   const oldCombatants=(previous?.members||[]).filter(m=>m.role==='combatant').length;
+   const oldSubstitutes=(previous?.members||[]).filter(m=>m.role==='substitute').length;
+   if((combatants>30&&combatants>oldCombatants)||(substitutes>20&&substitutes>oldSubstitutes)){setStatusError(legionLabel(t)+': This role assignment would exceed the 30/20 limit.');return;}
    if((t.members||[]).length>50){setStatusError(legionLabel(t)+' exceeds the 50-player registration limit.');return;}
   }
   onChange?.({...value,teams:nextTeams});
@@ -780,7 +801,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
         <button type="button" style={{...button,border:0,background:'transparent',padding:'8px 0'}} onClick={()=>{setStatusEditor(null);setStatusError('')}}>Cancel</button>
         <strong style={{fontSize:16}}>Manage TAL status</strong>
-        <button type="button" style={{...button,border:0,background:'transparent',color:C.gold,padding:'8px 0'}} onClick={saveStatusEditor}>Save</button>
+        <button type="button" style={{...button,border:0,background:'transparent',color:C.gold,padding:'8px 0'}} disabled={!!capacityError} onClick={saveStatusEditor}>Save</button>
       </div>
       <p style={{...muted,margin:'7px 0 14px'}}>{statusEditor.kind==='single'?(byId.get(statusEditor.playerId)?.username||byId.get(statusEditor.playerId)?.alias||'Player'):'Editing '+statusEditor.ids.length+' selected players'}. Changes apply only when you save.</p>
       {statusEditor.kind==='bulk'&&<p style={{...muted,background:C.section,borderRadius:10,padding:10}}>Select the settings you want to change. Unticked settings will stay as they are for each player.</p>}
@@ -798,6 +819,10 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
             <span><strong style={{fontSize:14,display:'block'}}>{label}</strong><span style={{...muted,display:'block',marginTop:3}}>{explanation}</span></span>
           </label>)}
         </div>
+        {section.key==='role'&&capacityError&&<div role="alert" style={{marginTop:9,padding:11,border:'1px solid '+C.gold,borderRadius:10,background:C.gold+'15',color:C.gold,fontSize:13,lineHeight:1.45}}>
+          <strong style={{display:'block',marginBottom:4}}>Roster capacity prevents this change</strong>
+          {capacityError} Choose a different role or free a slot in this legion.
+        </div>}
       </div>)}
       <div style={{marginTop:15,paddingTop:15,borderTop:'1px solid '+C.border}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}>
@@ -811,7 +836,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       </div>
       {statusApply.matchmakingOnly&&statusDraft.matchmakingOnly&&statusApply.role&&statusDraft.role==='combatant'&&<p style={{...muted,color:C.gold}}>Matchmaking-only players are excluded from battle teams. Consider using a substitute slot instead.</p>}
       {statusError&&<p role="alert" style={{color:C.red,fontSize:13,marginTop:12}}>{statusError}</p>}
-      <button type="button" style={{...button,width:'100%',background:C.gold,color:C.bg,marginTop:17,minHeight:50,fontSize:15,fontWeight:700}} onClick={saveStatusEditor}>Save changes</button>
+      <button type="button" style={{...button,width:'100%',background:C.gold,color:C.bg,marginTop:17,minHeight:50,fontSize:15,fontWeight:700}} disabled={!!capacityError} onClick={saveStatusEditor}>{capacityError?'Resolve roster capacity':'Save changes'}</button>
       <p style={{...muted,textAlign:'center',margin:'8px 0 0'}}>Cancel discards changes. Existing availability and legion assignments are preserved.</p>
     </section>
   </div>}
