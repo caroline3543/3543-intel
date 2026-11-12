@@ -55,6 +55,10 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [addingReview,setAddingReview]=useState(false);
  const [removeId,setRemoveId]=useState('');
  const [actionsId,setActionsId]=useState('');
+ const [statusEditor,setStatusEditor]=useState(null);
+ const [statusDraft,setStatusDraft]=useState({role:'pending',matchmakingOnly:false,registered:false});
+ const [statusApply,setStatusApply]=useState({role:false,matchmakingOnly:false,registered:false});
+ const [statusError,setStatusError]=useState('');
  const [previewOpen,setPreviewOpen]=useState(false);
  const [availablePreviewOpen,setAvailablePreviewOpen]=useState(false);
  const [copyTime,setCopyTime]=useState('12:00');
@@ -196,6 +200,49 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   onChange?.({...value,teams:(value?.teams||[]).map(t=>t.id!==entryTeam.id?t:{...t,members:(t.members||[]).map(m=>String(m.id)===String(playerId)?{...m,role:nextRole,registered}:m)})});
   setSwipeId('');setActionsId('');
   onMessage?.(registered?'Registration confirmed.':'Registration marked pending.');
+ }
+ function openStatusEditor(entryTeam,playerId){
+  const member=entryTeam?.members?.find(m=>String(m.id)===String(playerId));
+  if(!member||value?.locked||tournamentStatus(entryTeam)==='eliminated')return;
+  setStatusEditor({kind:'single',teamId:entryTeam.id,playerId:String(playerId)});
+  setStatusDraft({role:member.role||'pending',matchmakingOnly:!!member.matchmakingOnly,registered:!!member.registered});
+  setStatusApply({role:true,matchmakingOnly:true,registered:true});
+  setStatusError('');setActionsId('');setSwipeId('');
+ }
+ function openBulkStatusEditor(){
+  if(!selectedBulkIds.length||value?.locked)return;
+  setStatusEditor({kind:'bulk',ids:[...selectedBulkIds]});
+  setStatusDraft({role:'pending',matchmakingOnly:false,registered:false});
+  setStatusApply({role:false,matchmakingOnly:false,registered:false});
+  setStatusError('');setBulkPanel('');setBulkReview(false);
+ }
+ function saveStatusEditor(){
+  if(!statusEditor||value?.locked)return;
+  const targets=statusEditor.kind==='single'?[statusEditor.playerId]:statusEditor.ids;
+  if(statusEditor.kind==='bulk'&&!Object.values(statusApply).some(Boolean)){setStatusError('Choose at least one setting to update.');return;}
+  const ids=new Set(targets.map(String));
+  const affected=teams.filter(t=>t.members?.some(m=>ids.has(String(m.id))));
+  if(!affected.length){setStatusError('No current legion members were selected.');return;}
+  if(affected.some(t=>tournamentStatus(t)==='eliminated')){setStatusError('An eliminated legion cannot be edited.');return;}
+  const nextTeams=teams.map(t=>{
+   if(!affected.some(item=>item.id===t.id))return t;
+   return {...t,members:(t.members||[]).map(m=>ids.has(String(m.id))?{
+    ...m,
+    ...(statusApply.role?{role:statusDraft.role}:{}),
+    ...(statusApply.matchmakingOnly?{matchmakingOnly:statusDraft.matchmakingOnly}:{}),
+    ...(statusApply.registered?{registered:statusDraft.registered}:{})
+   }:m)};
+  });
+  for(const t of nextTeams){
+   const combatants=(t.members||[]).filter(m=>m.role==='combatant').length;
+   const substitutes=(t.members||[]).filter(m=>m.role==='substitute').length;
+   if(combatants>30||substitutes>20){setStatusError(legionLabel(t)+': '+(combatants>30?'Combatants exceed 30':'Substitutes exceed 20')+'. Choose another roster role.');return;}
+   if((t.members||[]).length>50){setStatusError(legionLabel(t)+' exceeds the 50-player registration limit.');return;}
+  }
+  onChange?.({...value,teams:nextTeams});
+  onMessage?.('TAL status saved for '+targets.length+' player'+(targets.length===1?'':'s')+'.');
+  setStatusEditor(null);setStatusError('');
+  if(statusEditor.kind==='bulk'){setBulkSelected([]);setSelecting(false);setBulkPanel('');}
  }
  function setMemberRole(entryTeam,playerId,role){
   if(value?.locked||tournamentStatus(entryTeam)==='eliminated')return;
@@ -456,7 +503,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       const chosen=selectedBulkIds.includes(String(player.id));
       return <article key={player.id} onClick={e=>{if(selecting&&!e.target.closest('button,input,select,textarea,[data-bulk-ignore]')){const id=String(player.id);setBulkSelected(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setBulkReview(false);}}} onPointerDown={e=>{if(!selecting)onSwipeDown(e,String(player.id))}} onPointerUp={e=>{if(!selecting)onSwipeUp(e,String(player.id),!!member&&editable)}} onPointerCancel={()=>{gesture.current=null;}} style={{background:chosen&&selecting?C.section:C.card,border:'1px solid '+(chosen&&selecting?C.gold:C.border),borderRadius:11,marginBottom:8,overflow:'hidden',touchAction:'pan-y',cursor:selecting?'pointer':'default'}}>
        {!selecting&&revealed&&member&&<div role="group" aria-label={'Registration action for '+(player.username||player.alias||'player')} style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',padding:'9px 11px',background:C.section}}>
-        <button type="button" style={{...button,color:member.registered?C.gold:C.green,background:C.card}} disabled={!editable} onClick={()=>setRegistration(entryTeam,player.id,!member.registered)}>{member.registered?'Mark unregistered':'Confirm registered'}</button>
+        <button type="button" style={{...button,color:C.gold,background:C.card}} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)}>Manage TAL status</button>
         <button type="button" aria-label="Close swipe actions" style={{...button,minWidth:44,padding:8}} onClick={()=>setSwipeId('')}>✕</button>
        </div>}
        <div style={{display:'flex',alignItems:'center',gap:6,padding:'10px 10px 5px'}}>{selecting&&<span aria-hidden="true" style={{height:24,width:24,borderRadius:'50%',background:chosen?C.gold:C.bg,border:'2px solid '+(chosen?C.gold:C.icy),flexShrink:0,display:'grid',placeItems:'center',color:C.bg,fontWeight:800}}>{chosen?'✓':''}</span>}
@@ -481,14 +528,13 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
         <span style={{fontSize:11,border:'1px solid '+(member.role==='combatant'?C.green:C.border),borderRadius:8,padding:'4px 7px',color:member.role==='combatant'?C.green:C.icy,background:C.section}}>{member.role==='combatant'?'Combatant':member.role==='substitute'?'Substitute':'Role unassigned'}</span>
         {member.matchmakingOnly&&<span style={{fontSize:11,border:'1px solid '+C.gold,borderRadius:8,padding:'4px 7px',color:C.gold,background:C.gold+'13'}}>Matchmaking only</span>}
        </div>}
-       {talView==='registration'&&member&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7,padding:'0 11px 12px'}}>
-        <label style={{fontSize:11,color:C.icy}}>Roster role<select aria-label={'Roster role for '+(player.username||player.alias||'player')} disabled={!editable} value={member.role||'pending'} onChange={e=>setMemberRole(entryTeam,player.id,e.target.value)} style={{...button,width:'100%',marginTop:4,fontSize:13,minWidth:0}}><option value="pending">Unassigned</option><option value="combatant">Combatant</option><option value="substitute">Substitute</option></select></label>
-        <label style={{fontSize:11,color:C.icy}}>Participation<select aria-label={'Participation for '+(player.username||player.alias||'player')} disabled={!editable} value={member.matchmakingOnly?'matchmaking':'playing'} onChange={e=>setMatchmakingOnly(entryTeam,player.id,e.target.value==='matchmaking')} style={{...button,width:'100%',marginTop:4,fontSize:13,minWidth:0}}><option value="playing">Playing</option><option value="matchmaking">Matchmaking only</option></select></label>
-       </div>}
+       {talView==='registration'&&member&&!selecting&&<div style={{padding:'0 11px 12px'}}>
+        <button type="button" aria-label={'Manage TAL status for '+(player.username||player.alias||'player')} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)} style={{...button,width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,background:C.section,color:editable?C.gold:C.icy,minHeight:48}}>⚙ Manage TAL status</button>
+       </div>
        {(isMove||shownStat)&&<div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'0 11px 10px',color:isMove?C.gold:C.icy,fontSize:12}}>{isMove&&<span>Move {status.tag||'No alliance'} → {entryTeam.host}</span>}{shownStat&&<span>{shownStat}</span>}</div>}
        {!selecting&&actionsId===player.id&&<div style={{padding:'8px 11px 12px',background:C.section,display:'grid',gap:5}}>
         {!member&&editable&&<><button type="button" style={{...button,textAlign:'left',color:C.gold}} onClick={()=>promoteCandidate(entryTeam,player.id,false)}>Move to needs registration</button><button type="button" style={{...button,textAlign:'left',color:C.green}} onClick={()=>promoteCandidate(entryTeam,player.id,true)}>Confirm registered in game</button></>}
-        {member&&<button type="button" style={{...button,textAlign:'left',color:member.registered?C.gold:C.green}} disabled={!editable} onClick={()=>setRegistration(entryTeam,player.id,!member.registered)}>{member.registered?'Mark registration pending':'Confirm registered'}</button>}
+        {member&&<button type="button" style={{...button,textAlign:'left',color:C.gold}} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)}>Manage TAL status</button>}
         <button type="button" style={{...button,textAlign:'left'}} onClick={()=>beginEditTimes(player)}>Edit available times</button>
         <button type="button" style={{...button,textAlign:'left'}} onClick={()=>{setActionsId('');onOpenPlayer?.(player.id)}}>Open Members profile</button>
         {member&&<button type="button" style={{...button,textAlign:'left',color:C.red}} disabled={!editable} onClick={()=>setRemoveId(player.id)}>Remove from legion…</button>}
@@ -515,7 +561,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     {selecting&&<div role="region" aria-label="Bulk player actions" style={{position:'fixed',bottom:'calc(76px + env(safe-area-inset-bottom, 0px))',left:'50%',transform:'translateX(-50%)',width:'min(calc(100vw - 24px), 420px)',boxSizing:'border-box',zIndex:150,background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:12,maxHeight:'min(65dvh, 580px)',overflowY:'auto',boxShadow:'0 -9px 28px '+C.bg+'bb'}}>
      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}><strong style={{fontSize:14}}>{selectedBulkCount} selected</strong><button type="button" style={{...button,minHeight:34,padding:'5px 9px',fontSize:12}} onClick={()=>{setSelecting(false);setBulkSelected([]);setBulkPanel('')}}>Done</button></div>
      <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:7}}>
-      {[['times','◷','Times'],['registration','✓','Registration'],['more','•••','More']].map(([id,icon,label])=><button type="button" key={id} disabled={!selectedBulkCount} aria-pressed={bulkPanel===id} style={{...button,minWidth:0,padding:'9px 4px',borderColor:bulkPanel===id?C.gold:C.border,color:bulkPanel===id?C.gold:C.icy,background:bulkPanel===id?C.gold+'17':C.section,display:'grid',justifyItems:'center',gap:4}} onClick={()=>bulkPanel===id?setBulkPanel(''):beginBulkPanel(id)}><span style={{fontSize:18,lineHeight:1}}>{icon}</span><span style={{fontSize:12}}>{label}</span></button>)}
+      {[['times','◷','Times'],['status','✓','TAL status'],['more','•••','More']].map(([id,icon,label])=><button type="button" key={id} disabled={!selectedBulkCount} aria-pressed={bulkPanel===id} style={{...button,minWidth:0,padding:'9px 4px',borderColor:bulkPanel===id?C.gold:C.border,color:bulkPanel===id?C.gold:C.icy,background:bulkPanel===id?C.gold+'17':C.section,display:'grid',justifyItems:'center',gap:4}} onClick={()=>id==='status'?openBulkStatusEditor():bulkPanel===id?setBulkPanel(''):beginBulkPanel(id)}><span style={{fontSize:18,lineHeight:1}}>{icon}</span><span style={{fontSize:12}}>{label}</span></button>)}
      </div>
      {bulkPanel==='more'&&<div style={{display:'grid',gap:5,marginTop:10,background:C.section,borderRadius:10,padding:7}}>
       {[['legion','Allocate to a legion'],['cooperation','Works well together'],['language','Edit languages'],['remove','Remove from TAL']].map(([id,label])=><button type="button" key={id} style={{...button,textAlign:'left',border:0,color:id==='remove'?C.red:C.white}} onClick={()=>beginBulkPanel(id)}>{label} <span style={{float:'right'}}>›</span></button>)}
@@ -562,5 +608,46 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
 
    </section>
   </>}
+  {statusEditor&&<div role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget){setStatusEditor(null);setStatusError('')}}} style={{position:'fixed',inset:0,zIndex:1200,background:'#0009',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+    <section role="dialog" aria-modal="true" aria-label="Manage TAL status" style={{width:'100%',maxWidth:480,maxHeight:'min(90dvh,900px)',overflowY:'auto',overscrollBehavior:'contain',borderRadius:'22px 22px 0 0',background:C.card,color:C.white,padding:'10px 18px calc(22px + env(safe-area-inset-bottom, 0px))',boxSizing:'border-box',boxShadow:'0 -15px 45px #0006'}}>
+      <div aria-hidden="true" style={{width:36,height:5,borderRadius:10,background:C.icy,opacity:.6,margin:'0 auto 12px'}}/>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+        <button type="button" style={{...button,border:0,background:'transparent',padding:'8px 0'}} onClick={()=>{setStatusEditor(null);setStatusError('')}}>Cancel</button>
+        <strong style={{fontSize:16}}>Manage TAL status</strong>
+        <button type="button" style={{...button,border:0,background:'transparent',color:C.gold,padding:'8px 0'}} onClick={saveStatusEditor}>Save</button>
+      </div>
+      <p style={{...muted,margin:'7px 0 14px'}}>{statusEditor.kind==='single'?(byId.get(statusEditor.playerId)?.username||byId.get(statusEditor.playerId)?.alias||'Player'):'Editing '+statusEditor.ids.length+' selected players'}. Changes apply only when you save.</p>
+      {statusEditor.kind==='bulk'&&<p style={{...muted,background:C.section,borderRadius:10,padding:10}}>Select the settings you want to change. Unticked settings will stay as they are for each player.</p>}
+      {[
+       {key:'role',title:'Roster role',description:'30 combatants · 20 substitutes',choices:[['combatant','Combatant','Starting roster · Enter at 0:00'],['substitute','Substitute','Reserve roster · Enter at 3:00+'],['pending','Unassigned','Role not decided']]},
+       {key:'matchmakingOnly',title:'Battle participation',description:'Who is expected to fight',choices:[[false,'Playing','Expected to join battle'],[true,'Matchmaking only','Registered for matchmaking, excluded from battle teams']]}
+      ].map(section=><div key={section.key} style={{marginTop:15,paddingTop:15,borderTop:'1px solid '+C.border}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}>
+          <div><strong style={{fontSize:15}}>{section.title}</strong><p style={{...muted,margin:'3px 0 0'}}>{section.description}</p></div>
+          {statusEditor.kind==='bulk'&&<label style={{display:'flex',alignItems:'center',gap:7,fontSize:12,color:C.icy,minHeight:44}}><input type="checkbox" checked={statusApply[section.key]} onChange={e=>{setStatusApply(old=>({...old,[section.key]:e.target.checked}));setStatusError('')}} style={{width:20,height:20,accentColor:C.gold}}/>Change</label>}
+        </div>
+        <div role="radiogroup" aria-label={section.title} style={{display:'grid',gap:7,opacity:statusEditor.kind==='bulk'&&!statusApply[section.key]?.65:1}}>
+          {section.choices.map(([choice,label,explanation])=><label key={String(choice)} style={{display:'flex',alignItems:'center',gap:13,minHeight:60,padding:'9px 12px',border:'1px solid '+(statusDraft[section.key]===choice?C.gold:C.border),borderRadius:12,background:statusDraft[section.key]===choice?C.gold+'12':C.section,cursor:'pointer'}}>
+            <input type="radio" name={'tal-status-'+section.key} disabled={statusEditor.kind==='bulk'&&!statusApply[section.key]} checked={statusDraft[section.key]===choice} onChange={()=>{setStatusDraft(old=>({...old,[section.key]:choice}));setStatusError('')}} style={{width:22,height:22,flexShrink:0,accentColor:C.gold}}/>
+            <span><strong style={{fontSize:14,display:'block'}}>{label}</strong><span style={{...muted,display:'block',marginTop:3}}>{explanation}</span></span>
+          </label>)}
+        </div>
+      </div>)}
+      <div style={{marginTop:15,paddingTop:15,borderTop:'1px solid '+C.border}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}>
+          <div><strong style={{fontSize:15}}>In-game registration</strong><p style={{...muted,margin:'3px 0 0'}}>Confirm after registering inside Whiteout Survival</p></div>
+          {statusEditor.kind==='bulk'&&<label style={{display:'flex',alignItems:'center',gap:7,fontSize:12,color:C.icy,minHeight:44}}><input type="checkbox" checked={statusApply.registered} onChange={e=>{setStatusApply(old=>({...old,registered:e.target.checked}));setStatusError('')}} style={{width:20,height:20,accentColor:C.gold}}/>Change</label>}
+        </div>
+        <label style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,minHeight:64,padding:'10px 12px',background:C.section,border:'1px solid '+C.border,borderRadius:12,opacity:statusEditor.kind==='bulk'&&!statusApply.registered?.65:1}}>
+          <span><strong style={{fontSize:14}}>{statusDraft.registered?'Registered in game':'Needs registration'}</strong><span style={{...muted,display:'block',marginTop:3}}>Registration confirmation</span></span>
+          <input type="checkbox" aria-label="Registered in game" checked={statusDraft.registered} disabled={statusEditor.kind==='bulk'&&!statusApply.registered} onChange={e=>{setStatusDraft(old=>({...old,registered:e.target.checked}));setStatusError('')}} style={{height:24,width:24,accentColor:C.gold,flexShrink:0}}/>
+        </label>
+      </div>
+      {statusApply.matchmakingOnly&&statusDraft.matchmakingOnly&&statusApply.role&&statusDraft.role==='combatant'&&<p style={{...muted,color:C.gold}}>Matchmaking-only players are excluded from battle teams. Consider using a substitute slot instead.</p>}
+      {statusError&&<p role="alert" style={{color:C.red,fontSize:13,marginTop:12}}>{statusError}</p>}
+      <button type="button" style={{...button,width:'100%',background:C.gold,color:C.bg,marginTop:17,minHeight:50,fontSize:15,fontWeight:700}} onClick={saveStatusEditor}>Save changes</button>
+      <p style={{...muted,textAlign:'center',margin:'8px 0 0'}}>Cancel discards changes. Existing availability and legion assignments are preserved.</p>
+    </section>
+  </div>}
  </section>;
 }
