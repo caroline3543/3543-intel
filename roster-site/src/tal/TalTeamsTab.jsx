@@ -494,6 +494,6 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
      {copyMessage&&<p role="status" style={{...small,color:C.gold,margin:'9px 0 0'}}>{copyMessage}</p>}
     </section>
    </>}
-
+  </>}
  </section>;
 }
