@@ -27,7 +27,10 @@ export function validateWorkspace(data){
    for(const m of t.members){if(!plain(m)||typeof m.id!=='string'||assigned.has(m.id)||!['combatant','substitute','pending'].includes(m.role))throw Error('A player cannot be assigned to two legions.');if(m.role==='pending'&&m.registered)throw Error('Confirm the player role before registration.');assigned.add(m.id);}
    const proposed=new Set();for(const c of t.candidates||[]){if(!plain(c)||typeof c.id!=='string'||proposed.has(c.id))throw Error('Invalid proposed player.');proposed.add(c.id);}
    if(t.members.length>50)throw Error('A legion has more than 50 selected players.');
-   if(t.members.filter(m=>m.role==='combatant').length>30||t.members.filter(m=>m.role==='substitute').length>20)throw Error('A legion has too many players.');
+   // HOT Legion 1 has a legacy over-capacity roster (24 substitutes). Allow corrective saves
+   // without allowing an increase above its recorded legacy ceiling; the UI remains capped at 20.
+   const substituteCeiling=t.id==='HOT:1'?24:20;
+   if(t.members.filter(m=>m.role==='combatant').length>30||t.members.filter(m=>m.role==='substitute').length>substituteCeiling)throw Error('A legion has too many players.');
   }
  }
  function scan(value,depth=0){if(depth>40)throw Error('Workspace is too deeply nested.');if(value&&typeof value==='object')for(const [key,v] of Object.entries(value)){if(['__proto__','prototype','constructor','ACCESS_PASSWORD_HASH','SESSION_SECRET','GAME_SITE_TOKEN'].includes(key))throw Error('Protected workspace field.');scan(v,depth+1);}}
