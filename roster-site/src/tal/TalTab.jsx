@@ -351,11 +351,17 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   setTimesDraft(Object.fromEntries(times.map(t=>[t,yes.has(t)?'available':no.has(t)?'unavailable':'unknown'])));
   setEditingTimes(String(player.id));setActionsId('');setSwipeId('');
  }
+ function markUnavailable(player){
+  if(value?.locked)return;
+  const old=value?.records?.[player.id]||{};
+  onChange?.({...value,records:{...(value?.records||{}),[player.id]:{...old,times:[],unavailableTimes:[...times],status:'unavailable',availabilitySubmitted:true}},availability:{...(value?.availability||{}),[player.id]:[]}});
+  setEditingTimes('');onMessage?.((player.username||player.alias||'Player')+' confirmed unavailable. Matchmaking retained.');
+ }
  function saveTimes(player){
   if(value?.locked)return;
   const yes=times.filter(t=>timesDraft[t]==='available'),no=times.filter(t=>timesDraft[t]==='unavailable');
   const old=value?.records?.[player.id]||{};
-  const nextRecord={...old,times:yes,unavailableTimes:no,status:yes.length?'available':'pending'};
+  const nextRecord={...old,times:yes,unavailableTimes:no,status:yes.length?'available':no.length===times.length?'unavailable':'pending',availabilitySubmitted:yes.length>0||no.length===times.length};
   onChange?.({...value,records:{...(value?.records||{}),[player.id]:nextRecord},availability:{...(value?.availability||{}),[player.id]:yes}});
   setEditingTimes('');onMessage?.('Updated '+(player.username||player.alias||'player')+' availability.');
  }
@@ -449,8 +455,8 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      <span style={{fontSize:12,color:team&&tournamentStatus(team)==='eliminated'?C.icy:C.green,whiteSpace:'nowrap'}}>{team?(tournamentStatus(team)==='eliminated'?'● Eliminated':'● Active'):'● Overview'}</span>
     </div>
    </section>
-   {talView==='registration'&&<div style={{display:'flex',justifyContent:'flex-end',margin:'0 0 8px',position:'relative'}}>
-    <button type="button" aria-label="Registration options" aria-expanded={registrationOptionsOpen} onClick={()=>setRegistrationOptionsOpen(v=>!v)} style={{...button,borderRadius:10,minHeight:44,padding:'9px 12px',fontSize:12,background:C.section}}>⋯ Options</button>
+   {talView==='registration'&&<div style={{display:'flex',justifyContent:'flex-end',margin:'-8px 0 4px',position:'relative',height:0,zIndex:12}}>
+    <button type="button" aria-label="Registration options" aria-expanded={registrationOptionsOpen} onClick={()=>setRegistrationOptionsOpen(v=>!v)} style={{...button,borderRadius:10,minHeight:44,minWidth:44,padding:'9px',fontSize:17,background:C.section,transform:'translateY(-54px)'}} title="Registration options">•••</button>
     {registrationOptionsOpen&&<div style={{position:'absolute',right:0,top:48,zIndex:20,width:'min(260px,85vw)',background:'#15273A',border:'1px solid '+C.border,padding:8,borderRadius:12,boxShadow:'0 10px 28px #0008'}}>
       <button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setResetOpen(true);setResetError('');setResetConfirmed(false);setResetPhrase('');setResetKind('both');}} style={{...button,width:'100%',textAlign:'left',border:0,background:'transparent',color:C.gold}}>↺ Reset this legion’s registration…</button>
       <div style={{...muted,padding:'5px 8px'}}>Only affects the selected legion.</div>
@@ -528,7 +534,17 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      </button>
      {attentionOpen===item.id&&<div style={{padding:'0 12px 12px',borderTop:'1px solid '+C.border}}>
       <p style={{...muted,margin:'9px 0'}}>{item.detail}</p>
-      {item.list.length?item.list.map(({player:p})=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,justifyContent:'space-between',padding:'5px 0'}}><span style={{fontSize:13,overflow:'hidden',textOverflow:'ellipsis'}}>{p.username||p.alias||p.fid||p.id}</span><button type="button" style={{...button,minHeight:40,padding:'7px 11px',fontSize:12}} onClick={()=>onOpenPlayer?.(p.id)}>Edit player →</button></div>):<p style={{...muted,color:C.green}}>All information complete.</p>}
+      {item.list.length?item.list.map(({player:p})=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,justifyContent:'space-between',flexWrap:'wrap',padding:'5px 0'}}><span style={{fontSize:13,overflow:'hidden',textOverflow:'ellipsis'}}>{p.username||p.alias||p.fid||p.id}</span><button type="button" style={{...button,minHeight:40,padding:'7px 11px',fontSize:12}} onClick={()=>{if(item.id==='availability'){beginEditTimes(p);setAttentionOpen('availability')}else onOpenPlayer?.(p.id)}}>{item.id==='availability'?'Edit availability →':'Edit troop tiers →'}</button>{item.id==='availability'&&editingTimes===String(p.id)&&<div style={{width:'100%',flexBasis:'100%',padding:'10px 0',borderTop:'1px solid '+C.border}}>
+ <strong style={{fontSize:13}}>Availability for {p.username||p.alias||p.fid}</strong>
+ <p style={{...muted,margin:'7px 0'}}>Select event times or confirm no availability. Matchmaking status is unchanged.</p>
+ <div role="group" aria-label="Edit player available times" style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:5}}>
+ {times.map(t=>{const state=timesDraft[t]||'unknown',next=state==='unknown'?'available':state==='available'?'unavailable':'unknown';return <button type="button" key={t} aria-label={t+' UTC: '+state} onClick={()=>setTimesDraft(old=>({...old,[t]:next}))} style={{...button,minWidth:0,minHeight:54,padding:3,fontSize:11,color:state==='available'?C.green:state==='unavailable'?C.red:C.icy,borderColor:state==='available'?C.green:state==='unavailable'?C.red:C.border}}>{t}<span style={{display:'block',fontSize:10}}>{state==='available'?'Yes':state==='unavailable'?'No':'Unknown'}</span></button>})}
+ </div>
+ <div style={{display:'flex',gap:7,flexWrap:'wrap',marginTop:10}}>
+ <button type="button" style={{...button,flex:1,minHeight:44,color:C.gold}} disabled={!!value?.locked} onClick={()=>markUnavailable(p)}>No availability</button>
+ <button type="button" style={{...button,flex:1,minHeight:44}} disabled={!!value?.locked} onClick={()=>saveTimes(p)}>Save times</button>
+ <button type="button" style={{...button,minHeight:44}} onClick={()=>setEditingTimes('')}>Cancel</button>
+ </div></div>}</div>):<p style={{...muted,color:C.green}}>All information complete.</p>}
      </div>}
     </div>)}
    </section>}
