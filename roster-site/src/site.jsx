@@ -83,6 +83,21 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
    setData(prev=>({...prev,talPlan:{...talPlan,autoRoles:false}}));
    setMessage('TAL changes saved on this device · syncing to the shared workspace…');
   }
+  function resetTalLegion(teamId,kind){
+   if(!teamId||!['roles','registration','both'].includes(kind))return;
+   pendingTalSync.current={active:true,sawDirty:false};
+   setData(prev=>{
+    const plan=prev.talPlan;
+    if(!plan?.teams?.some(t=>t.id===teamId))return prev;
+    const nextTeams=plan.teams.map(t=>t.id!==teamId?t:{...t,members:(t.members||[]).map(m=>({
+     ...m,
+     ...(kind==='roles'||kind==='both'?{role:'pending'}:{}),
+     ...(kind==='registration'||kind==='both'?{registered:false}:{})
+    }))});
+    return {...prev,talPlan:{...plan,teams:nextTeams,autoRoles:false}};
+   });
+   setMessage('Reset saved on this device · syncing to the shared workspace…');
+  }
   const requiredAction=sync.conflicts?.length?'conflict':['join','unpublished'].includes(sync.mode)?sync.mode:null;
   useEffect(()=>{if(requiredAction&&requiredAction!==lastAttention.current)setWorkspaceOpen(true);else if(!requiredAction&&lastAttention.current)setWorkspaceOpen(false);lastAttention.current=requiredAction;},[requiredAction]);
   const players=data.players||[];
@@ -203,7 +218,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='svs'&&<SvsComparison players={players}/>}
     {tab==='battle'&&<BattlePlanner onOpenMemberProfile={id=>{setInitialPlayerId(id);navigate('members');}} events={data.events||[]} players={players} plan={data.talPlan||newPlan()} sharedTeamPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('Reusable TAL teamwork preferences saved.');}} onMessage={setMessage} onUpdate={action=>{try{setData(prev=>({...prev,events:applyBattleAction(prev.events||[],action)}));return {ok:true};}catch(e){setMessage(e.message);return {ok:false,error:e.message};}}}/>}
     {tab==='changes'&&<NameChanges players={players} plan={data.talPlan||newPlan()} onOpen={id=>{setInitialPlayerId(id);navigate('members');}}/>}
-    {tab==='tal'&&<TalTab workspace={data} value={data.talPlan} players={players} onChange={saveTalPlan} onOpenPlayer={id=>{setInitialPlayerId(id);navigate('members');}} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage} sync={sync} onCheckSync={retry} onBulkApply={(ids,action)=>{const result=applyTalBulk(latest.current,ids,action);pendingTalSync.current={active:true,sawDirty:false};setData({...result.data,talPlan:{...result.data.talPlan,autoRoles:false}});setMessage('Bulk changes saved on this device · syncing…');}}/>}
+    {tab==='tal'&&<TalTab workspace={data} value={data.talPlan} players={players} onChange={saveTalPlan} onOpenPlayer={id=>{setInitialPlayerId(id);navigate('members');}} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage} sync={sync} onCheckSync={retry} onReset={resetTalLegion} onBulkApply={(ids,action)=>{const result=applyTalBulk(latest.current,ids,action);pendingTalSync.current={active:true,sawDirty:false};setData({...result.data,talPlan:{...result.data.talPlan,autoRoles:false}});setMessage('Bulk changes saved on this device · syncing…');}}/>}
     {tab==='teams'&&<section aria-label="Teams" style={{minHeight:'65vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'40px 20px'}}><div style={{textAlign:'center',maxWidth:300}}><svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Locked"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><h2 style={{color:C.white,fontSize:22,margin:'18px 0 8px'}}>Coming soon</h2><p style={{color:C.icy,fontSize:14,lineHeight:1.6}}>Teams will be available in a future update.</p></div></section>}
     </div>}
     </div>
