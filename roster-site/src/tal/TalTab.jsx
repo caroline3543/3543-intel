@@ -309,7 +309,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     ...m,
     ...(statusApply.role?{role:statusDraft.role}:{}),
     ...(statusApply.matchmakingOnly?{matchmakingOnly:statusDraft.matchmakingOnly}:{}),
-    ...(statusApply.registered?{registered:statusDraft.registered}:{})
+    ...(statusApply.role&&statusDraft.role==='pending'?{registered:false}:statusApply.registered?{registered:statusDraft.registered}:{})
    }:m)};
   });
   for(const t of nextTeams){
@@ -834,6 +834,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
           <input type="checkbox" aria-label="Registered in game" checked={statusDraft.registered} disabled={statusEditor.kind==='bulk'&&!statusApply.registered} onChange={e=>{setStatusDraft(old=>({...old,registered:e.target.checked}));setStatusError('')}} style={{height:24,width:24,accentColor:C.gold,flexShrink:0}}/>
         </label>
       </div>
+      {statusApply.role&&statusDraft.role==='pending'&&<p style={{...muted,color:C.gold,marginTop:8}}>Unassigned players cannot be marked registered in-game. Saving Unassigned will also set their registration to Needs registration.</p>}
       {statusApply.matchmakingOnly&&statusDraft.matchmakingOnly&&statusApply.role&&statusDraft.role==='combatant'&&<p style={{...muted,color:C.gold}}>Matchmaking-only players are excluded from battle teams. Consider using a substitute slot instead.</p>}
       {statusError&&<p role="alert" style={{color:C.red,fontSize:13,marginTop:12}}>{statusError}</p>}
       <button type="button" style={{...button,width:'100%',background:C.gold,color:C.bg,marginTop:17,minHeight:50,fontSize:15,fontWeight:700}} disabled={!!capacityError} onClick={saveStatusEditor}>{capacityError?'Resolve roster capacity':'Save changes'}</button>
