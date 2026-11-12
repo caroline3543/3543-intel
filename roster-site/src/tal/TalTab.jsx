@@ -41,7 +41,10 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [sort,setSort]=useState('name');
  const [sortDirection,setSortDirection]=useState('asc');
  const [registrationFilter,setRegistrationFilter]=useState('all');
- const [talView,setTalView]=useState('registration');
+ const [talView,setTalView]=useState(()=>{try{const saved=window.sessionStorage.getItem('tal:3573:last-section');return saved==='registration'||saved==='prep'?saved:'home';}catch{return 'home';}});
+ const sectionSnapshots=useRef({registration:null,prep:null});
+ const sectionScroll=useRef({registration:0,prep:0});
+ const [sectionNavigationReady,setSectionNavigationReady]=useState(false);
  const [roleFilter,setRoleFilter]=useState('all');
  const switchSort=field=>{if(sort===field)setSortDirection(d=>d==='asc'?'desc':'asc');else{setSort(field);setSortDirection(field==='name'||field==='labyrinth'?'asc':'desc');}setListLimit(40);};
  const [filtersOpen,setFiltersOpen]=useState(false);
@@ -152,6 +155,50 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const confirmedSubstitutes=registrationMembers.filter(m=>m.registered&&m.role==='substitute').length;
  const legionCount=shownTeams.length||1;
  useEffect(()=>{try{window.sessionStorage.setItem('tal:selected-legion',effectiveSelection);}catch{}},[effectiveSelection]);
+ function snapshotSection(){
+  return {check,search,timeFilters,timeMode,sort,sortDirection,registrationFilter,roleFilter,missingFilter,filtersOpen,listLimit};
+ }
+ function restoreSection(snapshot){
+  const next=snapshot||{};
+  setCheck(next.check||'all');setSearch(next.search||'');
+  setTimeFilters(Array.isArray(next.timeFilters)?next.timeFilters:[]);
+  setTimeMode(next.timeMode||'any');setSort(next.sort||'name');
+  setSortDirection(next.sortDirection||'asc');
+  setRegistrationFilter(next.registrationFilter||'all');
+  setRoleFilter(next.roleFilter||'all');setMissingFilter(next.missingFilter||'');
+  setFiltersOpen(!!next.filtersOpen);setListLimit(next.listLimit||40);
+ }
+ function navigateSection(next){
+  if(!['home','registration','prep'].includes(next)||next===talView)return;
+  if(talView!=='home'){
+   const snapshot=snapshotSection();
+   sectionSnapshots.current[talView]=snapshot;
+   sectionScroll.current[talView]=window.scrollY;
+   try{window.sessionStorage.setItem('tal:3573:filters:'+talView,JSON.stringify(snapshot));window.sessionStorage.setItem('tal:3573:scroll:'+talView,String(window.scrollY));}catch{}
+  }
+  setAdding(false);setActionsId('');setSwipeId('');setSelecting(false);setBulkSelected([]);
+  setBulkPanel('');setBulkReview(false);setEditingTimes('');setStatusEditor(null);
+  setRemoveId('');setTournamentConfirm('');setPreviewOpen(false);
+  if(next!=='home'){
+   let saved=sectionSnapshots.current[next];
+   if(!saved){try{saved=JSON.parse(window.sessionStorage.getItem('tal:3573:filters:'+next)||'null');}catch{}}
+   restoreSection(saved);
+   try{sectionScroll.current[next]=Number(window.sessionStorage.getItem('tal:3573:scroll:'+next))||0;}catch{}
+   try{window.sessionStorage.setItem('tal:3573:last-section',next);}catch{}
+  }
+  setSectionNavigationReady(true);
+  setTalView(next);
+ }
+ useEffect(()=>{
+  if(talView==='home'||!sectionNavigationReady)return;
+  const y=sectionScroll.current[talView]||0;
+  const frame=requestAnimationFrame(()=>window.scrollTo({top:y,behavior:'instant'}));
+  return()=>cancelAnimationFrame(frame);
+ },[talView,sectionNavigationReady]);
+ useEffect(()=>{
+  if(talView==='home')return;
+  try{window.sessionStorage.setItem('tal:3573:filters:'+talView,JSON.stringify(snapshotSection()));}catch{}
+ },[talView,check,search,timeFilters,timeMode,sort,sortDirection,registrationFilter,roleFilter,missingFilter,filtersOpen,listLimit]);
  function chooseLegion(id){setRoleFilter('all');setSelecting(false);setBulkSelected([]);setBulkPanel('');setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setBatchStatus('needs');setTimeMerge('add');setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
  function focusPlayers(){playersAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'});}
  function chooseReadiness(next){setCheck(current=>current===next?'all':next);setListLimit(40);focusPlayers();}
@@ -338,10 +385,31 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  }
   const canEdit=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated';
  return <section style={{padding:'5px 16px 32px'}}>
-  <h2 style={{fontSize:20,letterSpacing:'-.03em',margin:'3px 0 8px'}}>TAL Planner</h2>
-  <div role="group" aria-label="TAL planner sections" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:5,padding:5,marginBottom:14,background:C.section,border:'1px solid '+C.border,borderRadius:15}}>
-   {[['registration','Registration'],['prep','TAL Prep']].map(([id,label])=><button type="button" key={id} aria-pressed={talView===id} onClick={()=>{setTalView(id);setAdding(false);setActionsId('');setSelecting(false);setBulkSelected([]);setRoleFilter('all');setMissingFilter('');}} style={{...button,borderRadius:11,borderColor:talView===id?C.gold:'transparent',background:talView===id?C.card:'transparent',color:talView===id?C.white:C.icy,minHeight:46,fontSize:14}}>{label}</button>)}
-  </div>
+  {talView==='home'?<section aria-label="TAL Planner workflows">
+    <h2 style={{fontSize:20,letterSpacing:'-.03em',margin:'3px 0 6px'}}>TAL Planner</h2>
+    <p style={{...muted,margin:'0 0 16px',fontSize:13}}>Choose what you want to manage.</p>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10}}>
+     <button type="button" onClick={()=>navigateSection('registration')} style={{minWidth:0,minHeight:166,display:'flex',flexDirection:'column',alignItems:'flex-start',justifyContent:'space-between',gap:10,padding:14,background:'#15273A',border:'1px solid #274056',borderRadius:15,textAlign:'left',cursor:'pointer',color:C.white}}>
+      <span aria-hidden="true" style={{fontSize:24,color:C.gold}}>☑</span>
+      <span style={{fontWeight:750,fontSize:16}}>Registration</span>
+      <span style={{fontSize:12,lineHeight:1.45,color:C.icy}}>Player roles, substitutes and in-game registration</span>
+      <span style={{fontSize:12,color:C.gold}}>{registrationCount} confirmed · Open ›</span>
+     </button>
+     <button type="button" onClick={()=>navigateSection('prep')} style={{minWidth:0,minHeight:166,display:'flex',flexDirection:'column',alignItems:'flex-start',justifyContent:'space-between',gap:10,padding:14,background:'#15273A',border:'1px solid #274056',borderRadius:15,textAlign:'left',cursor:'pointer',color:C.white}}>
+      <span aria-hidden="true" style={{fontSize:24,color:C.gold}}>☷</span>
+      <span style={{fontWeight:750,fontSize:16}}>TAL Prep</span>
+      <span style={{fontSize:12,lineHeight:1.45,color:C.icy}}>Availability, alliance moves and readiness</span>
+      <span style={{fontSize:12,color:C.gold}}>Open preparation ›</span>
+     </button>
+    </div>
+   </section>:<div aria-label="TAL Planner destination" style={{marginBottom:12}}>
+     <button type="button" onClick={()=>navigateSection('home')} style={{background:'transparent',border:0,color:C.icy,padding:'7px 0',minHeight:36,fontSize:12,cursor:'pointer'}}>‹ TAL Planner</button>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+      <h2 style={{fontSize:20,letterSpacing:'-.03em',margin:'0'}}>{talView==='registration'?'Registration':'TAL Prep'}</h2>
+      <button type="button" onClick={()=>navigateSection(talView==='registration'?'prep':'registration')} style={{...button,minHeight:40,padding:'8px 12px',fontSize:12,background:'#182A3F',color:C.gold,borderRadius:22,border:'1px solid transparent'}}>{talView==='registration'?'TAL Prep →':'← Registration'}</button>
+     </div>
+   </div>}
+  {talView!=='home'&&<>
   {!teams.length?<div style={{padding:16,background:C.section,borderRadius:12}}><strong>No legions assigned</strong><p style={{fontSize:14,color:C.icy,lineHeight:1.5}}>Saved TAL legion assignments will appear when available. Existing plan data is retained.</p></div>:<>
    <section aria-label="Choose TAL legion" style={{marginBottom:10}}>
     <label style={{...muted,display:'block',marginBottom:5,fontWeight:700}} htmlFor="tal-legion-select">LEGION</label>
@@ -632,6 +700,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     </div>}
 
    </section>
+  </>}
   </>}
   {statusEditor&&<div role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget){setStatusEditor(null);setStatusError('')}}} style={{position:'fixed',inset:0,zIndex:1200,background:'#0009',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
     <section role="dialog" aria-modal="true" aria-label="Manage TAL status" style={{width:'100%',maxWidth:480,maxHeight:'min(90dvh,900px)',overflowY:'auto',overscrollBehavior:'contain',borderRadius:'22px 22px 0 0',background:C.card,color:C.white,padding:'10px 18px calc(22px + env(safe-area-inset-bottom, 0px))',boxSizing:'border-box',boxShadow:'0 -15px 45px #0006'}}>
