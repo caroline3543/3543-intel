@@ -39,8 +39,9 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [timeMode,setTimeMode]=useState('any');
  const [sort,setSort]=useState('name');
  const [registrationFilter,setRegistrationFilter]=useState('all');
- const [talView,setTalView]=useState('prep');
+ const [talView,setTalView]=useState('registration');
  const [roleFilter,setRoleFilter]=useState('all');
+ const [filtersOpen,setFiltersOpen]=useState(false);
  const [adding,setAdding]=useState(false);
  const [addQuery,setAddQuery]=useState('');
  const [addSearch,setAddSearch]=useState('');
@@ -143,6 +144,9 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const combatantCount=registrationMembers.filter(m=>m.role==='combatant').length;
  const substituteCount=registrationMembers.filter(m=>m.role==='substitute').length;
  const matchmakingCount=registrationMembers.filter(m=>m.matchmakingOnly).length;
+ const pendingRegistrationCount=registrationMembers.length-registrationCount;
+ const confirmedCombatants=registrationMembers.filter(m=>m.registered&&m.role==='combatant').length;
+ const confirmedSubstitutes=registrationMembers.filter(m=>m.registered&&m.role==='substitute').length;
  const legionCount=shownTeams.length||1;
  useEffect(()=>{try{window.sessionStorage.setItem('tal:selected-legion',effectiveSelection);}catch{}},[effectiveSelection]);
  function chooseLegion(id){setRoleFilter('all');setSelecting(false);setBulkSelected([]);setBulkPanel('');setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setBatchStatus('needs');setTimeMerge('add');setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
@@ -336,26 +340,30 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
    {[['registration','Registration'],['prep','TAL Prep']].map(([id,label])=><button type="button" key={id} aria-pressed={talView===id} onClick={()=>{setTalView(id);setAdding(false);setActionsId('');setSelecting(false);setBulkSelected([]);setRoleFilter('all');setMissingFilter('');}} style={{...button,borderRadius:11,borderColor:talView===id?C.gold:'transparent',background:talView===id?C.card:'transparent',color:talView===id?C.white:C.icy,minHeight:46,fontSize:14}}>{label}</button>)}
   </div>
   {!teams.length?<div style={{padding:16,background:C.section,borderRadius:12}}><strong>No legions assigned</strong><p style={{fontSize:14,color:C.icy,lineHeight:1.5}}>Saved TAL legion assignments will appear when available. Existing plan data is retained.</p></div>:<>
-   <section aria-label="Choose TAL legion" style={{marginBottom:12}}>
-    <div style={{fontSize:12,fontWeight:700,color:C.icy,marginBottom:8}}>LEGIONS</div>
-    <div role="group" aria-label="Select a legion to view its data" style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:6,scrollSnapType:'x proximity'}}>
-     {[{id:'',label:'All legions',status:'all'},...teams.map(t=>({id:t.id,label:legionLabel(t),status:tournamentStatus(t)}))].map(item=>{
-      const active=item.id===effectiveSelection,grey=item.status==='eliminated',dot=grey?C.icy:C.green;
-      return <button key={item.id||'all'} type="button" aria-pressed={active} onClick={()=>chooseLegion(item.id)} style={{flex:'0 0 150px',width:150,minWidth:150,minHeight:74,padding:11,textAlign:'left',display:'flex',flexDirection:'column',justifyContent:'center',gap:8,scrollSnapAlign:'start',border:'1px solid '+(active?C.gold:C.border),borderRadius:12,background:active?C.gold+'13':C.section,color:grey?C.icy:C.white,cursor:'pointer'}}>
-       <span style={{fontSize:14,fontWeight:700,whiteSpace:'nowrap'}}>{item.label}</span>
-       <span style={{display:'flex',alignItems:'center',gap:7,fontSize:12,color:dot}}><span aria-hidden="true" style={{width:7,height:7,flexShrink:0,borderRadius:'50%',background:dot}}/>{item.status==='all'?'Overview':grey?'Eliminated':'Active'}</span>
-      </button>;
-     })}
+   <section aria-label="Choose TAL legion" style={{marginBottom:10}}>
+    <label style={{...muted,display:'block',marginBottom:5,fontWeight:700}} htmlFor="tal-legion-select">LEGION</label>
+    <div style={{display:'flex',alignItems:'center',gap:8}}>
+     <select id="tal-legion-select" aria-label="Choose TAL legion" value={effectiveSelection} onChange={e=>chooseLegion(e.target.value)} style={{...button,flex:1,minWidth:0,background:C.card,color:C.white,minHeight:48,fontSize:15,fontWeight:650}}>
+      <option value="">All legions · Overview</option>
+      {teams.map(t=><option key={t.id} value={t.id}>{legionLabel(t)}{tournamentStatus(t)==='eliminated'?' · Eliminated':''}</option>)}
+     </select>
+     <span style={{fontSize:12,color:team&&tournamentStatus(team)==='eliminated'?C.icy:C.green,whiteSpace:'nowrap'}}>{team?(tournamentStatus(team)==='eliminated'?'● Eliminated':'● Active'):'● Overview'}</span>
     </div>
    </section>
-   {talView==='registration'&&<section aria-label="TAL registration overview" style={{background:C.card,border:'1px solid '+C.border,borderRadius:13,padding:12,marginBottom:14}}>
-    <div style={{fontWeight:700,fontSize:15,marginBottom:10}}>Registration overview</div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:7}}>
-     {[{label:'Registered',count:registrationCount,max:50*legionCount},{label:'Combatants',count:combatantCount,max:30*legionCount},{label:'Substitutes',count:substituteCount,max:20*legionCount}].map(item=><div key={item.label} style={{minWidth:0,background:C.section,border:'1px solid '+C.border,borderRadius:11,padding:10}}>
-      <div style={{fontSize:11,color:C.icy}}>{item.label}</div><div style={{fontSize:19,fontWeight:750,marginTop:5}}>{item.count}<span style={{fontSize:12,color:C.icy,fontWeight:500}}>/{item.max}</span></div>
-     </div>)}
+   {talView==='registration'&&<section aria-label="TAL registration overview" style={{background:C.card,border:'1px solid '+C.border,borderRadius:13,padding:12,marginBottom:12}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+     <strong style={{fontSize:15}}>Registration</strong>
+     <button type="button" disabled={!pendingRegistrationCount} onClick={()=>{setRegistrationFilter('unregistered');setListLimit(40);focusPlayers();}} style={{border:0,background:'transparent',color:pendingRegistrationCount?C.gold:C.icy,fontSize:12,padding:'7px 0',minHeight:36,cursor:pendingRegistrationCount?'pointer':'default'}}>{registrationCount} confirmed · {pendingRegistrationCount} pending ›</button>
     </div>
-    <div style={{...muted,marginTop:10}}>{matchmakingCount} matchmaking only · Registered players remain in TAL Prep automatically. Combatants start on the field; substitutes can enter after 3 minutes.</div>
+    <div role="progressbar" aria-label="In-game registration progress" aria-valuemin={0} aria-valuemax={registrationMembers.length||1} aria-valuenow={registrationCount} style={{height:7,background:C.border,borderRadius:20,overflow:'hidden',margin:'5px 0 9px'}}>
+     <div style={{height:'100%',width:(registrationMembers.length?Math.round(registrationCount/registrationMembers.length*100):0)+'%',background:C.gold,borderRadius:20}}/>
+    </div>
+    <div style={{display:'flex',justifyContent:'space-between',gap:8,flexWrap:'wrap',fontSize:12,color:C.icy}}>
+     <span>{combatantCount} combatants assigned <span style={{opacity:.8}}>({confirmedCombatants} registered)</span></span>
+     <span>{substituteCount} substitutes assigned <span style={{opacity:.8}}>({confirmedSubstitutes} registered)</span></span>
+    </div>
+    {!!matchmakingCount&&<div style={{...muted,marginTop:5}}>{matchmakingCount} matchmaking only</div>}
+    {team&&<div style={{...muted,marginTop:5}}>{registrationMembers.length} assigned / {50*legionCount} places</div>}
    </section>}
    {talView==='prep'&&<>
    <section aria-label="Alliance readiness" style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:12,marginBottom:14}}>
