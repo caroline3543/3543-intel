@@ -439,22 +439,20 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  }
 
  return <section style={{padding:'5px 16px 32px'}}>
-  <nav aria-label="TAL Planner sections" style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:6,margin:'5px 0 14px'}}>
-   {[['registration','Registration'],['prep','TAL Prep'],['teams','Teams']].map(([id,label])=><button key={id} type="button" aria-current={talView===id?'page':undefined} onClick={()=>navigateSection(id)} style={{...button,minWidth:0,minHeight:46,padding:'8px 4px',fontSize:12,borderRadius:11,background:talView===id?'#2A4057':'#172638',borderColor:talView===id?C.gold:C.border,color:talView===id?C.white:C.icy}}>{label}</button>)}
+  <section aria-label="Current TAL legion" style={{background:'#1D3449',border:'1px solid #53728D',borderRadius:14,padding:'11px 12px',margin:'3px 0 12px'}}>
+   <label htmlFor="tal-legion-select" style={{display:'flex',alignItems:'center',gap:7,fontSize:11,fontWeight:750,letterSpacing:'.05em',color:'#D2C095',marginBottom:6}}>◈ WORKING ON <span style={{marginLeft:'auto',fontWeight:500,letterSpacing:0,color:C.icy}}>Change legion ↓</span></label>
+   <select id="tal-legion-select" aria-label="Working on legion. Select to change legion" value={effectiveSelection} onChange={e=>chooseLegion(e.target.value)} style={{...button,width:'100%',minWidth:0,boxSizing:'border-box',background:'#29445D',color:C.white,minHeight:48,fontSize:16,fontWeight:750,borderColor:'#7594AC',borderRadius:10}}>
+    <option value="">All legions · Overview</option>
+    {teams.map(t=><option key={t.id} value={t.id}>{legionLabel(t)}{tournamentStatus(t)==='eliminated'?' · Eliminated':''}</option>)}
+   </select>
+   <div style={{display:'flex',justifyContent:'space-between',gap:8,marginTop:6,fontSize:11,color:C.icy}}><span>{team?(team.members||[]).length+' assigned players':'Choose a legion to begin'}</span><span style={{color:team&&tournamentStatus(team)==='eliminated'?C.icy:C.green}}>{team?(tournamentStatus(team)==='eliminated'?'● Eliminated':'● Active'):'Overview'}</span></div>
+  </section>
+  <nav aria-label="TAL Planner sections" style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:4,padding:4,borderRadius:13,background:'#172638',margin:'0 0 13px'}}>
+   {[['registration','Registration'],['prep','TAL Prep'],['teams','Teams']].map(([id,label])=><button key={id} type="button" aria-current={talView===id?'page':undefined} onClick={()=>navigateSection(id)} style={{...button,minWidth:0,minHeight:44,padding:'8px 2px',fontSize:12,borderRadius:9,background:talView===id?'#344D65':'transparent',borderColor:'transparent',color:talView===id?C.white:C.icy,fontWeight:talView===id?700:500}}>{label}</button>)}
   </nav>
   {talView==='teams'&&<TalTeamsTab value={value} players={players} selectedLegionId={effectiveSelection} drafts={teamDrafts} onDraftChange={onTeamDraftChange} syncReady={!!(sync?.joined&&sync?.mode==='active'&&!sync?.issue&&!sync?.conflicts?.length)}/>}
   {talView!=='home'&&talView!=='teams'&&<>
   {!teams.length?<div style={{padding:16,background:C.section,borderRadius:12}}><strong>No legions assigned</strong><p style={{fontSize:14,color:C.icy,lineHeight:1.5}}>Saved TAL legion assignments will appear when available. Existing plan data is retained.</p></div>:<>
-   <section aria-label="Choose TAL legion" style={{marginBottom:10}}>
-    <label style={{...muted,display:'block',marginBottom:5,fontWeight:700}} htmlFor="tal-legion-select">LEGION</label>
-    <div style={{display:'flex',alignItems:'center',gap:8}}>
-     <select id="tal-legion-select" aria-label="Choose TAL legion" value={effectiveSelection} onChange={e=>chooseLegion(e.target.value)} style={{...button,flex:1,minWidth:0,background:C.card,color:C.white,minHeight:48,fontSize:15,fontWeight:650}}>
-      <option value="">All legions · Overview</option>
-      {teams.map(t=><option key={t.id} value={t.id}>{legionLabel(t)}{tournamentStatus(t)==='eliminated'?' · Eliminated':''}</option>)}
-     </select>
-     <span style={{fontSize:12,color:team&&tournamentStatus(team)==='eliminated'?C.icy:C.green,whiteSpace:'nowrap'}}>{team?(tournamentStatus(team)==='eliminated'?'● Eliminated':'● Active'):'● Overview'}</span>
-    </div>
-   </section>
    {talView==='registration'&&<div style={{display:'flex',justifyContent:'flex-end',margin:'-8px 0 4px',position:'relative',height:0,zIndex:12}}>
     <button type="button" aria-label="Registration options" aria-expanded={registrationOptionsOpen} onClick={()=>setRegistrationOptionsOpen(v=>!v)} style={{...button,borderRadius:10,minHeight:44,minWidth:44,padding:'9px',fontSize:17,background:C.section,transform:'translateY(-54px)'}} title="Registration options">•••</button>
     {registrationOptionsOpen&&<div style={{position:'absolute',right:0,top:48,zIndex:20,width:'min(260px,85vw)',background:'#15273A',border:'1px solid '+C.border,padding:8,borderRadius:12,boxShadow:'0 10px 28px #0008'}}>
