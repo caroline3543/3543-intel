@@ -34,7 +34,7 @@ function moveText(rows,{time=null,availabilityFor=null}={}){
 }
 function savedTalSection(){try{const section=window.sessionStorage.getItem('tal:3573:last-section');if(section==='registration'||section==='prep')return JSON.parse(window.sessionStorage.getItem('tal:3573:filters:'+section)||'null')||{};}catch{}return {};}
 function savedTalScroll(section){try{return Number(window.sessionStorage.getItem('tal:3573:scroll:'+section))||0;}catch{return 0;}}
-export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legionRefresh,onMessage,workspace,onBulkApply}){
+export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legionRefresh,onMessage,workspace,onBulkApply,sync,onCheckSync,onReset}){
  const initialSection=useRef(savedTalSection());
  const [selected,setSelected]=useState(()=>{try{return window.sessionStorage.getItem('tal:selected-legion')||'';}catch{return '';}});
  const [check,setCheck]=useState(initialSection.current.check||'all');
@@ -68,6 +68,13 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [statusDraft,setStatusDraft]=useState({role:'pending',matchmakingOnly:false,registered:false});
  const [statusApply,setStatusApply]=useState({role:false,matchmakingOnly:false,registered:false});
  const [statusError,setStatusError]=useState('');
+ const [registrationOptionsOpen,setRegistrationOptionsOpen]=useState(false);
+ const [resetOpen,setResetOpen]=useState(false);
+ const [resetKind,setResetKind]=useState('both');
+ const [resetConfirmed,setResetConfirmed]=useState(false);
+ const [resetPhrase,setResetPhrase]=useState('');
+ const [resetError,setResetError]=useState('');
+ const [resetChecking,setResetChecking]=useState(false);
  const [previewOpen,setPreviewOpen]=useState(false);
  const [availablePreviewOpen,setAvailablePreviewOpen]=useState(false);
  const [copyTime,setCopyTime]=useState('12:00');
@@ -294,7 +301,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
    if((t.members||[]).length>50){setStatusError(legionLabel(t)+' exceeds the 50-player registration limit.');return;}
   }
   onChange?.({...value,teams:nextTeams});
-  onMessage?.('TAL status saved for '+targets.length+' player'+(targets.length===1?'':'s')+'.');
+  // The parent confirms shared persistence before displaying a success message.
   setStatusEditor(null);setStatusError('');
   if(statusEditor.kind==='bulk'){setBulkSelected([]);setSelecting(false);setBulkPanel('');}
  }
@@ -384,6 +391,23 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   }catch(e){setBulkError(e.message||'Unable to save changes.');setBulkReview(false);}
  }
   const canEdit=!!team&&!value?.locked&&tournamentStatus(team)!=='eliminated';
+ const resetSyncReady=!!(sync?.ready&&sync?.joined&&sync?.mode==='active'&&!sync?.issue&&!sync?.dirty&&!sync?.syncing&&!sync?.conflicts?.length&&sync?.checkedAt);
+ const resetCounts={members:team?.members?.length||0,roles:(team?.members||[]).filter(m=>m.role==='combatant'||m.role==='substitute').length,registered:(team?.members||[]).filter(m=>m.registered).length};
+ async function confirmRegistrationReset(){
+  if(!team||!onReset||resetPhrase!=='RESET'||!resetConfirmed||resetChecking)return;
+  if(!resetSyncReady){setResetError('Your workspace must finish syncing before you can reset registration. Review the sync status, then try again.');return;}
+  setResetChecking(true);setResetError('');
+  try{
+   const verified=await onCheckSync?.();
+   if(!verified||verified.mode!=='active'||!verified.joined||verified.issue||verified.syncing||verified.dirty||verified.conflicts?.length){
+    setResetError('The shared roster is not in sync. No reset was performed. Review sync before retrying.');return;
+   }
+   onReset(team.id,resetKind);
+   setResetOpen(false);setRegistrationOptionsOpen(false);setResetPhrase('');setResetConfirmed(false);
+  }catch(e){setResetError('Unable to verify the shared roster. Nothing was reset. '+(e?.message||''));}
+  finally{setResetChecking(false);}
+ }
+
  return <section style={{padding:'5px 16px 32px'}}>
   {talView==='home'?<section aria-label="TAL Planner workflows">
     <h2 style={{fontSize:20,letterSpacing:'-.03em',margin:'3px 0 6px'}}>TAL Planner</h2>
@@ -421,6 +445,13 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      <span style={{fontSize:12,color:team&&tournamentStatus(team)==='eliminated'?C.icy:C.green,whiteSpace:'nowrap'}}>{team?(tournamentStatus(team)==='eliminated'?'● Eliminated':'● Active'):'● Overview'}</span>
     </div>
    </section>
+   {talView==='registration'&&<div style={{display:'flex',justifyContent:'flex-end',margin:'0 0 8px',position:'relative'}}>
+    <button type="button" aria-label="Registration options" aria-expanded={registrationOptionsOpen} onClick={()=>setRegistrationOptionsOpen(v=>!v)} style={{...button,borderRadius:10,minHeight:44,padding:'9px 12px',fontSize:12,background:C.section}}>⋯ Options</button>
+    {registrationOptionsOpen&&<div style={{position:'absolute',right:0,top:48,zIndex:20,width:'min(260px,85vw)',background:'#15273A',border:'1px solid '+C.border,padding:8,borderRadius:12,boxShadow:'0 10px 28px #0008'}}>
+      <button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setResetOpen(true);setResetError('');setResetConfirmed(false);setResetPhrase('');setResetKind('both');}} style={{...button,width:'100%',textAlign:'left',border:0,background:'transparent',color:C.gold}}>↺ Reset this legion’s registration…</button>
+      <div style={{...muted,padding:'5px 8px'}}>Only affects the selected legion.</div>
+    </div>}
+   </div>}
    {talView==='registration'&&<section aria-label="TAL registration overview" style={{background:C.card,border:'1px solid '+C.border,borderRadius:13,padding:12,marginBottom:12}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
      <strong style={{fontSize:15}}>Registration</strong>
@@ -702,6 +733,47 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
    </section>
   </>}
   </>}
+  {resetOpen&&<div role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget&&!resetChecking){setResetOpen(false);setResetPhrase('');}}} style={{position:'fixed',inset:0,zIndex:1300,background:'#000b',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+    <section role="dialog" aria-modal="true" aria-label="Reset TAL registration" style={{width:'100%',maxWidth:480,maxHeight:'min(92dvh,920px)',overflowY:'auto',background:C.card,borderRadius:'20px 20px 0 0',padding:'12px 18px calc(24px + env(safe-area-inset-bottom,0px))',boxSizing:'border-box',boxShadow:'0 -10px 30px #0008'}}>
+      <div aria-hidden="true" style={{background:C.icy,width:36,height:5,opacity:.6,borderRadius:8,margin:'0 auto 12px'}}/>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+       <strong style={{fontSize:17}}>Reset registration</strong>
+       <button type="button" disabled={resetChecking} onClick={()=>{setResetOpen(false);setResetPhrase('')}} aria-label="Close reset registration" style={{...button,background:'transparent',border:0,minWidth:44,minHeight:44,fontSize:20}}>×</button>
+      </div>
+      <p style={{...muted,fontSize:13,margin:'5px 0 14px'}}>Only {team?legionLabel(team):'the selected legion'}. Members and their player profiles remain in the roster.</p>
+      <div style={{display:'grid',gap:8}}>
+       {[
+        ['roles','Clear roster roles','Combatants and Substitutes become Unassigned.'],
+        ['registration','Clear in-game confirmations','Everyone becomes Needs registration.'],
+        ['both','Start fresh','Clear both roster roles and registration confirmations.']
+       ].map(([id,title,detail])=><label key={id} style={{display:'flex',alignItems:'center',gap:12,background:resetKind===id?'#24374A':C.section,border:'1px solid '+(resetKind===id?C.gold:C.border),borderRadius:11,padding:'12px 10px',minHeight:62,cursor:'pointer'}}>
+        <input type="radio" name="registration-reset-kind" checked={resetKind===id} onChange={()=>{setResetKind(id);setResetPhrase('');setResetConfirmed(false);setResetError('');}} style={{height:21,width:21,accentColor:C.gold,flexShrink:0}}/>
+        <span><strong style={{fontSize:14,display:'block'}}>{title}</strong><span style={{...muted,display:'block',marginTop:3}}>{detail}</span></span>
+       </label>)}
+      </div>
+      <div style={{marginTop:14,padding:12,border:'1px solid '+C.border,borderRadius:12,background:C.section}}>
+       <strong style={{fontSize:14}}>Review changes for {team?legionLabel(team):'this legion'}</strong>
+       <div style={{...muted,marginTop:7}}>Players retained: {resetCounts.members}</div>
+       {(resetKind==='roles'||resetKind==='both')&&<div style={{...muted,marginTop:4}}>Role assignments to clear: {resetCounts.roles}</div>}
+       {(resetKind==='registration'||resetKind==='both')&&<div style={{...muted,marginTop:4}}>Registered confirmations to clear: {resetCounts.registered}</div>}
+       <p style={{...muted,margin:'9px 0 0'}}>Preserved: player IDs, legion membership, availability, troop information, language and teamwork preferences.</p>
+      </div>
+      {!resetSyncReady&&<div role="alert" style={{background:C.gold+'13',border:'1px solid '+C.gold,borderRadius:10,padding:10,marginTop:12,fontSize:13,color:C.gold}}>
+       Reset is unavailable while the shared workspace is unsynced or requires attention.
+       <button type="button" disabled={resetChecking} onClick={async()=>{setResetChecking(true);try{await onCheckSync?.()}catch{}finally{setResetChecking(false)}}} style={{...button,color:C.gold,marginTop:8,width:'100%'}}>Check sync again</button>
+      </div>}
+      <label style={{display:'flex',alignItems:'center',gap:9,fontSize:13,marginTop:13,minHeight:44,color:C.icy}}>
+       <input type="checkbox" checked={resetConfirmed} onChange={e=>setResetConfirmed(e.target.checked)} style={{height:21,width:21,accentColor:C.gold}}/>
+       I understand this will clear the selected TAL statuses.
+      </label>
+      <label style={{display:'block',marginTop:9,fontSize:13,color:C.icy}}>Type RESET to confirm
+       <input value={resetPhrase} disabled={resetChecking} onChange={e=>{setResetPhrase(e.target.value);setResetError('')}} placeholder="RESET" autoCapitalize="characters" autoComplete="off" spellCheck={false} style={{...button,display:'block',marginTop:6,width:'100%',boxSizing:'border-box',fontSize:16}}/>
+      </label>
+      {resetError&&<p role="alert" style={{color:C.red,fontSize:13}}>{resetError}</p>}
+      <button type="button" disabled={!resetConfirmed||resetPhrase!=='RESET'||!resetSyncReady||resetChecking||!canEdit} onClick={confirmRegistrationReset} style={{...button,width:'100%',background:resetConfirmed&&resetPhrase==='RESET'&&resetSyncReady&&!resetChecking?C.red:C.section,color:resetConfirmed&&resetPhrase==='RESET'&&resetSyncReady&&!resetChecking?C.white:C.icy,minHeight:50,marginTop:13}}>{resetChecking?'Verifying shared data…':'Confirm reset for '+(team?legionLabel(team):'legion')}</button>
+      <button type="button" disabled={resetChecking} onClick={()=>{setResetOpen(false);setResetPhrase('')}} style={{...button,width:'100%',borderRadius:10,background:'transparent',border:0,marginTop:7}}>Cancel</button>
+    </section>
+   </div>}
   {statusEditor&&<div role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget){setStatusEditor(null);setStatusError('')}}} style={{position:'fixed',inset:0,zIndex:1200,background:'#0009',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
     <section role="dialog" aria-modal="true" aria-label="Manage TAL status" style={{width:'100%',maxWidth:480,maxHeight:'min(90dvh,900px)',overflowY:'auto',overscrollBehavior:'contain',borderRadius:'22px 22px 0 0',background:C.card,color:C.white,padding:'10px 18px calc(22px + env(safe-area-inset-bottom, 0px))',boxSizing:'border-box',boxShadow:'0 -15px 45px #0006'}}>
       <div aria-hidden="true" style={{width:36,height:5,borderRadius:10,background:C.icy,opacity:.6,margin:'0 auto 12px'}}/>
