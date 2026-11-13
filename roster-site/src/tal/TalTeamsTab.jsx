@@ -449,7 +449,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
    </div>
    <section aria-label="Match availability" style={{...panel,padding:11,marginBottom:10}}>
     <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
-     {[{label:'Combatants available',count:combatantPool.length,note:'0:00 entry',color:'#83C7FF'},{label:'Substitutes available',count:substitutePool.length,note:'3:00+ entry',color:'#F6CB65'}].map(item=><div key={item.label} style={{background:C.section,borderRadius:10,padding:'10px 11px',minWidth:0}}>
+     {[{label:'Combatants available',count:combatantPool.length,note:'0:00 entry',color:'#83C7FF'},{label:'Substitutes available',count:substitutePool.length,note:'3:00+ entry',color:'#B6A9CF'}].map(item=><div key={item.label} style={{background:C.section,borderRadius:10,padding:'10px 11px',minWidth:0}}>
       <span style={{...small,fontSize:11,color:item.color}}>{item.note}</span><div style={{fontSize:24,fontWeight:750,lineHeight:1.2,margin:'3px 0'}}>{item.count}</div><span style={{...small,fontSize:11}}>{item.label}</span>
      </div>)}
     </div>
@@ -473,7 +473,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
      const role=isCombatant(id)?'Combatant · 0:00':isSubstitute(id)?'Substitute · 3:00+':isMatchmakingOnly(id)?'Matchmaking only':'Not registered';
      return <div key={id} style={{borderBottom:'1px solid '+C.border,padding:'10px 0',opacity:absent?.65:1}}>
       <div style={{display:'flex',gap:7,alignItems:'center',minWidth:0}}>
-       <input type="checkbox" aria-label={'Select '+name(p)} checked={checked} disabled={!available||absent} onChange={()=>toggle(id)} style={{width:20,height:20,flex:'0 0 20px',accentColor:C.gold,margin:0}}/>
+       <input type="checkbox" aria-label={'Select '+name(p)} checked={checked} disabled={!available||absent} onChange={()=>toggle(id)} style={{width:20,height:20,flex:'0 0 20px',accentColor:isSubstitute(id)?'#B6A9CF':'#83C7FF',margin:0}}/>
        <div style={{flex:'1 1 0',minWidth:0}}>
         <div style={{fontSize:14,fontWeight:650,lineHeight:1.25,overflowWrap:'anywhere'}}>{name(p)}{absent&&<span style={{color:C.gold,fontSize:11}}> · Absent</span>}</div>
         <div style={{fontSize:11,lineHeight:1.45,color:isCombatant(id)?'#83C7FF':isSubstitute(id)?'#F6CB65':C.icy,marginTop:3}}>{role}</div>
