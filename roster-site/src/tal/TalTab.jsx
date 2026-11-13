@@ -439,9 +439,9 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  }
 
  return <section style={{padding:'5px 16px 32px'}}>
-  <section aria-label="Current TAL legion" style={{background:'#1D3449',border:'1px solid #53728D',borderRadius:14,padding:'11px 12px',margin:'3px 0 12px'}}>
-   <label htmlFor="tal-legion-select" style={{display:'flex',alignItems:'center',gap:7,fontSize:11,fontWeight:750,letterSpacing:'.05em',color:'#D2C095',marginBottom:6}}>◈ WORKING ON <span style={{marginLeft:'auto',fontWeight:500,letterSpacing:0,color:C.icy}}>Change legion ↓</span></label>
-   <select id="tal-legion-select" aria-label="Working on legion. Select to change legion" value={effectiveSelection} onChange={e=>chooseLegion(e.target.value)} style={{...button,width:'100%',minWidth:0,boxSizing:'border-box',background:'#29445D',color:C.white,minHeight:48,fontSize:16,fontWeight:750,borderColor:'#7594AC',borderRadius:10}}>
+  <section aria-label="Current TAL legion" style={{padding:'4px 0 12px',margin:'3px 0 8px'}}>
+   <label htmlFor="tal-legion-select" style={{display:'flex',alignItems:'center',gap:7,fontSize:11,fontWeight:750,letterSpacing:'.05em',color:C.icy,marginBottom:6}}>LEGION</label>
+   <select id="tal-legion-select" aria-label="Working on legion. Select to change legion" value={effectiveSelection} onChange={e=>chooseLegion(e.target.value)} style={{...button,width:'100%',minWidth:0,boxSizing:'border-box',background:'#203448',color:C.white,minHeight:48,fontSize:16,fontWeight:700,borderColor:'#455F75',borderRadius:10}}>
     <option value="">All legions · Overview</option>
     {teams.map(t=><option key={t.id} value={t.id}>{legionLabel(t)}{tournamentStatus(t)==='eliminated'?' · Eliminated':''}</option>)}
    </select>
@@ -453,20 +453,20 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   {talView==='teams'&&<TalTeamsTab value={value} players={players} selectedLegionId={effectiveSelection} drafts={teamDrafts} onDraftChange={onTeamDraftChange} syncReady={!!(sync?.joined&&sync?.mode==='active'&&!sync?.issue&&!sync?.conflicts?.length)}/>}
   {talView!=='home'&&talView!=='teams'&&<>
   {!teams.length?<div style={{padding:16,background:C.section,borderRadius:12}}><strong>No legions assigned</strong><p style={{fontSize:14,color:C.icy,lineHeight:1.5}}>Saved TAL legion assignments will appear when available. Existing plan data is retained.</p></div>:<>
-   {talView==='registration'&&<div style={{display:'flex',justifyContent:'flex-end',margin:'-8px 0 4px',position:'relative',height:0,zIndex:12}}>
-    <button type="button" aria-label="Registration options" aria-expanded={registrationOptionsOpen} onClick={()=>setRegistrationOptionsOpen(v=>!v)} style={{...button,borderRadius:10,minHeight:44,minWidth:44,padding:'9px',fontSize:17,background:C.section,transform:'translateY(-54px)'}} title="Registration options">•••</button>
+   {talView==='registration'&&<div style={{display:'flex',justifyContent:'flex-end',margin:'2px 0 8px',position:'relative',minHeight:44,zIndex:12}}>
+    <button type="button" aria-label="Registration options" aria-expanded={registrationOptionsOpen} onClick={()=>setRegistrationOptionsOpen(v=>!v)} style={{...button,borderRadius:10,minHeight:44,minWidth:44,padding:'9px',fontSize:17,background:C.section}} title="Registration options">•••</button>
     {registrationOptionsOpen&&<div style={{position:'absolute',right:0,top:48,zIndex:20,width:'min(260px,85vw)',background:'#15273A',border:'1px solid '+C.border,padding:8,borderRadius:12,boxShadow:'0 10px 28px #0008'}}>
       <button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setResetOpen(true);setResetError('');setResetConfirmed(false);setResetPhrase('');setResetKind('both');}} style={{...button,width:'100%',textAlign:'left',border:0,background:'transparent',color:C.gold}}>↺ Reset this legion’s registration…</button>
       <div style={{...muted,padding:'5px 8px'}}>Only affects the selected legion.</div>
     </div>}
    </div>}
-   {talView==='registration'&&<section aria-label="TAL registration overview" style={{background:C.card,border:'1px solid '+C.border,borderRadius:13,padding:12,marginBottom:12}}>
+   {talView==='registration'&&<section aria-label="TAL registration overview" style={{padding:'8px 0 16px',marginBottom:12,borderBottom:'1px solid '+C.border}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
      <strong style={{fontSize:15}}>Registration</strong>
      <button type="button" disabled={!pendingRegistrationCount} onClick={()=>{setRegistrationFilter('unregistered');setListLimit(40);focusPlayers();}} style={{border:0,background:'transparent',color:pendingRegistrationCount?C.gold:C.icy,fontSize:12,padding:'7px 0',minHeight:36,cursor:pendingRegistrationCount?'pointer':'default'}}>{registrationCount} confirmed · {pendingRegistrationCount} pending ›</button>
     </div>
     <div role="progressbar" aria-label="In-game registration progress" aria-valuemin={0} aria-valuemax={registrationMembers.length||1} aria-valuenow={registrationCount} style={{height:7,background:C.border,borderRadius:20,overflow:'hidden',margin:'5px 0 9px'}}>
-     <div style={{height:'100%',width:(registrationMembers.length?Math.round(registrationCount/registrationMembers.length*100):0)+'%',background:C.gold,borderRadius:20}}/>
+     <div style={{height:'100%',width:(registrationMembers.length?Math.round(registrationCount/registrationMembers.length*100):0)+'%',background:'#45C77A',borderRadius:20}}/>
     </div>
     <div style={{display:'flex',justifyContent:'space-between',gap:8,flexWrap:'wrap',fontSize:12,color:C.icy}}>
      <span>{combatantCount} combatants assigned <span style={{opacity:.8}}>({confirmedCombatants} registered)</span></span>
@@ -486,7 +486,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      {[{id:'in-host',count:ready,label:'In alliance',color:C.green},{id:'move',count:move,label:'Need to move',color:C.gold},{id:'unknown',count:unverified,label:'Unverified',color:C.icy}].map(item=><button type="button" key={item.id} aria-pressed={check===item.id} onClick={()=>chooseReadiness(item.id)} style={{flex:1,minWidth:0,border:check===item.id?'1px solid '+item.color:'1px solid transparent',borderRadius:10,background:'transparent',minHeight:56,padding:5,textAlign:'center',cursor:'pointer'}}><strong style={{fontSize:18,display:'block',color:item.color}}>{item.count}</strong><span style={{fontSize:11,color:C.icy}}>{item.label}</span></button>)}
     </div>
    </section>
-   <section aria-label="Alliance move lists" style={{background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:'5px 12px',marginBottom:12}}>
+   <section aria-label="Alliance move lists" style={{padding:'5px 0',marginBottom:16}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:9,padding:'8px 0'}}>
      <strong style={{fontSize:13}}>Event time · UTC</strong>
      <select aria-label="Copy list event time" value={selectedCopyTime} onChange={e=>setCopyTime(e.target.value)} style={{...button,borderRadius:10,minHeight:42,fontSize:13,maxWidth:'65%'}}>{times.map(t=><option key={t} value={t}>{t} UTC</option>)}</select>
@@ -500,7 +500,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
         <strong style={{fontSize:13,display:'block'}}>{item.name}</strong>
         <span style={{...muted,display:'block',marginTop:3}}>{item.count} players · {item.description} {item.open?'▴':'›'}</span>
        </button>
-       <button type="button" disabled={!item.text||copying} style={{...button,color:item.text?C.gold:C.icy,borderRadius:10,minHeight:42,fontSize:12,padding:'6px 12px'}} onClick={()=>copyMovePreview(item.text,item.copyLabel)}>Copy</button>
+       <button type="button" disabled={!item.text||copying} aria-label={'Copy '+item.name} title={'Copy '+item.name} style={{...button,color:item.text?C.icy:C.border,borderRadius:10,minHeight:44,minWidth:44,fontSize:20,padding:'6px 10px'}} onClick={()=>copyMovePreview(item.text,item.copyLabel)}>▢</button>
       </div>
       {item.open&&<div style={{marginTop:8}}>{item.text?<pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:12,lineHeight:1.55,padding:11,borderRadius:10,background:C.section,maxHeight:290,overflowY:'auto',margin:0}}>{item.text}</pre>:<p style={muted}>No players to move.</p>}</div>}
     </div>)}
@@ -669,7 +669,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
         {gameLanguages(player).map(language=><span key={language} style={{fontSize:11,color:C.icy,padding:'4px 7px',borderRadius:7,background:C.section}}>{language}</span>)}
        </div>}
        {member&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:5,padding:talView==='prep'?'2px 12px 0':'5px 12px 2px'}}>
-        <span style={{fontSize:11,border:'1px solid '+(member.role==='combatant'?C.green:C.border),borderRadius:16,padding:'5px 8px',color:member.role==='combatant'?C.green:C.icy,background:'#0E1C2F'}}>{member.role==='combatant'?'Combatant':member.role==='substitute'?'Substitute':'Role unassigned'}</span>
+        <span style={{fontSize:11,border:'1px solid '+(member.role==='combatant'?'#399FFF':'transparent'),borderRadius:8,padding:'5px 8px',fontWeight:member.role==='combatant'?750:500,color:member.role==='combatant'?'#A5DCFF':member.role==='substitute'?'#B6A9CF':C.icy,background:member.role==='combatant'?'#174B79':member.role==='substitute'?'#29283D':'#0E1C2F'}}>{member.role==='combatant'?'⬡ Combatant · 0:00':member.role==='substitute'?'Substitute · 3:00+':'Role unassigned'}</span>
         <span style={{fontSize:11,border:'1px solid '+(member.registered?C.green:C.gold),borderRadius:16,padding:'5px 8px',color:member.registered?C.green:C.gold,background:'#0E1C2F'}}>{member.registered?'Registered':'Needs registration'}</span>
         {member.matchmakingOnly&&<span style={{fontSize:11,border:'1px solid '+C.gold,borderRadius:8,padding:'4px 7px',color:C.gold,background:C.gold+'13'}}>Matchmaking only</span>}
        </div>}
