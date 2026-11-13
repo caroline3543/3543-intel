@@ -55,6 +55,9 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const [roleFilter,setRoleFilter]=useState('all');
  const [playerSort,setPlayerSort]=useState('name');
  const [sortDirection,setSortDirection]=useState('asc');
+ const [subMetric,setSubMetric]=useState('troop');
+ const [subManual,setSubManual]=useState([]);
+ const [subOverride,setSubOverride]=useState(false);
  const [attendanceMenu,setAttendanceMenu]=useState('');
  const [step,setStep]=useState('teams');
  const [groups,setGroups]=useState(initialGroups);
@@ -163,7 +166,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const preferredIds=[...combatantPool.slice(0,30),...substitutePool.slice(0,substituteNeed)].map(p=>String(p.id));
  const visibleRoster=legionRoster.filter(p=>(!onlyAvailable||availableForMatch(p))&&(!playerSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(playerSearch.trim().toLowerCase())))).sort((a,b)=>{const av=sortValue(a,playerSort,value?.records),bv=sortValue(b,playerSort,value?.records);if(av==null&&bv!=null)return 1;if(bv==null&&av!=null)return -1;const n=playerSort==='strength'?comparePriority(a,b):playerSort==='name'?String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}):av===bv?0:av>bv?1:-1;return (sortDirection==='asc'?n:-n)||name(a).localeCompare(name(b),undefined,{sensitivity:'base'});});
   const battlePool=useMemo(()=>players.filter(p=>!p.blacklisted),[players]);
- const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource}),[chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource]);
+ const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource,subMetric,subManual,subOverride}),[chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource,subMetric,subManual,subOverride]);
  const snapshotSignature=JSON.stringify(snapshot);
  function applyDraft(saved){
   setChosen(Array.isArray(saved?.chosen)?saved.chosen.map(String):[]);
@@ -174,8 +177,9 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   setLeaderStrategy(saved?.leaderStrategy==='manual'?'manual':'power');
   setConfirmed(!!saved?.confirmed);
   setAbsentIds(Array.isArray(saved?.absentIds)?saved.absentIds:[]);
-  setCopyDraft(typeof saved?.copyDraft==='string'?saved.copyDraft:'');setCopySource(typeof saved?.copySource==='string'?saved.copySource:'');
-  lastSaved.current=JSON.stringify({chosen:Array.isArray(saved?.chosen)?saved.chosen.map(String):[],powers:saved?.powers&&typeof saved.powers==='object'?saved.powers:{},groups:Array.isArray(saved?.groups)&&saved.groups.length===4?saved.groups:initialGroups(),assignment:saved?.assignment&&typeof saved.assignment==='object'?saved.assignment:{},mode:saved?.mode==='stack'?'stack':'balanced',leaderStrategy:saved?.leaderStrategy==='manual'?'manual':'power',confirmed:!!saved?.confirmed,absentIds:Array.isArray(saved?.absentIds)?saved.absentIds:[],copyDraft:typeof saved?.copyDraft==='string'?saved.copyDraft:'',copySource:typeof saved?.copySource==='string'?saved.copySource:''});
+  setSubMetric(['troop','strength','city','lab'].includes(saved?.subMetric)?saved.subMetric:'troop');setSubManual(Array.isArray(saved?.subManual)?saved.subManual.map(String):[]);setSubOverride(!!saved?.subOverride);
+   setCopyDraft(typeof saved?.copyDraft==='string'?saved.copyDraft:'');setCopySource(typeof saved?.copySource==='string'?saved.copySource:'');
+  lastSaved.current=JSON.stringify({chosen:Array.isArray(saved?.chosen)?saved.chosen.map(String):[],powers:saved?.powers&&typeof saved.powers==='object'?saved.powers:{},groups:Array.isArray(saved?.groups)&&saved.groups.length===4?saved.groups:initialGroups(),assignment:saved?.assignment&&typeof saved.assignment==='object'?saved.assignment:{},mode:saved?.mode==='stack'?'stack':'balanced',leaderStrategy:saved?.leaderStrategy==='manual'?'manual':'power',confirmed:!!saved?.confirmed,absentIds:Array.isArray(saved?.absentIds)?saved.absentIds:[],copyDraft:typeof saved?.copyDraft==='string'?saved.copyDraft:'',copySource:typeof saved?.copySource==='string'?saved.copySource:'',subMetric:['troop','strength','city','lab'].includes(saved?.subMetric)?saved.subMetric:'troop',subManual:Array.isArray(saved?.subManual)?saved.subManual.map(String):[],subOverride:!!saved?.subOverride});
  }
  useEffect(()=>{
   let saved=null;
@@ -197,7 +201,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  useEffect(()=>{
   if(draftLoaded!==draftKey||!remoteDraft||remoteApplied.current===remoteDraft.updatedAt)return;
   remoteApplied.current=remoteDraft.updatedAt;
-  const incoming=JSON.stringify({chosen:remoteDraft.chosen||[],powers:remoteDraft.powers||{},groups:remoteDraft.groups||initialGroups(),assignment:remoteDraft.assignment||{},mode:remoteDraft.mode==='stack'?'stack':'balanced',leaderStrategy:remoteDraft.leaderStrategy==='manual'?'manual':'power',confirmed:!!remoteDraft.confirmed,absentIds:remoteDraft.absentIds||[],copyDraft:remoteDraft.copyDraft||'',copySource:remoteDraft.copySource||''});
+  const incoming=JSON.stringify({chosen:remoteDraft.chosen||[],powers:remoteDraft.powers||{},groups:remoteDraft.groups||initialGroups(),assignment:remoteDraft.assignment||{},mode:remoteDraft.mode==='stack'?'stack':'balanced',leaderStrategy:remoteDraft.leaderStrategy==='manual'?'manual':'power',confirmed:!!remoteDraft.confirmed,absentIds:remoteDraft.absentIds||[],copyDraft:remoteDraft.copyDraft||'',copySource:remoteDraft.copySource||'',subMetric:remoteDraft.subMetric||'troop',subManual:remoteDraft.subManual||[],subOverride:!!remoteDraft.subOverride});
   if(incoming===snapshotSignature){lastSaved.current=incoming;return;}
   if(snapshotSignature!==lastSaved.current){
    setDraftState('New shared draft available. Finish or review your unsaved edits.');
@@ -231,6 +235,11 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const selectedPlayers=effectiveIds.map(id=>byId.get(String(id))).filter(Boolean);
  const leaderCandidates=[...selectedPlayers].filter(p=>p.roles?.some?.(r=>/rally lead/i.test(String(r)))||p.rallyLeader||p.leaderProfile?.role==='leader');
  const powerOf=id=>valueNumber(powers[String(id)]??value?.records?.[id]?.troopPower);
+ const subScore=p=>subMetric==='troop'?powerOf(p.id):subMetric==='strength'?(hasTroopTiers(p)?1:null):sortValue(p,subMetric,value?.records);
+ const subCandidates=substitutePool.filter(p=>selectedIds.includes(String(p.id)));
+ const autoSubs=[...subCandidates].sort((a,b)=>{const x=subScore(a),y=subScore(b);if(x==null&&y!=null)return 1;if(y==null&&x!=null)return -1;if(subMetric==='strength')return comparePriority(b,a)||name(a).localeCompare(name(b));return (x===y?0:subMetric==='lab'?x-y:y-x)||name(a).localeCompare(name(b));});
+ const orderedSubs=subOverride?[...autoSubs].sort((a,b)=>(subManual.indexOf(String(a.id))<0?9999:subManual.indexOf(String(a.id)))-(subManual.indexOf(String(b.id))<0?9999:subManual.indexOf(String(b.id)))):autoSubs;
+ const subCopy=['TAL SUBSTITUTE ENTRY ORDER · '+matchTime+' UTC',legionLabel(selectedLegion)+' · '+matchDate,'Priority: '+(subOverride?'Manual':({troop:'Troop power',strength:'Troop strength',city:'City power',lab:'Labyrinth rank'})[subMetric]),'',...(orderedSubs.length?orderedSubs.map((p,i)=>(i+1)+'. '+name(p)):['No eligible selected substitutes']),'','Enter in this order as combatant slots become available.'].join('\\n');
  const teamPower=g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).reduce((sum,id)=>sum+(powerOf(id)||0),0);
  const groupPairs=cooperationGroups.filter(g=>Array.isArray(g?.ids)&&g.ids.length>1).flatMap(g=>{
   const ids=[...new Set(g.ids.map(String))],pairs=[];
