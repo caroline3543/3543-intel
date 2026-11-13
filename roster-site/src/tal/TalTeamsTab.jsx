@@ -47,6 +47,19 @@ function textOfTeams(groups,playersById,entryLabel=()=>null) {
  }).join('\n\n');
 }
 const initialGroups=()=>COLORS.map((c,i)=>({key:i+1,color:c.id,leader:null,members:[]}));
+// Keep drag updates inside this small component. Re-ranking the full match roster
+// and serialising its shared draft on every pointer movement made sliders feel stuck.
+function WeightSlider({metric,label,value,onCommit}){
+ const [local,setLocal]=useState(value);
+ const latest=useRef(value);
+ useEffect(()=>{setLocal(value);latest.current=value;},[value]);
+ const change=e=>{const next=Number(e.target.value);latest.current=next;setLocal(next);};
+ const commit=()=>{if(latest.current!==value)onCommit(latest.current);};
+ return <label style={{display:'block',marginTop:10}}>
+  <span style={{display:'flex',justifyContent:'space-between',gap:8,fontSize:12}}><span>{label}</span><span>{local}%</span></span>
+  <input aria-label={label+' weight'} type="range" min="0" max="100" step="5" value={local} onChange={change} onPointerUp={commit} onTouchEnd={commit} onKeyUp={commit} onBlur={commit} style={{width:'100%',minHeight:40,touchAction:'pan-y',accentColor:C.gold,cursor:'pointer'}}/>
+ </label>;
+}
 const draftPrefix='caroline-3573-tal-teams-v1:';
 export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGroups=[],drafts={},onDraftChange,syncReady=false,selectedLegionId}){
  const legions=(value?.teams||[]).filter(t=>['HOT','ARC','RKG'].includes(String(t.host||'').toUpperCase()));
@@ -543,7 +556,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
    <section aria-label="Substitute entry order" style={{padding:'14px 2px',marginBottom:12,borderTop:'1px solid '+C.border}}>
  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><div><strong style={{fontSize:16}}>Substitute entry order</strong><div style={{...small,fontSize:11}}>3:00+ · Priority as slots become available</div></div><button type="button" style={{...btn,border:0,borderRadius:22,background:C.section,fontSize:12}} onClick={()=>copy(subCopy)}>Copy order</button></div>
  <label style={{...small,fontSize:11,display:'block',marginTop:12}}>Ranking strategy<select aria-label="Substitute ranking strategy" value={subMetric} onChange={e=>{setSubMetric(e.target.value);setSubOverride(false);setSubManual([])}} style={{...btn,display:'block',width:'100%',marginTop:5,minHeight:44}}><option value="balanced">Balanced ranking (default)</option><option value="tiers">Highest troop tiers first</option><option value="troop">Highest troop power first</option></select></label>
- {subMetric==='balanced'&&<div style={{marginTop:12,background:C.section,borderRadius:12,padding:12}}><strong style={{fontSize:12}}>Ranking weights</strong><div style={{...small,fontSize:11,margin:'4px 0 8px'}}>Troop power uses Labyrinth rank only when power is missing. Scores are relative to eligible substitutes.</div>{[['tiers','Troop tiers'],['performance','Troop power / Labyrinth fallback'],['city','City power']].map(([key,label])=><label key={key} style={{display:'block',marginTop:10}}><span style={{display:'flex',justifyContent:'space-between',gap:8,fontSize:12}}><span>{label}</span><span>{subWeights[key]}%</span></span><input aria-label={label+' weight'} type="range" min="0" max="100" step="5" value={subWeights[key]} onChange={e=>setSubWeights(v=>({...v,[key]:Number(e.target.value)}))} style={{width:'100%',accentColor:C.gold}}/></label>)}<div style={{...small,fontSize:11,marginTop:6}}>Weights are automatically normalised to 100% when scoring.</div><button type="button" style={{...btn,border:0,fontSize:11,marginTop:6}} onClick={()=>setSubWeights({...priorityWeights})}>Reset weights to 40 / 40 / 20</button></div>}
+ {subMetric==='balanced'&&<div style={{marginTop:12,background:C.section,borderRadius:12,padding:12}}><strong style={{fontSize:12}}>Ranking weights</strong><div style={{...small,fontSize:11,margin:'4px 0 8px'}}>Troop power uses Labyrinth rank only when power is missing. Scores are relative to eligible substitutes.</div>{[['tiers','Troop tiers'],['performance','Troop power / Labyrinth fallback'],['city','City power']].map(([key,label])=><WeightSlider key={key} metric={key} label={label} value={subWeights[key]} onCommit={next=>setSubWeights(v=>v[key]===next?v:{...v,[key]:next})}/>)}<div style={{...small,fontSize:11,marginTop:6}}>Weights are automatically normalised to 100% when scoring.</div><button type="button" style={{...btn,border:0,fontSize:11,marginTop:6}} onClick={()=>setSubWeights({...priorityWeights})}>Reset weights to 40 / 40 / 20</button></div>}
  <div style={{display:'flex',gap:14,flexWrap:'wrap',marginTop:12}}><label style={{...small,fontSize:12,display:'flex',alignItems:'center',gap:6}}><input type="checkbox" checked={copyReasons} onChange={e=>setCopyReasons(e.target.checked)} style={{accentColor:C.gold}}/>Include explanations when copying</label><label style={{...small,fontSize:12,display:'flex',alignItems:'center',gap:6}}><input type="checkbox" checked={copyScores} onChange={e=>setCopyScores(e.target.checked)} style={{accentColor:C.gold}}/>Include priority scores</label></div>
  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,margin:'10px 0 4px'}}><span style={{...small,fontSize:11}}>{orderedSubs.length} selected substitutes · {subOverride?'Manual order':'Automatic order'}</span><button type="button" style={{...btn,border:0,background:'transparent',fontSize:11,minHeight:36}} onClick={()=>{setSubOverride(false);setSubManual([])}}>Reset order</button></div>
  {orderedSubs.map((p,i)=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,borderBottom:'1px solid '+C.border,padding:'8px 0'}}>
