@@ -16,6 +16,8 @@ const small={fontSize:12,color:C.icy,lineHeight:1.45};
 const name=p=>p.username||p.alias||String(p.fid||p.id);
 const valueNumber=n=>n!==''&&n!=null&&Number.isFinite(Number(String(n).replace(/,/g,'')))?Number(String(n).replace(/,/g,'')):null;
 const powerFormat=n=>n==null?'—':Number(n).toLocaleString('en-US');
+const tierValue=v=>{if(v==null)return null;const t=typeof v==='object'?String(v.tier??v.level??v.troopTier??''):String(v);const m=t.match(/(?:T|tier|level)\s*[-:]?\s*(\d{1,2})/i)||t.match(/^(\d{1,2})$/);return m?Number(m[1])+(/helios/i.test(JSON.stringify(v))?.5:0):null;};
+const sortValue=(p,key,records)=>{if(key==='name')return name(p);if(key==='strength'){const ts=['infantry','lancer','marksman'].map(k=>tierValue(p.troops?.[k]??p.troopTiers?.[k])).filter(x=>x!=null);return ts.length?Math.max(...ts):null;}const raw=key==='troop'?(records?.[p.id]?.troopPower??p.troopPower):key==='city'?(p.cityPower??p.power??p.providerStats?.power):(p.labyrinthRank??p.providerRankings?.labyrinth?.rank??p.providerStats?.labyrinthRank);return valueNumber(raw);};
 const fcNumber=p=>Number(String(p.furnaceLevel||'').match(/(?:FC|F)\s*(\d+)/i)?.[1]||0);
 const helios=p=>['infantry','lancer','marksman'].every(k=>/helios/i.test(String(p.troops?.[k]||'')));
 const norahInfo=p=>{
@@ -49,6 +51,8 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  });
  const [matchDate,setMatchDate]=useState(()=>{try{return JSON.parse(window.localStorage.getItem('caroline-3573-last-tal-match')||'null')?.date||new Date().toISOString().slice(0,10)}catch{return new Date().toISOString().slice(0,10)}});
  const [roleFilter,setRoleFilter]=useState('all');
+ const [playerSort,setPlayerSort]=useState('name');
+ const [sortDirection,setSortDirection]=useState('asc');
  const [attendanceMenu,setAttendanceMenu]=useState('');
  const [step,setStep]=useState('teams');
  const [groups,setGroups]=useState(initialGroups);
@@ -155,7 +159,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const substitutePool=pool.filter(p=>isSubstitute(p.id)&&!absentIds.includes(String(p.id)));
  const substituteNeed=Math.max(0,30-Math.min(30,combatantPool.length));
  const preferredIds=[...combatantPool.slice(0,30),...substitutePool.slice(0,substituteNeed)].map(p=>String(p.id));
- const visibleRoster=legionRoster.filter(p=>(!onlyAvailable||availableForMatch(p))&&(!playerSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(playerSearch.trim().toLowerCase())))).sort((a,b)=>Number(availableForMatch(b))-Number(availableForMatch(a))||name(a).localeCompare(name(b),undefined,{sensitivity:'base'}));
+ const visibleRoster=legionRoster.filter(p=>(!onlyAvailable||availableForMatch(p))&&(!playerSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(playerSearch.trim().toLowerCase())))).sort((a,b)=>{const av=sortValue(a,playerSort,value?.records),bv=sortValue(b,playerSort,value?.records);if(av==null&&bv!=null)return 1;if(bv==null&&av!=null)return -1;const n=playerSort==='name'?String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}):av===bv?0:av>bv?1:-1;return (sortDirection==='asc'?n:-n)||name(a).localeCompare(name(b),undefined,{sensitivity:'base'});});
   const battlePool=useMemo(()=>players.filter(p=>!p.blacklisted),[players]);
  const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource}),[chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource]);
  const snapshotSignature=JSON.stringify(snapshot);
@@ -463,6 +467,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     <div role="group" aria-label="Filter participants" style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:8}}>
      {[['all','All'],['combatant','Combatants'],['substitute','Substitutes'],['absent','Absent']].map(([key,label])=><button key={key} type="button" aria-pressed={roleFilter===key} style={{...btn,minHeight:39,padding:'7px 9px',fontSize:12,background:roleFilter===key?'#314B63':C.section,borderColor:roleFilter===key?C.gold:C.border,color:roleFilter===key?C.white:C.icy}} onClick={()=>setRoleFilter(key)}>{label}</button>)}
     </div>
+    <div aria-label="Sort players" style={{display:'flex',flexWrap:'wrap',gap:5,margin:'10px 0'}}>{[['name','Name'],['strength','Troop strength'],['troop','Troop power'],['city','City power'],['lab','Labyrinth rank']].map(([key,label])=><button type="button" key={key} aria-pressed={playerSort===key} onClick={()=>{if(playerSort===key)setSortDirection(d=>d==='asc'?'desc':'asc');else{setPlayerSort(key);setSortDirection(key==='name'||key==='lab'?'asc':'desc');}}} style={{...btn,minHeight:36,padding:'6px 8px',fontSize:11,borderColor:playerSort===key?'#83C7FF':C.border,background:playerSort===key?'#314B63':C.section}}>{label}{playerSort===key?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}</div>
     {showBulk&&<div style={{marginBottom:10}}><p style={{...small,fontSize:11}}>Paste Username, Troop power on separate lines.</p><textarea aria-label="Paste troop power" placeholder={'LOVE, 4250\nMaliD, 3880'} value={bulk} onChange={e=>setBulk(e.target.value)} rows={4} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16}}/><button type="button" style={{...btn,width:'100%',marginTop:6,minHeight:44}} onClick={saveBatch}>Apply power</button></div>}
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:3}}>
      <span style={{...small,fontSize:11}}>Match-specific troop power</span>
@@ -478,6 +483,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
         <div style={{fontSize:14,fontWeight:650,lineHeight:1.25,overflowWrap:'anywhere'}}>{name(p)}{absent&&<span style={{color:C.gold,fontSize:11}}> · Absent</span>}</div>
         <div style={{fontSize:11,lineHeight:1.45,color:isCombatant(id)?'#83C7FF':isSubstitute(id)?'#F6CB65':C.icy,marginTop:3}}>{role}</div>
         <div style={{fontSize:11,lineHeight:1.4,color:C.icy}}>{available?'Available · '+matchTime+' UTC':availabilityFor(p).length?'Unavailable · '+matchTime+' UTC':'Availability unknown'}</div>
+        {playerSort!=='name'&&<div style={{fontSize:11,color:'#C7D7E8'}}>{({strength:'Troop strength',troop:'Troop power',city:'City power',lab:'Labyrinth rank'})[playerSort]}: {sortValue(p,playerSort,value?.records)==null?'Not recorded':playerSort==='strength'?'Tier '+sortValue(p,playerSort,value?.records):powerFormat(sortValue(p,playerSort,value?.records))}</div>}
        </div>
        <input type="number" inputMode="numeric" min="0" aria-label={'Troop power for '+name(p)} value={powers[id]??''} onChange={e=>setPowers(old=>({...old,[id]:e.target.value}))} placeholder="Power" style={{...btn,flex:'0 0 72px',width:72,minWidth:0,minHeight:44,padding:'7px 5px',fontSize:14,boxSizing:'border-box',fontWeight:400}}/>
        <button type="button" aria-label={'Attendance options for '+name(p)} aria-expanded={attendanceMenu===id} onClick={()=>setAttendanceMenu(v=>v===id?'':id)} style={{border:'none',background:'transparent',color:C.icy,flex:'0 0 36px',width:36,height:44,fontSize:19,cursor:'pointer',padding:0}}>⋯</button>
