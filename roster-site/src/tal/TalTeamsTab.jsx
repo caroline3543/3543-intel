@@ -1,3 +1,4 @@
+import {comparePriority} from '../../../src/components/players/PlayerCard.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
 import {plannedMemberIds,legionLabel} from '../../../src/services/talRosterService.js';
@@ -16,8 +17,9 @@ const small={fontSize:12,color:C.icy,lineHeight:1.45};
 const name=p=>p.username||p.alias||String(p.fid||p.id);
 const valueNumber=n=>n!==''&&n!=null&&Number.isFinite(Number(String(n).replace(/,/g,'')))?Number(String(n).replace(/,/g,'')):null;
 const powerFormat=n=>n==null?'—':Number(n).toLocaleString('en-US');
-const tierValue=v=>{if(v==null)return null;const t=typeof v==='object'?String(v.tier??v.level??v.troopTier??''):String(v);const m=t.match(/(?:T|tier|level)\s*[-:]?\s*(\d{1,2})/i)||t.match(/^(\d{1,2})$/);return m?Number(m[1])+(/helios/i.test(JSON.stringify(v))?.5:0):null;};
-const sortValue=(p,key,records)=>{if(key==='name')return name(p);if(key==='strength'){const ts=['infantry','lancer','marksman'].map(k=>tierValue(p.troops?.[k]??p.troopTiers?.[k])).filter(x=>x!=null);return ts.length?Math.max(...ts):null;}const raw=key==='troop'?(records?.[p.id]?.troopPower??p.troopPower):key==='city'?(p.cityPower??p.power??p.providerStats?.power):(p.labyrinthRank??p.providerRankings?.labyrinth?.rank??p.providerStats?.labyrinthRank);return valueNumber(raw);};
+const troopTierLabels=p=>['infantry','lancer','marksman'].map((key,i)=>({key,label:['Inf','Lan','Mar'][i],tier:p.troops?.[key]||null}));
+const hasTroopTiers=p=>troopTierLabels(p).some(t=>t.tier);
+const sortValue=(p,key,records)=>{if(key==='name')return name(p);if(key==='strength')return hasTroopTiers(p)?1:null;const raw=key==='troop'?(records?.[p.id]?.troopPower??p.troopPower):key==='city'?(p.cityPower??p.power??p.providerStats?.power):(p.labyrinthRank??p.providerRankings?.labyrinth?.rank??p.providerStats?.labyrinthRank);return valueNumber(raw);};
 const fcNumber=p=>Number(String(p.furnaceLevel||'').match(/(?:FC|F)\s*(\d+)/i)?.[1]||0);
 const helios=p=>['infantry','lancer','marksman'].every(k=>/helios/i.test(String(p.troops?.[k]||'')));
 const norahInfo=p=>{
@@ -159,7 +161,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const substitutePool=pool.filter(p=>isSubstitute(p.id)&&!absentIds.includes(String(p.id)));
  const substituteNeed=Math.max(0,30-Math.min(30,combatantPool.length));
  const preferredIds=[...combatantPool.slice(0,30),...substitutePool.slice(0,substituteNeed)].map(p=>String(p.id));
- const visibleRoster=legionRoster.filter(p=>(!onlyAvailable||availableForMatch(p))&&(!playerSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(playerSearch.trim().toLowerCase())))).sort((a,b)=>{const av=sortValue(a,playerSort,value?.records),bv=sortValue(b,playerSort,value?.records);if(av==null&&bv!=null)return 1;if(bv==null&&av!=null)return -1;const n=playerSort==='name'?String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}):av===bv?0:av>bv?1:-1;return (sortDirection==='asc'?n:-n)||name(a).localeCompare(name(b),undefined,{sensitivity:'base'});});
+ const visibleRoster=legionRoster.filter(p=>(!onlyAvailable||availableForMatch(p))&&(!playerSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(playerSearch.trim().toLowerCase())))).sort((a,b)=>{const av=sortValue(a,playerSort,value?.records),bv=sortValue(b,playerSort,value?.records);if(av==null&&bv!=null)return 1;if(bv==null&&av!=null)return -1;const n=playerSort==='strength'?comparePriority(a,b):playerSort==='name'?String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}):av===bv?0:av>bv?1:-1;return (sortDirection==='asc'?n:-n)||name(a).localeCompare(name(b),undefined,{sensitivity:'base'});});
   const battlePool=useMemo(()=>players.filter(p=>!p.blacklisted),[players]);
  const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource}),[chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource]);
  const snapshotSignature=JSON.stringify(snapshot);
@@ -483,7 +485,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
         <div style={{fontSize:14,fontWeight:650,lineHeight:1.25,overflowWrap:'anywhere'}}>{name(p)}{absent&&<span style={{color:C.gold,fontSize:11}}> · Absent</span>}</div>
         <div style={{fontSize:11,lineHeight:1.45,color:isCombatant(id)?'#83C7FF':isSubstitute(id)?'#F6CB65':C.icy,marginTop:3}}>{role}</div>
         <div style={{fontSize:11,lineHeight:1.4,color:C.icy}}>{available?'Available · '+matchTime+' UTC':availabilityFor(p).length?'Unavailable · '+matchTime+' UTC':'Availability unknown'}</div>
-        {playerSort!=='name'&&<div style={{fontSize:11,color:'#C7D7E8'}}>{({strength:'Troop strength',troop:'Troop power',city:'City power',lab:'Labyrinth rank'})[playerSort]}: {sortValue(p,playerSort,value?.records)==null?'Not recorded':playerSort==='strength'?'Tier '+sortValue(p,playerSort,value?.records):powerFormat(sortValue(p,playerSort,value?.records))}</div>}
+        {playerSort!=='name'&&<div style={{fontSize:11,color:'#C7D7E8'}}>{({strength:'Troop strength',troop:'Troop power',city:'City power',lab:'Labyrinth rank'})[playerSort]}: {sortValue(p,playerSort,value?.records)==null?'Not recorded':playerSort==='strength'?troopTierLabels(p).filter(t=>t.tier).map(t=>`${t.label} ${t.tier}`).join(' · '):powerFormat(sortValue(p,playerSort,value?.records))}</div>}
        </div>
        <input type="number" inputMode="numeric" min="0" aria-label={'Troop power for '+name(p)} value={powers[id]??''} onChange={e=>setPowers(old=>({...old,[id]:e.target.value}))} placeholder="Power" style={{...btn,flex:'0 0 72px',width:72,minWidth:0,minHeight:44,padding:'7px 5px',fontSize:14,boxSizing:'border-box',fontWeight:400}}/>
        <button type="button" aria-label={'Attendance options for '+name(p)} aria-expanded={attendanceMenu===id} onClick={()=>setAttendanceMenu(v=>v===id?'':id)} style={{border:'none',background:'transparent',color:C.icy,flex:'0 0 36px',width:36,height:44,fontSize:19,cursor:'pointer',padding:0}}>⋯</button>
