@@ -1,5 +1,5 @@
 import {comparePriority} from '../../../src/components/players/PlayerCard.jsx';
-import {useEffect,useMemo,useRef,useState} from 'react';
+import {useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
 import {plannedMemberIds,legionLabel} from '../../../src/services/talRosterService.js';
 import {DEFAULT_TIMES} from './planner.js';
@@ -88,6 +88,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const [bulk,setBulk]=useState('');
  const [showBulk,setShowBulk]=useState(false);
  const [playerSearch,setPlayerSearch]=useState('');
+ const deferredPlayerSearch=useDeferredValue(playerSearch);
  const [onlyAvailable,setOnlyAvailable]=useState(false);
  const [mode,setMode]=useState('balanced');
  const [leaderStrategy,setLeaderStrategy]=useState('power');
@@ -186,7 +187,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const substitutePool=pool.filter(p=>isSubstitute(p.id)&&!absentIds.includes(String(p.id)));
  const substituteNeed=Math.max(0,30-Math.min(30,combatantPool.length));
  const preferredIds=[...combatantPool.slice(0,30),...substitutePool.slice(0,substituteNeed)].map(p=>String(p.id));
- const visibleRoster=legionRoster.filter(p=>(!onlyAvailable||availableForMatch(p))&&(!playerSearch||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(playerSearch.trim().toLowerCase())))).sort((a,b)=>{const av=sortValue(a,playerSort,value?.records),bv=sortValue(b,playerSort,value?.records);if(av==null&&bv!=null)return 1;if(bv==null&&av!=null)return -1;const n=playerSort==='strength'?(troopTierScore(a)===troopTierScore(b)?0:(troopTierScore(a)??-1)-(troopTierScore(b)??-1)):playerSort==='name'?String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}):av===bv?0:av>bv?1:-1;return (sortDirection==='asc'?n:-n)||name(a).localeCompare(name(b),undefined,{sensitivity:'base'});});
+ const visibleRoster=useMemo(()=>{const search=deferredPlayerSearch.trim().toLowerCase();return legionRoster.filter(p=>(!onlyAvailable||availableForMatch(p))&&(!search||[p.username,p.alias,p.fid].some(v=>String(v||'').toLowerCase().includes(search)))).sort((a,b)=>{const av=sortValue(a,playerSort,value?.records),bv=sortValue(b,playerSort,value?.records);if(av==null&&bv!=null)return 1;if(bv==null&&av!=null)return -1;const n=playerSort==='strength'?(troopTierScore(a)===troopTierScore(b)?0:(troopTierScore(a)??-1)-(troopTierScore(b)??-1)):playerSort==='name'?String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}):av===bv?0:av>bv?1:-1;return (sortDirection==='asc'?n:-n)||name(a).localeCompare(name(b),undefined,{sensitivity:'base'});});},[legionRoster,onlyAvailable,deferredPlayerSearch,playerSort,sortDirection,value?.records,value?.availability,matchTime,selectedLegion]);
   const battlePool=useMemo(()=>players.filter(p=>!p.blacklisted),[players]);
  const snapshot=useMemo(()=>({chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource,subMetric,subManual,subOverride,subWeights,copyReasons,copyScores}),[chosen,powers,groups,assignment,mode,leaderStrategy,confirmed,absentIds,copyDraft,copySource,subMetric,subManual,subOverride,subWeights,copyReasons,copyScores]);
  const snapshotSignature=JSON.stringify(snapshot);
