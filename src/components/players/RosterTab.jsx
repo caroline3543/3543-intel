@@ -12,7 +12,7 @@ import { RosterBulkEditor } from './RosterBulkEditor.jsx';
 import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch } from '../../services/rosterViewService.js';
 const button={minHeight:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,padding:'10px 12px',fontSize:14,fontWeight:600,cursor:'pointer'};
 
-const PRIMARY_SORTS=[['name','Name'],['power','City power'],['labyrinth','Labyrinth'],['progression','Troop strength']];
+const PRIMARY_SORTS=[['name','Name'],['power','City power'],['labyrinth','Labyrinth'],['progression','Troop tiers']];
 const EXTRA_SORTS=[['furnace','Furnace'],['kills','Kills'],['labyrinthScore','Labyrinth score'],['review','Needs review']];
 const T10=[66,71,76,83,88,94,99,104,110,115,121],T11=[80,86,92,100,106,114,120,126,135,141,148];
 function tierPower(raw){
@@ -49,7 +49,7 @@ function rosterSortValue(player, field) {
 }
 function sortDetail(player,field) {
   if(field==='name')return null;
-  if(field==='progression'){const n=troopScore(player);return {label:'Tier power',value:n===null?'Incomplete':n.toLocaleString('en-US',{maximumFractionDigits:1})};}
+  if(field==='progression'){const n=troopScore(player);return {label:'Troop tier rating',value:n===null?'Incomplete':n.toLocaleString('en-US',{maximumFractionDigits:1})};}
   const value=rosterSortValue(player,field);
   if(field==='furnace')return {label:'Furnace level',value:player.furnaceLevel||'Not recorded'};
   const label=({labyrinth:'Labyrinth rank',labyrinthScore:'Labyrinth score',power:'City power',kills:'Kills',review:'Fields to review'})[field];
@@ -146,7 +146,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
         <button style={button} onClick={()=>{setFieldsOpen(true);setOptionsOpen(false);}}>Update player details</button>
         <button style={button} onClick={copyRoster} disabled={!visible.length}>Copy filtered roster ({visible.length})</button>
       </div>}
-      {sort==='progression' && <p style={{fontSize:12,color:C.icy}}>Average per-troop tier power from recorded Infantry, Lancer and Marksman. Incomplete records sort last. Troop quantity and combat buffs are excluded.</p>}
+      {sort==='progression' && <p style={{fontSize:12,color:C.icy}}>Highest troop tiers first compares recorded Infantry, Lancer and Marksman tiers, including Helios. Missing tiers sort last. Troop counts and combat buffs are excluded.</p>}
       {(sort==='labyrinth'||sort==='labyrinthScore') && <p style={{fontSize:12,color:C.icy}}>State Labyrinth {sort==='labyrinth'?'rank':'score'} from Whiteout Stats. Missing values appear last.</p>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}><span role="status" style={{color:C.icy,fontSize:12}}>Showing {displayed.length} of {visible.length} players</span>{(filterCount>0||search) && <button style={button} onClick={()=>{setSearch('');setFilters({...EMPTY_FILTERS});}}>Clear filters</button>}</div>
       {selecting && <section style={{padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
