@@ -5,7 +5,7 @@ import {DEFAULT_TIMES} from './planner.js';
 
 const COLORS=[
  {id:'blue',name:'Blue',color:'#69B3FF',bg:'#172E48',buildings:['Proto I','Boiler']},
- {id:'yellow',name:'Yellow',color:'#F6CB65',bg:'#423A24',buildings:['Proto II','Transit']},
+ {id:'yellow',name:'Yellow',color:'#B6A9CF',bg:'#423A24',buildings:['Proto II','Transit']},
  {id:'green',name:'Green',color:'#7ADDAB',bg:'#1C3B30',buildings:['Repair I','Repair III']},
  {id:'pink',name:'Pink',color:'#FC8ECC',bg:'#442A3E',buildings:['Repair II','Repair IV']}
 ];
@@ -447,9 +447,9 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     <label style={{...small,fontSize:11,display:'block',minWidth:0}}>Match date<input type="date" aria-label="TAL match date" value={matchDate} onChange={e=>setMatchDate(e.target.value)} style={{...btn,display:'block',width:'100%',maxWidth:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 10px',colorScheme:'dark'}}/></label>
     <label style={{...small,fontSize:11,display:'block',minWidth:0}}>Match time · UTC<select aria-label="Match time UTC" value={matchTime} onChange={e=>resetForMatch(selectedLegion?.id,e.target.value)} style={{...btn,display:'block',width:'100%',maxWidth:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 10px'}}>{(value?.times||DEFAULT_TIMES).map(t=><option key={t}>{t}</option>)}</select></label>
    </div>
-   <section aria-label="Match availability" style={{...panel,padding:11,marginBottom:10}}>
+   <section aria-label="Match availability" style={{padding:'8px 0 14px',marginBottom:10,borderBottom:'1px solid '+C.border}}>
     <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
-     {[{label:'Combatants available',count:combatantPool.length,note:'0:00 entry',color:'#83C7FF'},{label:'Substitutes available',count:substitutePool.length,note:'3:00+ entry',color:'#F6CB65'}].map(item=><div key={item.label} style={{background:C.section,borderRadius:10,padding:'10px 11px',minWidth:0}}>
+     {[{label:'Combatants available',count:combatantPool.length,note:'0:00 entry',color:'#83C7FF'},{label:'Substitutes available',count:substitutePool.length,note:'3:00+ entry',color:'#F6CB65'}].map(item=><div key={item.label} style={{background:item.label.startsWith('Combatants')?'#173A59':'#26283B',borderRadius:12,padding:'10px 11px',minWidth:0}}>
       <span style={{...small,fontSize:11,color:item.color}}>{item.note}</span><div style={{fontSize:24,fontWeight:750,lineHeight:1.2,margin:'3px 0'}}>{item.count}</div><span style={{...small,fontSize:11}}>{item.label}</span>
      </div>)}
     </div>
@@ -476,7 +476,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
        <input type="checkbox" aria-label={'Select '+name(p)} checked={checked} disabled={!available||absent} onChange={()=>toggle(id)} style={{width:20,height:20,flex:'0 0 20px',accentColor:C.gold,margin:0}}/>
        <div style={{flex:'1 1 0',minWidth:0}}>
         <div style={{fontSize:14,fontWeight:650,lineHeight:1.25,overflowWrap:'anywhere'}}>{name(p)}{absent&&<span style={{color:C.gold,fontSize:11}}> · Absent</span>}</div>
-        <div style={{fontSize:11,lineHeight:1.45,color:isCombatant(id)?'#83C7FF':isSubstitute(id)?'#F6CB65':C.icy,marginTop:3}}>{role}</div>
+        <div style={{fontSize:11,lineHeight:1.45,color:isCombatant(id)?'#83C7FF':isSubstitute(id)?'#B6A9CF':C.icy,marginTop:3}}>{role}</div>
         <div style={{fontSize:11,lineHeight:1.4,color:C.icy}}>{available?'Available · '+matchTime+' UTC':availabilityFor(p).length?'Unavailable · '+matchTime+' UTC':'Availability unknown'}</div>
        </div>
        <input type="number" inputMode="numeric" min="0" aria-label={'Troop power for '+name(p)} value={powers[id]??''} onChange={e=>setPowers(old=>({...old,[id]:e.target.value}))} placeholder="Power" style={{...btn,flex:'0 0 72px',width:72,minWidth:0,minHeight:44,padding:'7px 5px',fontSize:14,boxSizing:'border-box',fontWeight:400}}/>
