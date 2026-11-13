@@ -19,7 +19,10 @@ const valueNumber=n=>n!==''&&n!=null&&Number.isFinite(Number(String(n).replace(/
 const powerFormat=n=>n==null?'—':Number(n).toLocaleString('en-US');
 const troopTierLabels=p=>['infantry','lancer','marksman'].map((key,i)=>({key,label:['Inf','Lan','Mar'][i],tier:p.troops?.[key]||null}));
 const hasTroopTiers=p=>troopTierLabels(p).some(t=>t.tier);
-const troopTierScore=p=>{const values=troopTierLabels(p).map(t=>{const v=String(t.tier||'');const m=v.match(/(?:FC|F|T)\s*(\d+)/i);return m?Number(m[1])+(/helios/i.test(v)?0.5:0):null;});return values.every(v=>v==null)?null:values.reduce((sum,v)=>sum+(v??0),0)/3;};
+// Match the Members roster's per-tier troop power scale (not match troop power).
+const T10=[66,71,76,83,88,94,99,104,110,115,121],T11=[80,86,92,100,106,114,120,126,135,141,148];
+const tierPower=raw=>{const x=String(raw||'').trim().toUpperCase();if(!x)return null;const fc=Number(x.match(/FC\s*(\d+)/)?.[1]||0);if(/T12|EXALTED/.test(x))return 96;if(/HELIOS|T11/.test(x))return T11[Math.min(fc,10)]??null;if(/FC\s*\d+|T10/.test(x))return T10[Math.min(fc,10)]??null;return ({7:28,8:38,9:50})[Number(x.match(/T\s*(\d+)/)?.[1]||0)]??null;};
+const troopTierScore=p=>{const values=troopTierLabels(p).map(t=>tierPower(t.tier));return values.every(v=>v!==null)?values.reduce((sum,v)=>sum+v,0)/3:null;};
 const percentile=(value,all,higher=true)=>{if(value==null)return null;const nums=all.filter(v=>v!=null&&Number.isFinite(v));if(!nums.length)return null;return 100*nums.filter(v=>higher?v<value:v>value).length/nums.length+50*nums.filter(v=>v===value).length/nums.length;};
 const priorityWeights={tiers:40,performance:40,city:20};
 const sortValue=(p,key,records)=>{if(key==='name')return name(p);if(key==='strength')return hasTroopTiers(p)?1:null;const raw=key==='troop'?(records?.[p.id]?.troopPower??p.troopPower):key==='city'?(p.cityPower??p.power??p.providerStats?.power):(p.labyrinthRank??p.providerRankings?.labyrinth?.rank??p.providerStats?.labyrinthRank);return valueNumber(raw);};
