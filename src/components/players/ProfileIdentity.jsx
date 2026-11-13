@@ -28,9 +28,10 @@ export function ProfileIdentity({player,onSave}) {
     {message&&<p role="status" style={{fontSize:14,color:C.green,marginBottom:0}}>{message}</p>}
   </section>;
   return <ProfileSection title="Edit identity"><form onSubmit={save}>
+    <div style={{position:'sticky',top:0,zIndex:4,background:C.card,padding:'8px 0 12px',display:'flex',gap:8,borderBottom:`1px solid ${C.border}`,marginBottom:12}}><button type="button" style={{...profileButton,flex:1}} onClick={()=>setDraft(null)}>Cancel</button><button type="submit" disabled={!draft.username.trim()} style={{...profileButton,flex:1,background:C.gold,color:C.bg}}>Save</button></div>
     {[['username','Username'],['alias','Nickname'],['country','Country'],['languages','Languages']].map(([key,label])=><label key={key} style={{display:'grid',gap:6,marginBottom:14,color:C.icy,fontSize:14}}>{label}<input autoFocus={key==='username'} required={key==='username'} value={draft[key]} onChange={event=>setDraft({...draft,[key]:event.target.value})} style={{...profileButton,width:'100%',fontSize:16,fontWeight:400,boxSizing:'border-box',color:C.white,cursor:'text'}}/>{key==='languages'&&<span style={{fontSize:13}}>Separate languages with commas.</span>}</label>)}
     <ProfileRow label="Player ID" value={player.fid||'Unknown'}/><ProfileRow label="Game language" value={gameLanguage||'Unknown'}/>
     <p style={{color:C.icy,fontSize:13,lineHeight:1.5}}>Player ID and game language come from game data. Refreshes may update the username.</p>
-    <div style={{display:'flex',gap:8}}><button type="button" style={{...profileButton,flex:1}} onClick={()=>setDraft(null)}>Cancel</button><button type="submit" disabled={!draft.username.trim()} style={{...profileButton,flex:1,background:C.gold,color:C.bg}}>Save</button></div>
+
   </form></ProfileSection>;
 }
