@@ -1,142 +1,103 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
 import {mightpulseRequest} from '../../../src/services/mightpulseService.js';
 import {normalizeRankings,rankingScore} from '../../../src/services/stateRankingsService.js';
-import {FurnaceDistribution,countFurnace} from './FurnaceDistribution.jsx';
-import {RosterFurnace,normalizeRosterResponse,aggregateRoster} from './RosterFurnace.jsx';
-const style={width:'100%',boxSizing:'border-box',border:'1px solid '+C.border,background:C.section,color:C.white,padding:'11px 12px',minHeight:44,borderRadius:10,fontSize:15};
-const btn={...style,width:'auto',fontWeight:650,cursor:'pointer'};
-const groups=[
- {label:'Battle strength',items:[['personal_power','Personal power'],['troop_power','Troop power'],['kills','Kills'],['furnace','Furnace level'],['state_transfer','State transfer score']]},
- {label:'Heroes & development',items:[['hero_total','Total hero power'],['single_hero','Single hero power'],['labyrinth','Labyrinth'],['pet_power','Pet power'],['chief_gear','Chief gear power'],['chief_charm','Chief charm power']]},
- {label:'Progression',items:[['research_power','Research power'],['building_power','Building power'],['island_prosperity','Island prosperity']]},
- {label:'Alliances',items:[['alliance_power','Alliance power'],['alliance_kills','Alliance kills']]}
+import {normalizeRosterResponse,aggregateRoster} from './RosterFurnace.jsx';
+import {countFurnace} from './FurnaceDistribution.jsx';
+
+const boards=[
+ ['personal_power','Personal power'],['troop_power','Troop power'],['hero_total','Hero power'],['pet_power','Pet power'],
+ ['chief_gear','Chief gear'],['chief_charm','Chief charms'],['research_power','Research power'],['building_power','Building power'],
+ ['kills','Kills'],['labyrinth','Labyrinth'],['furnace','Furnace'],['state_transfer','Transfer score'],
+ ['single_hero','Strongest hero'],['hero_no_equip','Hero power without gear'],['hero_equip','Hero equipment'],
+ ['island_prosperity','Island prosperity'],['alliance_power','Alliance power'],['alliance_kills','Alliance kills'],
+ ['rebel_conquest','Rebel conquest'],['land_of_heroes','Land of Heroes'],['cave_of_monsters','Cave of Monsters'],
+ ['charm_mine','Charm Mine'],['research_center','Research Center'],['gear_forge','Gear Forge'],['gaia_heart','Gaia Heart'],['master_power','Master power']
 ];
-const boards=groups.flatMap(group=>group.items);
-const toNum=value=>{if(value==null||value==='')return null;const v=Number(value);return Number.isFinite(v)?v:null;};
-const format=v=>v==null?'No data':Number(v).toLocaleString('en-US',{maximumFractionDigits:0});
-function summary(rows,mode,tag){
- const filtered=mode==='alliance'?rows.filter(r=>r.allianceTag.toLowerCase()===tag.trim().toLowerCase() || r.username.toLowerCase()===tag.trim().toLowerCase()):rows;
- const nums=filtered.map(r=>toNum(r.score)).filter(n=>n!=null);
- return {rows:filtered,count:filtered.length,total:nums.length?nums.reduce((a,b)=>a+b,0):null,top10:nums.length?nums.slice(0,10).reduce((a,b)=>a+b,0):null};
+const panel={background:'#17283D',border:'1px solid #293E55',borderRadius:13,padding:13};
+const input={background:'#0E1D30',border:'1px solid #36506A',borderRadius:9,color:'#F3F7FF',padding:'10px',fontSize:16,width:'100%',minWidth:0,boxSizing:'border-box'};
+const button={border:'1px solid #36506A',background:'#20364D',borderRadius:9,color:'#D9E7F7',minHeight:42,padding:'9px 12px',fontWeight:650,cursor:'pointer'};
+const n=x=>{const v=Number(x);return Number.isFinite(v)?v:null;};
+const fmt=x=>x==null?'—':Math.abs(x)>=1e9?(x/1e9).toFixed(2)+'B':Math.abs(x)>=1e6?(x/1e6).toFixed(2)+'M':Math.round(x).toLocaleString();
+const topSum=(rows,count)=>{const vals=rows.slice(0,count).map(r=>n(r.score)).filter(v=>v!=null);return vals.length?vals.reduce((a,b)=>a+b,0):null;};
+const levels=['FC10','FC9','FC8','FC7','FC6','FC5'];
+function Duel({label,a,b,selected,onClick,unit='',note=''}) {
+ const max=Math.max(a||0,b||0,1);
+ return <button type="button" onClick={onClick} aria-pressed={selected} style={{...panel,width:'100%',color:'#EAF2FB',textAlign:'left',cursor:'pointer',background:selected?'#203851':'#17283D'}}>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 1.35fr 1fr',alignItems:'center',gap:5}}>
+   <strong style={{color:'#89C4FF',fontSize:16,fontVariantNumeric:'tabular-nums'}}>{fmt(a)}{unit}</strong>
+   <span style={{fontSize:12,fontWeight:650,textAlign:'center'}}>{label}<span style={{display:'block',fontSize:10,fontWeight:450,color:a==null||b==null?'#91A6BE':a>b?'#89C4FF':b>a?'#EBC18A':'#A5B7C9',marginTop:3}}>{a==null||b==null?'Incomplete':a>b?'Your lead':b>a?'Their lead':'Tied'}</span></span>
+   <strong style={{color:'#EBC18A',fontSize:16,textAlign:'right',fontVariantNumeric:'tabular-nums'}}>{fmt(b)}{unit}</strong>
+  </div>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 2px 1fr',gap:5,alignItems:'center',marginTop:11}}>
+   <div style={{height:7,background:'#304255',borderRadius:8,display:'flex',justifyContent:'flex-end',overflow:'hidden'}}>{a!=null&&<div style={{height:'100%',width:(a/max*100)+'%',background:'#77B9FA',borderRadius:8}}/>}</div>
+   <div style={{height:13,background:'#71869A'}}/>
+   <div style={{height:7,background:'#304255',borderRadius:8,overflow:'hidden'}}>{b!=null&&<div style={{height:'100%',width:(b/max*100)+'%',background:'#E6B675',borderRadius:8}}/>}</div>
+  </div>
+  {note&&<div style={{fontSize:10,color:'#8EA6C0',marginTop:7}}>{note}</div>}
+ </button>;
 }
-const delta=(a,b)=>a==null||b==null||!b?'—':((a-b)/b*100>=0?'+':'')+((a-b)/b*100).toFixed(1)+'%';
-function CompareBar({a,b}){const max=Math.max(a||0,b||0,1);return <div style={{display:'grid',gap:5,marginTop:10}}><div style={{height:9,background:C.section,borderRadius:9,overflow:'hidden'}}><div style={{height:'100%',width:(Math.max(0,a||0)/max*100)+'%',background:C.gold,borderRadius:9}}/></div><div style={{height:9,background:C.section,borderRadius:9,overflow:'hidden'}}><div style={{height:'100%',width:(Math.max(0,b||0)/max*100)+'%',background:C.blue,borderRadius:9}}/></div></div>;}
-export function SvsComparison({players=[]}){
- const [mode,setMode]=useState('state'),[ourState,setOurState]=useState('3573'),[enemyState,setEnemyState]=useState(''),[ourTag,setOurTag]=useState('HOT'),[enemyTag,setEnemyTag]=useState(''),[board,setBoard]=useState('furnace');
- const [ourTags,setOurTags]=useState('HOT'),[enemyTags,setEnemyTags]=useState(''),[rosterData,setRosterData]=useState(null),[rosterBusy,setRosterBusy]=useState(false),[rosterErrors,setRosterErrors]=useState([]);
- const [snapshots,setSnapshots]=useState(null),[errors,setErrors]=useState([]),[busy,setBusy]=useState(false),[detailsOpen,setDetailsOpen]=useState(false),[copyStatus,setCopyStatus]=useState('');
- const valid=id=>/^[1-9]\d{0,4}$/.test(String(id));
- const ready=valid(ourState)&&valid(enemyState)&&(mode==='state'||(ourTag.trim()&&enemyTag.trim()));
- useEffect(()=>{setSnapshots(null);setErrors([]);setRosterData(null);setRosterErrors([]);},[mode,ourState,enemyState,ourTag,enemyTag,ourTags,enemyTags]);
- const tagsOf=value=>[...new Set(value.split(/[\s,;]+/).map(t=>t.trim()).filter(Boolean))].slice(0,5);
- async function loadRosters(){
-  if(!valid(ourState)||!valid(enemyState))return;
-  const sides=[{state:ourState,tags:tagsOf(mode==='alliance'?ourTag:ourTags)},{state:enemyState,tags:tagsOf(mode==='alliance'?enemyTag:enemyTags)}];
-  if(sides.some(side=>!side.tags.length))return;
-  setRosterBusy(true);setRosterErrors([]);
-  // A maximum of five alliances per side is intentional: avoid large bursts
-  // against the protected, rate-limited game provider.
-  const jobs=sides.flatMap((side,i)=>side.tags.map(tag=>({side:i,state:side.state,tag})));
-  const settled=await Promise.allSettled(jobs.map(job=>mightpulseRequest('alliance',{state:Number(job.state),tag:job.tag})
-   .then(response=>({job,players:normalizeRosterResponse(response,job.state,job.tag)}))));
-  const grouped=[[],[]],failed=[];
-  settled.forEach((item,i)=>{if(item.status==='fulfilled')grouped[item.value.job.side].push(item.value);
-    else failed.push(jobs[i].state+' ['+jobs[i].tag+']: '+(item.reason?.message||'Unavailable'));});
-  setRosterData({sides:grouped.map(aggregateRoster),loaded:grouped.map(x=>x.map(y=>y.job.tag)),at:new Date().toISOString()});
-  setRosterErrors(failed);setRosterBusy(false);
- }
- async function loadBoard(key,targets,previous=null){
+export function SvsComparison(){
+ const [mode,setMode]=useState('state'),[ours,setOurs]=useState('3573'),[theirs,setTheirs]=useState(''),[ourTag,setOurTag]=useState('HOT'),[theirTag,setTheirTag]=useState('');
+ const [view,setView]=useState('overview'),[board,setBoard]=useState('troop_power'),[limit,setLimit]=useState(10);
+ const [cache,setCache]=useState({}),[busy,setBusy]=useState(false),[errors,setErrors]=useState([]),[at,setAt]=useState(''),[rosters,setRosters]=useState(null),[detail,setDetail]=useState(false);
+ const valid=/^[1-9]\d{0,4}$/.test(ours)&&/^[1-9]\d{0,4}$/.test(theirs)&&(mode==='state'||(ourTag.trim()&&theirTag.trim()));
+ const key=mode+'|'+ours+'|'+theirs+'|'+ourTag.toUpperCase()+'|'+theirTag.toUpperCase();
+ const snapshot=cache[key]||{};
+ const list=mode==='alliance'?boards.filter(x=>!x[0].startsWith('alliance_')):boards;
+ const getRows=(b,i)=>{const rows=snapshot[b]?.[i]?.rows||[];return mode==='alliance'?rows.filter(r=>String(r.allianceTag||'').toUpperCase()===(i?theirTag:ourTag).trim().toUpperCase()):rows;};
+ const load=async (requested=board)=>{
+  if(!valid||busy)return;setBusy(true);setErrors([]);setDetail(false);
+  const needed=[requested,...(requested==='furnace'?[]:['furnace'])].filter((v,i,a)=>a.indexOf(v)===i);
+  const next={...snapshot};const failures=[];
+  for(const b of needed){
+   if(next[b])continue;
+   const states=[ours,theirs];
+   const results=await Promise.allSettled(states.map(state=>mightpulseRequest('rankings',{state:Number(state),board:b,limit:100}).then(r=>normalizeRankings(r,state,b))));
+   next[b]=results.map((r,i)=>r.status==='fulfilled'?r.value:null);
+   results.forEach((r,i)=>{if(r.status==='rejected')failures.push(states[i]+' · '+b+': '+(r.reason?.message||'Unavailable'));});
+  }
+  setCache(prev=>({...prev,[key]:next}));setErrors(failures);setAt(new Date().toISOString());setBusy(false);
+ };
+ const loadRosters=async()=>{
+  if(!valid||busy||mode!=='alliance')return;
   setBusy(true);setErrors([]);
-  const results=previous?.results?.map(v=>({...v}))||[{},{}];
-  const fail=[];
-  // Load only the selected board, for both states. Fetching all 16 boards at once
-  // would consume 32 protected API requests and can exhaust the daily allowance.
-  const requests=await Promise.allSettled(targets.map((target,index)=>results[index][key]
-    ?Promise.resolve(results[index][key])
-    :mightpulseRequest('rankings',{state:Number(target.state),board:key,limit:100})
-      .then(response=>normalizeRankings(response,target.state,key))));
-  requests.forEach((item,index)=>{if(item.status==='fulfilled')results[index][key]=item.value;
-    else fail.push(targets[index].state+' · '+key+': '+(item.reason?.message||'Unavailable'));});
-  setSnapshots({results,targets,at:new Date().toISOString()});setErrors(fail);setBusy(false);
- }
- async function compare(){
-  if(!ready)return;
-  const targets=[{state:ourState,label:mode==='state'?'Our state':'Our alliance',tag:ourTag},{state:enemyState,label:mode==='state'?'Opponent state':'Opponent alliance',tag:enemyTag}];
-  await loadBoard(board,targets,null);
- }
- async function chooseBoard(key){setBoard(key);setDetailsOpen(false);if(snapshots)await loadBoard(key,snapshots.targets,snapshots);}
-
- const left=snapshots?.results?.[0]?.[board],right=snapshots?.results?.[1]?.[board];
- const a=left?summary(left.rows,mode,ourTag):null,b=right?summary(right.rows,mode,enemyTag):null;
- const isFurnace=board==='furnace';
- const isAllianceBoard=board.startsWith('alliance_');
- const furnaceLeft=snapshots?.results?.[0]?.furnace;
- const furnaceRight=snapshots?.results?.[1]?.furnace;
- const furnaceScope=mode==='alliance'?'alliance':'state';
- const furnaceData=(result,tag)=>result?{...result,rows:mode==='alliance'?result.rows.filter(r=>r.allianceTag.toLowerCase()===tag.trim().toLowerCase()):result.rows}:null;
- const furnaceHighest=rows=>rows?.length?rankingScore(rows[0],'furnace'):'No data';
- const ranks=useMemo(()=>[a?.rows||[],b?.rows||[]].map(rows=>rows.slice(0,10)),[a?.rows,b?.rows]);
- async function copy(){
- const levels=['FC10','FC9','FC8','FC7','FC6','FC5'];
- const fleft=furnaceData(furnaceLeft,ourTag),fright=furnaceData(furnaceRight,enemyTag);
- const lc=fleft?countFurnace(fleft.rows):null,rc=fright?countFurnace(fright.rows):null;
- const furnaceLines=lc&&rc?['Furnace tier counts (published top 100 only)',...levels.map(t=>t+': '+lc[t]+' vs '+rc[t]),'FC7+: '+['FC10','FC9','FC8','FC7'].reduce((n,t)=>n+lc[t],0)+' vs '+['FC10','FC9','FC8','FC7'].reduce((n,t)=>n+rc[t],0)]:[];
- const lines=[mode==='state'?'SvS State Comparison':'SvS Alliance Comparison',mode==='state'?ourState+' vs '+enemyState:'['+ourTag+'] '+ourState+' vs ['+enemyTag+'] '+enemyState,'Top-100 published leaderboard sample only',...furnaceLines,'',boards.find(v=>v[0]===board)?.[1]||board,'Our top 10: '+(isFurnace?furnaceHighest(a?.rows):format(a?.top10)),'Opponent top 10: '+(isFurnace?furnaceHighest(b?.rows):format(b?.top10)),'Difference: '+(isFurnace?'Levels are not additive':delta(a?.top10,b?.top10))];
- try{await navigator.clipboard.writeText(lines.join('\n'));setCopyStatus('Summary copied');}
- catch{setCopyStatus('Copy unavailable on this device');}
-}
- const label=mode==='state'?'Top-100 entries':'Matching alliance entries in top 100';
- return <section style={{padding:'20px',color:C.white,minWidth:0}}>
- <h2 style={{fontSize:27,letterSpacing:-.5,margin:'0 0 16px'}}>SvS comparison</h2>
- <div role="group" aria-label="Comparison type" style={{display:'flex',gap:8,marginBottom:16}}>{[['state','State vs state'],['alliance','Alliance vs alliance']].map(([key,label])=><button key={key} aria-pressed={mode===key} onClick={()=>setMode(key)} style={{...btn,flex:1,background:mode===key?C.gold:C.section,color:mode===key?C.bg:C.white,fontSize:13}}>{label}</button>)}</div>
- <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10}}>
- <label style={{fontSize:13,color:C.icy}}>Our state<input aria-label="Our state" inputMode="numeric" style={{...style,marginTop:6}} value={ourState} onChange={e=>setOurState(e.target.value.trim())}/></label>
- <label style={{fontSize:13,color:C.icy}}>Opponent state<input aria-label="Opponent state" inputMode="numeric" placeholder="e.g. 3556" style={{...style,marginTop:6}} value={enemyState} onChange={e=>setEnemyState(e.target.value.trim())}/></label>
- {mode==='alliance'&&<><label style={{fontSize:13,color:C.icy}}>Our alliance<input aria-label="Our alliance tag" style={{...style,marginTop:6}} value={ourTag} onChange={e=>setOurTag(e.target.value.toUpperCase())}/></label><label style={{fontSize:13,color:C.icy}}>Opponent alliance<input aria-label="Opponent alliance tag" style={{...style,marginTop:6}} value={enemyTag} onChange={e=>setEnemyTag(e.target.value.toUpperCase())}/></label></>}
- </div>
- <button disabled={busy||!ready} onClick={compare} style={{...btn,width:'100%',marginTop:14,background:ready?C.gold:C.section,color:ready?C.bg:C.muted,fontSize:16}}>{busy?'Loading leaderboard…':snapshots?'Refresh leaderboard':'Compare leaderboards'}</button>
- {errors.length>0&&<div role="alert" style={{padding:12,border:'1px solid '+C.border,borderRadius:12,marginTop:12,color:C.icy,fontSize:13}}><strong>Some rankings could not be loaded.</strong><p style={{marginBottom:0}}>{errors.length} of 2 requests failed for this leaderboard. Missing values are not treated as zero.</p><details><summary>Show issues</summary>{errors.map((e,i)=><p key={i}>{e}</p>)}</details></div>}
- {snapshots&&<>
- <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'baseline',margin:'22px 0 8px'}}><h3 style={{fontSize:18,margin:0}}>Leaderboards</h3><span style={{fontSize:11,color:C.muted}}>Updated {new Date(snapshots.at).toLocaleTimeString()}</span></div>
-
- {furnaceLeft&&furnaceRight&&<FurnaceDistribution left={furnaceData(furnaceLeft,ourTag)} right={furnaceData(furnaceRight,enemyTag)} leftName={mode==='state'?ourState:ourTag} rightName={mode==='state'?enemyState:enemyTag} scope={furnaceScope}/>}
- <label style={{display:'block',color:C.icy,fontSize:13,margin:'20px 0 12px'}}>Metric<select aria-label="Comparison metric" style={{...style,marginTop:6}} value={board} onChange={e=>chooseBoard(e.target.value)}>{groups.map(group=><optgroup key={group.label} label={group.label}>{group.items.map(([key,label])=><option key={key} value={key}>{label}</option>)}</optgroup>)}</select></label>
- {!isFurnace&&<article style={{background:C.card,borderRadius:14,padding:16,marginBottom:12}}>
- <h3 style={{fontSize:16,margin:'0 0 12px'}}>{boards.find(x=>x[0]===board)?.[1]}</h3>
- <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>{[a,b].map((item,i)=><div key={i} style={{minWidth:0}}><div style={{color:i?C.blue:C.gold,fontSize:12,fontWeight:700}}>{i?'OPPONENT':'OUR SIDE'}</div><div style={{fontSize:23,fontWeight:750,overflowWrap:'anywhere',margin:'6px 0'}}>{isFurnace?furnaceHighest(item?.rows):format(item?.top10)}</div><div style={{color:C.icy,fontSize:12}}>{isFurnace?'Highest listed furnace':'Top 10 recorded score'}</div><div style={{fontSize:12,color:C.muted,marginTop:5}}>{item?.count??'—'} {label.toLowerCase()}</div></div>)}</div>
- {!isFurnace&&<><CompareBar a={a?.top10} b={b?.top10}/><p style={{fontSize:13,color:C.icy,marginBottom:0}}>Top 10 gap: <strong style={{color:C.white}}>{delta(a?.top10,b?.top10)}</strong></p></>}
- {isFurnace&&<p style={{fontSize:13,color:C.icy,marginBottom:0}}>Furnace rankings are levels, not additive power. Compare individual leaders below.</p>}
- </article>}
- {!isFurnace&&<div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10,marginBottom:12}}>
- {[a,b].map((item,i)=><article key={i} style={{background:C.section,padding:13,borderRadius:12}}><div style={{fontSize:12,color:C.icy}}>{i?'Opponent':'Our side'} · {label}</div><strong style={{fontSize:21}}>{item?.count??'—'}</strong><div style={{fontSize:12,color:C.muted,marginTop:5}}>Recorded in this leaderboard</div></article>)}</div>}
- <details open={detailsOpen} onToggle={e=>setDetailsOpen(e.currentTarget.open)} style={{background:C.card,borderRadius:14,padding:14}}>
- <summary style={{minHeight:44,cursor:'pointer',fontSize:15,fontWeight:700,padding:'12px 0'}}>Top 10 players</summary>
- <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>{ranks.map((rows,i)=><div key={i} style={{minWidth:0}}><strong style={{fontSize:13,color:i?C.blue:C.gold}}>{i?'Opponent':'Our side'}</strong>{rows.length?rows.map(row=><div key={row.key} style={{padding:'9px 0',borderBottom:'1px solid '+C.border,overflowWrap:'anywhere'}}><div style={{fontSize:13}}>#{row.rank} {row.username}</div><div style={{fontSize:12,color:C.icy}}>{row.allianceTag?'['+row.allianceTag+'] · ':''}{rankingScore(row,board)}</div></div>):<p style={{fontSize:13,color:C.muted}}>No matching published entries</p>}</div>)}</div>
- </details>
- <article style={{background:C.card,borderRadius:14,padding:14,marginTop:12}}>
- <h3 style={{fontSize:16,margin:'0 0 8px'}}>Battle considerations</h3>
- <div style={{fontSize:13,color:C.icy,lineHeight:1.65}}>
- {(!a?.rows?.length||!b?.rows?.length)?<p>There is not enough matching ranking data to assess the two sides. Check the state numbers or alliance tags before planning.</p>:
- isFurnace?<p>Compare individual rally leaders' stats and troop tiers. Furnace level is only one factor.</p>:
- <><p>{a.top10!=null&&b.top10!=null?(a.top10>b.top10?'Our top 10 scores higher. Check buffs and rally composition before committing.':a.top10<b.top10?'Their top 10 scores higher. Prioritise garrison coordination and counter-rally planning.':'Top 10 scores are similar. Compare heroes, troops and attendance.'):'Insufficient scores to compare.'}</p><p>Confirm attendance, rally leads and backup teams before battle.</p></>}
- </div></article>
- <button style={{...btn,width:'100%',marginTop:12}} onClick={copy}>Copy comparison</button>{copyStatus&&<p role="status" style={{fontSize:13,color:C.icy}}>{copyStatus}</p>}
- <p style={{fontSize:12,lineHeight:1.5,color:C.muted}}>Leaderboard data covers up to 100 ranked entries per state. Missing players are not necessarily unranked.</p>
- </>}
- <div style={{background:C.section,padding:14,borderRadius:14,marginTop:16}}>
- <h3 style={{fontSize:17,margin:'0 0 6px'}}>Furnace by alliance</h3>
- <p style={{fontSize:13,color:C.icy,lineHeight:1.45,margin:'0 0 12px'}}>Count players from complete alliance rosters.</p>
- {mode==='state'&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
- <label style={{fontSize:12,color:C.icy}}>Our alliances<input aria-label="Our state alliance tags" placeholder="HOT ARC RKG" style={{...style,marginTop:6}} value={ourTags} onChange={e=>setOurTags(e.target.value)}/></label>
- <label style={{fontSize:12,color:C.icy}}>Their alliances<input aria-label="Opponent state alliance tags" placeholder="Enter tags" style={{...style,marginTop:6}} value={enemyTags} onChange={e=>setEnemyTags(e.target.value)}/></label>
- </div>}
- {mode==='state'&&<p style={{fontSize:12,color:C.muted,margin:'8px 0'}}>Up to 5 tags per side, separated by commas.</p>}
- <button type="button" onClick={loadRosters} disabled={rosterBusy||!valid(ourState)||!valid(enemyState)||!(mode==='alliance'?ourTag&&enemyTag:ourTags.trim()&&enemyTags.trim())} style={{...btn,width:'100%',background:C.card}}>{rosterBusy?'Loading rosters…':'Compare furnace levels'}</button>
- {rosterErrors.length>0&&<p role="alert" style={{fontSize:12,color:C.red,lineHeight:1.5}}>Unavailable: {rosterErrors.join(' · ')}</p>}
- {rosterData&&<><p style={{fontSize:12,color:C.icy,marginBottom:0}}>Coverage: {rosterData.loaded[0].length}/{mode==='state'?tagsOf(ourTags).length:1} ours · {rosterData.loaded[1].length}/{mode==='state'?tagsOf(enemyTags).length:1} theirs</p>
- <RosterFurnace ours={rosterData.sides[0]} theirs={rosterData.sides[1]} ourLabel={mode==='state'?ourState:ourTag} theirLabel={mode==='state'?enemyState:enemyTag}/></>}
- </div>
-
+  const jobs=[{state:ours,tag:ourTag},{state:theirs,tag:theirTag}];
+  const result=await Promise.allSettled(jobs.map(j=>mightpulseRequest('alliance',{state:Number(j.state),tag:j.tag}).then(r=>aggregateRoster([{job:j,players:normalizeRosterResponse(r,j.state,j.tag)}]))));
+  setRosters({key,data:result.map(r=>r.status==='fulfilled'?r.value:null)});
+  setErrors(result.flatMap((r,i)=>r.status==='rejected'?[jobs[i].tag+': '+(r.reason?.message||'Unavailable')]:[]));
+  setBusy(false);
+ };
+ const report=()=>{const lines=['BATTLE INTELLIGENCE',mode==='state'?ours+' vs '+theirs:'['+ourTag+'] '+ours+' vs ['+theirTag+'] '+theirs,'Published top-100 leaderboard sample, not complete state totals',''];for(const [id,label] of list){if(!snapshot[id])continue;const a=getRows(id,0),b=getRows(id,1);lines.push(label+': '+fmt(topSum(a,limit))+' vs '+fmt(topSum(b,limit)));}navigator.clipboard?.writeText(lines.join('\n'));};
+ const metricRows=view==='overview'?boards.filter(x=>['troop_power','hero_total','labyrinth','pet_power','chief_gear','furnace'].includes(x[0])):view==='power'?boards.filter(x=>['personal_power','troop_power','hero_total','pet_power','chief_gear','chief_charm','research_power','building_power','kills'].includes(x[0])):view==='rankings'?list:view==='furnace'?[['furnace','Furnace levels']]:[];
+ const boardA=getRows(board,0),boardB=getRows(board,1);
+ const topA=topSum(boardA,limit),topB=topSum(boardB,limit);
+ const loaded=Object.keys(snapshot).length>0;
+ const rowsFor=(id,i)=>getRows(id,i);
+ return <section style={{padding:'12px 16px 30px',color:'#F2F7FC',fontSize:14}}>
+  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:14}}><div><h2 style={{fontSize:23,letterSpacing:'-.6px',margin:'0 0 4px'}}>Battle intelligence</h2><span style={{fontSize:12,color:'#9EB5CC'}}>State and alliance comparison</span></div><button style={button} onClick={report} disabled={!loaded}>Copy report</button></div>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,background:'#17283D',padding:5,borderRadius:12,marginBottom:12}}>{[['state','States'],['alliance','Alliances']].map(([id,label])=><button key={id} onClick={()=>{setMode(id);setRosters(null);setDetail(false)}} aria-pressed={mode===id} style={{...button,border:0,background:mode===id?'#426184':'transparent',color:mode===id?'white':'#AFC3D7'}}>{label}</button>)}</div>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:12}}>
+   {[0,1].map(i=><div key={i} style={panel}><label style={{fontSize:11,color:i?'#EBC18A':'#89C4FF',fontWeight:700}}>{i?'OPPONENT':'YOUR SIDE'}</label><input aria-label={i?'Opponent state':'Your state'} inputMode="numeric" value={i?theirs:ours} onChange={e=>i?setTheirs(e.target.value):setOurs(e.target.value)} placeholder="State ID" style={{...input,marginTop:7}}/>{mode==='alliance'&&<input aria-label={i?'Opponent alliance':'Your alliance'} value={i?theirTag:ourTag} onChange={e=>i?setTheirTag(e.target.value.toUpperCase()):setOurTag(e.target.value.toUpperCase())} placeholder="Alliance tag" style={{...input,marginTop:7}}/>}</div>)}
+  </div>
+  <button style={{...button,width:'100%',background:valid?'#D8B46F':'#24374A',color:valid?'#172536':'#8299AE',fontSize:15}} disabled={!valid||busy} onClick={()=>load()}>{busy?'Loading…':loaded?'Refresh / load selected metric':'Compare states'}</button>
+  {errors.length>0&&<div role="alert" style={{...panel,marginTop:10,color:'#F4C68E'}}><strong>Some data could not be loaded</strong><details><summary style={{marginTop:5}}>View details</summary>{errors.map((e,i)=><p key={i} style={{fontSize:12}}>{e}</p>)}</details></div>}
+  {loaded&&<><div style={{...panel,marginTop:14,marginBottom:13}}>
+   <div style={{display:'flex',justifyContent:'space-between',color:'#A9BED3',fontSize:11}}><strong>COMPARISON SNAPSHOT</strong><span>{at?new Date(at).toLocaleTimeString():''}</span></div>
+   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,margin:'13px 0'}}>
+    {[0,1].map(i=>{let wins=0;for(const [id] of boards){if(!snapshot[id])continue;const a=topSum(rowsFor(id,0),10),b=topSum(rowsFor(id,1),10);if(a!=null&&b!=null&&(i?b>a:a>b))wins++;}return <div key={i} style={{textAlign:'center'}}><div style={{fontSize:30,fontWeight:800,color:i?'#EBC18A':'#89C4FF'}}>{wins}</div><div style={{fontSize:12,color:'#B5C7D9'}}>{i?'Their leads':'Your leads'}</div></div>})}
+   </div><div style={{fontSize:12,color:'#AFC3D8',lineHeight:1.5}}>Lead counts cover loaded comparable metrics only. Rankings and furnace levels are not battle-power scores.</div>
+  </div>
+  <div style={{display:'flex',gap:5,overflowX:'auto',paddingBottom:8,marginBottom:9}}>{[['overview','Overview'],['power','Power'],['rankings','Rankings'],['furnace','Furnace'],['players','Players']].map(([id,label])=><button key={id} onClick={()=>setView(id)} style={{...button,flexShrink:0,minHeight:36,padding:'7px 11px',background:view===id?'#426184':'#1B2C42',border:0}}>{label}</button>)}</div>
+  {view!=='players'&&<><h3 style={{fontSize:17,margin:'9px 0 12px'}}>Head-to-head</h3><div style={{display:'flex',justifyContent:'space-between',color:'#A9BFD4',fontSize:12,marginBottom:8}}><span style={{color:'#89C4FF'}}>{mode==='alliance'?ourTag:ours}</span><span style={{color:'#EBC18A'}}>{mode==='alliance'?theirTag:theirs}</span></div>
+  <div style={{display:'grid',gap:8}}>{metricRows.map(([id,label])=>{const a=rowsFor(id,0),b=rowsFor(id,1),exists=!!snapshot[id];const va=id==='furnace'?null:exists?topSum(a,limit):null,vb=id==='furnace'?null:exists?topSum(b,limit):null;return <div key={id}><Duel label={label} a={va} b={vb} selected={board===id} note={id==='furnace'?'Tap for furnace distribution':!exists?'Not loaded · tap to fetch':'Published top '+limit+' only'} onClick={()=>{setBoard(id);setDetail(true);if(!snapshot[id])load(id);}}/></div>})}</div>
+  {view==='furnace'&&snapshot.furnace&&<div style={{...panel,marginTop:12}}><h3 style={{margin:'0 0 8px',fontSize:16}}>Furnace distribution</h3><p style={{fontSize:12,color:'#AFC3D8'}}>Counts reflect published top-100 furnace leaderboard entries, not the entire state.</p>{levels.map(level=>{const a=countFurnace(rowsFor('furnace',0))[level]||0,b=countFurnace(rowsFor('furnace',1))[level]||0;return <Duel key={level} label={level} a={a} b={b} onClick={()=>{}}/>})}</div>}
+  </>}
+  {view==='players'&&<div style={panel}><h3 style={{margin:'0 0 10px'}}>Top players</h3><label style={{fontSize:12,color:'#AFC3D8'}}>Leaderboard<select value={board} onChange={e=>{setBoard(e.target.value);if(!snapshot[e.target.value])load(e.target.value)}} style={{...input,margin:'7px 0'}}>{list.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>{[boardA,boardB].map((rows,i)=><div key={i}><strong style={{color:i?'#EBC18A':'#89C4FF',fontSize:12}}>{i?(mode==='alliance'?theirTag:theirs):(mode==='alliance'?ourTag:ours)}</strong>{rows.slice(0,limit).map((r,j)=><div key={r.key||j} style={{padding:'9px 0',borderBottom:'1px solid #30465C',fontSize:12,overflowWrap:'anywhere'}}>#{r.rank} {r.username}<div style={{color:'#AFC3D8',marginTop:3}}>{rankingScore(r,board)}</div></div>)}{!rows.length&&<p style={{fontSize:12,color:'#AFC3D8'}}>No matching entries</p>}</div>)}</div></div>}
+  {detail&&view!=='players'&&<div style={{...panel,marginTop:12,borderColor:'#507392'}}><div style={{display:'flex',justifyContent:'space-between',gap:8}}><strong>{boards.find(x=>x[0]===board)?.[1]}</strong><button style={{...button,minHeight:28,padding:'2px 9px'}} onClick={()=>setDetail(false)}>Close</button></div><p style={{color:'#AFC3D8',fontSize:12}}>Top {limit} recorded leaderboard scores. Missing entries are not zero.</p><Duel label="Top score sum" a={topA} b={topB} onClick={()=>{}}/><button style={{...button,width:'100%',marginTop:10}} onClick={()=>setView('players')}>View ranked players</button></div>}
+  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginTop:13}}><label style={{color:'#AFC3D8',fontSize:12}}>Compare top <select value={limit} onChange={e=>setLimit(Number(e.target.value))} style={{...input,width:90,marginLeft:6}}>{[10,25,50,100].map(x=><option key={x}>{x}</option>)}</select></label><button style={button} onClick={report}>Copy report</button></div>
+  {mode==='alliance'&&<div style={{...panel,marginTop:14}}><h3 style={{margin:'0 0 5px'}}>Complete alliance roster</h3><p style={{color:'#AFC3D8',fontSize:12}}>Fetch both alliances separately for a more complete furnace distribution. This does not change your saved roster.</p><button style={button} onClick={loadRosters} disabled={busy}>Load alliance rosters</button>{rosters?.key===key&&<p style={{fontSize:12,color:'#BFD2E4'}}>Roster response: {rosters.data.map((x,i)=>x?'Loaded '+(i?'opponent':'your')+' alliance':'Unavailable').join(' · ')}</p>}</div>}
+  <p style={{fontSize:11,color:'#90A8BF',lineHeight:1.5,marginTop:16}}>Data source: WhiteoutStats through the existing secured lookup. Published leaderboards contain at most 100 entries per state. Values are not complete state totals. Last fetched: {at?new Date(at).toLocaleString():'—'}.</p>
+  </>}
  </section>;
 }
