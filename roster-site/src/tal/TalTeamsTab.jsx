@@ -258,7 +258,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const selectedPlayers=effectiveIds.map(id=>byId.get(String(id))).filter(Boolean);
  const leaderCandidates=[...selectedPlayers].filter(p=>p.roles?.some?.(r=>/rally lead/i.test(String(r)))||p.rallyLeader||p.leaderProfile?.role==='leader');
  const powerOf=id=>valueNumber(powers[String(id)]??value?.records?.[id]?.troopPower);
- const subCandidates=substitutePool.filter(p=>selectedIds.includes(String(p.id)));
+ const subCandidates=substitutePool;
  const subStats=subCandidates.map(p=>({p,tiers:troopTierScore(p),troop:powerOf(p.id),city:sortValue(p,'city',value?.records),lab:sortValue(p,'lab',value?.records)}));
  const troopPopulation=subStats.map(x=>x.troop).filter(v=>v!=null);
  const labPopulation=subStats.map(x=>x.lab).filter(v=>v!=null);
@@ -286,7 +286,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  });
  const orderedSubs=subOverride?[...autoSubs].sort((a,b)=>(subManual.indexOf(String(a.id))<0?9999:subManual.indexOf(String(a.id)))-(subManual.indexOf(String(b.id))<0?9999:subManual.indexOf(String(b.id)))):autoSubs;
  const priorityLabel=({balanced:'Balanced ranking',tiers:'Highest troop tiers first',troop:'Highest troop power first'})[subMetric];
- const subCopy=['TAL SUBSTITUTE ENTRY ORDER · '+matchTime+' UTC',legionLabel(selectedLegion)+' · '+matchDate,'Priority: '+(subOverride?priorityLabel+' (manually adjusted)':priorityLabel),'',...(orderedSubs.length?orderedSubs.map((p,i)=>{const d=rankDetails.get(String(p.id));return (i+1)+'. '+name(p)+(copyScores&&d.score!=null?' ('+d.score.toFixed(0)+'/100)':'')+(copyReasons?'\n   '+d.reasons.join(' · '):'');}):['No eligible selected substitutes']),'','Enter in this order as combatant slots become available.'].join('\n');
+ const subCopy=['TAL SUBSTITUTE ENTRY ORDER · '+matchTime+' UTC',legionLabel(selectedLegion)+' · '+matchDate,'Priority: '+(subOverride?priorityLabel+' (manually adjusted)':priorityLabel),'',...(orderedSubs.length?orderedSubs.map((p,i)=>{const d=rankDetails.get(String(p.id));return (i+1)+'. '+name(p)+(copyScores&&d.score!=null?' ('+d.score.toFixed(0)+'/100)':'')+(copyReasons?'\n   '+d.reasons.join(' · '):'');}):['No eligible available substitutes']),'','Enter in this order as combatant slots become available.'].join('\n');
  const teamPower=g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).reduce((sum,id)=>sum+(powerOf(id)||0),0);
  const groupPairs=cooperationGroups.filter(g=>Array.isArray(g?.ids)&&g.ids.length>1).flatMap(g=>{
   const ids=[...new Set(g.ids.map(String))],pairs=[];
