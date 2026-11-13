@@ -509,15 +509,30 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     <label style={{...small,fontSize:11,display:'block',minWidth:0}}>Match date<input type="date" aria-label="TAL match date" value={matchDate} onChange={e=>setMatchDate(e.target.value)} style={{...btn,display:'block',width:'100%',maxWidth:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 10px',colorScheme:'dark'}}/></label>
     <label style={{...small,fontSize:11,display:'block',minWidth:0}}>Match time · UTC<select aria-label="Match time UTC" value={matchTime} onChange={e=>resetForMatch(selectedLegion?.id,e.target.value)} style={{...btn,display:'block',width:'100%',maxWidth:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 10px'}}>{(value?.times||DEFAULT_TIMES).map(t=><option key={t}>{t}</option>)}</select></label>
    </div>
-   <section aria-label="Match availability" style={{...panel,padding:11,marginBottom:10}}>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
-     {[{label:'Combatants available',count:combatantPool.length,note:'0:00 entry',color:'#83C7FF'},{label:'Substitutes available',count:substitutePool.length,note:'3:00+ entry',color:'#B6A9CF'}].map(item=><div key={item.label} style={{background:C.section,borderRadius:10,padding:'10px 11px',minWidth:0}}>
-      <span style={{...small,fontSize:11,color:item.color}}>{item.note}</span><div style={{fontSize:24,fontWeight:750,lineHeight:1.2,margin:'3px 0'}}>{item.count}</div><span style={{...small,fontSize:11}}>{item.label}</span>
-     </div>)}
+   <section aria-label="Match availability" style={{...panel,padding:14,marginBottom:10}}>
+    <div style={{...small,fontSize:11,letterSpacing:'.06em',textTransform:'uppercase'}}>Match availability · {matchTime} UTC</div>
+    <button type="button" aria-label="Show all available players" onClick={()=>{setRoleFilter('all');setOnlyAvailable(true);document.getElementById('tal-match-players')?.scrollIntoView({behavior:'smooth',block:'start'});}} style={{display:'flex',alignItems:'baseline',gap:9,background:'transparent',border:0,color:C.icy,padding:'8px 0 13px',cursor:'pointer',textAlign:'left',width:'100%'}}>
+     <span style={{fontSize:38,fontWeight:800,lineHeight:1.1,color:'#FFFFFF',fontVariantNumeric:'tabular-nums'}}>{new Set([...combatantPool,...substitutePool].map(p=>String(p.id))).size}</span>
+     <span style={{fontSize:14}}>players available</span>
+    </button>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:9}}>
+     <button type="button" aria-label="View available combatants" onClick={()=>{setRoleFilter('combatant');setOnlyAvailable(true);document.getElementById('tal-match-players')?.scrollIntoView({behavior:'smooth',block:'start'});}} style={{background:C.section,border:'1px solid '+C.border,borderRadius:11,padding:'12px 11px',minWidth:0,textAlign:'left',cursor:'pointer',color:C.icy,minHeight:110}}>
+      <span style={{display:'flex',justifyContent:'space-between',gap:4,fontSize:12,color:'#B6CBDA'}}>Combatants <span aria-hidden="true">›</span></span>
+      <span style={{display:'block',fontSize:28,fontWeight:750,lineHeight:1.3,color:'#FFFFFF',fontVariantNumeric:'tabular-nums'}}>{combatantPool.length}</span>
+      <span style={{fontSize:11,color:'#A9C4D8'}}>View players</span>
+     </button>
+     <button type="button" aria-label="Find best substitute using ranked recommendations" onClick={()=>document.getElementById('tal-substitute-entry-order')?.scrollIntoView({behavior:'smooth',block:'start'})} style={{background:C.section,border:'1px solid '+C.border,borderRadius:11,padding:'12px 11px',minWidth:0,textAlign:'left',cursor:'pointer',color:C.icy,minHeight:110}}>
+      <span style={{display:'flex',justifyContent:'space-between',gap:4,fontSize:12,color:'#B6CBDA'}}>Substitutes <span aria-hidden="true">›</span></span>
+      <span style={{display:'block',fontSize:28,fontWeight:750,lineHeight:1.3,color:'#FFFFFF',fontVariantNumeric:'tabular-nums'}}>{substitutePool.length}</span>
+      <span style={{fontSize:11,color:'#83C7FF'}}>✦ Find best substitute</span>
+     </button>
     </div>
-    <div style={{display:'flex',justifyContent:'space-between',gap:8,marginTop:9,color:C.icy,fontSize:11}}><span>{selectedIds.length} selected</span><span>{absentIds.length} absent</span></div>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:12,fontSize:11}}>
+     <span style={{color:combatantPool.length<30?'#F2C77B':C.icy}}>{combatantPool.length<30?'⚠ '+(30-combatantPool.length)+' combatant'+(30-combatantPool.length===1?'':'s')+' short of 30':'30 combatant places covered'}</span>
+     <span style={{color:C.icy}}>{absentIds.length} absent</span>
+    </div>
    </section>
-   <section aria-label="Match participants and power" style={{padding:'12px 4px',marginBottom:10}}>
+   <section id="tal-match-players" aria-label="Match participants and power" style={{padding:'12px 4px',marginBottom:10}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}>
      <strong style={{fontSize:16}}>Players</strong><button type="button" style={{...btn,minHeight:40,padding:'7px 10px',fontSize:12}} onClick={()=>setShowBulk(v=>!v)}>{showBulk?'Close paste':'Batch paste'}</button>
     </div>
@@ -554,7 +569,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     })}
     {!visibleRoster.filter(p=>roleFilter==='all'||roleFilter==='absent'&&absentIds.includes(String(p.id))||roleFilter==='combatant'&&isCombatant(p.id)&&!absentIds.includes(String(p.id))||roleFilter==='substitute'&&isSubstitute(p.id)&&!absentIds.includes(String(p.id))).length&&<p style={{...small,padding:'12px 0'}}>No players match this filter.</p>}
    </section>
-   <section aria-label="Substitute entry order" style={{padding:'14px 2px',marginBottom:12,borderTop:'1px solid '+C.border}}>
+   <section id="tal-substitute-entry-order" aria-label="Substitute entry order" style={{padding:'14px 2px',marginBottom:12,borderTop:'1px solid '+C.border}}>
  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><div><strong style={{fontSize:16}}>Substitute entry order</strong><div style={{...small,fontSize:11}}>3:00+ · Priority as slots become available</div></div><button type="button" style={{...btn,border:0,borderRadius:22,background:C.section,fontSize:12}} onClick={()=>copy(subCopy)}>Copy order</button></div>
  <label style={{...small,fontSize:11,display:'block',marginTop:12}}>Ranking strategy<select aria-label="Substitute ranking strategy" value={subMetric} onChange={e=>{setSubMetric(e.target.value);setSubOverride(false);setSubManual([])}} style={{...btn,display:'block',width:'100%',marginTop:5,minHeight:44}}><option value="balanced">Balanced ranking (default)</option><option value="tiers">Highest troop tiers first</option><option value="troop">Highest troop power first</option></select></label>
  {subMetric==='balanced'&&<div style={{marginTop:12,background:C.section,borderRadius:12,padding:12}}><strong style={{fontSize:12}}>Ranking weights</strong><div style={{...small,fontSize:11,margin:'4px 0 8px'}}>Troop power uses Labyrinth rank only when power is missing. Scores are relative to eligible substitutes.</div>{[['tiers','Troop tiers'],['performance','Troop power / Labyrinth fallback'],['city','City power']].map(([key,label])=><WeightSlider key={key} metric={key} label={label} value={subWeights[key]} onCommit={next=>setSubWeights(v=>v[key]===next?v:{...v,[key]:next})}/>)}<div style={{...small,fontSize:11,marginTop:6}}>Weights are automatically normalised to 100% when scoring.</div><button type="button" style={{...btn,border:0,fontSize:11,marginTop:6}} onClick={()=>setSubWeights({...priorityWeights})}>Reset weights to 40 / 40 / 20</button></div>}
