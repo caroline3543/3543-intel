@@ -9,7 +9,7 @@ const field={boxSizing:'border-box',width:'100%',minWidth:0,borderRadius:9,backg
 const btn={border:'1px solid #36516B',borderRadius:10,background:'#213850',color:'#F1F7FD',padding:'10px 12px',minHeight:44,fontSize:13,fontWeight:650,cursor:'pointer'};
 const fmt=v=>v==null?'—':Number(v).toLocaleString('en-US');
 const compact=v=>v==null?'—':Number(v)>=1e9?(v/1e9).toFixed(2)+'B':Number(v)>=1e6?(v/1e6).toFixed(2)+'M':fmt(v);
-const valid=s=>/^[1-9]\\d{0,4}$/.test(s);
+const valid=s=>/^[1-9][0-9]{0,4}$/.test(s);
 function Side({label,value,color}){return <div style={{minWidth:0}}><div style={{color,fontSize:11,fontWeight:700}}>{label}</div><div style={{fontSize:25,fontWeight:800,marginTop:5,fontVariantNumeric:'tabular-nums'}}>{value}</div></div>}
 export function SvsComparison(){
  const [mode,setMode]=useState('state'),[ourState,setOurState]=useState('3573'),[theirState,setTheirState]=useState('');
