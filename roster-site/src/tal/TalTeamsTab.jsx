@@ -241,11 +241,35 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const selectedPlayers=effectiveIds.map(id=>byId.get(String(id))).filter(Boolean);
  const leaderCandidates=[...selectedPlayers].filter(p=>p.roles?.some?.(r=>/rally lead/i.test(String(r)))||p.rallyLeader||p.leaderProfile?.role==='leader');
  const powerOf=id=>valueNumber(powers[String(id)]??value?.records?.[id]?.troopPower);
- const subScore=p=>subMetric==='troop'?powerOf(p.id):subMetric==='strength'?(hasTroopTiers(p)?1:null):sortValue(p,subMetric,value?.records);
  const subCandidates=substitutePool.filter(p=>selectedIds.includes(String(p.id)));
- const autoSubs=[...subCandidates].sort((a,b)=>{const x=subScore(a),y=subScore(b);if(x==null&&y!=null)return 1;if(y==null&&x!=null)return -1;if(subMetric==='strength')return comparePriority(b,a)||name(a).localeCompare(name(b));return (x===y?0:subMetric==='lab'?x-y:y-x)||name(a).localeCompare(name(b));});
+ const subStats=subCandidates.map(p=>({p,tiers:troopTierScore(p),troop:powerOf(p.id),city:sortValue(p,'city',value?.records),lab:sortValue(p,'lab',value?.records)}));
+ const troopPopulation=subStats.map(x=>x.troop).filter(v=>v!=null);
+ const labPopulation=subStats.map(x=>x.lab).filter(v=>v!=null);
+ const tierPopulation=subStats.map(x=>x.tiers).filter(v=>v!=null);
+ const cityPopulation=subStats.map(x=>x.city).filter(v=>v!=null);
+ const normalizedWeights=Object.fromEntries(Object.entries(subWeights).map(([k,v])=>[k,Math.max(0,Number(v)||0)]));
+ const rankDetails=new Map(subStats.map(x=>{
+  const tier=percentile(x.tiers,tierPopulation);
+  const city=percentile(x.city,cityPopulation);
+  const usingFallback=x.troop==null&&x.lab!=null;
+  // Labyrinth is a proxy only when troop power is absent, never an extra scoring component.
+  const performance=x.troop!=null?percentile(x.troop,troopPopulation):usingFallback?percentile(x.lab,labPopulation,false):null;
+  const parts=[['tiers',tier],['performance',performance],['city',city]].filter(([key,v])=>v!=null&&normalizedWeights[key]>0);
+  const total=parts.reduce((sum,[key])=>sum+normalizedWeights[key],0);
+  const score=total?parts.reduce((sum,[key,v])=>sum+normalizedWeights[key]*v,0)/total:null;
+  const missing=[x.tiers==null?'Troop tiers':null,x.troop==null&&!usingFallback?'Troop power / Labyrinth rank':null,x.city==null?'City power':null].filter(Boolean);
+  const reasons=[x.tiers!=null?'Troop tiers: '+troopTierLabels(x.p).filter(t=>t.tier).map(t=>t.label+' '+t.tier).join(' · '):null,x.troop!=null?'Troop power: '+powerFormat(x.troop):usingFallback?'Labyrinth fallback: rank '+powerFormat(x.lab):null,x.city!=null?'City power: '+powerFormat(x.city):null,missing.length?'Missing: '+missing.join(', '):null].filter(Boolean);
+  return [String(x.p.id),{...x,tier,city,performance,score,usingFallback,reasons}];
+ }));
+ const autoSubs=[...subCandidates].sort((a,b)=>{
+  const x=rankDetails.get(String(a.id)),y=rankDetails.get(String(b.id));
+  const compare=(k)=>x[k]==null&&y[k]!=null?1:y[k]==null&&x[k]!=null?-1:x[k]===y[k]?0:y[k]-x[k];
+  const n=subMetric==='tiers'?(compare('tiers')||compare('performance')||compare('city')):subMetric==='troop'?(compare('performance')||compare('tiers')||compare('city')):(compare('score')||compare('tiers')||compare('performance'));
+  return n||name(a).localeCompare(name(b));
+ });
  const orderedSubs=subOverride?[...autoSubs].sort((a,b)=>(subManual.indexOf(String(a.id))<0?9999:subManual.indexOf(String(a.id)))-(subManual.indexOf(String(b.id))<0?9999:subManual.indexOf(String(b.id)))):autoSubs;
- const subCopy=['TAL SUBSTITUTE ENTRY ORDER · '+matchTime+' UTC',legionLabel(selectedLegion)+' · '+matchDate,'Priority: '+(subOverride?'Manual':({troop:'Troop power',strength:'Troop strength',city:'City power',lab:'Labyrinth rank'})[subMetric]),'',...(orderedSubs.length?orderedSubs.map((p,i)=>(i+1)+'. '+name(p)):['No eligible selected substitutes']),'','Enter in this order as combatant slots become available.'].join('\n');
+ const priorityLabel=({balanced:'Balanced ranking',tiers:'Highest troop tiers first',troop:'Highest troop power first'})[subMetric];
+ const subCopy=['TAL SUBSTITUTE ENTRY ORDER · '+matchTime+' UTC',legionLabel(selectedLegion)+' · '+matchDate,'Priority: '+(subOverride?priorityLabel+' (manually adjusted)':priorityLabel),'',...(orderedSubs.length?orderedSubs.map((p,i)=>{const d=rankDetails.get(String(p.id));return (i+1)+'. '+name(p)+(copyScores&&d.score!=null?' ('+d.score.toFixed(0)+'/100)':'')+(copyReasons?'\\n   '+d.reasons.join(' · '):'');}):['No eligible selected substitutes']),'','Enter in this order as combatant slots become available.'].join('\\n');
  const teamPower=g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).reduce((sum,id)=>sum+(powerOf(id)||0),0);
  const groupPairs=cooperationGroups.filter(g=>Array.isArray(g?.ids)&&g.ids.length>1).flatMap(g=>{
   const ids=[...new Set(g.ids.map(String))],pairs=[];
