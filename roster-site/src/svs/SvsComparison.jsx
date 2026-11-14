@@ -4,9 +4,9 @@ import {normalizeRankings,rankingScore} from '../../../src/services/stateRanking
 import {normalizeRosterResponse} from './RosterFurnace.jsx';
 import {RosterFurnace} from './RosterFurnace.jsx';
 
-const panel={background:'#17283D',border:'1px solid #2B4157',borderRadius:14,padding:14};
-const field={boxSizing:'border-box',width:'100%',minWidth:0,borderRadius:9,background:'#102238',border:'1px solid #36516B',color:'#F2F7FD',fontSize:16,padding:'11px 10px'};
-const btn={border:'1px solid #36516B',borderRadius:10,background:'#213850',color:'#F1F7FD',padding:'10px 12px',minHeight:44,fontSize:13,fontWeight:650,cursor:'pointer'};
+const panel={background:'#15273A',border:'1px solid #344F69',borderRadius:15,padding:12};
+const field={boxSizing:'border-box',width:'100%',minWidth:0,borderRadius:9,background:'#0F1D30',border:'1px solid #344F69',color:'#F2F7FD',fontSize:16,padding:'10px 9px'};
+const btn={border:'1px solid #344F69',borderRadius:10,background:'#1E3448',color:'#F1F7FD',padding:'10px 12px',minHeight:44,fontSize:13,fontWeight:650,cursor:'pointer'};
 const fmt=v=>v==null?'—':Number(v).toLocaleString('en-US');
 const compact=v=>v==null?'—':Number(v)>=1e9?(v/1e9).toFixed(2)+'B':Number(v)>=1e6?(v/1e6).toFixed(2)+'M':fmt(v);
 const valid=s=>/^[1-9][0-9]{0,4}$/.test(s);
@@ -16,21 +16,21 @@ export function SvsComparison(){
  const [ourTag,setOurTag]=useState('HOT'),[theirTag,setTheirTag]=useState('');
  const [rankings,setRankings]=useState(null),[rosters,setRosters]=useState(null),[busy,setBusy]=useState(''),[errors,setErrors]=useState([]);
  const [top,setTop]=useState(10),[showPlayers,setShowPlayers]=useState(false),[sort,setSort]=useState('power'),[copyStatus,setCopyStatus]=useState('');
- const key=[mode,ourState,theirState,ourTag.trim().toUpperCase(),theirTag.trim().toUpperCase()].join('|');
+ const key=[mode,ourState,theirState,ourTag.trim(),theirTag.trim()].join('|');
  const ready=valid(ourState)&&valid(theirState)&&(mode==='state'||(ourTag.trim()&&theirTag.trim()));
  const rankData=rankings?.key===key?rankings:null,rosterData=rosters?.key===key?rosters:null;
- const filter=(rows,i)=>mode==='state'?rows:rows.filter(r=>String(r.allianceTag||'').toUpperCase()===(i?theirTag:ourTag).trim().toUpperCase());
+ const filter=(rows,i)=>mode==='state'?rows:rows.filter(r=>String(r.allianceTag||'')===(i?theirTag:ourTag).trim());
  const sides=rankData?.sides.map((r,i)=>r?filter(r.rows||[],i):null);
  const entries=sides?.map(r=>r?.slice(0,top)||[]);
  const copy=async()=>{
   const lines=['BATTLE COMPARISON',mode==='state'?ourState+' vs '+theirState:'['+ourTag+'] '+ourState+' vs ['+theirTag+'] '+theirState,''];
-  if(sides)lines.push('Labyrinth leaderboard entries (published top 100): '+sides.map(s=>s?.length??'Unavailable').join(' vs '),'Top '+top+' ranked entries: '+entries.map(s=>s.length).join(' vs '));
+  if(mode==='state'&&sides)lines.push('Labyrinth leaderboard entries (published top 100): '+sides.map(s=>s?.length??'Unavailable').join(' vs '),'Top '+top+' ranked entries: '+entries.map(s=>s.length).join(' vs '));
   if(rosterData)lines.push('Alliance roster sizes: '+rosterData.sides.map(s=>s?.length??'Unavailable').join(' vs '),'Recorded city power: '+rosterData.sides.map(s=>s?compact(s.reduce((n,p)=>n+(p.power||0),0)):'Unavailable').join(' vs '));
-  lines.push('Source: WhiteoutStats. Labyrinth data is limited to the published top 100 per state.');
-  try{await navigator.clipboard.writeText(lines.join('\\n'));setCopyStatus('Copied');}catch{setCopyStatus('Copy unavailable');}
+  lines.push(mode==='state'?'Source: WhiteoutStats. Labyrinth data is limited to the published top 100 per state.':'Source: WhiteoutStats. Alliance metrics reflect returned roster fields only.');
+  try{await navigator.clipboard.writeText(lines.join('\n'));setCopyStatus('Copied');}catch{setCopyStatus('Copy unavailable');}
  };
  const loadLab=async()=>{
-  if(!ready||busy)return;setBusy('lab');setErrors([]);
+  if(mode!=='state'||!ready||busy)return;setBusy('lab');setErrors([]);
   const states=[ourState,theirState];
   const results=await Promise.allSettled(states.map(state=>mightpulseRequest('rankings',{state:Number(state),board:'labyrinth',limit:100}).then(x=>normalizeRankings(x,state,'labyrinth'))));
   setRankings({key,sides:results.map(r=>r.status==='fulfilled'?r.value:null),at:new Date().toISOString()});
@@ -43,13 +43,14 @@ export function SvsComparison(){
   setRosters({key,sides:results.map(r=>r.status==='fulfilled'?r.value:null),at:new Date().toISOString()});
   setErrors(results.flatMap((r,i)=>r.status==='rejected'?[jobs[i].tag+': '+(r.reason?.message||'Could not load roster')]:[]));setBusy('');
  };
- const rows=rosterData?.sides.map(r=>r?[...r].sort((a,b)=>sort==='power'?(b.power||0)-(a.power||0):String(b.tier).localeCompare(String(a.tier))):[]);
+ const rows=rosterData?.sides.map(r=>r?[...r].sort((a,b)=>sort==='power'?(b.power??-1)-(a.power??-1):sort==='lab'?(b.labScore??-1)-(a.labScore??-1):String(b.tier).localeCompare(String(a.tier))):[]);
  const totals=rosterData?.sides.map(r=>r?r.reduce((n,p)=>n+(p.power||0),0):null);
+ const metrics=rosterData?.sides.map(list=>{if(!list)return null;const summarize=field=>{const values=list.map(p=>p[field]).filter(v=>v!=null&&Number.isFinite(v)).sort((a,b)=>a-b);return {count:values.length,total:values.reduce((a,b)=>a+b,0),average:values.length?values.reduce((a,b)=>a+b,0)/values.length:null,median:values.length?(values[Math.floor((values.length-1)/2)]+values[Math.floor(values.length/2)])/2:null};};return {power:summarize('power'),lab:summarize('labScore')};});
  return <section style={{padding:'12px 16px 35px',color:'#F2F7FD'}}>
   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:14}}><div><h2 style={{fontSize:23,letterSpacing:'-.5px',margin:'0 0 3px'}}>Compare</h2><div style={{fontSize:12,color:'#A7BED4'}}>Battle intelligence</div></div><button style={btn} disabled={!rankData&&!rosterData} onClick={copy}>Copy summary</button></div>
-  <div style={{...panel,padding:5,display:'grid',gridTemplateColumns:'1fr 1fr',gap:5,marginBottom:12}}>{[['state','States'],['alliance','Alliances']].map(([id,label])=><button key={id} aria-pressed={mode===id} onClick={()=>{setMode(id);setErrors([])}} style={{...btn,border:0,background:mode===id?'#416181':'transparent'}}>{label}</button>)}</div>
+  <div style={{background:'#15273A',borderRadius:14,padding:4,display:'grid',gridTemplateColumns:'1fr 1fr',gap:5,marginBottom:12}}>{[['state','States'],['alliance','Alliances']].map(([id,label])=><button key={id} aria-pressed={mode===id} onClick={()=>{setMode(id);setErrors([])}} style={{...btn,border:0,background:mode===id?'#416181':'transparent'}}>{label}</button>)}</div>
   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9}}>
-   {[0,1].map(i=><div key={i} style={panel}><label style={{color:i?'#EBC18A':'#89C4FF',fontSize:11,fontWeight:700}}>{i?'OPPONENT':'YOUR SIDE'}</label><input style={{...field,marginTop:7}} aria-label={i?'Opponent state':'Your state'} inputMode="numeric" placeholder="State ID" value={i?theirState:ourState} onChange={e=>i?setTheirState(e.target.value):setOurState(e.target.value)}/>{mode==='alliance'&&<input style={{...field,marginTop:7}} aria-label={i?'Opponent alliance':'Your alliance'} placeholder="Alliance tag" value={i?theirTag:ourTag} onChange={e=>i?setTheirTag(e.target.value.toUpperCase()):setOurTag(e.target.value.toUpperCase())}/>}</div>)}
+   {[0,1].map(i=><div key={i} style={{minWidth:0}}><label style={{color:i?'#EBC18A':'#89C4FF',fontSize:11,fontWeight:700}}>{i?'OPPONENT':'YOUR SIDE'}</label><input style={{...field,marginTop:7}} aria-label={i?'Opponent state':'Your state'} inputMode="numeric" placeholder="State ID" value={i?theirState:ourState} onChange={e=>i?setTheirState(e.target.value):setOurState(e.target.value)}/>{mode==='alliance'&&<input style={{...field,marginTop:7}} aria-label={i?'Opponent alliance':'Your alliance'} placeholder="Alliance tag" value={i?theirTag:ourTag} onChange={e=>i?setTheirTag(e.target.value):setOurTag(e.target.value)}/>}</div>)}
   </div>
   {mode==='state'&&<div style={{...panel,marginTop:13}}><h3 style={{fontSize:17,margin:'0 0 5px'}}>Furnace strength profile</h3><p style={{fontSize:13,color:'#A8BFD5',margin:0,lineHeight:1.5}}>A top-100 furnace comparison requires a verified state-wide furnace roster. The current state rankings source supplies Labyrinth results, not furnace-ranked players. No furnace advantage is calculated from that unrelated leaderboard.</p></div>}
   <div style={{...panel,marginTop:13}}>
@@ -60,15 +61,16 @@ export function SvsComparison(){
    </>}
   </div>
   {mode==='alliance'&&<div style={{...panel,marginTop:13}}>
-   <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}><div><h3 style={{fontSize:17,margin:'0 0 4px'}}>Alliance rosters</h3><div style={{fontSize:12,color:'#A8BFD5'}}>City power and furnace levels</div></div><button style={btn} disabled={!ready||!!busy} onClick={loadRosters}>{busy==='roster'?'Loading…':rosterData?'Refresh':'Load rosters'}</button></div>
+   <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}><div><h3 style={{fontSize:17,margin:'0 0 4px'}}>Alliance rosters</h3><div style={{fontSize:12,color:'#A8BFD5'}}>City power · Labyrinth score · Furnace level</div></div><button style={btn} disabled={!ready||!!busy} onClick={loadRosters}>{busy==='roster'?'Loading…':rosterData?'Refresh':'Load rosters'}</button></div>
    {rosterData&&<><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:15}}>{[0,1].map(i=><div key={i} style={{background:'#10263B',borderRadius:10,padding:10}}><Side label={i?'OPPONENT':'YOUR SIDE'} color={i?'#EBC18A':'#89C4FF'} value={compact(totals[i])}/><div style={{fontSize:12,color:'#A8BFD5',marginTop:6}}>Recorded city power · {rosterData.sides[i]?.length??'—'} players</div></div>)}</div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginTop:10}}>{metrics.map((m,i)=><div key={i} style={{background:'#102238',borderRadius:10,padding:10,minWidth:0}}><strong style={{color:i?'#EBC18A':'#89C4FF',fontSize:12}}>{i?theirTag:ourTag}</strong>{[['City power',m?.power],['Labyrinth score',m?.lab]].map(([label,stat])=><div key={label} style={{borderTop:'1px solid #30465B',marginTop:8,paddingTop:8}}><div style={{fontSize:12,color:'#AFC4D8'}}>{label}</div><div style={{fontSize:11,marginTop:3}}>Total {stat?.count?compact(stat.total):'—'} · Avg {stat?.average!=null?compact(Math.round(stat.average)):'—'}</div><div style={{fontSize:11,marginTop:3}}>Median {stat?.median!=null?compact(Math.round(stat.median)):'—'} · {stat?.count??0} with data</div></div>)}</div>)}</div>
     {rosterData.sides[0]&&rosterData.sides[1]&&<RosterFurnace ours={rosterData.sides[0]} theirs={rosterData.sides[1]} ourLabel={ourTag} theirLabel={theirTag}/>}
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:14}}><h4 style={{margin:0,fontSize:15}}>Players by {sort==='power'?'city power':'furnace'}</h4><select aria-label="Sort roster players" style={{...field,width:135,fontSize:13}} value={sort} onChange={e=>setSort(e.target.value)}><option value="power">City power</option><option value="furnace">Furnace</option></select></div>
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:9}}>{rows.map((list,i)=><div key={i}><div style={{color:i?'#EBC18A':'#89C4FF',fontSize:12,fontWeight:700}}>{i?theirTag:ourTag}</div>{list.slice(0,100).map(p=><div key={p.fid} style={{padding:'9px 0',borderBottom:'1px solid #30465B',fontSize:12,overflowWrap:'anywhere'}}><strong>{p.name}</strong><div style={{color:'#B4C8DD',marginTop:3}}>{p.level} · {compact(p.power)}</div></div>)}{!list.length&&<p style={{fontSize:12,color:'#A8BFD5'}}>No roster data</p>}</div>)}</div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:14}}><h4 style={{margin:0,fontSize:15}}>Players by {sort==='power'?'city power':sort==='lab'?'Labyrinth score':'furnace'}</h4><select aria-label="Sort roster players" style={{...field,width:135,fontSize:13}} value={sort} onChange={e=>setSort(e.target.value)}><option value="power">City power</option><option value="lab">Labyrinth score</option><option value="furnace">Furnace</option></select></div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:9}}>{rows.map((list,i)=><div key={i}><div style={{color:i?'#EBC18A':'#89C4FF',fontSize:12,fontWeight:700}}>{i?theirTag:ourTag}</div>{list.slice(0,100).map(p=><div key={p.fid} style={{padding:'9px 0',borderBottom:'1px solid #30465B',fontSize:12,overflowWrap:'anywhere'}}><strong>{p.name}</strong><div style={{color:'#B4C8DD',marginTop:3}}>{p.level} · City {compact(p.power)} · Lab {compact(p.labScore)}</div></div>)}{!list.length&&<p style={{fontSize:12,color:'#A8BFD5'}}>No roster data</p>}</div>)}</div>
    </>}
   </div>}
   {errors.length>0&&<div role="alert" style={{...panel,marginTop:12,color:'#F2C58B'}}>{errors.map((e,i)=><div key={i}>{e}</div>)}</div>}
   {copyStatus&&<p role="status" style={{color:'#A8BFD5',fontSize:12}}>{copyStatus}</p>}
-  <p style={{fontSize:11,color:'#91A9BF',lineHeight:1.5,marginTop:15}}>Rankings are a top-100 sample. Alliance roster statistics reflect returned members only. Missing values are not counted as zero. Read-only lookups do not alter Members or TAL data.</p>
+  <p style={{fontSize:11,color:'#91A9BF',lineHeight:1.5,marginTop:15}}>State Labyrinth rankings are a published top-100 sample. Alliance roster statistics reflect returned members only. Alliance tags are case-sensitive. Missing values are not counted as zero. Read-only lookups do not alter Members or TAL data.</p>
  </section>;
 }
