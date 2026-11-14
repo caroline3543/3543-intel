@@ -481,6 +481,11 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     <div style={{...muted,marginTop:9,fontSize:12}}>{pendingRegistrationCount} awaiting registration · {registrationMembers.filter(m=>m.role!=='combatant'&&m.role!=='substitute').length} roles unassigned</div>
     {!!matchmakingCount&&<div style={{...muted,marginTop:5,fontSize:12}}>{matchmakingCount} matchmaking only</div>}
     {team&&<div style={{...muted,marginTop:5,fontSize:12}}>{registrationMembers.length} assigned / {50*legionCount} places</div>}
+    <div role="group" aria-label="TAL status management" style={{borderTop:'1px solid '+C.border,marginTop:12,paddingTop:11,display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:7}}>
+     <button type="button" disabled={!canEdit} onClick={()=>{setSelecting(true);setBulkSelected([]);setBulkPanel('');setBulkReview(false);focusPlayers();}} style={{...button,minWidth:0,minHeight:42,fontSize:12,background:C.section}}>Edit roles & registration</button>
+     <button type="button" disabled={!canEdit} onClick={()=>{setSelecting(true);setBulkSelected([]);setBulkPanel('locks');setBulkReview(false);focusPlayers();}} style={{...button,minWidth:0,minHeight:42,fontSize:12,background:C.section}}>Manage locks</button>
+     <button type="button" disabled={!canEdit} onClick={()=>{setResetOpen(true);setResetError('');setResetConfirmed(false);setResetPhrase('');setResetKind(['teams']);}} style={{...button,minWidth:0,minHeight:42,fontSize:12,background:C.section,gridColumn:'1 / -1'}}>Clear allocations or reset statuses…</button>
+    </div>
    </section>}
    {talView==='prep'&&<>
    <section aria-label="Alliance readiness" style={{background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:12,marginBottom:12}}>
@@ -561,16 +566,6 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       <button type="button" style={{...button,color:C.gold,minWidth:70,minHeight:44,padding:'7px 10px'}} aria-pressed={selecting} onClick={()=>{setSelecting(v=>!v);setBulkSelected([]);setBulkPanel('');setBulkReview(false)}}>{selecting?'Done':'Select'}</button>
      </div>
     </div>
-    {talView==='registration'&&!selecting&&<div style={{position:'relative',margin:'0 0 12px'}}>
-     <button type="button" aria-expanded={registrationOptionsOpen} aria-controls="tal-manage-menu" onClick={()=>setRegistrationOptionsOpen(v=>!v)} style={{...button,minHeight:44,width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 13px',background:C.section}}>
-      <span>⚙ Manage players <span style={{...muted,fontSize:12,marginLeft:5}}>Assignments, roles and registration</span></span><span aria-hidden="true">{registrationOptionsOpen?'⌃':'⌄'}</span>
-     </button>
-     {registrationOptionsOpen&&<div id="tal-manage-menu" style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:8,marginTop:6,display:'grid',gap:5}}>
-      <button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setResetOpen(true);setResetError('');setResetConfirmed(false);setResetPhrase('');setResetKind(['teams']);}} style={{...button,minHeight:52,textAlign:'left',background:C.section}}>⌫ Clear allocations <span style={{...muted,display:'block',fontSize:11,marginTop:3}}>Choose what to reset · selected legion only</span></button>
-      <button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setSelecting(true);setBulkSelected([]);setBulkPanel('');setBulkReview(false);focusPlayers();}} style={{...button,minHeight:52,textAlign:'left',background:C.section}}>♙ Edit combat roles <span style={{...muted,display:'block',fontSize:11,marginTop:3}}>Select players, then edit their status</span></button>
-      <div style={{...muted,fontSize:12,padding:'8px 10px'}}><button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setSelecting(true);setBulkSelected([]);setBulkPanel('locks');focusPlayers();}}>Manage locks · Select players</button></div>
-     </div>}
-    </div>}
     {selecting&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}><strong style={{fontSize:13}}>{selectedBulkCount} selected</strong><div style={{display:'flex',gap:6}}><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected(old=>[...new Set([...old,...filteredIds])])}>Select all matching</button><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected([])}>Clear</button></div></div>}
 
 
@@ -673,7 +668,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
        </div>}
        <div style={{display:'flex',alignItems:'center',gap:6,padding:'9px 12px 2px'}}>{selecting&&<span aria-hidden="true" style={{height:24,width:24,borderRadius:'50%',background:chosen?C.gold:C.bg,border:'2px solid '+(chosen?C.gold:C.icy),flexShrink:0,display:'grid',placeItems:'center',color:C.bg,fontWeight:800}}>{chosen?'✓':''}</span>}
         <button type="button" title="Open Members profile" aria-label={'Open profile for '+(player.username||player.alias||'player')} style={{display:'flex',alignItems:'center',flex:1,minWidth:0,gap:10,padding:'4px 0',textAlign:'left',background:'transparent',border:0,color:C.white,cursor:'pointer',minHeight:48}} onClick={()=>{if(selecting){const id=String(player.id);setBulkSelected(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setBulkReview(false);return;}setSwipeId('');setActionsId('');onOpenPlayer?.(player.id)}}>
-         <span style={{position:'relative',display:'inline-flex',flexShrink:0}}><PlayerAvatar player={player} size={40}/>{member&&(member.registrationLocked||member.roleLocked)&&<span aria-hidden="true" style={{position:'absolute',right:-4,bottom:-4,background:member.registrationLocked&&member.roleLocked?C.green:C.section,border:'2px solid '+C.card,borderRadius:14,width:22,height:22,display:'grid',placeItems:'center',fontSize:12}}>🔒</span>}</span>
+         <span style={{display:'inline-flex',flexShrink:0}}><PlayerAvatar player={player} size={40}/></span>
          <span style={{flex:1,minWidth:0}}>
           <span style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:7}}><strong style={{fontSize:15,fontWeight:650,overflowWrap:'anywhere',lineHeight:1.3}}>{player.username||player.alias||'Unknown player'}</strong>{player.furnaceLevel&&<span style={{fontSize:13,color:C.gold}}>{player.furnaceLevel}</span>}</span>
           <span style={{...muted,display:'block',marginTop:3}}>{String(status.tag||player.allianceTag||'').toUpperCase()===String(entryTeam.host||'').toUpperCase()?legionLabel(entryTeam):(status.tag||player.allianceTag||'Alliance unknown')+' · '+legionLabel(entryTeam)}</span>
