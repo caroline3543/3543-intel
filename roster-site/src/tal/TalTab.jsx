@@ -22,7 +22,7 @@ function moveText(rows,{time=null,availabilityFor=null}={}){
   if(time!==null&&(!availabilityFor||!availabilityFor(player).includes(time)))continue;
   const id=String(player.id),destination=String(team.host).trim();
   const origin=check.status==='unknown'?'unknown alliance':check.tag?String(check.tag).trim():'no alliance';
-  const key=origin.toLowerCase()+'|'+destination.toLowerCase();
+  const key=JSON.stringify([origin,destination]);
   if(!groups.has(key))groups.set(key,{origin,destination,players:[]});
   if(seen.has(key+'|'+id))continue;
   seen.add(key+'|'+id);
@@ -32,6 +32,19 @@ function moveText(rows,{time=null,availabilityFor=null}={}){
   const prefix=time===null?'Players who need to move':'Players available at '+time.slice(0,2)+'UTC who need to move';
   return prefix+' from '+g.origin+' to '+g.destination+':\n'+g.players.sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base',numeric:true})).map(playerName=>'• '+playerName).join('\n');
  }).join('\n\n');
+}
+function splitGameChatMessages(text){
+ if(!text)return [];
+ const groups=text.split(/\n\s*\n/).filter(Boolean),blocks=[];
+ for(const group of groups){
+  const [heading,...names]=group.split('\n').filter(Boolean);
+  const pages=Math.ceil(names.length/10);
+  for(let page=0;page<pages;page++){
+   const title=pages>1?heading.replace(/:$/, '')+' ('+(page+1)+'/'+pages+'):':heading;
+   blocks.push([title,...names.slice(page*10,(page+1)*10)].join('\n'));
+  }
+ }
+ return blocks;
 }
 function savedTalSection(){try{const section=window.sessionStorage.getItem('tal:3573:last-section');if(section==='registration'||section==='prep'||section==='teams')return JSON.parse(window.sessionStorage.getItem('tal:3573:filters:'+section)||'null')||{};}catch{}return {};}
 function savedTalScroll(section){try{return Number(window.sessionStorage.getItem('tal:3573:scroll:'+section))||0;}catch{return 0;}}
@@ -506,16 +519,19 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     {[
       {name:'Players who need to move',count:moveCopyCount,description:'All availability times',open:previewOpen,toggle:()=>setPreviewOpen(v=>!v),text:movePreview,copyLabel:'Move list'},
       {name:'Available players who need to move',count:availableMoveCount,description:selectedCopyTime+' UTC',open:availablePreviewOpen,toggle:()=>setAvailablePreviewOpen(v=>!v),text:availableMovePreview,copyLabel:'Available move list'}
-    ].map(item=><div key={item.name} style={{borderTop:'1px solid '+C.border,padding:'10px 0'}}>
-      <div style={{display:'flex',gap:9,alignItems:'center'}}>
-       <button type="button" aria-expanded={item.open} onClick={item.toggle} style={{flex:1,minWidth:0,minHeight:48,textAlign:'left',background:'transparent',border:0,color:C.white,padding:'5px 0',cursor:'pointer'}}>
-        <strong style={{fontSize:13,display:'block'}}>{item.name}</strong>
-        <span style={{...muted,display:'block',marginTop:3}}>{item.count} players · {item.description} {item.open?'▴':'›'}</span>
-       </button>
-       <button type="button" disabled={!item.text||copying} style={{...button,color:item.text?C.gold:C.icy,borderRadius:10,minHeight:42,fontSize:12,padding:'6px 12px'}} onClick={()=>copyMovePreview(item.text,item.copyLabel)}>Copy</button>
-      </div>
-      {item.open&&<div style={{marginTop:8}}>{item.text?<pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:12,lineHeight:1.55,padding:11,borderRadius:10,background:C.section,maxHeight:290,overflowY:'auto',margin:0}}>{item.text}</pre>:<p style={muted}>No players to move.</p>}</div>}
-    </div>)}
+    ].map(item=>{const blocks=splitGameChatMessages(item.text);return <div key={item.name} style={{borderTop:'1px solid '+C.border,padding:'10px 0'}}>
+      <button type="button" aria-expanded={item.open} onClick={item.toggle} style={{width:'100%',minHeight:44,textAlign:'left',background:'transparent',border:0,color:C.white,padding:'5px 0',cursor:'pointer'}}>
+       <strong style={{fontSize:13,display:'block'}}>{item.name}</strong>
+       <span style={{...muted,display:'block',marginTop:3}}>{item.count} players · {blocks.length} messages · {item.description} {item.open?'▴':'›'}</span>
+      </button>
+      {item.open&&<div style={{display:'grid',gap:9,marginTop:8}}>{blocks.length?blocks.map((block,index)=><div key={index} style={{background:C.section,borderRadius:10,padding:10}}>
+       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:7}}>
+        <span style={{...muted,fontSize:12}}>Message {index+1} of {blocks.length} · {block.split('\n').length}/11 lines</span>
+        <button type="button" disabled={copying} style={{...button,minHeight:38,padding:'5px 12px',fontSize:12,color:C.gold}} onClick={()=>copyMovePreview(block,item.copyLabel+' '+(index+1)+'/'+blocks.length)}>Copy</button>
+       </div>
+       <pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontFamily:'inherit',fontSize:12,lineHeight:1.55,margin:0}}>{block}</pre>
+      </div>):<p style={muted}>No players to move.</p>}</div>}
+    </div>})}
    </section>
 
    {team&&<section aria-label="Tournament options" style={{marginBottom:12}}>
