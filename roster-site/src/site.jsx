@@ -80,7 +80,17 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   },[sync.dirty,sync.syncing,sync.issue,sync.conflicts?.length,sync.joined,sync.mode]);
   function saveTalPlan(talPlan){
    pendingTalSync.current={active:true,sawDirty:false};
-   setData(prev=>({...prev,talPlan:{...talPlan,autoRoles:false}}));
+   setData(prev=>{
+    const previous=new Map((prev.talPlan?.teams||[]).flatMap(t=>(t.members||[]).map(m=>[t.id+':'+String(m.id),m])));
+    const teams=(talPlan.teams||[]).map(t=>({...t,members:(t.members||[]).map(m=>{
+     const old=previous.get(t.id+':'+String(m.id));if(!old)return m;
+     return {...m,
+      ...(old.registrationLocked&&m.registrationLocked!==false?{registered:old.registered}:{}),
+      ...(old.roleLocked&&m.roleLocked!==false?{role:old.role}:{})
+     };
+    })}));
+    return {...prev,talPlan:{...talPlan,teams,autoRoles:false}};
+   });
    setMessage('TAL changes saved on this device · syncing to the shared workspace…');
   }
   function resetTalLegion(teamId,kind){
@@ -91,8 +101,8 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     if(!plan?.teams?.some(t=>t.id===teamId))return prev;
     const nextTeams=plan.teams.map(t=>t.id!==teamId?t:{...t,members:(t.members||[]).map(m=>({
      ...m,
-     ...(kind==='roles'||kind==='both'?{role:'pending'}:{}),
-     ...(kind==='registration'||kind==='both'?{registered:false}:{})
+     ...(kind==='roles'||kind==='both'&&!m.roleLocked?{role:'pending'}:{}),
+     ...(kind==='registration'||kind==='both'&&!m.registrationLocked?{registered:false}:{})
     }))});
     return {...prev,talPlan:{...plan,teams:nextTeams,autoRoles:false}};
    });
