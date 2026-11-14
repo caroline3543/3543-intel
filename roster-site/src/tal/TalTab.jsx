@@ -482,7 +482,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   {!teams.length?<div style={{padding:16,background:C.section,borderRadius:12}}><strong>No legions assigned</strong><p style={{fontSize:14,color:C.icy,lineHeight:1.5}}>Saved TAL legion assignments will appear when available. Existing plan data is retained.</p></div>:<>
    {talView==='registration'&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:12}}>
     <div><div style={{...muted,fontSize:11,letterSpacing:'.07em'}}>TAL PLANNER · {team?.host||'ALLIANCE'} {team?.number||''}</div><h2 style={{margin:'3px 0 0',fontSize:21}}>{selecting?'Manage players':'Registration'}</h2></div>
-    <button type="button" disabled={!selecting&&!canEdit} style={{...button,minHeight:44,padding:'9px 14px',color:selecting?C.green:C.gold}} onClick={()=>{if(selecting){setSelecting(false);setBulkSelected([]);setBulkPanel('');setBulkReview(false);}else{setSelecting(true);setBulkSelected([]);setBulkPanel('');setBulkReview(false);focusPlayers();}}}>{selecting?'Done':'⚙ Manage'}</button>
+    <button type="button" disabled={!selecting&&!canEdit} style={{...button,minHeight:44,padding:'9px 14px',color:selecting?C.green:C.gold}} onClick={()=>{if(selecting){setSelecting(false);setBulkSelected([]);setBulkPanel('');setBulkReview(false);}else{setSelecting(true);setBulkSelected([]);setBulkPanel('');setBulkReview(false);}}}>{selecting?'Done':'⚙ Manage'}</button>
    </div>}
    {talView==='registration'&&!selecting&&<section aria-label="TAL registration overview" style={{background:C.card,border:'1px solid '+C.border,borderRadius:13,padding:12,marginBottom:12}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
@@ -545,7 +545,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     </div>}
    </section>}
    </>}
-   {talView==='registration'&&<section aria-label="Needs attention" style={{background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:12,marginBottom:12}}>
+   {talView==='registration'&&!selecting&&<section aria-label="Needs attention" style={{background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:12,marginBottom:12}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}>
       <div><strong style={{fontSize:16}}>Needs attention</strong><div style={{...muted,marginTop:3}}>Complete missing player information</div></div>
       <span style={{fontSize:12,color:C.gold}}>{missingTroopPlayers.length+missingAvailabilityPlayers.length} issues</span>
@@ -580,6 +580,8 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
 
      </div>
     </div>
+    {selecting&&talView==='registration'&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:12,padding:'9px 11px',borderRadius:10,background:C.section}}><span style={{...muted,fontSize:12}}>Select players, then edit registration, roles, availability or locks below.</span></div>}
+    {selecting&&talView==='registration'&&<div style={{marginBottom:10}}><button type="button" disabled={!canEdit} style={{...button,minHeight:38,fontSize:12,color:C.icy}} onClick={()=>{setResetOpen(true);setResetError('');setResetConfirmed(false);setResetPhrase('');setResetKind(['teams']);}}>Reset allocations or statuses…</button></div>}
     {selecting&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}><strong style={{fontSize:13}}>{selectedBulkCount} selected</strong><div style={{display:'flex',gap:6}}><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected(old=>[...new Set([...old,...filteredIds])])}>Select all matching</button><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected([])}>Clear</button></div></div>}
 
 
