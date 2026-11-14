@@ -7,6 +7,8 @@ export function normalizeRosterResponse(response,expectedState,tag){
  const data=response?.data;
  if(!Array.isArray(data?.members))throw new Error('Alliance roster missing');
  if(data.alliance?.kid!=null&&Number(data.alliance.kid)!==Number(expectedState))throw new Error('Alliance belongs to a different state');
+ const returnedTag=data.alliance?.tag??data.alliance?.alliance_tag??data.alliance?.abbr;
+ if(returnedTag!=null&&String(returnedTag)!==String(tag))throw new Error('Alliance tag does not match exactly (capitalisation matters)');
  const seen=new Set();
  return data.members.flatMap(m=>{
   if(m.kid!=null&&Number(m.kid)!==Number(expectedState))return [];
@@ -16,7 +18,7 @@ export function normalizeRosterResponse(response,expectedState,tag){
   const raw=m.furnace_level_label??m.furnace_level??m.stove_lv??m.town_center_level;
   const level=providerFurnaceLevel(raw);
   const tier=level?.startsWith('FC')?level:level?.startsWith('F')?'Pre-FC':'Unknown';
-  return [{fid:id,name:m.nick_name||'Unknown player',tag:tag,level:level||'Unknown',tier:tierNames.includes(tier)?tier:'Unknown',power:Number(m.power)||null}];
+  return [{fid:id,name:m.nick_name||'Unknown player',tag:tag,level:level||'Unknown',tier:tierNames.includes(tier)?tier:'Unknown',power:Number(m.power)||null,labScore:(()=>{const raw=m.labyrinth_score??m.lab_score??m.labyrinth?.score;return raw==null||raw===''||!Number.isFinite(Number(raw))?null:Number(raw)})()}];
  });
 }
 export function aggregateRoster(rosters){
