@@ -94,6 +94,8 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [bulkHost,setBulkHost]=useState('HOT');
  const [bulkLegionNumber,setBulkLegionNumber]=useState('1');
  const [bulkReview,setBulkReview]=useState(false);
+ const [bulkLockAction,setBulkLockAction]=useState(null);
+ const [lockDetailsId,setLockDetailsId]=useState('');
  const [bulkError,setBulkError]=useState('');
  const [missingFilter,setMissingFilter]=useState(initialSection.current.missingFilter||'');
  const [attentionOpen,setAttentionOpen]=useState('');
@@ -335,6 +337,12 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   updateTeam({...entryTeam,members:(entryTeam.members||[]).map(m=>String(m.id)===String(playerId)?{...m,[key]:!m[key]}:m)});
   setActionsId('');
  }
+ function applyBulkLocks(field,locked){
+  if(value?.locked||!selectedBulkIds.length)return;
+  const ids=new Set(selectedBulkIds.map(String));
+  onChange?.({...value,teams:teams.map(t=>tournamentStatus(t)==='eliminated'?t:{...t,members:(t.members||[]).map(m=>ids.has(String(m.id))?{...m,[field==='registration'?'registrationLocked':'roleLocked']:locked}:m)})});
+  setBulkLockAction(null);
+ }
  function setMemberRole(entryTeam,playerId,role){
   if(value?.locked||tournamentStatus(entryTeam)==='eliminated')return;
   if(!['combatant','substitute','pending'].includes(role))return;
@@ -560,7 +568,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      {registrationOptionsOpen&&<div id="tal-manage-menu" style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:8,marginTop:6,display:'grid',gap:5}}>
       <button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setResetOpen(true);setResetError('');setResetConfirmed(false);setResetPhrase('');setResetKind(['teams']);}} style={{...button,minHeight:52,textAlign:'left',background:C.section}}>⌫ Clear allocations <span style={{...muted,display:'block',fontSize:11,marginTop:3}}>Choose what to reset · selected legion only</span></button>
       <button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setSelecting(true);setBulkSelected([]);setBulkPanel('');setBulkReview(false);focusPlayers();}} style={{...button,minHeight:52,textAlign:'left',background:C.section}}>♙ Edit combat roles <span style={{...muted,display:'block',fontSize:11,marginTop:3}}>Select players, then edit their status</span></button>
-      <div style={{...muted,fontSize:12,padding:'8px 10px'}}>🔒 To lock registration or roles, open a player’s ••• menu.</div>
+      <div style={{...muted,fontSize:12,padding:'8px 10px'}}><button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setSelecting(true);setBulkSelected([]);setBulkPanel('locks');focusPlayers();}}>Manage locks · Select players</button></div>
      </div>}
     </div>}
     {selecting&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:9}}><strong style={{fontSize:13}}>{selectedBulkCount} selected</strong><div style={{display:'flex',gap:6}}><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected(old=>[...new Set([...old,...filteredIds])])}>Select all matching</button><button type="button" style={{...button,minHeight:36,padding:'5px 9px',fontSize:12}} onClick={()=>setBulkSelected([])}>Clear</button></div></div>}
@@ -665,15 +673,20 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
        </div>}
        <div style={{display:'flex',alignItems:'center',gap:6,padding:'11px 12px 3px'}}>{selecting&&<span aria-hidden="true" style={{height:24,width:24,borderRadius:'50%',background:chosen?C.gold:C.bg,border:'2px solid '+(chosen?C.gold:C.icy),flexShrink:0,display:'grid',placeItems:'center',color:C.bg,fontWeight:800}}>{chosen?'✓':''}</span>}
         <button type="button" title="Open Members profile" aria-label={'Open profile for '+(player.username||player.alias||'player')} style={{display:'flex',alignItems:'center',flex:1,minWidth:0,gap:10,padding:'4px 0',textAlign:'left',background:'transparent',border:0,color:C.white,cursor:'pointer',minHeight:48}} onClick={()=>{if(selecting){const id=String(player.id);setBulkSelected(old=>old.includes(id)?old.filter(x=>x!==id):[...old,id]);setBulkReview(false);return;}setSwipeId('');setActionsId('');onOpenPlayer?.(player.id)}}>
-         <PlayerAvatar player={player} size={40}/>
+         <span style={{position:'relative',display:'inline-flex',flexShrink:0}}><PlayerAvatar player={player} size={40}/>{member&&(member.registrationLocked||member.roleLocked)&&<span aria-hidden="true" style={{position:'absolute',right:-4,bottom:-4,background:member.registrationLocked&&member.roleLocked?C.green:C.section,border:'2px solid '+C.card,borderRadius:14,width:22,height:22,display:'grid',placeItems:'center',fontSize:12}}>🔒</span>}</span>
          <span style={{flex:1,minWidth:0}}>
           <span style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:7}}><strong style={{fontSize:15,fontWeight:650,overflowWrap:'anywhere',lineHeight:1.3}}>{player.username||player.alias||'Unknown player'}</strong>{player.furnaceLevel&&<span style={{fontSize:13,color:C.gold}}>{player.furnaceLevel}</span>}</span>
           <span style={{...muted,display:'block',marginTop:3}}>{String(status.tag||player.allianceTag||'').toUpperCase()===String(entryTeam.host||'').toUpperCase()?legionLabel(entryTeam):(status.tag||player.allianceTag||'Alliance unknown')+' · '+legionLabel(entryTeam)}</span>
          </span>
         </button>
-        {!selecting&&<button type="button" title="Edit player planning actions" aria-label={'Edit planning options for '+(player.username||player.alias||'player')} aria-expanded={actionsId===player.id} style={{...button,minWidth:44,padding:7,background:'transparent',border:0,fontSize:20}} onClick={()=>{setActionsId(actionsId===player.id?'':player.id);setSwipeId('');setRemoveId('')}}>•••</button>}
+        {!selecting&&member&&(member.registrationLocked||member.roleLocked)&&<button type="button" aria-label={'View locks for '+(player.username||player.alias||'player')} onClick={()=>setLockDetailsId(lockDetailsId===String(player.id)?'':String(player.id))} style={{...button,minHeight:44,minWidth:44,padding:6,background:'transparent',border:0,fontSize:16}}>🔒</button>}
+         {!selecting&&<button type="button" title="Edit player planning actions" aria-label={'Edit planning options for '+(player.username||player.alias||'player')} aria-expanded={actionsId===player.id} style={{...button,minWidth:44,padding:7,background:'transparent',border:0,fontSize:20}} onClick={()=>{setActionsId(actionsId===player.id?'':player.id);setSwipeId('');setRemoveId('')}}>•••</button>}
        </div>
-       {(tierChips(player).length>0||gameLanguages(player).length>0)&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:5,padding:'5px 12px 3px'}}>
+       {!selecting&&member&&lockDetailsId===String(player.id)&&<div style={{padding:'10px 12px',background:C.section,display:'grid',gap:8}}>
+         <strong style={{fontSize:13}}>Lock status · {player.username||player.alias}</strong>
+         {[['registration','Registration',!!member.registrationLocked],['role','Combat role',!!member.roleLocked]].map(([field,label,locked])=><div key={field} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,fontSize:13}}><span>{label} · {locked?'Locked':'Unlocked'}</span><button type="button" disabled={!editable} style={{...button,minHeight:44,padding:'7px 10px',fontSize:12}} onClick={()=>toggleMemberLock(entryTeam,player.id,field)}>{locked?'🔓 Unlock':'🔒 Lock'}</button></div>)}
+        </div>}
+        {(tierChips(player).length>0||gameLanguages(player).length>0)&&<div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:5,padding:'5px 12px 3px'}}>
         {tierChips(player).map(([key,label,color])=><span key={key} style={{fontSize:12,color:C.icy,padding:'5px 7px',borderRadius:6,background:'#0E1C2F'}}><span style={{color}}>{label}</span> {player.troops[key]}</span>)}
         {gameLanguages(player).map(language=><span key={language} style={{fontSize:11,color:C.icy,padding:'4px 7px',borderRadius:7,background:C.section}}>{language}</span>)}
        </div>}
@@ -720,8 +733,13 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:7}}>
       {[['times','◷','Times'],['status','✓','TAL status'],['more','•••','More']].map(([id,icon,label])=><button type="button" key={id} disabled={!selectedBulkCount} aria-pressed={bulkPanel===id} style={{...button,minWidth:0,padding:'9px 4px',borderColor:bulkPanel===id?C.gold:C.border,color:bulkPanel===id?C.gold:C.icy,background:bulkPanel===id?C.gold+'17':C.section,display:'grid',justifyItems:'center',gap:4}} onClick={()=>id==='status'?openBulkStatusEditor():bulkPanel===id?setBulkPanel(''):beginBulkPanel(id)}><span style={{fontSize:18,lineHeight:1}}>{icon}</span><span style={{fontSize:12}}>{label}</span></button>)}
      </div>
+     {bulkPanel==='locks'&&<div style={{display:'grid',gap:7,marginTop:10,background:C.section,borderRadius:10,padding:10}}>
+      <strong style={{fontSize:14}}>Manage locks · {selectedBulkCount} selected</strong>
+      {[['registration','Registration'],['role','Combat roles']].map(([field,label])=><div key={field} style={{display:'flex',gap:7,alignItems:'center',justifyContent:'space-between'}}><span style={{fontSize:13}}>{label}</span><div style={{display:'flex',gap:6}}><button type="button" style={{...button,minHeight:44,fontSize:12,padding:'7px 9px'}} onClick={()=>setBulkLockAction({field,locked:true})}>🔒 Lock</button><button type="button" style={{...button,minHeight:44,fontSize:12,padding:'7px 9px'}} onClick={()=>setBulkLockAction({field,locked:false})}>Unlock</button></div></div>)}
+      {bulkLockAction&&<div style={{border:'1px solid '+C.gold,borderRadius:10,padding:10}}><strong style={{fontSize:13}}>Confirm {bulkLockAction.locked?'locking':'unlocking'} {bulkLockAction.field==='registration'?'registration':'combat roles'} for {selectedBulkCount} players?</strong><div style={{display:'flex',gap:8,marginTop:9}}><button type="button" style={{...button,flex:1}} onClick={()=>setBulkLockAction(null)}>Cancel</button><button type="button" disabled={!canEdit} style={{...button,flex:1,color:C.gold}} onClick={()=>applyBulkLocks(bulkLockAction.field,bulkLockAction.locked)}>Confirm</button></div></div>}
+     </div>}
      {bulkPanel==='more'&&<div style={{display:'grid',gap:5,marginTop:10,background:C.section,borderRadius:10,padding:7}}>
-      {[['legion','Allocate to a legion'],['cooperation','Works well together'],['language','Edit languages'],['remove','Remove from TAL']].map(([id,label])=><button type="button" key={id} style={{...button,textAlign:'left',border:0,color:id==='remove'?C.red:C.white}} onClick={()=>beginBulkPanel(id)}>{label} <span style={{float:'right'}}>›</span></button>)}
+      {[['locks','Manage locks'],['legion','Allocate to a legion'],['cooperation','Works well together'],['language','Edit languages'],['remove','Remove from TAL']].map(([id,label])=><button type="button" key={id} style={{...button,textAlign:'left',border:0,color:id==='remove'?C.red:C.white}} onClick={()=>beginBulkPanel(id)}>{label} <span style={{float:'right'}}>›</span></button>)}
      </div>}
      {bulkPanel==='times'&&<div style={{marginTop:10,background:C.section,borderRadius:10,padding:10}}>
       <strong style={{fontSize:14}}>Edit available times · UTC</strong>
