@@ -71,7 +71,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const [statusError,setStatusError]=useState('');
  const [registrationOptionsOpen,setRegistrationOptionsOpen]=useState(false);
  const [resetOpen,setResetOpen]=useState(false);
- const [resetKind,setResetKind]=useState('both');
+ const [resetKind,setResetKind]=useState(['teams']);
  const [resetConfirmed,setResetConfirmed]=useState(false);
  const [resetPhrase,setResetPhrase]=useState('');
  const [resetError,setResetError]=useState('');
@@ -430,7 +430,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const resetSyncReady=!!(sync?.ready&&sync?.joined&&sync?.mode==='active'&&!sync?.issue&&!sync?.dirty&&!sync?.syncing&&!sync?.conflicts?.length&&sync?.checkedAt);
  const resetCounts={members:team?.members?.length||0,roles:(team?.members||[]).filter(m=>m.role==='combatant'||m.role==='substitute').length,registered:(team?.members||[]).filter(m=>m.registered).length};
  async function confirmRegistrationReset(){
-  if(!team||!onReset||resetPhrase!=='RESET'||!resetConfirmed||resetChecking)return;
+  if(!team||!onReset||resetPhrase!=='RESET'||!resetKind.length||!resetConfirmed||resetChecking)return;
   if(!resetSyncReady){setResetError('Your workspace must finish syncing before you can reset registration. Review the sync status, then try again.');return;}
   setResetChecking(true);setResetError('');
   try{
@@ -462,7 +462,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
    {talView==='registration'&&<div style={{display:'flex',justifyContent:'flex-end',margin:'-8px 0 4px',position:'relative',height:0,zIndex:12}}>
     <button type="button" aria-label="Registration options" aria-expanded={registrationOptionsOpen} onClick={()=>setRegistrationOptionsOpen(v=>!v)} style={{...button,borderRadius:10,minHeight:44,minWidth:44,padding:'9px',fontSize:17,background:C.section,transform:'translateY(-54px)'}} title="Registration options">•••</button>
     {registrationOptionsOpen&&<div style={{position:'absolute',right:0,top:48,zIndex:20,width:'min(260px,85vw)',background:'#15273A',border:'1px solid '+C.border,padding:8,borderRadius:12,boxShadow:'0 10px 28px #0008'}}>
-      <button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setResetOpen(true);setResetError('');setResetConfirmed(false);setResetPhrase('');setResetKind('both');}} style={{...button,width:'100%',textAlign:'left',border:0,background:'transparent',color:C.gold}}>↺ Reset this legion’s registration…</button>
+      <button type="button" disabled={!canEdit} onClick={()=>{setRegistrationOptionsOpen(false);setResetOpen(true);setResetError('');setResetConfirmed(false);setResetPhrase('');setResetKind(['teams']);}} style={{...button,width:'100%',textAlign:'left',border:0,background:'transparent',color:C.gold}}>↺ Clear allocations…</button>
       <div style={{...muted,padding:'5px 8px'}}>Only affects the selected legion.</div>
     </div>}
    </div>}
@@ -764,29 +764,29 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   </>}
   </>}
   {resetOpen&&<div role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget&&!resetChecking){setResetOpen(false);setResetPhrase('');}}} style={{position:'fixed',inset:0,zIndex:1300,background:'#000b',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-    <section role="dialog" aria-modal="true" aria-label="Reset TAL registration" style={{width:'100%',maxWidth:480,maxHeight:'min(92dvh,920px)',overflowY:'auto',background:C.card,borderRadius:'20px 20px 0 0',padding:'12px 18px calc(24px + env(safe-area-inset-bottom,0px))',boxSizing:'border-box',boxShadow:'0 -10px 30px #0008'}}>
+    <section role="dialog" aria-modal="true" aria-label="Clear TAL allocations" style={{width:'100%',maxWidth:480,maxHeight:'min(92dvh,920px)',overflowY:'auto',background:C.card,borderRadius:'20px 20px 0 0',padding:'12px 18px calc(24px + env(safe-area-inset-bottom,0px))',boxSizing:'border-box',boxShadow:'0 -10px 30px #0008'}}>
       <div aria-hidden="true" style={{background:C.icy,width:36,height:5,opacity:.6,borderRadius:8,margin:'0 auto 12px'}}/>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-       <strong style={{fontSize:17}}>Reset registration</strong>
+       <strong style={{fontSize:17}}>Clear allocations</strong>
        <button type="button" disabled={resetChecking} onClick={()=>{setResetOpen(false);setResetPhrase('')}} aria-label="Close reset registration" style={{...button,background:'transparent',border:0,minWidth:44,minHeight:44,fontSize:20}}>×</button>
       </div>
       <p style={{...muted,fontSize:13,margin:'5px 0 14px'}}>Only {team?legionLabel(team):'the selected legion'}. Members and their player profiles remain in the roster.</p>
       <div style={{display:'grid',gap:8}}>
        {[
-        ['roles','Clear roster roles','Combatants and Substitutes become Unassigned.'],
-        ['registration','Clear in-game confirmations','Everyone becomes Needs registration.'],
-        ['both','Start fresh','Clear both roster roles and registration confirmations.']
-       ].map(([id,title,detail])=><label key={id} style={{display:'flex',alignItems:'center',gap:12,background:resetKind===id?'#24374A':C.section,border:'1px solid '+(resetKind===id?C.gold:C.border),borderRadius:11,padding:'12px 10px',minHeight:62,cursor:'pointer'}}>
-        <input type="radio" name="registration-reset-kind" checked={resetKind===id} onChange={()=>{setResetKind(id);setResetPhrase('');setResetConfirmed(false);setResetError('');}} style={{height:21,width:21,accentColor:C.gold,flexShrink:0}}/>
+        ['teams','Team allocations','Clear team and building assignments. Keep registration and combat roles.'],
+        ['roles','Combat roles','Reset Combatant and Substitute roles to Unassigned.'],
+        ['registration','Registration status','Reset Registered to Needs registration.']
+       ].map(([id,title,detail])=><label key={id} style={{display:'flex',alignItems:'center',gap:12,background:resetKind.includes(id)?'#24374A':C.section,border:'1px solid '+(resetKind.includes(id)?C.gold:C.border),borderRadius:11,padding:'12px 10px',minHeight:62,cursor:'pointer'}}>
+        <input type="checkbox" checked={resetKind.includes(id)} onChange={()=>{setResetKind(old=>old.includes(id)?old.filter(v=>v!==id):[...old,id]);setResetPhrase('');setResetConfirmed(false);setResetError('');}} style={{height:21,width:21,accentColor:C.gold,flexShrink:0}}/>
         <span><strong style={{fontSize:14,display:'block'}}>{title}</strong><span style={{...muted,display:'block',marginTop:3}}>{detail}</span></span>
        </label>)}
       </div>
       <div style={{marginTop:14,padding:12,border:'1px solid '+C.border,borderRadius:12,background:C.section}}>
        <strong style={{fontSize:14}}>Review changes for {team?legionLabel(team):'this legion'}</strong>
        <div style={{...muted,marginTop:7}}>Players retained: {resetCounts.members}</div>
-       {(resetKind==='roles'||resetKind==='both')&&<div style={{...muted,marginTop:4}}>Role assignments to clear: {resetCounts.roles}</div>}
-       {(resetKind==='registration'||resetKind==='both')&&<div style={{...muted,marginTop:4}}>Registered confirmations to clear: {resetCounts.registered}</div>}
-       <p style={{...muted,margin:'9px 0 0'}}>Preserved: player IDs, legion membership, availability, troop information, language and teamwork preferences.</p>
+       {(resetKind.includes('roles'))&&<div style={{...muted,marginTop:4}}>Role assignments to clear: {resetCounts.roles}</div>}
+       {(resetKind.includes('registration'))&&<div style={{...muted,marginTop:4}}>Registered confirmations to clear: {resetCounts.registered}</div>}
+       <p style={{...muted,margin:'9px 0 0'}}>Unchecked statuses are preserved. Individual role and registration locks are respected. Player profiles and legion membership are retained.</p>
       </div>
       {!resetSyncReady&&<div role="alert" style={{background:C.gold+'13',border:'1px solid '+C.gold,borderRadius:10,padding:10,marginTop:12,fontSize:13,color:C.gold}}>
        Reset is unavailable while the shared workspace is unsynced or requires attention.
@@ -794,13 +794,13 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
       </div>}
       <label style={{display:'flex',alignItems:'center',gap:9,fontSize:13,marginTop:13,minHeight:44,color:C.icy}}>
        <input type="checkbox" checked={resetConfirmed} onChange={e=>setResetConfirmed(e.target.checked)} style={{height:21,width:21,accentColor:C.gold}}/>
-       I understand this will clear the selected TAL statuses.
+       I understand only the checked allocations and statuses will be cleared.
       </label>
       <label style={{display:'block',marginTop:9,fontSize:13,color:C.icy}}>Type RESET to confirm
        <input value={resetPhrase} disabled={resetChecking} onChange={e=>{setResetPhrase(e.target.value);setResetError('')}} placeholder="RESET" autoCapitalize="characters" autoComplete="off" spellCheck={false} style={{...button,display:'block',marginTop:6,width:'100%',boxSizing:'border-box',fontSize:16}}/>
       </label>
       {resetError&&<p role="alert" style={{color:C.red,fontSize:13}}>{resetError}</p>}
-      <button type="button" disabled={!resetConfirmed||resetPhrase!=='RESET'||!resetSyncReady||resetChecking||!canEdit} onClick={confirmRegistrationReset} style={{...button,width:'100%',background:resetConfirmed&&resetPhrase==='RESET'&&resetSyncReady&&!resetChecking?C.red:C.section,color:resetConfirmed&&resetPhrase==='RESET'&&resetSyncReady&&!resetChecking?C.white:C.icy,minHeight:50,marginTop:13}}>{resetChecking?'Verifying shared data…':'Confirm reset for '+(team?legionLabel(team):'legion')}</button>
+      <button type="button" disabled={!resetConfirmed||!resetKind.length||resetPhrase!=='RESET'||!resetSyncReady||resetChecking||!canEdit} onClick={confirmRegistrationReset} style={{...button,width:'100%',background:resetConfirmed&&resetPhrase==='RESET'&&resetSyncReady&&!resetChecking?C.red:C.section,color:resetConfirmed&&resetPhrase==='RESET'&&resetSyncReady&&!resetChecking?C.white:C.icy,minHeight:50,marginTop:13}}>{resetChecking?'Verifying shared data…':'Confirm reset for '+(team?legionLabel(team):'legion')}</button>
       <button type="button" disabled={resetChecking} onClick={()=>{setResetOpen(false);setResetPhrase('')}} style={{...button,width:'100%',borderRadius:10,background:'transparent',border:0,marginTop:7}}>Cancel</button>
     </section>
    </div>}
