@@ -41,3 +41,31 @@ export function recentAllianceMoves(players){
  }
  return rows.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||a.id.localeCompare(b.id));
 }
+
+// Only completed furnace tiers count: FC6-1 through FC6-4 remain FC6.
+export function completedFurnaceTier(value){
+ if(value==null)return null;
+ const raw=String(value).trim();
+ const fc=raw.match(/^FC\s*(\d+)(?:[-.]([0-4]))?$/i);
+ if(fc)return 'FC'+Number(fc[1]);
+ const normal=raw.match(/^F(?:urnace)?\s*(\d+)$/i);
+ if(normal)return 'F'+Number(normal[1]);
+ return null;
+}
+export function recentFurnaceChanges(players){
+ const rows=[];
+ for(const player of players||[]){
+  const seen=new Set();
+  for(const entry of player.observationHistory||[]){
+   if(entry.stream!=='profile'||!Number.isFinite(Date.parse(entry.observedAt)))continue;
+   for(const change of entry.changes||[]){
+    if(change.field!=='furnaceLevel')continue;
+    const before=completedFurnaceTier(change.before),after=completedFurnaceTier(change.after);
+    if(!before||!after||before===after)continue;
+    const key=JSON.stringify([entry.observedAt,before,after]);if(seen.has(key))continue;seen.add(key);
+    rows.push({id:String(player.id)+':furnace:'+key,playerId:player.id,before,after,at:entry.observedAt,type:'furnace'});
+   }
+  }
+ }
+ return rows.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||a.id.localeCompare(b.id));
+}
