@@ -329,6 +329,12 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
   setStatusEditor(null);setStatusError('');
   if(statusEditor.kind==='bulk'){setBulkSelected([]);setSelecting(false);setBulkPanel('');}
  }
+ function toggleMemberLock(entryTeam,playerId,field){
+  if(value?.locked||tournamentStatus(entryTeam)==='eliminated')return;
+  const key=field==='registration'?'registrationLocked':'roleLocked';
+  updateTeam({...entryTeam,members:(entryTeam.members||[]).map(m=>String(m.id)===String(playerId)?{...m,[key]:!m[key]}:m)});
+  setActionsId('');
+ }
  function setMemberRole(entryTeam,playerId,role){
   if(value?.locked||tournamentStatus(entryTeam)==='eliminated')return;
   if(!['combatant','substitute','pending'].includes(role))return;
@@ -681,6 +687,8 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
        {!selecting&&actionsId===player.id&&<div style={{padding:'8px 11px 12px',background:C.section,display:'grid',gap:5}}>
         {!member&&editable&&<><button type="button" style={{...button,textAlign:'left',color:C.gold}} onClick={()=>promoteCandidate(entryTeam,player.id,false)}>Move to needs registration</button><button type="button" style={{...button,textAlign:'left',color:C.green}} onClick={()=>promoteCandidate(entryTeam,player.id,true)}>Confirm registered in game</button></>}
         {member&&<button type="button" style={{...button,textAlign:'left',color:C.gold}} disabled={!editable} onClick={()=>openStatusEditor(entryTeam,player.id)}>Manage TAL status</button>}
+        {member&&<button type="button" style={{...button,textAlign:'left'}} disabled={!editable} onClick={()=>toggleMemberLock(entryTeam,player.id,'registration')}>{member.registrationLocked?'🔒 Unlock registration':'🔓 Lock registration'} · {member.registered?'Registered':'Needs registration'}</button>}
+        {member&&<button type="button" style={{...button,textAlign:'left'}} disabled={!editable} onClick={()=>toggleMemberLock(entryTeam,player.id,'role')}>{member.roleLocked?'🔒 Unlock battle role':'🔓 Lock battle role'} · {member.role==='combatant'?'Combatant':member.role==='substitute'?'Substitute':'Unassigned'}</button>}
         <button type="button" style={{...button,textAlign:'left'}} onClick={()=>beginEditTimes(player)}>Edit available times</button>
         <button type="button" style={{...button,textAlign:'left'}} onClick={()=>{setActionsId('');onOpenPlayer?.(player.id)}}>Open Members profile</button>
         {member&&<button type="button" style={{...button,textAlign:'left',color:C.red}} disabled={!editable} onClick={()=>setRemoveId(player.id)}>Remove from legion…</button>}
