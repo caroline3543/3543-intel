@@ -26,31 +26,66 @@ export function aggregateRoster(rosters){
 }
 export function RosterFurnace({ours,theirs,ourLabel,theirLabel}){
  const [selected,setSelected]=useState(null);
- const columns=[{name:ourLabel,players:ours,color:C.gold},{name:theirLabel,players:theirs,color:C.blue}];
+ const [threshold,setThreshold]=useState(8);
+ const [metric,setMetric]=useState('count');
+ const columns=[{name:ourLabel,players:ours,color:'#89C4FF'},{name:theirLabel,players:theirs,color:'#EBC18A'}];
  const counts=columns.map(side=>Object.fromEntries(tierNames.map(tier=>[tier,side.players.filter(p=>p.tier===tier).length])));
- const max=Math.max(1,...counts.flatMap(c=>tierNames.map(t=>c[t])));
- const high=c=>['FC10','FC9','FC8','FC7'].reduce((n,t)=>n+c[t],0);
- return <section style={{background:C.card,borderRadius:16,padding:16,marginTop:16}}>
-  <h3 style={{fontSize:18,margin:'0 0 5px'}}>Furnace distribution</h3>
-  <p style={{color:C.icy,fontSize:13,lineHeight:1.5,margin:'0 0 14px'}}>Tap a tier to view players.</p>
-  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
-   {columns.map((side,i)=><div key={i} style={{background:C.section,padding:12,borderRadius:12,minWidth:0}}>
-    <div style={{fontSize:12,fontWeight:700,color:side.color,overflowWrap:'anywhere'}}>{side.name}</div>
-    <div style={{fontWeight:800,fontSize:29,marginTop:6}}>{side.players.length}</div><div style={{fontSize:12,color:C.icy}}>Players</div>
-    <div style={{borderTop:'1px solid '+C.border,marginTop:10,paddingTop:10,fontSize:13}}><strong>{high(counts[i])}</strong> <span style={{color:C.icy}}>FC7+</span></div>
+ const known=columns.map(side=>side.players.filter(p=>p.tier!=='Unknown').length);
+ const qualified=columns.map((side,i)=>tierNames.filter(t=>/^FC\\d+$/.test(t)&&Number(t.slice(2))>=threshold).reduce((n,t)=>n+counts[i][t],0));
+ const shares=qualified.map((n,i)=>known[i]?n/known[i]*100:0);
+ const values=metric==='count'?qualified:shares;
+ const leader=values[0]===values[1]?-1:values[0]>values[1]?0:1;
+ const delta=Math.abs(values[0]-values[1]);
+ const median=side=>{
+  const sorted=side.players.map(p=>p.tier).filter(t=>/^FC\\d+$/.test(t)).map(t=>Number(t.slice(2))).sort((a,b)=>a-b);
+  if(!sorted.length)return '—';
+  const lo=sorted[Math.floor((sorted.length-1)/2)],hi=sorted[Math.floor(sorted.length/2)];
+  return lo===hi?'FC'+lo:'FC'+lo+'–FC'+hi;
+ };
+ const max=Math.max(1,...counts.flatMap(c=>tierNames.map(t=>metric==='count'?c[t]:c[t])));
+ return <section style={{background:C.card,borderRadius:16,padding:14,marginTop:16}}>
+  <div style={{fontSize:11,fontWeight:750,color:C.icy,letterSpacing:'.07em'}}>FURNACE STRENGTH PROFILE</div>
+  <h3 style={{fontSize:19,margin:'5px 0 4px'}}>Summary of advantages</h3>
+  <p style={{color:C.icy,fontSize:12,margin:'0 0 12px'}}>Development comparison · recorded alliance members</p>
+  <div style={{background:C.section,borderRadius:12,padding:13,marginBottom:15}}>
+   <div style={{fontSize:22,fontWeight:800,fontVariantNumeric:'tabular-nums'}}>{leader<0?'Even at FC'+threshold+'+':columns[leader].name+' leads'}</div>
+   <div style={{fontSize:13,color:C.icy,marginTop:5}}>{leader<0?'Both sides are equal at this threshold':(metric==='count'?delta+' more players':delta.toFixed(1)+' percentage points')+' at FC'+threshold+'+'}</div>
+   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginTop:12}}>
+    {columns.map((side,i)=><div key={i} style={{borderTop:'1px solid '+C.border,paddingTop:9}}><div style={{color:side.color,fontSize:12,fontWeight:700}}>{side.name}</div><div style={{fontSize:18,fontWeight:750}}>{median(side)}</div><div style={{fontSize:11,color:C.icy}}>Median furnace</div></div>)}
+   </div>
+  </div>
+  <h4 style={{fontSize:16,margin:'0 0 9px'}}>Threshold comparison</h4>
+  <div role="group" aria-label="Furnace threshold" style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:5,marginBottom:10}}>
+   {[7,8,9,10].map(n=><button key={n} type="button" aria-pressed={threshold===n} onClick={()=>setThreshold(n)} style={{border:'1px solid '+(threshold===n?'#89C4FF':C.border),borderRadius:9,minHeight:42,color:threshold===n?'#F2F7FD':C.icy,background:threshold===n?'#31516D':C.section,fontWeight:700}}>FC{n}{n===10?'':'+'}</button>)}
+  </div>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:17}}>
+   {columns.map((side,i)=><div key={i} style={{background:C.section,borderRadius:12,padding:12,minWidth:0}}>
+    <div style={{fontSize:12,color:side.color,fontWeight:750,overflowWrap:'anywhere'}}>{side.name}</div>
+    <div style={{fontSize:27,fontWeight:800,fontVariantNumeric:'tabular-nums',marginTop:4}}>{metric==='count'?qualified[i]:shares[i].toFixed(1)+'%'}</div>
+    <div style={{fontSize:11,color:C.icy}}>{qualified[i]} of {known[i]} known furnace levels</div>
    </div>)}
   </div>
-  <div style={{display:'grid',gridTemplateColumns:'76px 1fr 1fr',gap:8,alignItems:'center',marginBottom:6}}><span style={{color:C.muted,fontSize:12}}>Tier</span>{columns.map((side,i)=><span key={i} style={{color:side.color,textAlign:'center',fontSize:12,fontWeight:700,overflowWrap:'anywhere'}}>{side.name}</span>)}</div>
-  {tierNames.map(tier=><button type="button" key={tier} onClick={()=>setSelected(selected===tier?null:tier)} aria-expanded={selected===tier} style={{display:'grid',gridTemplateColumns:'76px 1fr 1fr',gap:8,width:'100%',alignItems:'center',border:0,borderTop:'1px solid '+C.border,padding:'10px 0',background:selected===tier?C.section:'transparent',color:C.white,textAlign:'left',cursor:'pointer',borderRadius:4}}>
-   <strong style={{fontSize:13}}>{tier}</strong>
-   {counts.map((count,i)=><div key={i} style={{textAlign:'center'}}><strong style={{fontSize:16}}>{count[tier]}</strong><div style={{height:6,background:C.bg,borderRadius:4,overflow:'hidden',marginTop:6}}><div style={{height:'100%',background:columns[i].color,width:count[tier]/max*100+'%',borderRadius:4}}/></div></div>)}
-  </button>)}
-  {selected&&<div style={{background:C.section,borderRadius:12,padding:12,marginTop:10}}>
-   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><strong style={{fontSize:14}}>{selected} players</strong><button type="button" onClick={()=>setSelected(null)} style={{background:'none',border:0,color:C.icy,minHeight:36}}>Close</button></div>
-   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-    {columns.map((side,i)=><div key={i}><strong style={{fontSize:12,color:side.color}}>{side.name}</strong>{side.players.filter(p=>p.tier===selected).length?side.players.filter(p=>p.tier===selected).map(p=><div key={p.fid} style={{padding:'8px 0',borderBottom:'1px solid '+C.border,fontSize:12,overflowWrap:'anywhere'}}>{p.name}<div style={{color:C.muted}}>[{p.tag}] · {p.level}</div></div>):<p style={{fontSize:12,color:C.muted}}>None</p>}</div>)}
+  <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:10}}>
+   <div><h4 style={{fontSize:16,margin:0}}>Furnace distribution</h4><div style={{fontSize:12,color:C.icy,marginTop:3}}>Players at each level</div></div>
+   <div role="group" aria-label="Distribution metric" style={{display:'flex',gap:4,background:C.section,borderRadius:9,padding:3}}>
+    {[['count','Players'],['percent','Roster %']].map(([id,label])=><button type="button" key={id} aria-pressed={metric===id} onClick={()=>setMetric(id)} style={{border:0,borderRadius:7,minHeight:37,padding:'6px 9px',fontSize:12,fontWeight:650,background:metric===id?'#365675':'transparent',color:C.white}}>{label}</button>)}
    </div>
-  </div>}
-  <p style={{fontSize:12,color:C.muted,lineHeight:1.55,margin:'14px 0 0'}}>Only loaded alliances are counted. Players are deduplicated by ID.</p>
+  </div>
+  <div style={{display:'flex',gap:13,marginBottom:10}}>{columns.map((side,i)=><span key={i} style={{fontSize:12,color:side.color}}>● {side.name}</span>)}</div>
+  {tierNames.map(tier=>{
+   const selectedTier=/^FC\\d+$/.test(tier)&&Number(tier.slice(2))>=threshold;
+   const series=counts.map((c,i)=>metric==='count'?c[tier]:known[i]?c[tier]/known[i]*100:0);
+   const scale=Math.max(1,...tierNames.flatMap(t=>counts.map((c,i)=>metric==='count'?c[t]:known[i]?c[t]/known[i]*100:0)));
+   return <div key={tier} style={{borderTop:'1px solid '+C.border,padding:'10px 0',opacity:selectedTier||!/^FC\\d+$/.test(tier)?1:.72}}>
+    <button type="button" aria-expanded={selected===tier} onClick={()=>setSelected(selected===tier?null:tier)} style={{display:'flex',justifyContent:'space-between',width:'100%',border:0,background:'transparent',color:C.white,padding:'0 0 7px',textAlign:'left',minHeight:26}}>
+     <strong style={{fontSize:13}}>{tier}</strong><span style={{fontSize:12,color:C.icy,fontVariantNumeric:'tabular-nums'}}>{series.map(v=>metric==='count'?v:v.toFixed(1)+'%').join(' vs ')}</span>
+    </button>
+    {series.map((v,i)=><div key={i} style={{height:10,background:C.bg,borderRadius:5,overflow:'hidden',margin:'3px 0 4px'}}><div style={{height:'100%',background:columns[i].color,width:v/scale*100+'%',borderRadius:5}}/></div>)}
+    {selected===tier&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,background:C.section,borderRadius:9,padding:9,marginTop:8}}>
+     {columns.map((side,i)=><div key={i} style={{minWidth:0}}><strong style={{fontSize:12,color:side.color}}>{side.name}</strong>{side.players.filter(p=>p.tier===tier).map(p=><div key={p.fid} style={{fontSize:12,padding:'5px 0',overflowWrap:'anywhere'}}>{p.name}</div>)}{!counts[i][tier]&&<p style={{fontSize:12,color:C.icy}}>No players</p>}</div>)}
+    </div>}
+   </div>;
+  })}
+  <p style={{fontSize:12,color:C.icy,lineHeight:1.5,margin:'13px 0 0'}}>Recorded players: {columns.map(s=>s.players.length).join(' vs ')}. Unknown furnace levels are excluded from percentages. Counts reflect returned alliance rosters, not total state populations. Furnace progression does not directly measure combat power.</p>
  </section>;
 }
