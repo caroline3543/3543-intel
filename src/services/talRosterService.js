@@ -23,3 +23,21 @@ export function recentNameChanges(players) {
   return rows.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||a.id.localeCompare(b.id));
 }
 export function utcChecked(at) { return at&&Number.isFinite(Date.parse(at))?new Date(at).toISOString().slice(0,16).replace('T',' ')+' UTC':'Not checked'; }
+
+export function recentAllianceMoves(players){
+ const rows=[];
+ for(const player of players||[]){
+  const seen=new Set();
+  for(const entry of player.observationHistory||[]){
+   if(entry.stream!=='profile'||!Number.isFinite(Date.parse(entry.observedAt)))continue;
+   for(const change of entry.changes||[]){
+    if(change.field!=='allianceTag'||typeof change.before!=='string'||typeof change.after!=='string')continue;
+    const before=change.before.trim()||'No alliance',after=change.after.trim()||'No alliance';
+    if(before===after)continue;
+    const key=JSON.stringify([entry.observedAt,before,after]);if(seen.has(key))continue;seen.add(key);
+    rows.push({id:String(player.id)+':alliance:'+key,playerId:player.id,before,after,at:entry.observedAt,type:'alliance'});
+   }
+  }
+ }
+ return rows.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||a.id.localeCompare(b.id));
+}
