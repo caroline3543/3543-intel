@@ -484,20 +484,18 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     <div><div style={{...muted,fontSize:11,letterSpacing:'.07em'}}>TAL PLANNER · {team?.host||'ALLIANCE'} {team?.number||''}</div><h2 style={{margin:'3px 0 0',fontSize:21}}>{selecting?'Manage players':'Registration'}</h2></div>
     <button type="button" disabled={!selecting&&!canEdit} style={{...button,minHeight:44,padding:'9px 14px',color:selecting?C.green:C.gold}} onClick={()=>{if(selecting){setSelecting(false);setBulkSelected([]);setBulkPanel('');setBulkReview(false);}else{setSelecting(true);setBulkSelected([]);setBulkPanel('');setBulkReview(false);}}}>{selecting?'Done':'⚙ Manage'}</button>
    </div>}
-   {talView==='registration'&&!selecting&&<section aria-label="TAL registration overview" style={{background:C.card,border:'1px solid '+C.border,borderRadius:13,padding:12,marginBottom:12}}>
+   {talView==='registration'&&!selecting&&<section aria-label="TAL registration overview" style={{background:C.card,borderRadius:13,padding:'12px 14px',marginBottom:10}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
      <strong style={{fontSize:15}}>Registration</strong>
-     <button type="button" disabled={!pendingRegistrationCount} onClick={()=>{setRegistrationFilter('unregistered');setListLimit(40);focusPlayers();}} style={{border:0,background:'transparent',color:pendingRegistrationCount?C.gold:C.icy,fontSize:12,padding:'7px 0',minHeight:36,cursor:pendingRegistrationCount?'pointer':'default'}}>{registrationCount} confirmed · {pendingRegistrationCount} pending ›</button>
+     <span style={{color:pendingRegistrationCount?C.gold:C.green,fontSize:12}}>{pendingRegistrationCount?pendingRegistrationCount+' pending':'✓ Complete'}</span>
     </div>
-    <div role="progressbar" aria-label="In-game registration progress" aria-valuemin={0} aria-valuemax={registrationMembers.length||1} aria-valuenow={registrationCount} style={{height:7,background:C.border,borderRadius:20,overflow:'hidden',margin:'5px 0 9px'}}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:6,marginTop:12}}>
+     {[{label:'Registered',value:registrationCount+'/'+registrationMembers.length},{label:'Combatants',value:combatantCount},{label:'Substitutes',value:substituteCount}].map(item=><div key={item.label} style={{minWidth:0}}><strong style={{fontSize:20,display:'block',fontVariantNumeric:'tabular-nums'}}>{item.value}</strong><span style={{...muted,fontSize:11}}>{item.label}</span></div>)}
+    </div>
+    <div role="progressbar" aria-label="In-game registration progress" aria-valuemin={0} aria-valuemax={registrationMembers.length||1} aria-valuenow={registrationCount} style={{height:5,background:C.border,borderRadius:20,overflow:'hidden',margin:'12px 0 8px'}}>
      <div style={{height:'100%',width:(registrationMembers.length?Math.round(registrationCount/registrationMembers.length*100):0)+'%',background:C.gold,borderRadius:20}}/>
     </div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:7,marginTop:10}}>
-     {[{label:'Registered',value:registrationCount+'/'+registrationMembers.length},{label:'Combatants',value:combatantCount},{label:'Substitutes',value:substituteCount}].map(item=><div key={item.label} style={{background:C.section,borderRadius:10,padding:'10px 5px',textAlign:'center',minWidth:0}}><strong style={{fontSize:19,display:'block'}}>{item.value}</strong><span style={{...muted,fontSize:11}}>{item.label}</span></div>)}
-    </div>
-    <div style={{...muted,marginTop:9,fontSize:12}}>{pendingRegistrationCount} awaiting registration · {registrationMembers.filter(m=>m.role!=='combatant'&&m.role!=='substitute').length} roles unassigned</div>
-    {!!matchmakingCount&&<div style={{...muted,marginTop:5,fontSize:12}}>{matchmakingCount} matchmaking only</div>}
-    {team&&<div style={{...muted,marginTop:5,fontSize:12}}>{registrationMembers.length} assigned / {50*legionCount} places</div>}
+    <div style={{...muted,fontSize:12}}>{registrationMembers.filter(m=>m.role!=='combatant'&&m.role!=='substitute').length===0?'All roles assigned':registrationMembers.filter(m=>m.role!=='combatant'&&m.role!=='substitute').length+' roles unassigned'}{matchmakingCount?' · '+matchmakingCount+' matchmaking only':''}{team?' · '+registrationMembers.length+'/'+(50*legionCount)+' places':''}</div>
    </section>}
    {talView==='prep'&&<>
    <section aria-label="Alliance readiness" style={{background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:12,marginBottom:12}}>
@@ -545,17 +543,17 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     </div>}
    </section>}
    </>}
-   {talView==='registration'&&!selecting&&<section aria-label="Needs attention" style={{background:C.card,border:'1px solid '+C.border,borderRadius:14,padding:12,marginBottom:12}}>
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}>
-      <div><strong style={{fontSize:16}}>Needs attention</strong><div style={{...muted,marginTop:3}}>Complete missing player information</div></div>
-      <span style={{fontSize:12,color:C.gold}}>{missingTroopPlayers.length+missingAvailabilityPlayers.length} issues</span>
+   {talView==='registration'&&!selecting&&<section aria-label="Needs attention" style={{background:C.card,borderRadius:13,padding:'12px 14px',marginBottom:10}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}>
+      <strong style={{fontSize:15}}>Needs attention</strong>
+      <span style={{fontSize:12,color:C.gold}}>{missingTroopPlayers.length+missingAvailabilityPlayers.length} {missingTroopPlayers.length+missingAvailabilityPlayers.length===1?'issue':'issues'}</span>
     </div>
     {[
      {id:'tiers',label:'Troop tiers missing',list:missingTroopPlayers,detail:'Infantry, Lancer or Marksman tier not recorded'},
      {id:'availability',label:'Availability missing',list:missingAvailabilityPlayers,detail:'No event times recorded'}
-    ].map(item=><div key={item.id} style={{background:C.section,border:'1px solid '+C.border,borderRadius:11,marginTop:7,overflow:'hidden'}}>
-     <button type="button" aria-expanded={attentionOpen===item.id} onClick={()=>setAttentionOpen(v=>v===item.id?'':item.id)} style={{background:'transparent',border:0,width:'100%',display:'flex',alignItems:'center',gap:11,textAlign:'left',padding:12,minHeight:56,color:C.white,cursor:'pointer'}}>
-      <span style={{fontSize:20,color:C.gold}}>◇</span><span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13}}>{item.label}</strong><span style={muted}>{item.list.length} player{item.list.length===1?'':'s'}{item.list.length===1?' · '+(item.list[0]?.player?.username||item.list[0]?.player?.alias||item.list[0]?.player?.fid||'Player'):''}</span></span><span style={{color:C.icy}}>{attentionOpen===item.id?'⌃':'⌄'}</span>
+    ].filter(item=>item.list.length>0).map(item=><div key={item.id} style={{borderTop:'1px solid '+C.border,marginTop:5,overflow:'hidden'}}>
+     <button type="button" aria-expanded={attentionOpen===item.id} onClick={()=>setAttentionOpen(v=>v===item.id?'':item.id)} style={{background:'transparent',border:0,width:'100%',display:'flex',alignItems:'center',gap:11,textAlign:'left',padding:'9px 0',minHeight:44,color:C.white,cursor:'pointer'}}>
+      <span style={{fontSize:17,color:C.gold}}>◇</span><span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13}}>{item.label}</strong><span style={muted}>{item.list.length} player{item.list.length===1?'':'s'}{item.list.length===1?' · '+(item.list[0]?.player?.username||item.list[0]?.player?.alias||item.list[0]?.player?.fid||'Player'):''}</span></span><span style={{color:C.icy}}>{attentionOpen===item.id?'⌃':'⌄'}</span>
      </button>
      {attentionOpen===item.id&&<div style={{padding:'0 12px 12px',borderTop:'1px solid '+C.border}}>
       <p style={{...muted,margin:'9px 0'}}>{item.detail}</p>
@@ -587,9 +585,9 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
 
     <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
      <div style={{flex:1,minWidth:0}}>
-    <PlayerSearch label="Search TAL players" placeholder="Search username, nickname or ID" players={entries.map(e=>e.player)} value={search} onChange={v=>{setSearch(v);setListLimit(40)}} onSelect={p=>{setSearch(p.fid||p.username||p.alias||String(p.id));setListLimit(40)}}/>
+    <PlayerSearch label="Search or add TAL players" placeholder="Search or add players" players={entries.map(e=>e.player)} value={search} onChange={v=>{setSearch(v);setListLimit(40)}} onSelect={p=>{setSearch(p.fid||p.username||p.alias||String(p.id));setListLimit(40)}}/>
      </div>
-     {teams.length>0&&!selecting&&<button type="button" aria-label={adding?'Close add players':'Add players'} disabled={!!value?.locked||(!team&&teams.every(t=>tournamentStatus(t)==='eliminated'))} onClick={()=>{if(!team){const target=teams.find(t=>tournamentStatus(t)!=='eliminated');if(!target)return;chooseLegion(target.id);setAdding(true);}else setAdding(v=>!v);setRemoveId('')}} style={{...button,minHeight:44,padding:'9px 12px',whiteSpace:'nowrap',color:C.gold}}>{adding?'Close':'＋ Add'}</button>}
+     {teams.length>0&&!selecting&&<button type="button" aria-label={adding?'Close player picker':'Find players to add'} title="Find players to add" disabled={!!value?.locked||(!team&&teams.every(t=>tournamentStatus(t)==='eliminated'))} onClick={()=>{if(!team){const target=teams.find(t=>tournamentStatus(t)!=='eliminated');if(!target)return;chooseLegion(target.id);setAdding(true);}else setAdding(v=>!v);if(!adding)setAddSearch(search);setRemoveId('')}} style={{...button,minHeight:44,padding:'9px 12px',whiteSpace:'nowrap',color:C.gold}}>{adding?'Done':'♙＋'}</button>}
     </div>
     {talView==='prep'?<div role="group" aria-label="Filter alliance readiness" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:6,marginBottom:4,alignItems:'center',scrollbarWidth:'none'}}>
      <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Prep</span>
