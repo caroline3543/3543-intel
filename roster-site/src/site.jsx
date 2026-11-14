@@ -93,20 +93,28 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
    });
    setMessage('TAL changes saved on this device · syncing to the shared workspace…');
   }
-  function resetTalLegion(teamId,kind){
-   if(!teamId||!['roles','registration','both'].includes(kind))return;
-   pendingTalSync.current={active:true,sawDirty:false};
-   setData(prev=>{
-    const plan=prev.talPlan;
-    if(!plan?.teams?.some(t=>t.id===teamId))return prev;
-    const nextTeams=plan.teams.map(t=>t.id!==teamId?t:{...t,members:(t.members||[]).map(m=>({
-     ...m,
-     ...(kind==='roles'||kind==='both'&&!m.roleLocked?{role:'pending'}:{}),
-     ...(kind==='registration'||kind==='both'&&!m.registrationLocked?{registered:false}:{})
-    }))});
-    return {...prev,talPlan:{...plan,teams:nextTeams,autoRoles:false}};
-   });
-   setMessage('Reset saved on this device · syncing to the shared workspace…');
+  function resetTalLegion(teamId,kinds){
+    const choices=Array.isArray(kinds)?kinds:[kinds];
+    if(!teamId||!choices.some(k=>['teams','roles','registration'].includes(k)))return;
+    pendingTalSync.current={active:true,sawDirty:false};
+    setData(prev=>{
+      const plan=prev.talPlan;
+      if(!plan?.teams?.some(t=>t.id===teamId))return prev;
+      const nextTeams=plan.teams.map(t=>t.id!==teamId?t:{...t,members:(t.members||[]).map(m=>({
+        ...m,
+        ...(choices.includes('roles')&&!m.roleLocked?{role:'pending'}:{}),
+        ...(choices.includes('registration')&&!m.registrationLocked?{registered:false}:{})
+      }))});
+      const existing=prev.talTeamPreferences||{};
+      const drafts={...(existing.drafts||{})};
+      if(choices.includes('teams'))for(const key of Object.keys(drafts)){
+        if(!key.startsWith(String(teamId)+':'))continue;
+        const draft=drafts[key]||{};
+        drafts[key]={...draft,groups:[],assignment:{},confirmed:false,absentIds:[],copyDraft:'',copySource:'',updatedAt:new Date().toISOString()};
+      }
+      return {...prev,talPlan:{...plan,teams:nextTeams,autoRoles:false},talTeamPreferences:{...existing,drafts}};
+    });
+    setMessage('Selected allocations cleared on this device · syncing…');
   }
   const requiredAction=sync.conflicts?.length?'conflict':['join','unpublished'].includes(sync.mode)?sync.mode:null;
   useEffect(()=>{if(requiredAction&&requiredAction!==lastAttention.current)setWorkspaceOpen(true);else if(!requiredAction&&lastAttention.current)setWorkspaceOpen(false);lastAttention.current=requiredAction;},[requiredAction]);
