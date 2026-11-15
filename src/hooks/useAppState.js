@@ -2,7 +2,7 @@ import {withGameLanguage} from '../services/gameLanguageService.js';
 import { useAllianceProfileImport } from './useAllianceProfileImport.js';
 import { activeStateId, assertImportState } from '../services/stateWorkspaceService.js';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { loadFromStorage, saveToStorage, mergeImportedData } from '../services/exportImportService.js';
+import { loadFromStorage, saveToStorage, mergeImportedData, recordDeletion, clearDeletion } from '../services/exportImportService.js';
 import {
   pushPlayer, deletePlayerRemote, pushPlan, deletePlanRemote, pullAll, isCloudConfigured,
 } from '../services/cloudSyncService.js';
@@ -67,6 +67,7 @@ export function useAppState() {
   const savePlayer = useCallback((player) => {
     const stamped = withGameLanguage({ ...player, profileLastUpdated: new Date().toISOString() });
     setData(prev => {
+      prev = clearDeletion(prev, 'players', stamped.id);
       const isEdit = prev.players.some(p => p.id === stamped.id);
       return {
         ...prev,
@@ -88,7 +89,7 @@ export function useAppState() {
   const addPlayers = useCallback((newPlayers) => {
     const stamped = newPlayers.map(p => ({ ...p, profileLastUpdated: new Date().toISOString() }));
     setData(prev => ({
-      ...prev,
+      ...stamped.reduce((data,p)=>clearDeletion(data,'players',p.id),prev),
       players: [...prev.players, ...stamped],
       lastUpdated: new Date().toISOString(),
     }));
@@ -104,7 +105,7 @@ export function useAppState() {
   const updatePlayers = useCallback((updatedPlayers) => {
     const stamped = updatedPlayers.map(p => ({ ...p, profileLastUpdated: new Date().toISOString() }));
     setData(prev => ({
-      ...prev,
+      ...stamped.reduce((data,p)=>clearDeletion(data,'players',p.id),prev),
       players: prev.players.map(p => {
         const u = stamped.find(u => u.id === p.id);
         return u ? u : p;
@@ -122,7 +123,7 @@ export function useAppState() {
 
   const deletePlayer = useCallback((id) => {
     setData(prev => ({
-      ...prev,
+      ...recordDeletion(prev,'players',id),
       players: prev.players.filter(p => p.id !== id),
       lastUpdated: new Date().toISOString(),
     }));
@@ -135,7 +136,7 @@ export function useAppState() {
   // ── Event operations ──────────────────────────────────────
   const createEvent = useCallback((ev) => {
     setData(prev => ({
-      ...prev,
+      ...clearDeletion(prev,'events',ev.id),
       events: [...(prev.events || []), { ...ev, updatedAt: new Date().toISOString() }],
       lastUpdated: new Date().toISOString(),
     }));
@@ -144,7 +145,7 @@ export function useAppState() {
 
   const updateEvent = useCallback((ev) => {
     setData(prev => ({
-      ...prev,
+      ...clearDeletion(prev,'events',ev.id),
       events: (prev.events || []).map(e => e.id === ev.id ? { ...ev, updatedAt: new Date().toISOString() } : e),
       lastUpdated: new Date().toISOString(),
     }));
@@ -152,7 +153,7 @@ export function useAppState() {
 
   const deleteEvent = useCallback((id) => {
     setData(prev => ({
-      ...prev,
+      ...recordDeletion(prev,'events',id),
       events: (prev.events || []).filter(e => e.id !== id),
       lastUpdated: new Date().toISOString(),
     }));
@@ -164,13 +165,13 @@ export function useAppState() {
   // every call we push every plan in it — fine at this data volume (a
   // handful of plans per alliance), and guarantees nothing gets missed.
   const saveSvsPlans = useCallback((plans) => {
-    setData(prev => ({ ...prev, svsPlans: plans, lastUpdated: new Date().toISOString() }));
+    setData(prev => ({ ...plans.reduce((data,p)=>clearDeletion(data,'svsPlans',p.id),prev), svsPlans: plans, lastUpdated: new Date().toISOString() }));
     plans.forEach(p => pushPlan(p, allianceTag()));
   }, []);
 
   const deleteSvsPlan = useCallback((id) => {
     setData(prev => ({
-      ...prev,
+      ...recordDeletion(prev,'svsPlans',id),
       svsPlans: (prev.svsPlans || []).filter(p => p.id !== id),
       lastUpdated: new Date().toISOString(),
     }));
@@ -265,6 +266,7 @@ export function useAppState() {
   // to check.
   const saveLabyrinthEntry = useCallback((entry) => {
     setData(prev => {
+      prev=clearDeletion(prev,'labyrinthEntries',entry.id);
       const isEdit = (prev.labyrinthEntries || []).some(e => e.id === entry.id);
       return {
         ...prev,
@@ -278,7 +280,7 @@ export function useAppState() {
 
   const deleteLabyrinthEntry = useCallback((id) => {
     setData(prev => ({
-      ...prev,
+      ...recordDeletion(prev,'labyrinthEntries',id),
       labyrinthEntries: (prev.labyrinthEntries || []).filter(e => e.id !== id),
       lastUpdated: new Date().toISOString(),
     }));
@@ -296,7 +298,12 @@ export function useAppState() {
   // custom-roles array, same pattern as saveSvsPlans; create/rename/
   // delete/reorder in the UI all go through this one setter.
   const saveCustomRoles = useCallback((customRoles) => {
-    setData(prev => ({ ...prev, customRoles, lastUpdated: new Date().toISOString() }));
+    setData(prev => {
+      const removed=(prev.customRoles||[]).filter(r=>!customRoles.some(next=>next.id===r.id));
+      let next=removed.reduce((data,r)=>recordDeletion(data,'customRoles',r.id),prev);
+      next=customRoles.reduce((data,r)=>clearDeletion(data,'customRoles',r.id),next);
+      return {...next,customRoles,lastUpdated:new Date().toISOString()};
+    });
   }, []);
 
   // ── Leadership checklist ──────────────────────────────────
