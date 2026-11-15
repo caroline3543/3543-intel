@@ -39,6 +39,6 @@ jobs:
       - name: Install isolated browser test dependencies
         run: npm install --no-save --package-lock=false playwright@1.56.1
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Browser acceptance smoke test
         run: node tests/3573-browser-smoke.mjs
