@@ -58,7 +58,7 @@ try{
   await page.getByRole('button',{name:'Select players'}).click();
   await page.getByRole('button',{name:'Select shown'}).click();
   await page.getByRole('button',{name:'Update selected'}).click();
-  assert.equal(await page.getByRole('button',{name:'Apply changes'}).isDisabled(),true,'Bulk editor should not submit an empty change');
+  assert.equal(await page.getByRole('button',{name:/Review changes for/}).isDisabled(),true,'Bulk editor should not submit an empty change');
   await page.getByRole('button',{name:'Done selecting'}).click();
   assert.deepEqual(writes,[],'Read-only smoke test must not write to a workspace');
   assert.equal(errors.length,0,'Browser runtime errors: '+errors.join('; '));
