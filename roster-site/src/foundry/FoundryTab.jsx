@@ -48,6 +48,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const [allianceFilter,setAllianceFilter]=useState(()=>localStorage.getItem('caroline3573_foundry_alliance')||'');
  const [addRole,setAddRole]=useState('join');
  const [managing,setManaging]=useState(null);
+ const [roleFilter,setRoleFilter]=useState('join'),[bulkMode,setBulkMode]=useState(false),[bulkSelected,setBulkSelected]=useState([]),[confirmRemoval,setConfirmRemoval]=useState(false),[rankExpanded,setRankExpanded]=useState({R5:true,R4:true,R3:true,R2:true,R1:true});
  const [pasteIssues,setPasteIssues]=useState([]);
  const [manualMatches,setManualMatches]=useState({});
  const [editingPower,setEditingPower]=useState(null),[powerInput,setPowerInput]=useState('');
@@ -113,8 +114,12 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
    const key=plain(n);
    return key.length>=3?entries.filter(p=>p.matched&&plain(p.name)===key):[];
  };
- const suggestions=n=>{const key=plain(n);return key.length<3?[]:entries.filter(p=>p.matched&&(plain(p.name).includes(key)||key.includes(plain(p.name)))).slice(0,6);};
- const searchMatches=query.trim()?entries.filter(p=>p.matched&&(norm(p.name).includes(norm(query))||(plain(query).length>=3&&plain(p.name).includes(plain(query)))||String(p.id)===query.trim())).slice(0,8):[];
+ const suggestions=n=>{const key=plain(n);return key.length<3?[]:entries.filter(p=>p.matched&&plain(p.name).length>=3&&(plain(p.name).includes(key)||key.includes(plain(p.name)))).slice(0,6);};
+ const searchMatches=query.trim()?entries.filter(p=>p.matched&&p.name.trim()&&(norm(p.name).includes(norm(query))||(plain(query).length>=3&&plain(p.name).includes(plain(query)))||String(p.id)===query.trim())).slice(0,8):[];
+ const filteredRegistrations=roleFilter==='join'?joined:subs;
+ const groupedRanks=['R5','R4','R3','R2','R1','Unranked'];
+ const bulkUpdate=(role)=>{const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};let joins=joined.length,substitutes=subs.length;for(const id of ids){if(nextRegs[id]==='join')joins--;else if(nextRegs[id]==='sub')substitutes++;nextRegs[id]=role;if(role!=='join'){delete nextTeams[id];delete nextAssignments[id]}}if(joins>30||substitutes>10){setNotice('Not enough registration slots for this change');return}update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' registration roles updated');setRoleFilter(role);setBulkSelected([]);setBulkMode(false)};
+ const bulkRemove=()=>{const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};ids.forEach(id=>{delete nextRegs[id];delete nextTeams[id];delete nextAssignments[id]});update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' removed from Foundry registration');setBulkSelected([]);setBulkMode(false);setConfirmRemoval(false)};
  const add=(id,role=addRole)=>{
   const p=entries.find(x=>x.id===id);
   if(!p||!p.matched){setNotice('Select a matched player profile');return}
@@ -161,9 +166,9 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const missingPower=joined.filter(p=>p.power<=0);
  const balanceSpread=average?Math.round((Math.max(...Object.values(teamTotals))-Math.min(...Object.values(teamTotals)))/average*100):0;
  return <section style={{padding:'16px 16px 110px',color:'#eef5fc'}}>
-  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:16}}><div><div style={{fontSize:12,color:'#f5b74f',fontWeight:800}}>STATE 3573</div><h1 style={{fontSize:25,margin:'4px 0'}}>Foundry</h1><div style={{fontSize:12,color:'#a6bed2'}}>Legion combatants and opening assignments</div></div><button style={btn} onClick={()=>{if(undo){onSaveFoundry?.(undo);setUndo(null);setNotice('Last change undone')}}} disabled={!undo}>Undo</button></div>
+  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:16}}><div><div style={{fontSize:12,color:'#f5b74f',fontWeight:800}}>STATE 3573</div><h1 style={{fontSize:25,margin:'4px 0'}}>Foundry</h1></div><button style={btn} onClick={()=>{if(undo){onSaveFoundry?.(undo);setUndo(null);setNotice('Last change undone')}}} disabled={!undo}>Undo</button></div>
   <label style={{display:'block',fontSize:12,color:'#a9bfd0',marginBottom:6}}>Foundry registration alliance</label><select aria-label="Foundry registration alliance" value={chosen} onChange={e=>{setAllianceFilter(e.target.value);localStorage.setItem('caroline3573_foundry_alliance',e.target.value)}} style={{...btn,width:'100%',marginBottom:14}}>{[...new Set([...alliances,chosen])].map(a=><option key={a} value={a}>{a}</option>)}</select>
-  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}><div style={style}><div style={{fontSize:12,color:'#a6bed2'}}>Join</div><strong style={{fontSize:23}}>{joined.length}<span style={{color:'#8ea7bd',fontSize:14}}>/30</span></strong></div><div style={style}><div style={{fontSize:12,color:'#a6bed2'}}>Substitutes</div><strong style={{fontSize:23}}>{subs.length}<span style={{color:'#8ea7bd',fontSize:14}}>/10</span></strong></div></div>
+  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>{[['join','Combatants',joined.length,30],['sub','Substitutes',subs.length,10]].map(([key,label,count,limit])=><button key={key} type="button" aria-pressed={roleFilter===key} onClick={()=>{setRoleFilter(key);setView('players');setBulkSelected([]);setBulkMode(false)}} style={{...style,marginBottom:0,textAlign:'left',cursor:'pointer',border:roleFilter===key?'2px solid #eab14f':'1px solid #30465a',background:roleFilter===key?'#24364b':'#142438',minHeight:90}}><div style={{fontSize:13,color:'#c2d2e1',display:'flex',justifyContent:'space-between'}}>{label}{roleFilter===key?'✓':''}</div><strong style={{fontSize:24}}>{count}<span style={{color:'#8ea7bd',fontSize:14}}>/{limit}</span></strong></button>)}</div>
   <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:6,marginBottom:14}}>{[['players','Players'],['teams','Teams'],['buildings','Buildings']].map(([id,label])=><button key={id} onClick={()=>setView(id)} style={{...btn,background:view===id?'#f5ad38':'#172a3e',color:view===id?'#101b28':'#e9f2fa',padding:'9px 3px'}}>{label}</button>)}</div>
   {notice&&<div role="status" style={{...style,fontSize:13,color:'#f5bd5b'}}>{notice}</div>}
   {view==='players'&&<>
@@ -184,20 +189,37 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} troop power</small></span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
    {showPaste&&<div style={style}><label style={{display:'block',fontSize:13,marginBottom:8}}>Paste names or Username, troop power</label><textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={5} placeholder={'Erth, 8997\nVanellope, 4717\nLaw'} style={{...btn,width:'100%',boxSizing:'border-box'}}/><button style={{...btn,marginTop:8,width:'100%'}} onClick={importRows}>Match and register players</button>{pasteIssues.length>0&&<div style={{marginTop:10,color:'#f5bd5b',fontSize:12}}><strong>Needs review ({pasteIssues.length})</strong>{pasteIssues.map((issue,i)=><div key={i} style={{paddingTop:8}}><div>{issue.name} · {issue.reason}</div>{issue.candidates?.length>0&&<div style={{display:'grid',gap:5,marginTop:6}}>{issue.candidates.map(p=><button key={p.id} style={{...btn,textAlign:'left',fontSize:12}} onClick={()=>{setManualMatches(prev=>({...prev,[issue.name]:p.id}));setNotice('Match selected for '+issue.name+'. Tap Match and register players again.')}}>Use {p.name} · {p.alliance}</button>)}</div>}</div>)}</div>}</div>}
    {editingPower&&<div style={style}><strong>Edit Foundry troop power · {entries.find(p=>p.id===editingPower)?.name}</strong><p style={{fontSize:12,color:'#a9bfd0'}}>Updates the player's profile with today's date.</p><input aria-label="Foundry troop power" inputMode="numeric" value={powerInput} onChange={e=>setPowerInput(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',marginBottom:8}} placeholder="Troop power"/><div style={{display:'flex',gap:8}}><button style={{...btn,flex:1}} onClick={()=>setEditingPower(null)}>Cancel</button><button style={{...btn,flex:1,background:'#32694d'}} onClick={savePower}>Save power</button></div></div>}
-   <div style={style}><h2 style={{fontSize:16,margin:'0 0 10px'}}>Registered players <span style={{float:'right',color:'#a9bfd0',fontSize:13}}>{joined.length+subs.length} total</span></h2>
-   {[...joined,...subs].length?[...joined,...subs].map(p=><div key={p.id} style={{borderBottom:'1px solid #2c4155',padding:'12px 0'}}>
-     <div style={{display:'flex',alignItems:'center',gap:10}}>
-       <PlayerAvatar player={avatarFor(p)} size={38}/>
-       <div style={{flex:1,minWidth:0}}><strong style={{fontSize:14,overflowWrap:'anywhere'}}>{p.name}</strong>{!p.matched&&<span style={{color:'#f5bd5b',fontSize:11}}> · Needs matching</span>}<div style={{fontSize:12,color:'#a9bfd0'}}>{registrations[p.id]==='join'?'Combatant':'Substitute'}</div></div>
-       <InlinePower player={p} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power saved for '+p.name)}}/>
-       <button aria-label={'Manage '+p.name} aria-expanded={managing===p.id} style={{...btn,minWidth:44,fontSize:20,padding:'7px'}} onClick={()=>setManaging(managing===p.id?null:p.id)}>⋯</button>
+   <div style={{...style,padding:12}}>
+     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:6}}>
+       <div><h2 style={{fontSize:17,margin:'0 0 3px'}}>{roleFilter==='join'?'Combatants':'Substitutes'}</h2><div style={{fontSize:12,color:'#a9bfd0'}}>By alliance rank · Highest troop power first</div></div>
+       <button type="button" style={{...btn,background:bulkMode?'#344c63':'#21354b'}} onClick={()=>{setBulkMode(v=>!v);setBulkSelected([]);setConfirmRemoval(false)}}>{bulkMode?'Done':'Select'}</button>
      </div>
-     {managing===p.id&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
-       <button style={btn} onClick={()=>{setEditingPower(p.id);setPowerInput(p.power?String(p.power):'');setManaging(null)}}>Edit troop power</button>
-       <button style={btn} onClick={()=>{setStatus(p.id,registrations[p.id]==='join'?'sub':'join');setManaging(null)}}>Make {registrations[p.id]==='join'?'substitute':'combatant'}</button>
-       <button style={{...btn,gridColumn:'1 / -1',color:'#f1a9a9'}} onClick={()=>{setStatus(p.id,registrations[p.id]);setManaging(null)}}>Remove from Foundry</button>
+     {bulkMode&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',fontSize:12,color:'#b9cad9'}}><span>{bulkSelected.length} selected</span><button style={{...btn,minHeight:34,padding:'6px 10px'}} onClick={()=>setBulkSelected(filteredRegistrations.map(p=>p.id))}>Select all</button></div>}
+     {groupedRanks.map(group=>{const ranked=filteredRegistrations.filter(p=>p.rank===group).sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));const eligible=entries.filter(p=>p.rank===group&&p.alliance===chosen).length;return <div key={group} style={{marginTop:10}}>
+       <button type="button" aria-expanded={rankExpanded[group]!==false} onClick={()=>setRankExpanded(v=>({...v,[group]:v[group]===false}))} style={{...btn,width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#20344a',textAlign:'left',borderRadius:12,minHeight:46}}>
+         <span style={{display:'flex',gap:9,alignItems:'center'}}><strong style={{color:'#f0c176'}}>{group}</strong><span style={{fontSize:12,color:'#a9bfd0'}}>{group==='R5'?'Alliance leader':group==='R4'?'Officers':group==='Unranked'?'Rank not recorded':'Members'}</span></span>
+         <span style={{fontSize:13,color:'#c8d7e4'}}>{ranked.length}/{group==='R5'&&eligible<=1?1:eligible||ranked.length} {rankExpanded[group]===false?'⌄':'⌃'}</span>
+       </button>
+       {rankExpanded[group]!==false&&(ranked.length?ranked.map(p=><div key={p.id} style={{borderBottom:'1px solid #2c4155',padding:'12px 0'}}>
+         <div style={{display:'flex',alignItems:'center',gap:9}}>
+           {bulkMode?<input type="checkbox" aria-label={'Select '+p.name} checked={bulkSelected.includes(p.id)} onChange={e=>setBulkSelected(v=>e.target.checked?[...v,p.id]:v.filter(x=>x!==p.id))} style={{width:22,height:22,accentColor:'#eab14f'}}/>:<PlayerAvatar player={avatarFor(p)} size={38}/>}
+           <div style={{flex:1,minWidth:0}}><strong style={{fontSize:14,overflowWrap:'anywhere'}}>{p.name}</strong><div style={{fontSize:11,color:'#a9bfd0'}}>{p.alliance}{!p.matched?' · Needs matching':''}</div></div>
+           <InlinePower player={p} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power saved for '+p.name)}}/>
+           {!bulkMode&&<button aria-label={'Manage '+p.name} aria-expanded={managing===p.id} style={{...btn,minWidth:42,fontSize:20,padding:7}} onClick={()=>setManaging(managing===p.id?null:p.id)}>⋯</button>}
+         </div>
+         {!bulkMode&&managing===p.id&&<div style={{display:'grid',gap:8,marginTop:10}}>
+           <div style={{fontSize:12,color:'#a9bfd0'}}>Registration role</div>
+           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>{[['join','Combatant'],['sub','Substitute']].map(([role,label])=><button key={role} aria-pressed={registrations[p.id]===role} style={{...btn,background:registrations[p.id]===role?'#66502d':'#20344a',borderColor:registrations[p.id]===role?'#eab14f':'#40546a'}} onClick={()=>{if(registrations[p.id]!==role){setStatus(p.id,role);setRoleFilter(role)}setManaging(null)}}>{label}</button>)}</div>
+           <button style={{...btn,color:'#f1a9a9',borderColor:'#79525b'}} onClick={()=>{setStatus(p.id,registrations[p.id]);setManaging(null)}}>Remove from Foundry</button>
+         </div>}
+       </div>):<div style={{padding:'12px 4px',fontSize:12,color:'#839bae'}}>No {roleFilter==='join'?'combatants':'substitutes'} at this rank</div>)}
+     </div>})}
+     {bulkMode&&bulkSelected.length>0&&<div style={{position:'sticky',bottom:75,zIndex:4,...style,marginTop:14,background:'#26384d',borderColor:'#eab14f'}}>
+       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><strong>{bulkSelected.length} selected</strong><button style={{...btn,minHeight:32,padding:'5px 10px'}} onClick={()=>setBulkSelected([])}>Clear</button></div>
+       <div style={{display:'flex',flexWrap:'wrap',gap:7}}><button style={btn} onClick={()=>bulkUpdate('join')}>Make combatants</button><button style={btn} onClick={()=>bulkUpdate('sub')}>Make substitutes</button><button style={{...btn,color:'#f1a9a9'}} onClick={()=>setConfirmRemoval(true)}>Remove from Foundry</button></div>
+       {confirmRemoval&&<div style={{marginTop:10}}><p style={{fontSize:13}}>Remove {bulkSelected.length} registration(s)? Player profiles will be kept.</p><button style={{...btn,color:'#f1a9a9',marginRight:8}} onClick={bulkRemove}>Confirm removal</button><button style={btn} onClick={()=>setConfirmRemoval(false)}>Cancel</button></div>}
      </div>}
-   </div>):<p style={{fontSize:13,color:'#a9bfd0'}}>No players registered yet. Search above to add one.</p>}</div>
+   </div>
   </>}
   {(view==='teams'||view==='buildings')&&<>
    <div style={{...style,padding:12}}>
