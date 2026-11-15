@@ -286,7 +286,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  });
  const orderedSubs=subOverride?[...autoSubs].sort((a,b)=>(subManual.indexOf(String(a.id))<0?9999:subManual.indexOf(String(a.id)))-(subManual.indexOf(String(b.id))<0?9999:subManual.indexOf(String(b.id)))):autoSubs;
  const priorityLabel=({balanced:'Balanced ranking',tiers:'Highest troop tiers first',troop:'Highest troop power first'})[subMetric];
- const subCopy=['TAL SUBSTITUTE ENTRY ORDER · '+matchTime+' UTC',legionLabel(selectedLegion)+' · '+matchDate,'Priority: '+(subOverride?priorityLabel+' (manually adjusted)':priorityLabel),'',...(orderedSubs.length?orderedSubs.map((p,i)=>{const d=rankDetails.get(String(p.id));return (i+1)+'. '+name(p)+(copyScores&&d.score!=null?' ('+d.score.toFixed(0)+'/100)':'')+(copyReasons?'\n   '+d.reasons.join(' · '):'');}):['No eligible available substitutes']),'','Enter in this order as combatant slots become available.'].join('\n');
+ const subCopy=['TAL SUBSTITUTE ENTRY ORDER · '+matchTime+' UTC',(selectedLegion?legionLabel(selectedLegion):'No legion selected')+' · '+matchDate,'Priority: '+(subOverride?priorityLabel+' (manually adjusted)':priorityLabel),'',...(orderedSubs.length?orderedSubs.map((p,i)=>{const d=rankDetails.get(String(p.id));return (i+1)+'. '+name(p)+(copyScores&&d.score!=null?' ('+d.score.toFixed(0)+'/100)':'')+(copyReasons?'\n   '+d.reasons.join(' · '):'');}):['No eligible available substitutes']),'','Enter in this order as combatant slots become available.'].join('\n');
  const teamPower=g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).reduce((sum,id)=>sum+(powerOf(id)||0),0);
  const groupPairs=cooperationGroups.filter(g=>Array.isArray(g?.ids)&&g.ids.length>1).flatMap(g=>{
   const ids=[...new Set(g.ids.map(String))],pairs=[];
@@ -483,7 +483,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  async function copy(text){try{await navigator.clipboard.writeText(text);setCopyMessage('Copied to clipboard.');}catch{setCopyMessage('Clipboard unavailable. Copy from the preview instead.');}}
  const assignmentText='INITIAL ASSIGNMENTS\n\n'+BUILDINGS.map(b=>'» '+b+': '+activePlayers.filter(({id})=>assignment[id]===b).map(({id})=>name(byId.get(id)||{id})+(isSubstitute(id)?' (3:00+)':'')).join(', ')).join('\n');
  const teamText=textOfTeams(groups.map(g=>({...g,leader:absentIds.includes(String(g.leader))?null:g.leader,members:g.members.filter(id=>!absentIds.includes(String(id)))})),byId,id=>isSubstitute(id)?'3:00+':'0:00');
- const fullBattlePlan='⚔️ TAL · '+legionLabel(selectedLegion)+' · '+matchTime+' UTC\n\n'+teamText+'\n\n'+assignmentText+'\n\nCombatants enter immediately. Assigned substitutes enter after 3 minutes.';
+ const fullBattlePlan='⚔️ TAL · '+(selectedLegion?legionLabel(selectedLegion):'No legion selected')+' · '+matchTime+' UTC\n\n'+teamText+'\n\n'+assignmentText+'\n\nCombatants enter immediately. Assigned substitutes enter after 3 minutes.';
  const copyStale=!!copySource&&copySource!==teamText;
  function openTeamCopy(){if(!copyOpen&&!copyDraft){setCopyDraft(teamText);setCopySource(teamText)}setCopyOpen(v=>!v)}
  function regenerateCopy(){setCopyDraft(teamText);setCopySource(teamText);setCopyMessage('Preview updated from current teams.');}
