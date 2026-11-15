@@ -9,7 +9,7 @@ const power=p=>Number(p.troopPower??p.lastFoundryTroopPower??p.lastTroopPower??0
 const alliance=p=>String(p.alliance||p.homeAlliance||p.allianceTag||p.alliance_name||'Unassigned').trim()||'Unassigned';
 const rank=p=>{const r=String(p.allianceRank??p.rank??p.alliance_rank??'').toUpperCase();return /^R[1-5]$/.test(r)?r:'Unranked'};
 const format=n=>Math.round(n).toLocaleString();
-export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,teamworkPreferences={}}){
+export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroopPower,teamworkPreferences={}}){
  const saved=sharedFoundry||{};
  const [view,setView]=useState('players'),[query,setQuery]=useState('');
  const [paste,setPaste]=useState(''),[showPaste,setShowPaste]=useState(false),[notice,setNotice]=useState(''),[selected,setSelected]=useState(null);
@@ -18,9 +18,10 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,teamworkPr
  const [allianceFilter,setAllianceFilter]=useState(()=>localStorage.getItem('caroline3573_foundry_alliance')||'');
  const [addRole,setAddRole]=useState('join');
  const [pasteIssues,setPasteIssues]=useState([]);
+ const [editingPower,setEditingPower]=useState(null),[powerInput,setPowerInput]=useState('');
  const entries=useMemo(()=>{
   const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:power(p),rank:rank(p),alliance:alliance(p),matched:true,language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim()}]}));
-  for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:p.power||current.power}:{...p,alliance:p.alliance||'Unassigned',matched:false});}
+  for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:current.power||p.power}:{...p,alliance:p.alliance||'Unassigned',matched:false});}
   return [...map.values()].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
  },[players,saved.imports]);
  const alliances=useMemo(()=>[...new Set(entries.map(p=>p.alliance).filter(a=>a!=='Unassigned'))].sort(),[entries]);
@@ -101,6 +102,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,teamworkPr
   else setNotice(issues.length?issues.length+' names need review':'No new players to add');
   if(!issues.length){setPaste('');setShowPaste(false)}
  };
+ const savePower=()=>{const value=Number(String(powerInput).replace(/,/g,'').trim());if(!Number.isFinite(value)||value<0||!Number.isInteger(value)||!String(powerInput).trim()){setNotice('Enter a valid whole-number troop power');return;}const p=entries.find(x=>x.id===editingPower);if(!p||!p.matched){setNotice('Player profile not found');return;}onSaveTroopPower?.(editingPower,value);setEditingPower(null);setNotice('Foundry troop power saved to '+p.name+'\'s profile');};
  const assign=(id,colour)=>{const nextTeams={...teams,[id]:colour};const nextAlloc={...assignments};if(!buildings[colour].includes(nextAlloc[id]))nextAlloc[id]=buildings[colour][0];update({teams:nextTeams,assignments:nextAlloc},'Team updated')};
  const move=(id,building)=>{const colour=colours.find(c=>buildings[c].includes(building));if(!colour)return;update({teams:{...teams,[id]:colour},assignments:{...assignments,[id]:building}},'Building updated');setSelected(null)};
  const copyText=()=>['INITIAL ASSIGNMENTS',...colours.flatMap(c=>buildings[c].map(b=>'» '+b+': '+active.filter(p=>assignments[p.id]===b).map(p=>p.name).join(', ')))].join('\n');
@@ -122,8 +124,9 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,teamworkPr
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} troop power</small></span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
    <button style={{...btn,width:'100%',marginBottom:12}} onClick={()=>setShowPaste(v=>!v)}>＋ Paste player list</button>
    {showPaste&&<div style={style}><label style={{display:'block',fontSize:13,marginBottom:8}}>Paste names or Username, troop power</label><textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={5} placeholder={'Erth, 8997\nVanellope, 4717\nLaw'} style={{...btn,width:'100%',boxSizing:'border-box'}}/><button style={{...btn,marginTop:8,width:'100%'}} onClick={importRows}>Match and register players</button>{pasteIssues.length>0&&<div style={{marginTop:10,color:'#f5bd5b',fontSize:12}}><strong>Needs review ({pasteIssues.length})</strong>{pasteIssues.map((issue,i)=><div key={i} style={{paddingTop:5}}>{issue}</div>)}</div>}</div>}
+   {editingPower&&<div style={style}><strong>Edit Foundry troop power · {entries.find(p=>p.id===editingPower)?.name}</strong><p style={{fontSize:12,color:'#a9bfd0'}}>Updates the player's profile with today's date.</p><input aria-label="Foundry troop power" inputMode="numeric" value={powerInput} onChange={e=>setPowerInput(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',marginBottom:8}} placeholder="Troop power"/><div style={{display:'flex',gap:8}}><button style={{...btn,flex:1}} onClick={()=>setEditingPower(null)}>Cancel</button><button style={{...btn,flex:1,background:'#32694d'}} onClick={savePower}>Save power</button></div></div>}
    <div style={style}><h2 style={{fontSize:16,margin:'0 0 10px'}}>Registered players <span style={{float:'right',color:'#a9bfd0',fontSize:13}}>{joined.length+subs.length} total</span></h2>
-   {[...joined,...subs].length?[...joined,...subs].map(p=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 0',borderBottom:'1px solid #2c4155'}}><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong>{!p.matched&&<span style={{color:'#f5bd5b',fontSize:11}}> · Needs matching</span>}<div style={{fontSize:12,color:'#a9bfd0'}}>{format(p.power)} troop power · {registrations[p.id]==='join'?'Combatant':'Substitute'}</div></div><button style={{...btn,padding:'8px'}} onClick={()=>setStatus(p.id,registrations[p.id]==='join'?'sub':'join')}>Change</button><button aria-label={'Remove '+p.name} style={{...btn,padding:'8px'}} onClick={()=>setStatus(p.id,registrations[p.id])}>✕</button></div>):<p style={{fontSize:13,color:'#a9bfd0'}}>No players registered yet. Search above to add one.</p>}</div>
+   {[...joined,...subs].length?[...joined,...subs].map(p=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 0',borderBottom:'1px solid #2c4155'}}><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong>{!p.matched&&<span style={{color:'#f5bd5b',fontSize:11}}> · Needs matching</span>}<div style={{fontSize:12,color:'#a9bfd0'}}>{format(p.power)} troop power · {registrations[p.id]==='join'?'Combatant':'Substitute'}</div></div><button style={{...btn,padding:'8px'}} onClick={()=>{setEditingPower(p.id);setPowerInput(p.power?String(p.power):'')}}>Edit power</button><button style={{...btn,padding:'8px'}} onClick={()=>setStatus(p.id,registrations[p.id]==='join'?'sub':'join')}>Change</button><button aria-label={'Remove '+p.name} style={{...btn,padding:'8px'}} onClick={()=>setStatus(p.id,registrations[p.id])}>✕</button></div>):<p style={{fontSize:13,color:'#a9bfd0'}}>No players registered yet. Search above to add one.</p>}</div>
   </>}
   {(view==='teams'||view==='buildings')&&<>
    <div style={{...style,padding:12}}>
