@@ -46,7 +46,7 @@ try{
   for(const name of ['Members','TAL Planner','Compare','Changes','Foundry'])assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name}).count(),1);
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Members'}).click();
-  const search=page.getByRole('combobox',{name:'Search players'});
+  const search=page.getByRole('combobox',{name:'Search roster'});
   await search.fill('Spic');
   await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
   await search.fill('Spicyy');
