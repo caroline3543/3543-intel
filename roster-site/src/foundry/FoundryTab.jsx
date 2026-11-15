@@ -76,9 +76,9 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,teamworkPr
   const nextTeams={...teams},nextAssignments={...assignments};
   const issues=[];let added=0,updated=0;
   let joins=joined.length,substitutes=subs.length;
-  for(const raw of paste.split(/\\r?\\n/)){
+  for(const raw of paste.replace(/\\r\\n|\\n|\\r/g,'\n').split(/\r?\n/)){
    const line=raw.trim();if(!line)continue;
-   const match=line.match(/^(.*?)(?:[,\\t]\\s*([\\d,]+))?$/);
+   const match=line.match(/^(.*?)(?:[,\t]\s*([\d,]+))?$/);
    const n=match?.[1]?.trim(),value=match?.[2],pwr=value?Number(value.replace(/,/g,'')):null;
    if(!n||value&&(!Number.isFinite(pwr)||pwr<0)){issues.push(line+' · invalid format');continue}
    const matches=entries.filter(x=>x.matched&&norm(x.name)===norm(n));
@@ -114,7 +114,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,teamworkPr
    <input aria-label="Search player name or ID" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search player name or ID to add…" style={{...btn,width:'100%',boxSizing:'border-box',textAlign:'left',marginBottom:10}}/>
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} troop power</small></span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
    <button style={{...btn,width:'100%',marginBottom:12}} onClick={()=>setShowPaste(v=>!v)}>＋ Paste player list</button>
-   {showPaste&&<div style={style}><label style={{display:'block',fontSize:13,marginBottom:8}}>Paste names or Username, troop power</label><textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={5} placeholder={'Erth, 8997\\nVanellope, 4717\\nLaw'} style={{...btn,width:'100%',boxSizing:'border-box'}}/><button style={{...btn,marginTop:8,width:'100%'}} onClick={importRows}>Match and register players</button>{pasteIssues.length>0&&<div style={{marginTop:10,color:'#f5bd5b',fontSize:12}}><strong>Needs review ({pasteIssues.length})</strong>{pasteIssues.map((issue,i)=><div key={i} style={{paddingTop:5}}>{issue}</div>)}</div>}</div>}
+   {showPaste&&<div style={style}><label style={{display:'block',fontSize:13,marginBottom:8}}>Paste names or Username, troop power</label><textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={5} placeholder={'Erth, 8997\nVanellope, 4717\nLaw'} style={{...btn,width:'100%',boxSizing:'border-box'}}/><button style={{...btn,marginTop:8,width:'100%'}} onClick={importRows}>Match and register players</button>{pasteIssues.length>0&&<div style={{marginTop:10,color:'#f5bd5b',fontSize:12}}><strong>Needs review ({pasteIssues.length})</strong>{pasteIssues.map((issue,i)=><div key={i} style={{paddingTop:5}}>{issue}</div>)}</div>}</div>}
    <div style={style}><h2 style={{fontSize:16,margin:'0 0 10px'}}>Registered players <span style={{float:'right',color:'#a9bfd0',fontSize:13}}>{joined.length+subs.length} total</span></h2>
    {[...joined,...subs].length?[...joined,...subs].map(p=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 0',borderBottom:'1px solid #2c4155'}}><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong>{!p.matched&&<span style={{color:'#f5bd5b',fontSize:11}}> · Needs matching</span>}<div style={{fontSize:12,color:'#a9bfd0'}}>{format(p.power)} troop power · {registrations[p.id]==='join'?'Combatant':'Substitute'}</div></div><button style={{...btn,padding:'8px'}} onClick={()=>setStatus(p.id,registrations[p.id]==='join'?'sub':'join')}>Change</button><button aria-label={'Remove '+p.name} style={{...btn,padding:'8px'}} onClick={()=>setStatus(p.id,registrations[p.id])}>✕</button></div>):<p style={{fontSize:13,color:'#a9bfd0'}}>No players registered yet. Search above to add one.</p>}</div>
   </>}
