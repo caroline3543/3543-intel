@@ -53,6 +53,10 @@ try{
    assert.equal(errors.length,0,'TAL '+section+' runtime error: '+errors.join('; '));
    assert.equal(await talSections.count(),1,'TAL section navigation disappeared after opening '+section);
    assert.equal(await talSections.getByRole('button',{name:section,exact:true}).getAttribute('aria-current'),'page',section+' should be active after navigation');
+   if(section==='Teams'){
+    await page.getByText('No TAL legions yet. Assign players in Registration first.').waitFor();
+    assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).count(),1,'Main navigation should remain available with no TAL legions');
+   }
   }
   await talSections.getByRole('button',{name:'Registration',exact:true}).click();
   assert.equal(await talSections.getByRole('button',{name:'Registration',exact:true}).getAttribute('aria-current'),'page');
