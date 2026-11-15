@@ -46,6 +46,14 @@ try{
   for(const name of ['Members','TAL Planner','Compare','Changes','Foundry'])assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name}).count(),1);
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Members'}).click();
+  const search=page.getByRole('combobox',{name:'Search players'});
+  await search.fill('Spic');
+  await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
+  await search.fill('Spciy');
+  await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
+  await search.fill('681766603');
+  await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
+  await search.fill('');
   assert.deepEqual(writes,[],'Read-only smoke test must not write to a workspace');
   assert.equal(errors.length,0,'Browser runtime errors: '+errors.join('; '));
   await context.close();
