@@ -29,6 +29,9 @@ jobs:
         run: node --test tests/deletion-merge-safety.test.js tests/bulk-joiner-heroes.test.js tests/fuzzy-player-matching.test.js tests/roster-search-consistency.test.js tests/talPoll.test.js
       - name: Full repository regression suite
         run: npm test
-      - name: Production build
+      - name: Repository build
         if: always() && steps.install.outcome == 'success'
         run: npm run build
+      - name: 3573 roster-site production build
+        if: always() && steps.install.outcome == 'success'
+        run: npm run build --prefix roster-site
