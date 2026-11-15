@@ -1,5 +1,6 @@
 import {useMemo,useState,useRef} from 'react';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
+import {playerSearchFields} from '../../../src/services/playerNames.js';
 const colours=['Blue','Yellow','Green','Pink'];
 const teamColors={Blue:'#397DB6',Yellow:'#D8A13C',Green:'#348D68',Pink:'#F05A9D'};
 const buildings={Blue:['Prototype I','Repair Facility I'],Yellow:['Prototype II','Transit Station'],Green:['Boiler Room','Repair Facility III'],Pink:['Repair Facility II','Repair Facility IV']};
@@ -55,7 +56,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const [generationMode,setGenerationMode]=useState('all'),[expanded,setExpanded]=useState({Blue:true,Yellow:true,Green:true,Pink:true});
  const avatarFor=p=>players.find(x=>String(x.id??x.fid??name(x))===p.id)||{username:p.name};
  const entries=useMemo(()=>{
-  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:power(p),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim()}]}));
+  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:power(p),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim(),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String)}]}));
   for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:current.power||p.power}:{...p,alliance:p.alliance||'Unassigned',matched:false});}
   return [...map.values()].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
  },[players,saved.imports]);
@@ -105,17 +106,20 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
   update({teams:next,assignments:alloc},mode==='all'?'Teams regenerated with top three assigned to Prototype I, Prototype II and Boiler Room':'Unassigned players added without changing existing assignments');
  };
  const norm=v=>String(v||'').normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleLowerCase();
- const plain=v=>norm(v).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^\p{L}\p{N}]/gu,'');
+ const plain=v=>norm(v).normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^\\p{L}\\p{N}]/gu,'');
+ const fields=p=>[p.name,...(p.searchFields||[]),p.id].filter(v=>String(v||'').trim());
  const candidateMatches=n=>{
-   const idMatches=entries.filter(p=>p.matched&&(p.id===n||String(players.find(x=>String(x.id??x.fid??name(x))===p.id)?.fid||'')===n));
-   if(idMatches.length)return idMatches;
-   const exact=entries.filter(p=>p.matched&&norm(p.name)===norm(n));
+   const raw=norm(n),key=plain(n);
+   const exactId=entries.filter(p=>p.matched&&fields(p).some(v=>/^\\d+$/.test(String(v))&&norm(v)===raw));
+   if(exactId.length)return exactId;
+   const exact=entries.filter(p=>p.matched&&fields(p).some(v=>norm(v)===raw));
    if(exact.length)return exact;
-   const key=plain(n);
-   return key.length>=3?entries.filter(p=>p.matched&&plain(p.name)===key):[];
+   return key.length>=3?entries.filter(p=>p.matched&&fields(p).some(v=>plain(v).length>=3&&plain(v)===key)):[];
  };
- const suggestions=n=>{const key=plain(n);return key.length<3?[]:entries.filter(p=>p.matched&&plain(p.name).length>=3&&(plain(p.name).includes(key)||key.includes(plain(p.name)))).slice(0,6);};
- const searchMatches=query.trim()?entries.filter(p=>p.matched&&p.name.trim()&&(norm(p.name).includes(norm(query))||(plain(query).length>=3&&plain(p.name).includes(plain(query)))||String(p.id)===query.trim())).slice(0,8):[];
+ const suggestions=n=>{const key=plain(n);return key.length<3?[]:entries.filter(p=>p.matched&&fields(p).some(v=>plain(v).length>=3&&(plain(v).includes(key)||key.includes(plain(v))))).slice(0,8);};
+ const searchMatches=query.trim()?entries.filter(p=>p.matched&&fields(p).some(v=>norm(v).includes(norm(query))||(plain(query).length>=3&&plain(v).length>=3&&plain(v).includes(plain(query))))).slice(0,8):[];
+ const pastedList=value=>/\\r|\\n/.test(value)||value.split(/\\s*[,;]\\s*/).filter(Boolean).length>=3;
+ const onSearchInput=value=>{if(pastedList(value)){setPaste(value.replace(/\\s*;\\s*/g,'\\n'));setShowPaste(true);setQuery('');setNotice('Multiple players detected. Review the pasted list below.')}else setQuery(value)};
  const filteredRegistrations=roleFilter==='join'?joined:subs;
  const groupedRanks=['R5','R4','R3','R2','R1','Unranked'];
  const bulkUpdate=(role)=>{const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};let joins=joined.length,substitutes=subs.length;for(const id of ids){if(nextRegs[id]===role)continue;if(nextRegs[id]==='join')joins--;else if(nextRegs[id]==='sub')substitutes--;if(role==='join')joins++;else substitutes++;nextRegs[id]=role;if(role!=='join'){delete nextTeams[id];delete nextAssignments[id]}}if(joins>30||substitutes>10){setNotice('Not enough registration slots for this change');return}update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' registration roles updated');setRoleFilter(role);setBulkSelected([]);setBulkMode(false)};
@@ -142,7 +146,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
    const p=matches[0],id=p.id,current=nextRegs[id],under=nextUnder[id];
    if(current&&under!==chosen){issues.push({name:n,reason:'Registered under '+under,candidates:[]});continue}
    if(current===addRole&&under===chosen){updated++;continue}
-   if(addRole==='join'&&joins>=30||addRole==='sub'&&substitutes>=10){issues.push({name:n,reason:(addRole==='join'?'Combatant':'Substitute')+' limit reached',candidates:[]});continue}
+   if((addRole==='join'&&joins>=30&&current!=='join')||(addRole==='sub'&&substitutes>=10&&current!=='sub')){issues.push({name:n,reason:(addRole==='join'?'Combatant':'Substitute')+' limit reached',candidates:[]});continue}
    if(current==='join')joins--;if(current==='sub')substitutes--;
    if(addRole==='join')joins++;else substitutes++;
    nextRegs[id]=addRole;nextUnder[id]=chosen;
@@ -181,7 +185,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
      </div>
      <div style={{display:'flex',alignItems:'center',gap:9,background:'#20344a',border:'1px solid #496077',borderRadius:12,padding:'0 12px'}}>
        <span aria-hidden="true" style={{fontSize:20,color:'#eeb85a'}}>⊕</span>
-       <input aria-label="Search and add player by name or ID" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name or Player ID to add" style={{background:'transparent',color:'#eef5fc',border:0,outline:'none',minHeight:42,width:'100%',fontSize:14}}/>
+       <input aria-label="Search and add player by name or ID" value={query} onChange={e=>onSearchInput(e.target.value)} placeholder="Search name or Player ID to add" style={{background:'transparent',color:'#eef5fc',border:0,outline:'none',minHeight:42,width:'100%',fontSize:14}}/>
        {query&&<button type="button" aria-label="Clear search" onClick={()=>setQuery('')} style={{...btn,padding:'4px 8px',minHeight:32}}>×</button>}
      </div>
      <button type="button" style={{...btn,background:'transparent',border:0,padding:'5px 2px',minHeight:30,color:'#a9c4dc',fontSize:13}} onClick={()=>setShowPaste(v=>!v)}>{showPaste?'Hide bulk import':'＋ Paste multiple players'}</button>
