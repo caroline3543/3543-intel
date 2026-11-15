@@ -1,3 +1,4 @@
+import { mightpulseRequest } from '../../services/mightpulseService.js';
 import {PlayerSearch} from './PlayerSearch.jsx';
 import { useState, useEffect, useRef } from 'react';
 import { C } from '../../utils/constants.js';
@@ -81,6 +82,27 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const [sortDirection,setSortDirection]=useState('asc');
   const [viewingPlayer,setViewingPlayer]=useState(null);
   const [profileOpen,setProfileOpen]=useState(false);
+  const [playerLookup,setPlayerLookup]=useState({status:'idle'});
+  async function checkPlayerName(player){
+    const fid=String(player?.fid||'').trim();
+    if(!/^[1-9]\\d{3,14}$/.test(fid)){setPlayerLookup({status:'error',message:'This player needs a valid Player ID.'});return;}
+    setPlayerLookup({status:'loading',fid});
+    try{
+      const response=await mightpulseRequest('player',{fid});
+      const base=response?.data?.player||response?.data;
+      const returnedId=String(base?.chief_id??base?.fid??response?.data?.chief_id??'');
+      if(returnedId!==fid)throw Error('Provider returned a different player ID. No changes made.');
+      const name=String(base?.nick_name||'').trim();
+      if(!name)throw Error('Provider did not return a username. No changes made.');
+      setPlayerLookup({status:'success',fid,name,retrievedAt:response.retrieved_at||null,cachedAt:response?.data?.cached_at||base?.cached_at||null});
+    }catch(e){setPlayerLookup({status:'error',fid,message:e.message||'Lookup failed'});}
+  }
+  function applyCheckedName(player){
+    if(playerLookup.status!=='success'||playerLookup.fid!==String(player.fid)||!playerLookup.name)return;
+    onSavePlayer({...player,username:playerLookup.name,pastUsernames:[...new Set([...(player.pastUsernames||[]),player.username].filter(Boolean))]});
+    setPlayerLookup({status:'idle'});
+  }
+
   const [editingPlayer,setEditingPlayer]=useState(null);
   const [leaderOpen,setLeaderOpen]=useState(false);
   const [fieldsOpen,setFieldsOpen]=useState(false);
@@ -111,7 +133,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const lastFetch=latestRosterFetch(players);
   function toggle(id){setSelected(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);return next;});}
   function stopSelection(){setSelecting(false);setSelected(new Set());setEditingSelection(false);}
-  function openProfile(player){setViewingPlayer(player);setProfileOpen(true);}
+  function openProfile(player){setViewingPlayer(player);setPlayerLookup({status:'idle'});setProfileOpen(true);}
   function savePlayer(player){onSavePlayer(player);setViewingPlayer(player);}
   async function copyRoster(){
     try{
@@ -160,7 +182,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     {grouped?groups.filter(g=>g.members.length).map(group=><section key={group.name}><h3 style={{fontSize:16,color:C.icy}}>{group.name} · {group.members.length}</h3>{group.members.map(card)}</section>):displayed.map(card)}
     {visibleCount<visible.length&&<div ref={loadRef} role="status" style={{textAlign:'center',padding:18,color:C.icy,fontSize:13}}>Showing {displayed.length} of {visible.length} · More players load as you scroll <button style={{...button,marginLeft:8}} onClick={()=>setVisibleCount(n=>Math.min(n+20,visible.length))}>Load more</button></div>}
     {filtersOpen && <RosterFilters players={players} roles={roles} filters={filters} onChange={next=>setFilters(next)} onClose={()=>setFiltersOpen(false)} count={visible.length}/>}
-    <ProfileView player={currentPlayer} players={players} teamworkPreferences={teamworkPreferences} onSaveTeamworkPreferences={onSaveTeamworkPreferences} roles={roles} open={profileOpen} onClose={()=>setProfileOpen(false)} onEdit={()=>{setProfileOpen(false);setEditingPlayer(currentPlayer);}} events={events} onOpenLeaderProfile={()=>setLeaderOpen(true)} onSave={savePlayer}/>
+    <ProfileView player={currentPlayer} playerLookup={playerLookup} onCheckPlayerName={checkPlayerName} onApplyCheckedName={applyCheckedName} players={players} teamworkPreferences={teamworkPreferences} onSaveTeamworkPreferences={onSaveTeamworkPreferences} roles={roles} open={profileOpen} onClose={()=>setProfileOpen(false)} onEdit={()=>{setProfileOpen(false);setEditingPlayer(currentPlayer);}} events={events} onOpenLeaderProfile={()=>setLeaderOpen(true)} onSave={savePlayer}/>
     <RallyLeaderProfileSheet player={currentPlayer} open={leaderOpen} onClose={()=>setLeaderOpen(false)} onSave={savePlayer}/>
     <PlayerSheet open={!!editingPlayer} player={editingPlayer} roles={roles} onClose={()=>setEditingPlayer(null)} onSave={savePlayer} existingTags={[...new Set(players.map(p=>p.allianceTag).filter(Boolean))]} existingPlayers={players} onOpenExisting={openProfile} onGoToIntel={onGoToIntel}/>
     <RoleManagerSheet open={rolesOpen} onClose={()=>setRolesOpen(false)} roles={roles} onSaveCustomRoles={onSaveCustomRoles} players={players} onUpdatePlayers={onUpdatePlayers}/>
