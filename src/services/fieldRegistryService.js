@@ -155,6 +155,8 @@ function setFieldValue(player, fieldId, value) {
       return { ...player, troops: { ...player.troops, lancer: value }, profileLastUpdated: stamp };
     case 'marksman':
       return { ...player, troops: { ...player.troops, marksman: value }, profileLastUpdated: stamp };
+    case 'joinerHeroes':
+      return { ...player, joinerHeroes: value, profileLastUpdated: stamp };
     case 'allianceRank':
       return { ...player, allianceRank: value, profileLastUpdated: stamp };
     default:
