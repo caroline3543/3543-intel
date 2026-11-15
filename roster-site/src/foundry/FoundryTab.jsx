@@ -2,8 +2,10 @@ import {useMemo,useState,useRef} from 'react';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
 const colours=['Blue','Yellow','Green','Pink'];
 const teamColors={Blue:'#397DB6',Yellow:'#D8A13C',Green:'#348D68',Pink:'#F05A9D'};
-const buildings={Blue:['Prototype I','Boiler Room'],Yellow:['Prototype II','Transit Station'],Green:['Repair Facility I','Repair Facility III'],Pink:['Repair Facility II','Repair Facility IV']};
+const buildings={Blue:['Prototype I','Repair Facility I'],Yellow:['Prototype II','Transit Station'],Green:['Boiler Room','Repair Facility III'],Pink:['Repair Facility II','Repair Facility IV']};
 const anchorBuildings=['Prototype I','Prototype II','Boiler Room'];
+// Prototype I and Boiler must have separate team anchors.
+const anchorTeams=['Blue','Yellow','Green'];
 const style={background:'#142438',border:'1px solid #30465a',borderRadius:14,padding:14,marginBottom:12};
 const btn={border:'1px solid #40546a',borderRadius:10,background:'#21354b',color:'#e9f2fa',padding:'10px 12px',minHeight:42,fontWeight:650,cursor:'pointer'};
 const name=p=>p.username||p.alias||p.name||String(p.fid||p.id);
@@ -24,6 +26,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const [focusTeam,setFocusTeam]=useState('Blue'),[moving,setMoving]=useState(null),[confirmGenerate,setConfirmGenerate]=useState(false);
  const [allianceFilter,setAllianceFilter]=useState(()=>localStorage.getItem('caroline3573_foundry_alliance')||'');
  const [addRole,setAddRole]=useState('join');
+ const [managing,setManaging]=useState(null);
  const [pasteIssues,setPasteIssues]=useState([]);
  const [editingPower,setEditingPower]=useState(null),[powerInput,setPowerInput]=useState('');
  const [generationMode,setGenerationMode]=useState('all'),[expanded,setExpanded]=useState({Blue:true,Yellow:true,Green:true,Pink:true});
@@ -62,7 +65,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
   const ranked=attending.filter(p=>p.power>0);
   const anchors=ranked.slice(0,3);
   if(mode==='all'){
-   anchors.forEach((p,i)=>{const building=anchorBuildings[i];const c=colours.find(color=>buildings[color].includes(building));put(p,c);alloc[p.id]=building});
+   anchors.forEach((p,i)=>{const building=anchorBuildings[i];const c=anchorTeams[i];put(p,c);alloc[p.id]=building});
   }
   attending.filter(p=>!next[p.id]).forEach(p=>{
    const available=colours.filter(c=>members[c].length<Math.ceil(attending.length/4));
@@ -132,14 +135,36 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
   <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:6,marginBottom:14}}>{[['players','Players'],['teams','Teams'],['buildings','Buildings']].map(([id,label])=><button key={id} onClick={()=>setView(id)} style={{...btn,background:view===id?'#f5ad38':'#172a3e',color:view===id?'#101b28':'#e9f2fa',padding:'9px 3px'}}>{label}</button>)}</div>
   {notice&&<div role="status" style={{...style,fontSize:13,color:'#f5bd5b'}}>{notice}</div>}
   {view==='players'&&<>
-   <div style={{display:'flex',gap:8,marginBottom:12}}><button style={{...btn,flex:1,background:addRole==='join'?'#32694d':'#21354b'}} onClick={()=>setAddRole('join')}>Add combatant</button><button style={{...btn,flex:1,background:addRole==='sub'?'#725724':'#21354b'}} onClick={()=>setAddRole('sub')}>Add substitute</button></div>
-   <input aria-label="Search player name or ID" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search player name or ID to add…" style={{...btn,width:'100%',boxSizing:'border-box',textAlign:'left',marginBottom:10}}/>
+   <div style={{...style,padding:12}}>
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:10}}>
+       <strong style={{fontSize:15}}>Add players</strong>
+       <div role="group" aria-label="Registration role" style={{display:'flex',gap:4,background:'#0d1b2c',borderRadius:10,padding:3}}>
+         {[['join','Combatant'],['sub','Substitute']].map(([role,label])=><button key={role} type="button" aria-pressed={addRole===role} onClick={()=>setAddRole(role)} style={{...btn,minHeight:36,padding:'6px 9px',fontSize:12,border:'none',background:addRole===role?'#344c63':'transparent'}}>{label}</button>)}
+       </div>
+     </div>
+     <div style={{display:'flex',alignItems:'center',gap:9,background:'#20344a',border:'1px solid #496077',borderRadius:12,padding:'0 12px'}}>
+       <span aria-hidden="true" style={{fontSize:20,color:'#eeb85a'}}>⊕</span>
+       <input aria-label="Search and add player by name or ID" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name or Player ID to add" style={{background:'transparent',color:'#eef5fc',border:0,outline:'none',minHeight:48,width:'100%',fontSize:14}}/>
+       {query&&<button type="button" aria-label="Clear search" onClick={()=>setQuery('')} style={{...btn,padding:'4px 8px',minHeight:32}}>×</button>}
+     </div>
+     <button type="button" style={{...btn,background:'transparent',border:0,padding:'8px 2px',minHeight:34,color:'#a9c4dc',fontSize:13}} onClick={()=>setShowPaste(v=>!v)}>{showPaste?'Hide bulk import':'＋ Paste multiple players'}</button>
+   </div>
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} troop power</small></span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
-   <button style={{...btn,width:'100%',marginBottom:12}} onClick={()=>setShowPaste(v=>!v)}>＋ Paste player list</button>
    {showPaste&&<div style={style}><label style={{display:'block',fontSize:13,marginBottom:8}}>Paste names or Username, troop power</label><textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={5} placeholder={'Erth, 8997\nVanellope, 4717\nLaw'} style={{...btn,width:'100%',boxSizing:'border-box'}}/><button style={{...btn,marginTop:8,width:'100%'}} onClick={importRows}>Match and register players</button>{pasteIssues.length>0&&<div style={{marginTop:10,color:'#f5bd5b',fontSize:12}}><strong>Needs review ({pasteIssues.length})</strong>{pasteIssues.map((issue,i)=><div key={i} style={{paddingTop:5}}>{issue}</div>)}</div>}</div>}
    {editingPower&&<div style={style}><strong>Edit Foundry troop power · {entries.find(p=>p.id===editingPower)?.name}</strong><p style={{fontSize:12,color:'#a9bfd0'}}>Updates the player's profile with today's date.</p><input aria-label="Foundry troop power" inputMode="numeric" value={powerInput} onChange={e=>setPowerInput(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',marginBottom:8}} placeholder="Troop power"/><div style={{display:'flex',gap:8}}><button style={{...btn,flex:1}} onClick={()=>setEditingPower(null)}>Cancel</button><button style={{...btn,flex:1,background:'#32694d'}} onClick={savePower}>Save power</button></div></div>}
    <div style={style}><h2 style={{fontSize:16,margin:'0 0 10px'}}>Registered players <span style={{float:'right',color:'#a9bfd0',fontSize:13}}>{joined.length+subs.length} total</span></h2>
-   {[...joined,...subs].length?[...joined,...subs].map(p=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 0',borderBottom:'1px solid #2c4155'}}><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong>{!p.matched&&<span style={{color:'#f5bd5b',fontSize:11}}> · Needs matching</span>}<div style={{fontSize:12,color:'#a9bfd0'}}>{format(p.power)} troop power · {registrations[p.id]==='join'?'Combatant':'Substitute'}</div></div><button style={{...btn,padding:'8px'}} onClick={()=>{setEditingPower(p.id);setPowerInput(p.power?String(p.power):'')}}>Edit power</button><button style={{...btn,padding:'8px'}} onClick={()=>setStatus(p.id,registrations[p.id]==='join'?'sub':'join')}>Change</button><button aria-label={'Remove '+p.name} style={{...btn,padding:'8px'}} onClick={()=>setStatus(p.id,registrations[p.id])}>✕</button></div>):<p style={{fontSize:13,color:'#a9bfd0'}}>No players registered yet. Search above to add one.</p>}</div>
+   {[...joined,...subs].length?[...joined,...subs].map(p=><div key={p.id} style={{borderBottom:'1px solid #2c4155',padding:'12px 0'}}>
+     <div style={{display:'flex',alignItems:'center',gap:10}}>
+       <PlayerAvatar player={avatarFor(p)} size={38}/>
+       <div style={{flex:1,minWidth:0}}><strong style={{fontSize:14,overflowWrap:'anywhere'}}>{p.name}</strong>{!p.matched&&<span style={{color:'#f5bd5b',fontSize:11}}> · Needs matching</span>}<div style={{fontSize:12,color:'#a9bfd0'}}>{format(p.power)} troop power · {registrations[p.id]==='join'?'Combatant':'Substitute'}</div></div>
+       <button aria-label={'Manage '+p.name} aria-expanded={managing===p.id} style={{...btn,minWidth:44,fontSize:20,padding:'7px'}} onClick={()=>setManaging(managing===p.id?null:p.id)}>⋯</button>
+     </div>
+     {managing===p.id&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
+       <button style={btn} onClick={()=>{setEditingPower(p.id);setPowerInput(p.power?String(p.power):'');setManaging(null)}}>Edit troop power</button>
+       <button style={btn} onClick={()=>{setStatus(p.id,registrations[p.id]==='join'?'sub':'join');setManaging(null)}}>Make {registrations[p.id]==='join'?'substitute':'combatant'}</button>
+       <button style={{...btn,gridColumn:'1 / -1',color:'#f1a9a9'}} onClick={()=>{setStatus(p.id,registrations[p.id]);setManaging(null)}}>Remove from Foundry</button>
+     </div>}
+   </div>):<p style={{fontSize:13,color:'#a9bfd0'}}>No players registered yet. Search above to add one.</p>}</div>
   </>}
   {(view==='teams'||view==='buildings')&&<>
    <div style={{...style,padding:12}}>
