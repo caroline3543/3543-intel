@@ -1,7 +1,9 @@
 import {useMemo,useState,useRef} from 'react';
+import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
 const colours=['Blue','Yellow','Green','Pink'];
 const teamColors={Blue:'#397DB6',Yellow:'#D8A13C',Green:'#348D68',Pink:'#F05A9D'};
 const buildings={Blue:['Prototype I','Boiler Room'],Yellow:['Prototype II','Transit Station'],Green:['Repair Facility I','Repair Facility III'],Pink:['Repair Facility II','Repair Facility IV']};
+const anchorBuildings=['Prototype I','Prototype II','Boiler Room'];
 const style={background:'#142438',border:'1px solid #30465a',borderRadius:14,padding:14,marginBottom:12};
 const btn={border:'1px solid #40546a',borderRadius:10,background:'#21354b',color:'#e9f2fa',padding:'10px 12px',minHeight:42,fontWeight:650,cursor:'pointer'};
 const name=p=>p.username||p.alias||p.name||String(p.fid||p.id);
@@ -24,6 +26,8 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const [addRole,setAddRole]=useState('join');
  const [pasteIssues,setPasteIssues]=useState([]);
  const [editingPower,setEditingPower]=useState(null),[powerInput,setPowerInput]=useState('');
+ const [generationMode,setGenerationMode]=useState('all'),[expanded,setExpanded]=useState({Blue:true,Yellow:true,Green:true,Pink:true});
+ const avatarFor=p=>players.find(x=>String(x.id??x.fid??name(x))===p.id)||{username:p.name};
  const entries=useMemo(()=>{
   const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:power(p),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim()}]}));
   for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:current.power||p.power}:{...p,alliance:p.alliance||'Unassigned',matched:false});}
@@ -43,32 +47,36 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
   if(next!=='join'){delete nextTeams[id];delete nextAssignments[id]}
   update({registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments},'Registration updated');
  };
- const autoTeams=()=>{setConfirmGenerate(false);
-  const next={},totals=Object.fromEntries(colours.map(c=>[c,0])),members=Object.fromEntries(colours.map(c=>[c,[]]));
-  const attending=[...joined].sort((a,b)=>b.power-a.power);
-  const prefs=teamworkPreferences||{};
-  const pairs=Array.isArray(prefs.pairs)?prefs.pairs:[];
-  const groups=Array.isArray(prefs.groups)?prefs.groups:[];
+ const autoTeams=(mode='all')=>{
+  setConfirmGenerate(false);
+  const next=mode==='add'?{...teams}:{},alloc=mode==='add'?{...assignments}:{};
+  const totals=Object.fromEntries(colours.map(c=>[c,0])),members=Object.fromEntries(colours.map(c=>[c,[]]));
+  const attending=[...joined].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
+  const prefs=teamworkPreferences||{},pairs=Array.isArray(prefs.pairs)?prefs.pairs:[],groups=Array.isArray(prefs.groups)?prefs.groups:[];
   const affinity=(a,b)=>{
-   const linked=pairs.some(pair=>Array.isArray(pair)&&pair.map(String).includes(a.id)&&pair.map(String).includes(b.id))
-     ||groups.some(g=>Array.isArray(g.memberIds)&&g.memberIds.map(String).includes(a.id)&&g.memberIds.map(String).includes(b.id));
-   return (linked?2:0)+(a.language&&a.language===b.language?1:0);
+   const linked=pairs.some(pair=>Array.isArray(pair)&&pair.map(String).includes(a.id)&&pair.map(String).includes(b.id))||groups.some(g=>Array.isArray(g.memberIds)&&g.memberIds.map(String).includes(a.id)&&g.memberIds.map(String).includes(b.id));
+   return (linked?2:0)+(a.language&&a.language.toLowerCase()===b.language?.toLowerCase()?1:0);
   };
-  attending.forEach((p,index)=>{
+  const put=(p,c)=>{next[p.id]=c;totals[c]+=p.power;members[c].push(p)};
+  if(mode==='add')attending.forEach(p=>{if(colours.includes(next[p.id]))put(p,next[p.id])});
+  const ranked=attending.filter(p=>p.power>0);
+  const anchors=ranked.slice(0,3);
+  if(mode==='all'){
+   anchors.forEach((p,i)=>{const building=anchorBuildings[i];const c=colours.find(color=>buildings[color].includes(building));put(p,c);alloc[p.id]=building});
+  }
+  attending.filter(p=>!next[p.id]).forEach(p=>{
    const available=colours.filter(c=>members[c].length<Math.ceil(attending.length/4));
    const choices=available.length?available:colours;
    const minimum=Math.min(...choices.map(c=>totals[c]));
-   const tolerance=Math.max(1,minimum*0.05);
-   const viable=choices.filter(c=>totals[c]<=minimum+tolerance);
-   const c=viable.sort((a,b)=>{
-    const affinityA=members[a].reduce((n,x)=>n+affinity(p,x),0);
-    const affinityB=members[b].reduce((n,x)=>n+affinity(p,x),0);
-    return affinityB-affinityA||totals[a]-totals[b]||colours.indexOf(a)-colours.indexOf(b);
-   })[0];
-   next[p.id]=c;totals[c]+=p.power;members[c].push(p);
+   const viable=choices.filter(c=>totals[c]<=minimum+Math.max(1,minimum*.05));
+   const c=viable.sort((x,y)=>members[y].reduce((n,q)=>n+affinity(p,q),0)-members[x].reduce((n,q)=>n+affinity(p,q),0)||totals[x]-totals[y]||colours.indexOf(x)-colours.indexOf(y))[0];
+   put(p,c);
   });
-  const alloc={};colours.forEach(c=>{const group=members[c].sort((a,b)=>b.power-a.power),bins=[0,0];group.forEach(p=>{const i=bins[0]<=bins[1]?0:1;alloc[p.id]=buildings[c][i];bins[i]+=p.power})});
-  update({teams:next,assignments:alloc},'Teams generated using power, language and cooperation preferences');
+  colours.forEach(c=>{
+   const bins=[0,0];members[c].forEach(p=>{const i=buildings[c].indexOf(alloc[p.id]);if(i>=0)bins[i]+=p.power});
+   members[c].filter(p=>!alloc[p.id]).sort((a,b)=>b.power-a.power).forEach(p=>{const i=bins[0]<=bins[1]?0:1;alloc[p.id]=buildings[c][i];bins[i]+=p.power});
+  });
+  update({teams:next,assignments:alloc},mode==='all'?'Teams regenerated with top three assigned to Prototype I, Prototype II and Boiler Room':'Unassigned players added without changing existing assignments');
  };
  const norm=v=>String(v||'').normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleLowerCase();
  const searchMatches=query.trim()?entries.filter(p=>p.matched&&(norm(p.name).includes(norm(query))||String(p.id)===query.trim())).slice(0,8):[];
@@ -140,13 +148,13 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
     <div style={{fontSize:12,color:'#a9bfd0',marginTop:10}}>{!assignedCount?'Generate teams to see balance':missingPower.length?'Missing troop power for '+missingPower.length+' player(s). Balance is provisional.':balanceSpread+'% spread between strongest and weakest team'}</div>
    </div>
    {view==='teams'&&<>
-    <button style={{...btn,width:'100%',background:'#70521f',marginBottom:8}} onClick={()=>setConfirmGenerate(true)}>Generate teams</button>
+    <div style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}><button style={{...btn,padding:'8px 12px',background:'#263b50'}} onClick={()=>setConfirmGenerate(v=>!v)}>⚙ Generate teams</button></div>
     <p style={{fontSize:12,color:'#9ab1c3',margin:'0 0 14px'}}>Balances troop power while considering language and preferred teammates.</p>
-    {confirmGenerate&&<div style={style}><strong>Replace existing teams?</strong><p style={{fontSize:13,color:'#a9bfd0'}}>This will replace manual team and opening building assignments for {joined.length} combatants.</p>{missingPower.length>0&&<p style={{fontSize:12,color:'#f5bd5b'}}>Warning: {missingPower.length} player(s) have missing troop power.</p>}<div style={{display:'flex',gap:8}}><button style={{...btn,flex:1}} onClick={()=>setConfirmGenerate(false)}>Cancel</button><button style={{...btn,flex:1,background:'#32694d'}} onClick={autoTeams}>Generate</button></div></div>}
-    {joined.some(p=>!teams[p.id])&&<div style={{...style,borderColor:'#B78B45'}}><h3 style={{margin:'0 0 12px'}}>Unallocated players <span style={{fontSize:13,color:'#a9bfd0'}}>({joined.filter(p=>!teams[p.id]).length})</span></h3>{joined.filter(p=>!teams[p.id]).map(p=><div key={p.id} style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:'#a9bfd0'}}>{p.power?format(p.power)+' troop power':'Missing troop power'}{p.tierScore!==null?' · Tier score '+p.tierScore:''}</div></div><select aria-label={'Assign '+p.name+' to team'} defaultValue="" onChange={e=>{if(e.target.value)assign(p.id,e.target.value)}} style={{...btn,maxWidth:130}}><option value="" disabled>Assign</option>{colours.map(c=><option key={c} value={c}>{c}</option>)}</select></div>)}</div>}
-    {colours.map(c=><div key={c} ref={el=>{teamRefs.current[c]=el}} style={{...style,scrollMarginTop:20,borderTop:'4px solid '+teamColors[c]}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div><h2 style={{fontSize:19,margin:0,color:teamColors[c]}}>{c} team</h2><span style={{fontSize:12,color:'#a9bfd0'}}>{active.filter(p=>teams[p.id]===c).length} players · {format(teamTotals[c])} power</span></div><button style={{...btn,padding:'8px'}} onClick={()=>{navigator.clipboard?.writeText(active.filter(p=>teams[p.id]===c).map(p=>p.name).join('\n'));setNotice(c+' team copied')}}>Copy</button></div>
-    {active.filter(p=>teams[p.id]===c).map(p=><div key={p.id} style={{borderTop:'1px solid #30465a',padding:'12px 0'}}><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:p.power>0?'#a9bfd0':'#f5bd5b'}}>{p.power>0?format(p.power)+' troop power':'Missing troop power'}</div>{p.tierScore!==null&&<div style={{fontSize:12,color:'#83B5CE'}}>Tier strength score · {p.tierScore}</div>}</div><button style={{...btn,padding:'8px 10px'}} onClick={()=>setMoving(moving===p.id?null:p.id)}>Move</button></div>{moving===p.id&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{colours.filter(x=>x!==c).map(x=><button key={x} style={{...btn,padding:'8px',borderColor:teamColors[x]}} onClick={()=>{assign(p.id,x);setMoving(null);jumpToTeam(x)}}>{x}</button>)}</div>}</div>)}
-    {!active.some(p=>teams[p.id]===c)&&<p style={{fontSize:13,color:'#a9bfd0'}}>No players assigned to this team.</p>}</div>)}
+    {confirmGenerate&&<div style={style}><strong>Team generation</strong><p style={{fontSize:13,color:'#a9bfd0'}}>The strongest three combatants anchor Prototype I, Prototype II and Boiler Room when regenerating all. Manual assignments are preserved when adding unassigned players only.</p>{missingPower.length>0&&<p style={{fontSize:12,color:'#f5bd5b'}}>{missingPower.length} player(s) have missing troop power.</p>}<div style={{display:'grid',gap:8}}><button style={{...btn,background:'#32694d'}} onClick={()=>autoTeams('add')}>Add unassigned players only</button><button style={{...btn,background:'#70521f'}} onClick={()=>{setGenerationMode('all');autoTeams('all')}}>Regenerate all teams and buildings</button><button style={btn} onClick={()=>setConfirmGenerate(false)}>Cancel</button></div></div>}
+    {joined.some(p=>!teams[p.id])&&<div style={{...style,borderColor:'#B78B45'}}><h3 style={{margin:'0 0 12px'}}>Unallocated players <span style={{fontSize:13,color:'#a9bfd0'}}>({joined.filter(p=>!teams[p.id]).length})</span></h3>{joined.filter(p=>!teams[p.id]).map(p=><div key={p.id} style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}><div style={{flex:1,minWidth:0}}><div style={{display:'flex',gap:9,alignItems:'center'}}><PlayerAvatar player={avatarFor(p)} size={36}/><div><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:'#a9bfd0'}}>{p.power?format(p.power)+' troop power':'Missing troop power'}{p.tierScore!==null?' · Tier score '+p.tierScore:''}</div></div></div></div><select aria-label={'Assign '+p.name+' to team'} defaultValue="" onChange={e=>{if(e.target.value)assign(p.id,e.target.value)}} style={{...btn,maxWidth:130}}><option value="" disabled>Assign</option>{colours.map(c=><option key={c} value={c}>{c}</option>)}</select></div>)}</div>}
+    {colours.map(c=><div key={c} ref={el=>{teamRefs.current[c]=el}} style={{...style,scrollMarginTop:20,borderTop:'4px solid '+teamColors[c]}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div onClick={()=>setExpanded(v=>({...v,[c]:!v[c]}))} style={{cursor:'pointer'}}><h2 style={{fontSize:19,margin:0,color:teamColors[c]}}>{c} team {expanded[c]?'⌃':'⌄'}</h2><span style={{fontSize:12,color:'#a9bfd0'}}>{active.filter(p=>teams[p.id]===c).length} players · {format(teamTotals[c])} power</span></div><button style={{...btn,padding:'8px'}} onClick={()=>{navigator.clipboard?.writeText(active.filter(p=>teams[p.id]===c).map(p=>p.name).join('\n'));setNotice(c+' team copied')}}>Copy</button></div>
+    {expanded[c]&&active.filter(p=>teams[p.id]===c).map(p=><div key={p.id} style={{borderTop:'1px solid #30465a',padding:'12px 0'}}><div style={{display:'flex',alignItems:'center',gap:8}}><PlayerAvatar player={avatarFor(p)} size={38}/><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:p.power>0?'#a9bfd0':'#f5bd5b'}}>{p.power>0?format(p.power)+' troop power':'Missing troop power'}</div>{p.tierScore!==null&&<div style={{fontSize:12,color:'#83B5CE'}}>Tier strength score · {p.tierScore}</div>}</div><button style={{...btn,padding:'8px 10px'}} onClick={()=>setMoving(moving===p.id?null:p.id)}>⇄</button></div>{moving===p.id&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{colours.filter(x=>x!==c).map(x=><button key={x} style={{...btn,padding:'8px',borderColor:teamColors[x]}} onClick={()=>{assign(p.id,x);setMoving(null);jumpToTeam(x)}}>{x}</button>)}</div>}</div>)}
+    {expanded[c]&&!active.some(p=>teams[p.id]===c)&&<p style={{fontSize:13,color:'#a9bfd0'}}>No players assigned to this team.</p>}</div>)}
    </>}
    {view==='buildings'&&<>
     <p style={{fontSize:12,color:'#9ab1c3',margin:'0 0 12px'}}>Select a player, then choose their starting building.</p>
