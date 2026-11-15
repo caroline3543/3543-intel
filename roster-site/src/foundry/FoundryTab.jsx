@@ -54,6 +54,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const [manualMatches,setManualMatches]=useState({});
  const [editingPower,setEditingPower]=useState(null),[powerInput,setPowerInput]=useState('');
  const [generationMode,setGenerationMode]=useState('all'),[expanded,setExpanded]=useState({Blue:true,Yellow:true,Green:true,Pink:true});
+ const [teamMessage,setTeamMessage]=useState(null),[teamMessageOpen,setTeamMessageOpen]=useState(false);
  const avatarFor=p=>players.find(x=>String(x.id??x.fid??name(x))===p.id)||{username:p.name};
  const entries=useMemo(()=>{
   const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:power(p),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim(),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String)}]}));
@@ -162,6 +163,8 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const savePower=()=>{const value=Number(String(powerInput).replace(/,/g,'').trim());if(!Number.isFinite(value)||value<0||!Number.isInteger(value)||!String(powerInput).trim()){setNotice('Enter a valid whole-number troop power');return;}const p=entries.find(x=>x.id===editingPower);if(!p||!p.matched){setNotice('Player profile not found');return;}onSaveTroopPower?.(editingPower,value);setEditingPower(null);setNotice('Foundry troop power saved to '+p.name+'\'s profile');};
  const assign=(id,colour)=>{const nextTeams={...teams,[id]:colour};const nextAlloc={...assignments};if(!buildings[colour].includes(nextAlloc[id]))nextAlloc[id]=buildings[colour][0];update({teams:nextTeams,assignments:nextAlloc},'Team updated')};
  const move=(id,building)=>{const colour=colours.find(c=>buildings[c].includes(building));if(!colour)return;update({teams:{...teams,[id]:colour},assignments:{...assignments,[id]:building}},'Building updated');setSelected(null)};
+ const generatedTeamMessage=()=>colours.map(c=>c.toUpperCase()+' TEAM:\\n'+joined.filter(p=>teams[p.id]===c).sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name)).map(p=>p.name).join(', ')).join('\\n\\n');
+ const copyTeamMessage=async()=>{const message=teamMessage===null?generatedTeamMessage():teamMessage;try{await navigator.clipboard.writeText(message);setNotice('Team message copied')}catch{setNotice('Copy failed. Select the text and copy manually.')}};
  const copyText=()=>['INITIAL ASSIGNMENTS',...colours.flatMap(c=>buildings[c].map(b=>'» '+b+': '+active.filter(p=>assignments[p.id]===b).map(p=>p.name).join(', ')))].join('\n');
  const total=arr=>arr.reduce((n,p)=>n+p.power,0);
  const teamTotals=Object.fromEntries(colours.map(c=>[c,total(active.filter(p=>teams[p.id]===c))]));
@@ -239,6 +242,15 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
     {colours.map(c=><div key={c} ref={el=>{teamRefs.current[c]=el}} style={{...style,scrollMarginTop:20,borderTop:'4px solid '+teamColors[c]}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div onClick={()=>setExpanded(v=>({...v,[c]:!v[c]}))} style={{cursor:'pointer'}}><h2 style={{fontSize:19,margin:0,color:teamColors[c]}}>{c} team {expanded[c]?'⌃':'⌄'}</h2><span style={{fontSize:12,color:'#a9bfd0'}}>{active.filter(p=>teams[p.id]===c).length} players · {format(teamTotals[c])} power</span></div><button style={{...btn,padding:'8px'}} onClick={()=>{navigator.clipboard?.writeText(active.filter(p=>teams[p.id]===c).map(p=>p.name).join('\n'));setNotice(c+' team copied')}}>Copy</button></div>
     {expanded[c]&&active.filter(p=>teams[p.id]===c).map(p=><div key={p.id} style={{borderTop:'1px solid #30465a',padding:'12px 0'}}><div style={{display:'flex',alignItems:'center',gap:8}}><PlayerAvatar player={avatarFor(p)} size={38}/><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:p.power>0?'#a9bfd0':'#f5bd5b'}}>{p.power>0?format(p.power)+' troop power':'Missing troop power'}</div>{p.tierScore!==null&&<div style={{fontSize:12,color:'#83B5CE'}}>Tier strength score · {p.tierScore}</div>}</div><button style={{...btn,padding:'8px 10px'}} onClick={()=>setMoving(moving===p.id?null:p.id)}>⇄</button></div>{moving===p.id&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{colours.filter(x=>x!==c).map(x=><button key={x} style={{...btn,padding:'8px',borderColor:teamColors[x]}} onClick={()=>{assign(p.id,x);setMoving(null);jumpToTeam(x)}}>{x}</button>)}</div>}</div>)}
     {expanded[c]&&!active.some(p=>teams[p.id]===c)&&<p style={{fontSize:13,color:'#a9bfd0'}}>No players assigned to this team.</p>}</div>)}
+    <div style={{...style,padding:14}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <div><h2 style={{fontSize:17,margin:'0 0 4px'}}>Team message</h2><span style={{fontSize:12,color:'#a9bfd0'}}>Edit before copying to alliance chat</span></div>
+        <button type="button" style={{...btn,minHeight:36}} onClick={()=>{setTeamMessage(generatedTeamMessage());setTeamMessageOpen(true)}}>↻ Regenerate</button>
+      </div>
+      <button type="button" aria-expanded={teamMessageOpen} style={{...btn,width:'100%',marginTop:12,textAlign:'left',background:'#20344a'}} onClick={()=>setTeamMessageOpen(v=>!v)}>{teamMessageOpen?'Hide editable message':'Show editable message'}</button>
+      {teamMessageOpen&&<><textarea aria-label="Editable team message" rows={12} value={teamMessage===null?generatedTeamMessage():teamMessage} onChange={e=>setTeamMessage(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',resize:'vertical',marginTop:10,whiteSpace:'pre-wrap',lineHeight:1.6,fontWeight:500}}/>{teamMessage!==null&&teamMessage!==generatedTeamMessage()&&<p style={{fontSize:12,color:'#a9bfd0'}}>Custom edits remain until you regenerate.</p>}</>}
+      <button type="button" style={{...btn,width:'100%',marginTop:10,background:'#f5ad38',color:'#101b28',borderColor:'#eab14f'}} onClick={copyTeamMessage}>Copy team message</button>
+    </div>
    </>}
    {view==='buildings'&&<>
     <p style={{fontSize:12,color:'#9ab1c3',margin:'0 0 12px'}}>Select a player, then choose their starting building.</p>
