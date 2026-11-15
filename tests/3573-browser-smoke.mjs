@@ -45,6 +45,14 @@ try{
   if(await tour.isVisible()) await tour.getByRole('button',{name:'Skip'}).click();
   for(const name of ['Members','TAL Planner','Compare','Changes','Foundry'])assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name}).count(),1);
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  const talSections=page.getByRole('navigation',{name:'TAL Planner sections'});
+  await talSections.waitFor();
+  for(const section of ['Registration','TAL Prep','Teams']){
+   await talSections.getByRole('button',{name:section,exact:true}).click();
+   assert.equal(await talSections.getByRole('button',{name:section,exact:true}).getAttribute('aria-current'),'page',section+' should be active after navigation');
+  }
+  await talSections.getByRole('button',{name:'Registration',exact:true}).click();
+  assert.equal(await talSections.getByRole('button',{name:'Registration',exact:true}).getAttribute('aria-current'),'page');
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Members'}).click();
   const search=page.getByRole('combobox',{name:'Search roster'});
   await search.fill('Spic');
