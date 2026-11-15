@@ -1,4 +1,4 @@
-import {useMemo,useState} from 'react';
+import {useMemo,useState,useRef} from 'react';
 const colours=['Blue','Yellow','Green','Pink'];
 const teamColors={Blue:'#397DB6',Yellow:'#D8A13C',Green:'#348D68',Pink:'#F05A9D'};
 const buildings={Blue:['Prototype I','Boiler Room'],Yellow:['Prototype II','Transit Station'],Green:['Repair Facility I','Repair Facility III'],Pink:['Repair Facility II','Repair Facility IV']};
@@ -9,18 +9,23 @@ const power=p=>Number(p.lastFoundryTroopPower??p.troopPower??p.lastTroopPower??0
 const alliance=p=>String(p.alliance||p.homeAlliance||p.allianceTag||p.alliance_name||'Unassigned').trim()||'Unassigned';
 const rank=p=>{const r=String(p.allianceRank??p.rank??p.alliance_rank??'').toUpperCase();return /^R[1-5]$/.test(r)?r:'Unranked'};
 const format=n=>Math.round(n).toLocaleString();
+const T10=[66,71,76,83,88,94,99,104,110,115,121],T11=[80,86,92,100,106,114,120,126,135,141,148];
+const tierValue=raw=>{const x=String(raw||'').trim().toUpperCase();if(!x)return null;const fc=Number(x.match(/FC\s*(\d+)/)?.[1]||0);if(/T12|EXALTED/.test(x))return 96;if(/HELIOS|T11/.test(x))return T11[Math.min(fc,10)]??null;if(/FC\s*\d+|T10/.test(x))return T10[Math.min(fc,10)]??null;return ({7:28,8:38,9:50})[Number(x.match(/T\s*(\d+)/)?.[1]||0)]??null;};
+const tierScore=p=>{const scores=['infantry','lancer','marksman'].map(k=>tierValue(p.troops?.[k]));return scores.every(x=>x!==null)?Math.round(scores.reduce((a,b)=>a+b,0)/3*10)/10:null;};
 export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroopPower,teamworkPreferences={}}){
  const saved=sharedFoundry||{};
  const [view,setView]=useState('players'),[query,setQuery]=useState('');
  const [paste,setPaste]=useState(''),[showPaste,setShowPaste]=useState(false),[notice,setNotice]=useState(''),[selected,setSelected]=useState(null);
  const [undo,setUndo]=useState(null);
+ const teamRefs=useRef({});
+ const jumpToTeam=c=>{setFocusTeam(c);teamRefs.current[c]?.scrollIntoView({behavior:'smooth',block:'start'});};
  const [focusTeam,setFocusTeam]=useState('Blue'),[moving,setMoving]=useState(null),[confirmGenerate,setConfirmGenerate]=useState(false);
  const [allianceFilter,setAllianceFilter]=useState(()=>localStorage.getItem('caroline3573_foundry_alliance')||'');
  const [addRole,setAddRole]=useState('join');
  const [pasteIssues,setPasteIssues]=useState([]);
  const [editingPower,setEditingPower]=useState(null),[powerInput,setPowerInput]=useState('');
  const entries=useMemo(()=>{
-  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:power(p),rank:rank(p),alliance:alliance(p),matched:true,language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim()}]}));
+  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:power(p),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim()}]}));
   for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:current.power||p.power}:{...p,alliance:p.alliance||'Unassigned',matched:false});}
   return [...map.values()].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
  },[players,saved.imports]);
@@ -131,17 +136,17 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
   {(view==='teams'||view==='buildings')&&<>
    <div style={{...style,padding:12}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><strong>Team balance</strong><span style={{fontSize:12,color:'#a9bfd0'}}>{assignedCount}/{joined.length} assigned</span></div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:7}}>{colours.map(c=><button key={c} onClick={()=>{setFocusTeam(c);setMoving(null);setSelected(null)}} style={{...btn,minWidth:0,padding:'10px 3px',borderColor:focusTeam===c?teamColors[c]:'#40546a',background:focusTeam===c?'#263b50':'#1a2b40'}}><div style={{height:4,background:teamColors[c],borderRadius:4,marginBottom:8}}/><div style={{fontSize:11}}>{c}</div><div style={{fontSize:13,marginTop:3}}>{teamTotals[c]?format(teamTotals[c]):'—'}</div></button>)}</div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:7}}>{colours.map(c=><button key={c} onClick={()=>{setMoving(null);setSelected(null);if(view==='teams')jumpToTeam(c);else setFocusTeam(c)}} style={{...btn,minWidth:0,padding:'10px 3px',borderColor:focusTeam===c?teamColors[c]:'#40546a',background:focusTeam===c?'#263b50':'#1a2b40'}}><div style={{height:4,background:teamColors[c],borderRadius:4,marginBottom:8}}/><div style={{fontSize:11}}>{c}</div><div style={{fontSize:13,marginTop:3}}>{teamTotals[c]?format(teamTotals[c]):'—'}</div></button>)}</div>
     <div style={{fontSize:12,color:'#a9bfd0',marginTop:10}}>{!assignedCount?'Generate teams to see balance':missingPower.length?'Missing troop power for '+missingPower.length+' player(s). Balance is provisional.':balanceSpread+'% spread between strongest and weakest team'}</div>
    </div>
    {view==='teams'&&<>
     <button style={{...btn,width:'100%',background:'#70521f',marginBottom:8}} onClick={()=>setConfirmGenerate(true)}>Generate teams</button>
     <p style={{fontSize:12,color:'#9ab1c3',margin:'0 0 14px'}}>Balances troop power while considering language and preferred teammates.</p>
     {confirmGenerate&&<div style={style}><strong>Replace existing teams?</strong><p style={{fontSize:13,color:'#a9bfd0'}}>This will replace manual team and opening building assignments for {joined.length} combatants.</p>{missingPower.length>0&&<p style={{fontSize:12,color:'#f5bd5b'}}>Warning: {missingPower.length} player(s) have missing troop power.</p>}<div style={{display:'flex',gap:8}}><button style={{...btn,flex:1}} onClick={()=>setConfirmGenerate(false)}>Cancel</button><button style={{...btn,flex:1,background:'#32694d'}} onClick={autoTeams}>Generate</button></div></div>}
-    <div style={style}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div><h2 style={{fontSize:19,margin:0,color:teamColors[focusTeam]}}>{focusTeam} team</h2><span style={{fontSize:12,color:'#a9bfd0'}}>{active.filter(p=>teams[p.id]===focusTeam).length} players · {format(teamTotals[focusTeam])} power</span></div><button style={{...btn,padding:'8px'}} onClick={()=>{navigator.clipboard?.writeText(active.filter(p=>teams[p.id]===focusTeam).map(p=>p.name).join('\n'));setNotice('Team list copied')}}>Copy</button></div>
-    {active.filter(p=>teams[p.id]===focusTeam).map(p=><div key={p.id} style={{borderTop:'1px solid #30465a',padding:'12px 0'}}><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:p.power>0?'#a9bfd0':'#f5bd5b'}}>{p.power>0?format(p.power)+' troop power':'Missing troop power'}</div></div><button style={{...btn,padding:'8px 10px'}} onClick={()=>setMoving(moving===p.id?null:p.id)}>Move</button></div>{moving===p.id&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{colours.filter(c=>c!==focusTeam).map(c=><button key={c} style={{...btn,padding:'8px',borderColor:teamColors[c]}} onClick={()=>{assign(p.id,c);setMoving(null);setFocusTeam(c)}}>{c}</button>)}</div>}</div>)}
-    {!active.some(p=>teams[p.id]===focusTeam)&&<p style={{fontSize:13,color:'#a9bfd0'}}>No players assigned to this team.</p>}</div>
-    {joined.some(p=>!teams[p.id])&&<div style={style}><h3 style={{marginTop:0}}>Unassigned combatants</h3>{joined.filter(p=>!teams[p.id]).map(p=><div key={p.id} style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}><span style={{flex:1,fontSize:13}}>{p.name}</span><button style={btn} onClick={()=>assign(p.id,focusTeam)}>Add to {focusTeam}</button></div>)}</div>}
+    {joined.some(p=>!teams[p.id])&&<div style={{...style,borderColor:'#B78B45'}}><h3 style={{margin:'0 0 12px'}}>Unallocated players <span style={{fontSize:13,color:'#a9bfd0'}}>({joined.filter(p=>!teams[p.id]).length})</span></h3>{joined.filter(p=>!teams[p.id]).map(p=><div key={p.id} style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:'#a9bfd0'}}>{p.power?format(p.power)+' troop power':'Missing troop power'}{p.tierScore!==null?' · Tier score '+p.tierScore:''}</div></div><select aria-label={'Assign '+p.name+' to team'} defaultValue="" onChange={e=>{if(e.target.value)assign(p.id,e.target.value)}} style={{...btn,maxWidth:130}}><option value="" disabled>Assign</option>{colours.map(c=><option key={c} value={c}>{c}</option>)}</select></div>)}</div>}
+    {colours.map(c=><div key={c} ref={el=>{teamRefs.current[c]=el}} style={{...style,scrollMarginTop:20,borderTop:'4px solid '+teamColors[c]}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div><h2 style={{fontSize:19,margin:0,color:teamColors[c]}}>{c} team</h2><span style={{fontSize:12,color:'#a9bfd0'}}>{active.filter(p=>teams[p.id]===c).length} players · {format(teamTotals[c])} power</span></div><button style={{...btn,padding:'8px'}} onClick={()=>{navigator.clipboard?.writeText(active.filter(p=>teams[p.id]===c).map(p=>p.name).join('\n'));setNotice(c+' team copied')}}>Copy</button></div>
+    {active.filter(p=>teams[p.id]===c).map(p=><div key={p.id} style={{borderTop:'1px solid #30465a',padding:'12px 0'}}><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:p.power>0?'#a9bfd0':'#f5bd5b'}}>{p.power>0?format(p.power)+' troop power':'Missing troop power'}</div>{p.tierScore!==null&&<div style={{fontSize:12,color:'#83B5CE'}}>Tier strength score · {p.tierScore}</div>}</div><button style={{...btn,padding:'8px 10px'}} onClick={()=>setMoving(moving===p.id?null:p.id)}>Move</button></div>{moving===p.id&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{colours.filter(x=>x!==c).map(x=><button key={x} style={{...btn,padding:'8px',borderColor:teamColors[x]}} onClick={()=>{assign(p.id,x);setMoving(null);jumpToTeam(x)}}>{x}</button>)}</div>}</div>)}
+    {!active.some(p=>teams[p.id]===c)&&<p style={{fontSize:13,color:'#a9bfd0'}}>No players assigned to this team.</p>}</div>)}
    </>}
    {view==='buildings'&&<>
     <p style={{fontSize:12,color:'#9ab1c3',margin:'0 0 12px'}}>Select a player, then choose their starting building.</p>
