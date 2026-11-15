@@ -54,7 +54,7 @@ try{
   await search.fill('681766603');
   await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
   await search.fill('');
-  await page.getByRole('button',{name:/Options/}).click();
+  await page.getByRole('button',{name:'☷ Options',exact:true}).click();
   await page.getByRole('button',{name:'Select players'}).click();
   await page.getByRole('button',{name:'Select shown'}).click();
   await page.getByRole('button',{name:'Update selected'}).click();
