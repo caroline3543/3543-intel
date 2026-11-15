@@ -76,8 +76,13 @@ export function useAppState() {
         lastUpdated: new Date().toISOString(),
       };
     });
-    pushPlayer(stamped, allianceTag()); // fire-and-forget cloud push
-    showToast('Player saved ✓');
+    showToast('Player updated on this device. Cloud save pending.');
+    if (isCloudConfigured()) {
+      pushPlayer(stamped, allianceTag()).then(ok => {
+        if (!ok) showToast('Cloud save failed. Your local change remains; retry syncing before switching devices.', 'error');
+        else showToast('Player saved to cloud ✓');
+      });
+    }
   }, [showToast]);
 
   const addPlayers = useCallback((newPlayers) => {
@@ -87,8 +92,13 @@ export function useAppState() {
       players: [...prev.players, ...stamped],
       lastUpdated: new Date().toISOString(),
     }));
-    stamped.forEach(p => pushPlayer(p, allianceTag()));
-    if (stamped.length) showToast(`${stamped.length} player${stamped.length !== 1 ? 's' : ''} added ✓`);
+    if (stamped.length) showToast(`${stamped.length} added on this device. Cloud save pending.`);
+    if (stamped.length && isCloudConfigured()) {
+      Promise.all(stamped.map(p => pushPlayer(p, allianceTag()))).then(results => {
+        const failed = results.filter(ok => !ok).length;
+        showToast(failed ? `${failed} player cloud save${failed === 1 ? '' : 's'} failed. Local changes remain.` : `${stamped.length} players saved to cloud ✓`, failed ? 'error' : 'success');
+      });
+    }
   }, [showToast]);
 
   const updatePlayers = useCallback((updatedPlayers) => {
@@ -101,8 +111,13 @@ export function useAppState() {
       }),
       lastUpdated: new Date().toISOString(),
     }));
-    stamped.forEach(p => pushPlayer(p, allianceTag()));
-    if (stamped.length) showToast(`${stamped.length} updated ✓`);
+    if (stamped.length) showToast(`${stamped.length} updated on this device. Cloud save pending.`);
+    if (stamped.length && isCloudConfigured()) {
+      Promise.all(stamped.map(p => pushPlayer(p, allianceTag()))).then(results => {
+        const failed = results.filter(ok => !ok).length;
+        showToast(failed ? `${failed} player cloud update${failed === 1 ? '' : 's'} failed. Local changes remain.` : `${stamped.length} cloud updates confirmed ✓`, failed ? 'error' : 'success');
+      });
+    }
   }, [showToast]);
 
   const deletePlayer = useCallback((id) => {
@@ -111,8 +126,10 @@ export function useAppState() {
       players: prev.players.filter(p => p.id !== id),
       lastUpdated: new Date().toISOString(),
     }));
-    deletePlayerRemote(id);
-    showToast('Player removed');
+    showToast('Player removed on this device. Cloud deletion pending.');
+    if (isCloudConfigured()) {
+      deletePlayerRemote(id).then(ok => showToast(ok ? 'Player removed from cloud ✓' : 'Cloud deletion failed. Player may return after sync.', ok ? 'success' : 'error'));
+    }
   }, [showToast]);
 
   // ── Event operations ──────────────────────────────────────
