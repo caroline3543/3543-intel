@@ -65,6 +65,15 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   function setData(value){setSharedData(prev=>{const next=withAutomaticRoles(typeof value==='function'?value(prev):value);latest.current=next;return next;});}
   useEffect(()=>{if(sync.ready&&sync.joined&&!sync.conflicts?.length){const normalized=withAutomaticRoles(data);if(normalized!==data)setSharedData(normalized);}},[data,sync.ready,sync.joined,sync.conflicts?.length]);
   const [apiProgress,setApiProgress]=useState('');
+  const [apiResult,setApiResult]=useState(null);
+  const [syncTick,setSyncTick]=useState(0);
+  const syncPendingSince=useRef(null);
+  useEffect(()=>{if(sync.dirty){if(syncPendingSince.current===null)syncPendingSince.current=Date.now();}else syncPendingSince.current=null;},[sync.dirty]);
+  useEffect(()=>{const timer=setInterval(()=>setSyncTick(n=>n+1),1000);return()=>clearInterval(timer)},[]);
+  const syncLate=Boolean(sync.dirty&&syncPendingSince.current!==null&&Date.now()-syncPendingSince.current>=30000);
+  const syncProblem=Boolean(sync.issue||sync.conflicts?.length||syncLate);
+  const syncLabel=syncProblem?'Sync not working':sync.dirty||sync.syncing?'Syncing':'Synced';
+  const syncColor=syncProblem?'#F07575':sync.dirty||sync.syncing?'#E6BF7B':'#72CBA9';
   const [importing,setImporting]=useState(false),[deleting,setDeleting]=useState(null),[message,setMessage]=useState('');
   const latest=useRef(data);latest.current=data;
   const pendingTalSync=useRef({active:false,sawDirty:false});
@@ -129,11 +138,35 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     setData(prev=>({...prev,players:mergeAllianceProfiles(prev.players,rows,'3573').players,settings:{...prev.settings,lastApiRefresh:{at:new Date().toISOString(),scope:'Alliance roster',count:rows.length}}}));return {updated:result.updated.length,added:result.added.length};
   }
   async function syncNow(){setMessage('Syncing shared workspace…');const result=await retry();setMessage(result?.issue?result.issue:result?.conflicts?.length?'Edits need review.':result?.dirty||result?.syncing?'Changes are still syncing.':'Synced. All shared changes are up to date.');}
-  async function refreshAll(){
-    if(refreshing.current)return;refreshing.current=true;stopRefresh.current=false;let done=0,failed=0,updated=0;
-    try{for(const tag of DEFAULT_ALLIANCES){if(stopRefresh.current)break;setApiProgress(`Refreshing [${tag}] · ${done+1}/${DEFAULT_ALLIANCES.length}`);try{const rows=allianceRows(await fetchMightpulseAlliance(3573,tag),'3573',tag);if(!rows.length)throw Error('No roster returned');importRoster(rows);updated+=rows.length;}catch(e){failed++;setMessage(`[${tag}]: ${e.message}`);if([401,403,429].includes(e.status)||[401,403,429].includes(e.providerStatus))break;}done++;}
-      setData(prev=>({...prev,settings:{...prev.settings,lastApiRefresh:{at:new Date().toISOString(),scope:'HOT, ARC, RKG, LUN',count:updated,failed,partial:failed>0||done<4}}}));
-      setMessage(`API refresh: ${updated} profiles updated${failed?` · ${failed} failed`:''}. Sharing with leaders…`);await retry();
+  async function refreshAll(onlyTags=null){
+    if(refreshing.current)return;
+    refreshing.current=true;stopRefresh.current=false;
+    const targets=Array.isArray(onlyTags)?onlyTags:DEFAULT_ALLIANCES;
+    const failures=[],successes=[];let checked=0,updated=0,added=0;
+    setApiResult(null);
+    try{
+      for(const tag of targets){
+        if(stopRefresh.current)break;
+        setApiProgress('Refreshing '+tag+' · '+(checked+1)+'/'+targets.length);
+        try{
+          const rows=allianceRows(await fetchMightpulseAlliance(3573,tag),'3573',tag);
+          if(!rows.length)throw Error('No roster returned');
+          const result=importRoster(rows);
+          successes.push(tag);updated+=result.updated;added+=result.added;
+        }catch(e){
+          failures.push({tag,reason:e.message||'API request failed'});
+          if([401,403,429].includes(e.status)||[401,403,429].includes(e.providerStatus))break;
+        }
+        checked++;
+      }
+      const status=failures.length||successes.length<targets.length?(successes.length?'partial':'failed'):'success';
+      const result={status,successes,failures,updated,added,checked,requested:targets.length,at:new Date().toISOString()};
+      setApiResult(result);
+      if(successes.length){
+        setData(prev=>({...prev,settings:{...prev.settings,lastApiRefresh:{at:result.at,scope:successes.join(', '),count:updated+added,failed:failures.length,partial:status!=='success'}}}));
+        setMessage(status==='success'?'API refresh complete · '+updated+' updated · '+added+' added':'API refresh partially completed · '+failures.length+' failed');
+        await retry();
+      }else setMessage('API refresh failed. Existing player records were preserved.');
     }finally{refreshing.current=false;setApiProgress('');}
   }
   async function refreshLab(){
@@ -188,9 +221,9 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
         <div style={{minWidth:0}}><h1 style={{margin:0,fontSize:19,letterSpacing:'-.025em',fontWeight:750}}>3573 · Caroline</h1><p style={{margin:'3px 0 0',fontSize:12,color:C.icy}}>{players.length} players</p></div>
         <div style={{display:'flex',alignItems:'center',gap:7}}>
-          <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:sync.issue?C.gold:C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
-            <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:sync.issue?C.gold:sync.syncing?'#E6BF7B':sync.dirty?'#E6BF7B':'#72CBA9'}}/>
-            {sync.issue?'Sync issue':sync.syncing?'Syncing':sync.dirty?'Unsynced':'Shared'}
+          <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:syncProblem?'#F07575':C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
+            <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:syncColor}}/>
+            {syncLabel}
           </button>
           <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
@@ -199,6 +232,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
               <button style={button} disabled={exporting} onClick={backup}>{exporting?'Exporting…':'Export roster as Excel'}</button>
               <button style={button} disabled={sync.syncing||sync.mode==='join'||!!sync.conflicts?.length} onClick={syncNow}>{sync.syncing?'Syncing…':sync.issue?'Retry sync':sync.dirty?'Sync changes':'Check sync'}</button>
               <button style={button} onClick={()=>setWorkspaceOpen(true)}>Workspace settings</button>
+              {apiResult&&<div role="status" style={{padding:10,borderRadius:10,background:'#1A2C40',fontSize:12,lineHeight:1.6}}><strong style={{color:apiResult.status==='success'?'#72CBA9':'#F0B25C'}}>{apiResult.status==='success'?'Refresh complete':apiResult.status==='partial'?'Refresh partially completed':'Refresh failed'}</strong><div>{apiResult.updated} profiles updated · {apiResult.added} added</div><div>{apiResult.successes.length} of {apiResult.requested} alliances refreshed</div>{apiResult.failures.map(f=><div key={f.tag} style={{color:'#F0B25C'}}>{f.tag}: {f.reason}</div>)}{apiResult.failures.length>0&&<button style={{...button,width:'100%',marginTop:8}} disabled={!!apiProgress} onClick={()=>refreshAll(apiResult.failures.map(f=>f.tag))}>Retry failed alliances</button>}</div>}
               {data.settings?.lastApiRefresh&&<span style={{fontSize:11,color:C.icy,lineHeight:1.4}}>API updated {new Date(data.settings.lastApiRefresh.at).toISOString().slice(0,16).replace('T',' ')} UTC</span>}
             </div>
           </details>
@@ -209,9 +243,9 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
         <div style={{minWidth:0}}><h1 style={{margin:0,fontSize:19,letterSpacing:'-.025em',fontWeight:750}}>3573 · Caroline</h1><p style={{margin:'3px 0 0',fontSize:12,color:C.icy}}>{tab==='tal'?'TAL Planner':tab==='teams'?'Teams':tab==='changes'?'Name Changes':tab==='battle'?'Battle planner':'SvS comparison'}</p></div>
         <div style={{display:'flex',alignItems:'center',gap:7}}>
-          <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:sync.issue?C.gold:C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
-            <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:sync.issue?C.gold:sync.syncing?'#E6BF7B':sync.dirty?'#E6BF7B':'#72CBA9'}}/>
-            {sync.issue?'Sync issue':sync.syncing?'Syncing':sync.dirty?'Unsynced':'Shared'}
+          <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:syncProblem?'#F07575':C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
+            <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:syncColor}}/>
+            {syncLabel}
           </button>
           <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
