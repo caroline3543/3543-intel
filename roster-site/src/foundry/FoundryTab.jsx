@@ -114,7 +114,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
    return key.length>=3?entries.filter(p=>p.matched&&plain(p.name)===key):[];
  };
  const suggestions=n=>{const key=plain(n);return key.length<3?[]:entries.filter(p=>p.matched&&(plain(p.name).includes(key)||key.includes(plain(p.name)))).slice(0,6);};
- const searchMatches=query.trim()?entries.filter(p=>p.matched&&(norm(p.name).includes(norm(query))||plain(p.name).includes(plain(query))||String(p.id)===query.trim())).slice(0,8):[];
+ const searchMatches=query.trim()?entries.filter(p=>p.matched&&(norm(p.name).includes(norm(query))||(plain(query).length>=3&&plain(p.name).includes(plain(query)))||String(p.id)===query.trim())).slice(0,8):[];
  const add=(id,role=addRole)=>{
   const p=entries.find(x=>x.id===id);
   if(!p||!p.matched){setNotice('Select a matched player profile');return}
