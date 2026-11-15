@@ -66,6 +66,55 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   useEffect(()=>{if(sync.ready&&sync.joined&&!sync.conflicts?.length){const normalized=withAutomaticRoles(data);if(normalized!==data)setSharedData(normalized);}},[data,sync.ready,sync.joined,sync.conflicts?.length]);
   const [apiProgress,setApiProgress]=useState('');
   const [apiResult,setApiResult]=useState(null);
+  const [nameRefresh,setNameRefresh]=useState({status:'idle',done:0,total:0,changes:[],failed:0});
+  const nameRefreshStop=useRef(false);
+  async function refreshUsernames(){
+    if(refreshing.current)return;
+    refreshing.current=true;nameRefreshStop.current=false;
+    const unique=new Map();
+    for(const p of latest.current.players||[]){
+      const fid=String(p.fid||'').trim();
+      if(/^[1-9]\\d{3,14}$/.test(fid)&&!unique.has(fid))unique.set(fid,p);
+    }
+    const targets=[...unique.values()];
+    const changes=[];let failed=0,done=0;
+    setNameRefresh({status:'running',done:0,total:targets.length,changes:[],failed:0});
+    try{
+      for(const p of targets){
+        if(nameRefreshStop.current)break;
+        try{
+          const response=await mightpulseRequest('player',{fid:String(p.fid)});
+          const base=response?.data?.player||response?.data;
+          const id=String(base?.chief_id??base?.fid??response?.data?.chief_id??'');
+          const username=String(base?.nick_name||'').trim();
+          if(id!==String(p.fid)||!username)throw Error('Invalid player response');
+          if(username!==p.username)changes.push({id:p.id,fid:String(p.fid),before:p.username||'',after:username});
+        }catch(e){
+          failed++;
+          if([401,403,429].includes(e.status)||[401,403,429].includes(e.providerStatus)){
+            setMessage(e.status===429||e.providerStatus===429?'API rate limit reached. Review the partial results.':'Username refresh stopped: '+e.message);
+            done++;break;
+          }
+        }
+        done++;
+        setNameRefresh({status:'running',done,total:targets.length,changes:[...changes],failed});
+      }
+      setNameRefresh({status:'review',done,total:targets.length,changes,failed});
+    }finally{refreshing.current=false;}
+  }
+  function applyUsernameChanges(){
+    const changes=nameRefresh.changes||[];
+    if(!changes.length)return;
+    const byId=new Map(changes.map(c=>[c.id,c]));
+    setData(prev=>({...prev,players:prev.players.map(p=>{
+      const c=byId.get(p.id);
+      if(!c||p.username!==c.before)return p;
+      return {...p,username:c.after,pastUsernames:[...new Set([...(p.pastUsernames||[]),p.username].filter(Boolean))],profileLastUpdated:new Date().toISOString()};
+    })}));
+    setNameRefresh(v=>({...v,status:'applied'}));
+    setMessage('Username changes saved to the shared roster. Check sync status.');
+  }
+
   const [syncTick,setSyncTick]=useState(0);
   const syncPendingSince=useRef(null);
   useEffect(()=>{if(sync.dirty){if(syncPendingSince.current===null)syncPendingSince.current=Date.now();}else syncPendingSince.current=null;},[sync.dirty]);
@@ -229,6 +278,17 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
               <strong style={{fontSize:13,marginBottom:2}}>Workspace actions</strong>
               <button style={button} onClick={refreshAll} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button>
+              <button style={button} onClick={refreshUsernames} disabled={!!apiProgress||!!legionRefresh||nameRefresh.status==='running'||sync.mode==='join'||!!sync.conflicts?.length}>{nameRefresh.status==='running'?'Checking usernames…':'Refresh usernames'}</button>
+              {nameRefresh.status!=='idle'&&<div role="status" style={{padding:10,borderRadius:10,background:C.section,fontSize:12,lineHeight:1.6}}>
+                <strong>{nameRefresh.status==='running'?'Checking usernames':nameRefresh.status==='applied'?'Names saved':'Username review'}</strong>
+                <div>{nameRefresh.done} of {nameRefresh.total} checked · {nameRefresh.changes.length} differences · {nameRefresh.failed} failed</div>
+                {nameRefresh.status==='running'&&<button style={button} onClick={()=>{nameRefreshStop.current=true;}}>Stop</button>}
+                {nameRefresh.status==='review'&&<div style={{maxHeight:220,overflowY:'auto',marginTop:6}}>
+                  {nameRefresh.changes.length===0?<div>No username differences found in successful lookups.</div>:nameRefresh.changes.map(c=><div key={c.id} style={{padding:'6px 0',borderBottom:'1px solid '+C.border,overflowWrap:'anywhere'}}>{c.before||'Unknown'} → <strong>{c.after}</strong> · {c.fid}</div>)}
+                  {nameRefresh.changes.length>0&&<button style={{...button,marginTop:8,width:'100%'}} onClick={applyUsernameChanges}>Apply {nameRefresh.changes.length} username changes</button>}
+                  <p style={{margin:'6px 0 0'}}>API names may be outdated. Review before applying. Other profile fields remain unchanged.</p>
+                </div>}
+              </div>}
               <button style={button} disabled={exporting} onClick={backup}>{exporting?'Exporting…':'Export roster as Excel'}</button>
               <button style={button} disabled={sync.syncing||sync.mode==='join'||!!sync.conflicts?.length} onClick={syncNow}>{sync.syncing?'Syncing…':sync.issue?'Retry sync':sync.dirty?'Sync changes':'Check sync'}</button>
               <button style={button} onClick={()=>setWorkspaceOpen(true)}>Workspace settings</button>
@@ -251,6 +311,17 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
               <strong style={{fontSize:13,marginBottom:2}}>Workspace actions</strong>
               <button style={button} onClick={refreshAll} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button>
+              <button style={button} onClick={refreshUsernames} disabled={!!apiProgress||!!legionRefresh||nameRefresh.status==='running'||sync.mode==='join'||!!sync.conflicts?.length}>{nameRefresh.status==='running'?'Checking usernames…':'Refresh usernames'}</button>
+              {nameRefresh.status!=='idle'&&<div role="status" style={{padding:10,borderRadius:10,background:C.section,fontSize:12,lineHeight:1.6}}>
+                <strong>{nameRefresh.status==='running'?'Checking usernames':nameRefresh.status==='applied'?'Names saved':'Username review'}</strong>
+                <div>{nameRefresh.done} of {nameRefresh.total} checked · {nameRefresh.changes.length} differences · {nameRefresh.failed} failed</div>
+                {nameRefresh.status==='running'&&<button style={button} onClick={()=>{nameRefreshStop.current=true;}}>Stop</button>}
+                {nameRefresh.status==='review'&&<div style={{maxHeight:220,overflowY:'auto',marginTop:6}}>
+                  {nameRefresh.changes.length===0?<div>No username differences found in successful lookups.</div>:nameRefresh.changes.map(c=><div key={c.id} style={{padding:'6px 0',borderBottom:'1px solid '+C.border,overflowWrap:'anywhere'}}>{c.before||'Unknown'} → <strong>{c.after}</strong> · {c.fid}</div>)}
+                  {nameRefresh.changes.length>0&&<button style={{...button,marginTop:8,width:'100%'}} onClick={applyUsernameChanges}>Apply {nameRefresh.changes.length} username changes</button>}
+                  <p style={{margin:'6px 0 0'}}>API names may be outdated. Review before applying. Other profile fields remain unchanged.</p>
+                </div>}
+              </div>}
               <button style={button} disabled={exporting} onClick={backup}>{exporting?'Exporting…':'Export roster as Excel'}</button>
               <button style={button} disabled={sync.syncing||sync.mode==='join'||!!sync.conflicts?.length} onClick={syncNow}>{sync.syncing?'Syncing…':sync.issue?'Retry sync':sync.dirty?'Sync changes':'Check sync'}</button>
               <button style={button} onClick={()=>setWorkspaceOpen(true)}>Workspace settings</button>
