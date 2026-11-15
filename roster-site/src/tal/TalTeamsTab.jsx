@@ -62,7 +62,7 @@ function WeightSlider({metric,label,value,onCommit}){
 }
 const draftPrefix='caroline-3573-tal-teams-v1:';
 export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGroups=[],drafts={},onDraftChange,syncReady=false,selectedLegionId}){
- const legions=(value?.teams||[]).filter(t=>['HOT','ARC','RKG'].includes(String(t.host||'').toUpperCase()));
+ const legions=(value?.teams||[]).filter(t=>t&&['HOT','ARC','RKG'].includes(String(t.host||'').toUpperCase()));
  const [legionId,setLegionId]=useState(()=>{
   try{return JSON.parse(window.localStorage.getItem('caroline-3573-last-tal-match')||'null')?.legion||legions[0]?.id||''}catch{return legions[0]?.id||''}
  });
