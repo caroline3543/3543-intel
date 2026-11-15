@@ -8,6 +8,8 @@ import { normalizeName, nameSimilarity } from '../utils/normalize.js';
 export function searchPlayers(players, query, limit = 8) {
   const q = normalizeName(query);
   if (!q) return [];
+  // Numeric player IDs are identifiers, not names: never suggest fuzzy IDs.
+  if (/^\d+$/.test(q)) return players.filter(p => String(p.fid||'') === q || String(p.id||'') === q).slice(0,limit);
 
   return players
     .map((player, index) => {
