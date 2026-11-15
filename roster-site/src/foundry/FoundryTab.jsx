@@ -1,10 +1,10 @@
-import {useMemo,useState,useRef} from 'react';
+import {useMemo,useState,useRef,useEffect} from 'react';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
 import {playerSearchFields} from '../../../src/services/playerNames.js';
 const colours=['Blue','Yellow','Green','Pink'];
 const teamColors={Blue:'#397DB6',Yellow:'#D8A13C',Green:'#348D68',Pink:'#F05A9D'};
-const buildings={Blue:['Prototype I','Repair Facility I'],Yellow:['Prototype II','Transit Station'],Green:['Boiler Room','Repair Facility III'],Pink:['Repair Facility II','Repair Facility IV']};
-const anchorBuildings=['Prototype I','Prototype II','Boiler Room'];
+const buildings={Blue:['Prototype Site I','Boiler Room'],Yellow:['Prototype Site II','Central Transit Station'],Green:['Repair Facility I','Repair Facility III'],Pink:['Repair Facility II','Repair Facility IV']};
+const anchorBuildings=['Prototype Site I','Prototype Site II','Repair Facility I'];
 // Prototype I and Boiler must have separate team anchors.
 const anchorTeams=['Blue','Yellow','Green'];
 const style={background:'#142438',border:'1px solid #30465a',borderRadius:16,padding:12,marginBottom:10};
@@ -66,6 +66,9 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const registrations=saved.registrations||{},teams=saved.teams||{},assignments=saved.assignments||{},registeredUnder=saved.registeredUnder||{};
  const joined=entries.filter(p=>registrations[p.id]==='join'&&registeredUnder[p.id]===chosen),subs=entries.filter(p=>registrations[p.id]==='sub'&&registeredUnder[p.id]===chosen);
  const active=joined.filter(p=>teams[p.id]&&colours.includes(teams[p.id]));
+ const validAssignments=Object.fromEntries(active.map(p=>[p.id,buildings[teams[p.id]].includes(assignments[p.id])?assignments[p.id]:buildings[teams[p.id]][0]]));
+ const invalidAssignments=active.filter(p=>!buildings[teams[p.id]].includes(assignments[p.id]));
+ useEffect(()=>{if(!invalidAssignments.length||!onSaveFoundry)return;onSaveFoundry({...saved,assignments:{...assignments,...validAssignments}});},[saved,onSaveFoundry,invalidAssignments.map(p=>p.id+':'+teams[p.id]+':'+assignments[p.id]).join('|')]);
  const update=(patch,msg)=>{setUndo(saved);onSaveFoundry?.({...saved,...patch});setNotice(msg||'Updated · syncing across devices');};
  const setStatus=(id,status)=>{const current=registeredUnder[id]===chosen?registrations[id]:'';const next=status===current?'':status;
   if(next==='join'&&joined.length>=30&&current!=='join'){setNotice('30 combatant slots are full');return}
@@ -77,7 +80,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  };
  const autoTeams=(mode='all')=>{
   setConfirmGenerate(false);
-  const next=mode==='add'?{...teams}:{},alloc=mode==='add'?{...assignments}:{};
+  const next=mode==='add'?{...teams}:{},alloc=mode==='add'?{...validAssignments}:{};
   const totals=Object.fromEntries(colours.map(c=>[c,0])),members=Object.fromEntries(colours.map(c=>[c,[]]));
   const attending=[...joined].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
   const prefs=teamworkPreferences||{},pairs=Array.isArray(prefs.pairs)?prefs.pairs:[],groups=Array.isArray(prefs.groups)?prefs.groups:[];
@@ -104,7 +107,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
    const bins=[0,0];members[c].forEach(p=>{const i=buildings[c].indexOf(alloc[p.id]);if(i>=0)bins[i]+=p.power});
    members[c].filter(p=>!alloc[p.id]).sort((a,b)=>b.power-a.power).forEach(p=>{const i=bins[0]<=bins[1]?0:1;alloc[p.id]=buildings[c][i];bins[i]+=p.power});
   });
-  update({teams:next,assignments:alloc},mode==='all'?'Teams regenerated with top three assigned to Prototype I, Prototype II and Boiler Room':'Unassigned players added without changing existing assignments');
+  update({teams:next,assignments:alloc},mode==='all'?'Teams regenerated with anchors in their colour zones':'Unassigned players added without changing existing assignments');
  };
  const norm=v=>String(v||'').normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleLowerCase();
  const plain=v=>norm(v).normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^\\p{L}\\p{N}]/gu,'');
@@ -165,7 +168,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const move=(id,building)=>{const colour=colours.find(c=>buildings[c].includes(building));if(!colour)return;update({teams:{...teams,[id]:colour},assignments:{...assignments,[id]:building}},'Building updated');setSelected(null)};
  const generatedTeamMessage=()=>colours.map(c=>c.toUpperCase()+' TEAM\n'+joined.filter(p=>teams[p.id]===c).sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name)).map(p=>p.name).join(', ')).join('\n\n');
  const copyTeamMessage=async()=>{const message=teamMessage===null?generatedTeamMessage():teamMessage;try{await navigator.clipboard.writeText(message);setNotice('Team message copied')}catch{setNotice('Copy failed. Select the text and copy manually.')}};
- const copyText=()=>['INITIAL ASSIGNMENTS',...colours.flatMap(c=>buildings[c].map(b=>'» '+b+': '+active.filter(p=>assignments[p.id]===b).map(p=>p.name).join(', ')))].join('\n');
+ const copyText=()=>['INITIAL ASSIGNMENTS',...colours.flatMap(c=>buildings[c].map(b=>'» '+b+': '+active.filter(p=>teams[p.id]===c&&validAssignments[p.id]===b).map(p=>p.name).join(', ')))].join('\n');
  const total=arr=>arr.reduce((n,p)=>n+p.power,0);
  const teamTotals=Object.fromEntries(colours.map(c=>[c,total(active.filter(p=>teams[p.id]===c))]));
  const assignedCount=active.length;
@@ -255,8 +258,8 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
    {view==='buildings'&&<>
     <p style={{fontSize:12,color:'#9ab1c3',margin:'0 0 12px'}}>Select a player, then choose their starting building.</p>
     <h2 style={{fontSize:19,color:teamColors[focusTeam],margin:'0 0 12px'}}>{focusTeam} team · opening assignments</h2>
-    {buildings[focusTeam].map(b=>{const list=active.filter(p=>assignments[p.id]===b);return <div key={b} style={{...style,borderColor:selected?teamColors[focusTeam]:'#30465a'}}><div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}><strong>{b}</strong><span style={{fontSize:12,color:'#a9bfd0'}}>{list.length} players · {format(total(list))}</span></div><div style={{display:'flex',gap:7,flexWrap:'wrap',marginTop:12}}>{list.map(p=><button key={p.id} onClick={()=>setSelected(selected===p.id?null:p.id)} style={{...btn,padding:'8px 10px',borderColor:selected===p.id?teamColors[focusTeam]:'#40546a'}}>{p.name}</button>)}</div>{selected&&active.some(p=>p.id===selected&&assignments[p.id]!==b)&&<button style={{...btn,width:'100%',marginTop:10}} onClick={()=>move(selected,b)}>Move selected player here</button>}</div>})}
-    {joined.some(p=>!assignments[p.id])&&<div style={style}><strong>Unallocated players</strong><div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{joined.filter(p=>!assignments[p.id]).map(p=><button key={p.id} style={{...btn,padding:'8px',borderColor:selected===p.id?teamColors[focusTeam]:'#40546a'}} onClick={()=>setSelected(p.id)}>{p.name}</button>)}</div></div>}
+    {buildings[focusTeam].map(b=>{const list=active.filter(p=>teams[p.id]===focusTeam&&validAssignments[p.id]===b);return <div key={b} style={{...style,borderColor:selected?teamColors[focusTeam]:'#30465a'}}><div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}><strong>{b}</strong><span style={{fontSize:12,color:'#a9bfd0'}}>{list.length} players · {format(total(list))}</span></div><div style={{display:'flex',gap:7,flexWrap:'wrap',marginTop:12}}>{list.map(p=><button key={p.id} onClick={()=>setSelected(selected===p.id?null:p.id)} style={{...btn,padding:'8px 10px',borderColor:selected===p.id?teamColors[focusTeam]:'#40546a'}}>{p.name}</button>)}</div>{selected&&active.some(p=>p.id===selected&&validAssignments[p.id]!==b)&&<button style={{...btn,width:'100%',marginTop:10}} onClick={()=>move(selected,b)}>Move selected player here</button>}</div>})}
+    {joined.some(p=>!validAssignments[p.id])&&<div style={style}><strong>Unallocated players</strong><div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{joined.filter(p=>!validAssignments[p.id]).map(p=><button key={p.id} style={{...btn,padding:'8px',borderColor:selected===p.id?teamColors[focusTeam]:'#40546a'}} onClick={()=>setSelected(p.id)}>{p.name}</button>)}</div></div>}
     <div style={style}><strong>Initial assignments</strong><pre style={{whiteSpace:'pre-wrap',fontSize:12,lineHeight:1.7}}>{copyText()}</pre><button style={{...btn,width:'100%'}} onClick={()=>{navigator.clipboard?.writeText(copyText());setNotice('Assignments copied')}}>Copy assignments</button></div>
    </>}
   </>}
