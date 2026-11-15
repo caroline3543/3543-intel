@@ -5,7 +5,7 @@ const buildings={Blue:['Prototype I','Boiler Room'],Yellow:['Prototype II','Tran
 const style={background:'#142438',border:'1px solid #30465a',borderRadius:14,padding:14,marginBottom:12};
 const btn={border:'1px solid #40546a',borderRadius:10,background:'#21354b',color:'#e9f2fa',padding:'10px 12px',minHeight:42,fontWeight:650,cursor:'pointer'};
 const name=p=>p.username||p.alias||p.name||String(p.fid||p.id);
-const power=p=>Number(p.troopPower??p.lastFoundryTroopPower??p.lastTroopPower??0)||0;
+const power=p=>Number(p.lastFoundryTroopPower??p.troopPower??p.lastTroopPower??0)||0;
 const alliance=p=>String(p.alliance||p.homeAlliance||p.allianceTag||p.alliance_name||'Unassigned').trim()||'Unassigned';
 const rank=p=>{const r=String(p.allianceRank??p.rank??p.alliance_rank??'').toUpperCase();return /^R[1-5]$/.test(r)?r:'Unranked'};
 const format=n=>Math.round(n).toLocaleString();
