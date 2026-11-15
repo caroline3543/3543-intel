@@ -18,7 +18,7 @@ import { ProviderStatsSection } from './ProviderStatsSection.jsx';
 import { PlayerRankingsSection } from './PlayerRankingsSection.jsx';
 import { PlayerHistorySection } from './PlayerHistorySection.jsx';
 import { TroopPowerChart } from './TroopPowerChart.jsx';
-export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,players=[],teamworkPreferences={},onSaveTeamworkPreferences}) {
+export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,players=[],teamworkPreferences={},onSaveTeamworkPreferences,playerLookup,onCheckPlayerName,onApplyCheckedName}) {
   const panel=useRef(null);
   const close=useRef(onClose);close.current=onClose;
   useEffect(()=>{
@@ -52,6 +52,18 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
         <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel].filter(Boolean).join(' · ')}</div><CopyPlayerId fid={player.fid}/></div>
         <button style={profileButton} aria-label="Close profile" onClick={onClose}>✕</button>
       </header>
+      <ProfileSection title="Check username with API">
+        <p style={{fontSize:13,color:C.icy,margin:'0 0 10px'}}>Look up this Player ID directly. This checks the provider separately from the alliance roster and won't change saved data without confirmation.</p>
+        <button type="button" style={profileButton} disabled={!player.fid||playerLookup?.status==='loading'} onClick={()=>onCheckPlayerName?.(player)}>{playerLookup?.status==='loading'?'Checking…':'Refresh player name'}</button>
+        {playerLookup?.fid===String(player.fid)&&playerLookup.status==='error'&&<p role="alert" style={{fontSize:13,color:C.red}}>{playerLookup.message}</p>}
+        {playerLookup?.fid===String(player.fid)&&playerLookup.status==='success'&&<div role="status" style={{marginTop:12,padding:12,borderRadius:10,border:`1px solid ${C.border}`,fontSize:13,color:C.icy}}>
+          <div>Saved name: <strong>{player.username||'Unknown'}</strong></div>
+          <div>Direct API name: <strong>{playerLookup.name}</strong></div>
+          <div style={{marginTop:6,fontSize:12}}>Retrieved: {playerLookup.retrievedAt?new Date(playerLookup.retrievedAt).toLocaleString():'Not provided'}</div>
+          <div style={{fontSize:12}}>Provider cache timestamp: {playerLookup.cachedAt?new Date(playerLookup.cachedAt).toLocaleString():'Not provided'}</div>
+          {playerLookup.name!==player.username?<button type="button" style={{...profileButton,marginTop:10}} onClick={()=>onApplyCheckedName?.(player)}>Use API username</button>:<p style={{margin:'8px 0 0'}}>The direct API returned the saved username. If the game shows a different name, the provider may be behind.</p>}
+        </div>}
+      </ProfileSection>
       {player.blacklisted&&<p style={{fontSize:14,color:C.red}}>Excluded from battle plans{player.blacklistReason?`: ${player.blacklistReason}`:''}</p>}
       <ProfileSection title="Alliance rank"><p style={{fontSize:14,color:C.icy,margin:'0 0 12px'}}>Tap a rank to set it. Tap again to clear.</p><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{ALLIANCE_RANKS.map(rank=><button key={rank} style={{...profileButton,color:player.allianceRank===rank?C.gold:C.icy,borderColor:player.allianceRank===rank?C.gold:C.border}} aria-pressed={player.allianceRank===rank} onClick={()=>setAllianceRank(rank)}>{rank}</button>)}</div></ProfileSection>
       {player.lastFoundryTroopPower!=null&&<ProfileSection title="Last known Foundry troop power"><div style={{fontSize:20,fontWeight:700,color:C.icy}}>{Number(player.lastFoundryTroopPower).toLocaleString()}</div><div style={{fontSize:12,color:C.muted||'#9bb0c4',marginTop:4}}>Recorded {player.lastFoundryTroopPowerAt?new Date(player.lastFoundryTroopPowerAt).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}):'date unknown'}</div></ProfileSection>}
