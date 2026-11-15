@@ -1,5 +1,5 @@
 export const WORKSPACE_ID='3573-leaders';
-export const SHARED_KEYS=['players','events','customRoles','settings','talPlan','talTeamPreferences'];
+export const SHARED_KEYS=['players','events','customRoles','settings','talPlan','talTeamPreferences','foundry'];
 const plain=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 export function sharedData(data){const out={};for(const key of SHARED_KEYS)if(data[key]!==undefined)out[key]=structuredClone(data[key]);return {...out,players:out.players||[],events:out.events||[],customRoles:out.customRoles||[],settings:{...out.settings,stateId:'3573'}};}
 export function validateWorkspace(data){
@@ -18,6 +18,10 @@ export function validateWorkspace(data){
    if(!id||!plain(fields)||Object.entries(fields).some(([key,value])=>!['priority','reliable','strategy','voice','punctual'].includes(key)||typeof value!=='boolean'))throw Error('Invalid TAL teamwork player preference.');
   }
   if((prefs.pairs||[]).some(pair=>!Array.isArray(pair)||pair.length!==2||pair.some(id=>typeof id!=='string'||!id)||pair[0]===pair[1]))throw Error('Invalid TAL teamwork pairing.');
+ }
+ if(data.foundry!=null){
+  const f=data.foundry;
+  if(!plain(f)||!plain(f.registrations||{})||!plain(f.registeredUnder||{})||!plain(f.teams||{})||!plain(f.assignments||{})||!Array.isArray(f.imports||[]))throw Error('Invalid Foundry registration data.');
  }
  if(data.talPlan!=null){
   if(!plain(data.talPlan)||!Array.isArray(data.talPlan.teams||[])||!plain(data.talPlan.records||{}))throw Error('Invalid TAL plan.');
