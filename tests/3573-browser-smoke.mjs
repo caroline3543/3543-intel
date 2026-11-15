@@ -49,6 +49,9 @@ try{
   await talSections.waitFor();
   for(const section of ['Registration','TAL Prep','Teams']){
    await talSections.getByRole('button',{name:section,exact:true}).click();
+   await page.waitForTimeout(150);
+   assert.equal(errors.length,0,'TAL '+section+' runtime error: '+errors.join('; '));
+   assert.equal(await talSections.count(),1,'TAL section navigation disappeared after opening '+section);
    assert.equal(await talSections.getByRole('button',{name:section,exact:true}).getAttribute('aria-current'),'page',section+' should be active after navigation');
   }
   await talSections.getByRole('button',{name:'Registration',exact:true}).click();
