@@ -41,6 +41,8 @@ try{
   });
   await page.goto(origin,{waitUntil:'domcontentloaded'});
   await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
+  const tour=page.getByRole('dialog',{name:/Load your alliances/i});
+  if(await tour.isVisible()) await tour.getByRole('button',{name:'Skip'}).click();
   for(const name of ['Members','TAL Planner','Compare','Changes','Foundry'])assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name}).count(),1);
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Members'}).click();
