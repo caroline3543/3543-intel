@@ -16,6 +16,27 @@ const format=n=>Math.round(n).toLocaleString();
 const T10=[66,71,76,83,88,94,99,104,110,115,121],T11=[80,86,92,100,106,114,120,126,135,141,148];
 const tierValue=raw=>{const x=String(raw||'').trim().toUpperCase();if(!x)return null;const fc=Number(x.match(/FC\s*(\d+)/)?.[1]||0);if(/T12|EXALTED/.test(x))return 96;if(/HELIOS|T11/.test(x))return T11[Math.min(fc,10)]??null;if(/FC\s*\d+|T10/.test(x))return T10[Math.min(fc,10)]??null;return ({7:28,8:38,9:50})[Number(x.match(/T\s*(\d+)/)?.[1]||0)]??null;};
 const tierScore=p=>{const scores=['infantry','lancer','marksman'].map(k=>tierValue(p.troops?.[k]));return scores.every(x=>x!==null)?Math.round(scores.reduce((a,b)=>a+b,0)/3*10)/10:null;};
+function InlinePower({player,onSave}){
+ const [value,setValue]=useState(String(player.power||''));
+ const [focused,setFocused]=useState(false);
+ const [error,setError]=useState(false);
+ const latest=String(player.power||'');
+ const commit=()=>{
+   setFocused(false);
+   const raw=value.replace(/,/g,'').trim();
+   if(!raw){setValue(latest);setError(false);return;}
+   const number=Number(raw);
+   if(!Number.isSafeInteger(number)||number<0){setError(true);return;}
+   setError(false);
+   if(number!==player.power)onSave(player.id,number);
+   setValue(String(number));
+ };
+ return <div style={{width:98,flexShrink:0}}>
+  <label htmlFor={'foundry-power-'+player.id} style={{display:'block',fontSize:10,color:'#a9bfd0',marginBottom:4}}>Troop power</label>
+  <input id={'foundry-power-'+player.id} aria-label={'Troop power for '+player.name} inputMode="numeric" type="text" value={focused?value:latest} onFocus={()=>{setValue(latest);setFocused(true)}} onChange={e=>{setValue(e.target.value);setError(false)}} onBlur={commit} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape'){setValue(latest);e.currentTarget.blur()}}} style={{width:'100%',boxSizing:'border-box',minHeight:42,padding:'8px 7px',fontSize:14,fontWeight:650,textAlign:'right',color:'#eef5fc',background:'#20344a',border:'1px solid '+(error?'#f1a9a9':'#496077'),borderRadius:10}} placeholder="0"/>
+  {error&&<span role="alert" style={{fontSize:10,color:'#f1a9a9'}}>Whole number only</span>}
+ </div>;
+}
 export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroopPower,teamworkPreferences={}}){
  const saved=sharedFoundry||{};
  const [view,setView]=useState('players'),[query,setQuery]=useState('');
@@ -156,7 +177,8 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
    {[...joined,...subs].length?[...joined,...subs].map(p=><div key={p.id} style={{borderBottom:'1px solid #2c4155',padding:'12px 0'}}>
      <div style={{display:'flex',alignItems:'center',gap:10}}>
        <PlayerAvatar player={avatarFor(p)} size={38}/>
-       <div style={{flex:1,minWidth:0}}><strong style={{fontSize:14,overflowWrap:'anywhere'}}>{p.name}</strong>{!p.matched&&<span style={{color:'#f5bd5b',fontSize:11}}> · Needs matching</span>}<div style={{fontSize:12,color:'#a9bfd0'}}>{format(p.power)} troop power · {registrations[p.id]==='join'?'Combatant':'Substitute'}</div></div>
+       <div style={{flex:1,minWidth:0}}><strong style={{fontSize:14,overflowWrap:'anywhere'}}>{p.name}</strong>{!p.matched&&<span style={{color:'#f5bd5b',fontSize:11}}> · Needs matching</span>}<div style={{fontSize:12,color:'#a9bfd0'}}>{registrations[p.id]==='join'?'Combatant':'Substitute'}</div></div>
+       <InlinePower player={p} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power saved for '+p.name)}}/>
        <button aria-label={'Manage '+p.name} aria-expanded={managing===p.id} style={{...btn,minWidth:44,fontSize:20,padding:'7px'}} onClick={()=>setManaging(managing===p.id?null:p.id)}>⋯</button>
      </div>
      {managing===p.id&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
