@@ -80,7 +80,7 @@ try{
   await context.close();
  }
  // Exercise the TAL screens with real-looking assignments in an isolated mocked workspace.
- const populated={...fixture,talPlan:{name:'3573 TAL test',times:['02:00','07:00','12:00','14:00','19:00'],availability:{'1':['12:00'],'2':['12:00']},records:{},teams:[{id:'HOT:1',host:'HOT',number:1,members:[{id:'1',role:'combatant',registered:true},{id:'2',role:'substitute',registered:false}]}]}};
+ const populated={...fixture,talPlan:{name:'3573 TAL test',times:['02:00','07:00','12:00','14:00','19:00'],availability:{'1':['12:00'],'2':['12:00']},records:{},teams:[{id:'HOT:1',host:'HOT',number:1,slots:[],members:[{id:'1',role:'combatant',registered:true},{id:'2',role:'substitute',registered:false}]}]}};
  for(const width of [390,1280]){
   const context=await browser.newContext({viewport:{width,height:844}});
   const page=await context.newPage();record(page);
