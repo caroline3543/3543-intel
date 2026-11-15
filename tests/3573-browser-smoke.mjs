@@ -105,6 +105,12 @@ try{
    await page.waitForTimeout(150);
    assert.equal(errors.length,0,'Populated TAL '+section+' runtime errors: '+errors.join('; '));
    assert.equal(await sections.getByRole('button',{name:section,exact:true}).getAttribute('aria-current'),'page');
+   if(section==='Teams'){
+    await page.getByRole('heading',{name:'Team preparation'}).waitFor();
+    assert.equal(await page.getByLabel('Match time UTC').count(),1,'Match time selector must exist for assigned legion');
+    assert.equal(await page.getByRole('button',{name:'Show all available players'}).count(),1,'Attendance summary must be accessible');
+    assert.equal(await page.getByRole('group',{name:'Filter participants'}).count(),1,'Participant filters must be accessible');
+   }
   }
   assert.deepEqual(writes,[],'Populated TAL navigation must not write to the workspace');
   await context.close();
