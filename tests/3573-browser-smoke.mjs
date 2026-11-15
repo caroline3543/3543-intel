@@ -49,7 +49,7 @@ try{
   const search=page.getByRole('combobox',{name:'Search players'});
   await search.fill('Spic');
   await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
-  await search.fill('Spciy');
+  await search.fill('Spicyy');
   await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
   await search.fill('681766603');
   await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
