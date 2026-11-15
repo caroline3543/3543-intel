@@ -97,7 +97,8 @@ A player may be selected but not registered, registered but unavailable, or assi
 - Enter Manage from the contextual header. The selection checkbox is distinct from the profile-card tap target.
 - Select all applies to **all matching filtered results**, including results not yet loaded, and must show the exact affected count. An entire-roster operation requires separate explicit scope selection.
 - Freeze selected membership as stable Player IDs for the editing session. Changing filters must not silently add/remove targets. Clear selection on reload or account change. Recheck eligibility at execution and show affected/excluded counts.
-- Provide contextual actions, with roughly three primary actions and a **More** menu:  - Members: Language, Edit fields, other authorised roster operations.
+- Provide contextual actions, with roughly three primary actions and a **More** menu:
+  - Members: Language, Edit fields, other authorised roster operations.
   - TAL: Registration, Availability, Legion, Role, Locks, Works well together, Remove from TAL.
   - Foundry: Availability, Assign team, Role, Locks, Remove from event.
   - Team planner: Move, Assign zone, Clear assignment.
@@ -196,7 +197,8 @@ Do not use a generic “Saved” message to imply Google Sheets has synchronised
 
 ## 10. Draft recovery and retention
 
-| Recovery category | Approved period | Clock starts ||---|---|---|
+| Recovery category | Approved period | Clock starts |
+|---|---|---|
 | Unfinished forms | 7 days | Last meaningful edit |
 | Unapplied event-planner drafts | 14 days | Last meaningful edit |
 | Unresolved save operations | Fixed 30 days | Original submission |
@@ -295,7 +297,8 @@ All applicable pages must use a shared search interface and matching behaviour, 
 - Use consistent field height, search icon, typography, spacing, clear affordance, focus and disabled states across Members, TAL, Foundry and other approved search contexts.
 - Use the same matching rules for current usernames, nicknames, previous usernames and Player IDs. Prioritise exact Player ID matches; preserve Unicode and stylised names; identify alias matches; never silently merge similar names.
 - Use a consistent autocomplete suggestion structure, matching highlights, keyboard navigation, touch targets, loading/empty/error states and screen-reader announcements.
-- Search the complete authorised, eligible dataset, not merely currently loaded cards; apply context-specific eligibility and permissions before presenting actions.- Contextual actions may differ: e.g. Add player in Members, Add to TAL in TAL, Add to event in Foundry. Never imply that a search result is eligible for an action when it is not.
+- Search the complete authorised, eligible dataset, not merely currently loaded cards; apply context-specific eligibility and permissions before presenting actions.
+- Contextual actions may differ: e.g. Add player in Members, Add to TAL in TAL, Add to event in Foundry. Never imply that a search result is eligible for an action when it is not.
 - Maintain appropriate search state across navigation according to Section 3. Ensure consistent clear/reset behaviour and no accidental selection changes.
 - Acceptance: equivalent queries and identities produce consistent matching/ranking across applicable pages, subject only to explicit contextual eligibility and permissions; keyboard and touch journeys pass in each adopting app.
 
@@ -394,6 +397,7 @@ Before a shared change is adopted by any app, verify applicable components in Me
 8. Loading/empty/offline/unknown-outcome feedback, retry safety and contextual recovery.
 9. Header/action hierarchy, safe-area layout, responsive breakpoints and dynamic text.
 10. Per-app feature isolation and permissions; a shared component change must not activate a feature in another app.
+
 Document expected results, actual results, exceptions and approving app owner for each adoption. A failed relevant regression blocks that app's adoption until resolved or an explicit documented exception is approved. These are **future implementation acceptance requirements**, not tests performed as part of this draft.
 
 ### 18.14 Review status
@@ -493,7 +497,8 @@ All five requirements in Section 19 are **approved conceptual design requirement
 
 1. A field marked Sheets-authoritative cannot be silently overwritten by an app-originated update; a conflicting edit produces a traceable review state.
 2. Two imported rows with the same (state ID, Player ID) reconcile to one canonical player without merging unrelated alias matches; an alliance move preserves identity and authorised history.
-3. A team-assignment lock prevents a generator, bulk move and sync reconciliation from moving that player, while an unrelated editable field can still be changed.4. A partial bulk operation explicitly identifies locked/excluded players and confirmed successes; no skipped change is reported as saved.
+3. A team-assignment lock prevents a generator, bulk move and sync reconciliation from moving that player, while an unrelated editable field can still be changed.
+4. A partial bulk operation explicitly identifies locked/excluded players and confirmed successes; no skipped change is reported as saved.
 5. Undo, draft recovery, conflict review and version-history restoration have distinct controls, permission checks and user-facing explanations.
 
 All four requirements in Section 20 are **approved conceptual design requirements**. The eight-stage design review remains **100% approved**. This file is a standalone draft only; no repository edit, implementation, commit or deployment is authorised.
