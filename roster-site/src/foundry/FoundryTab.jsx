@@ -49,6 +49,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const [addRole,setAddRole]=useState('join');
  const [managing,setManaging]=useState(null);
  const [pasteIssues,setPasteIssues]=useState([]);
+ const [manualMatches,setManualMatches]=useState({});
  const [editingPower,setEditingPower]=useState(null),[powerInput,setPowerInput]=useState('');
  const [generationMode,setGenerationMode]=useState('all'),[expanded,setExpanded]=useState({Blue:true,Yellow:true,Green:true,Pink:true});
  const avatarFor=p=>players.find(x=>String(x.id??x.fid??name(x))===p.id)||{username:p.name};
@@ -103,7 +104,17 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
   update({teams:next,assignments:alloc},mode==='all'?'Teams regenerated with top three assigned to Prototype I, Prototype II and Boiler Room':'Unassigned players added without changing existing assignments');
  };
  const norm=v=>String(v||'').normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleLowerCase();
- const searchMatches=query.trim()?entries.filter(p=>p.matched&&(norm(p.name).includes(norm(query))||String(p.id)===query.trim())).slice(0,8):[];
+ const plain=v=>norm(v).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^\p{L}\p{N}]/gu,'');
+ const candidateMatches=n=>{
+   const idMatches=entries.filter(p=>p.matched&&(p.id===n||String(players.find(x=>String(x.id??x.fid??name(x))===p.id)?.fid||'')===n));
+   if(idMatches.length)return idMatches;
+   const exact=entries.filter(p=>p.matched&&norm(p.name)===norm(n));
+   if(exact.length)return exact;
+   const key=plain(n);
+   return key.length>=3?entries.filter(p=>p.matched&&plain(p.name)===key):[];
+ };
+ const suggestions=n=>{const key=plain(n);return key.length<3?[]:entries.filter(p=>p.matched&&(plain(p.name).includes(key)||key.includes(plain(p.name)))).slice(0,6);};
+ const searchMatches=query.trim()?entries.filter(p=>p.matched&&(norm(p.name).includes(norm(query))||plain(p.name).includes(plain(query))||String(p.id)===query.trim())).slice(0,8):[];
  const add=(id,role=addRole)=>{
   const p=entries.find(x=>x.id===id);
   if(!p||!p.matched){setNotice('Select a matched player profile');return}
@@ -120,13 +131,13 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
    const line=raw.trim();if(!line)continue;
    const match=line.match(/^(.*?)(?:[,\t]\s*([\d,]+))?$/);
    const n=match?.[1]?.trim(),value=match?.[2],pwr=value?Number(value.replace(/,/g,'')):null;
-   if(!n||value&&(!Number.isFinite(pwr)||pwr<0)){issues.push(line+' · invalid format');continue}
-   const matches=entries.filter(x=>x.matched&&norm(x.name)===norm(n));
-   if(matches.length!==1){issues.push(n+(matches.length?' · multiple profiles':' · no matching profile'));continue}
+   if(!n||value&&(!Number.isFinite(pwr)||pwr<0)){issues.push({name:line,reason:'Invalid format',candidates:[]});continue}
+   const matches=manualMatches[n]?entries.filter(x=>x.id===manualMatches[n]&&x.matched):candidateMatches(n);
+   if(matches.length!==1){issues.push({name:n,reason:matches.length?'Multiple profiles match':'No exact match',candidates:matches.length?matches:suggestions(n)});continue}
    const p=matches[0],id=p.id,current=nextRegs[id],under=nextUnder[id];
-   if(current&&under!==chosen){issues.push(n+' · registered under '+under);continue}
+   if(current&&under!==chosen){issues.push({name:n,reason:'Registered under '+under,candidates:[]});continue}
    if(current===addRole&&under===chosen){updated++;continue}
-   if(addRole==='join'&&joins>=30||addRole==='sub'&&substitutes>=10){issues.push(n+' · '+(addRole==='join'?'combatant':'substitute')+' limit reached');continue}
+   if(addRole==='join'&&joins>=30||addRole==='sub'&&substitutes>=10){issues.push({name:n,reason:(addRole==='join'?'Combatant':'Substitute')+' limit reached',candidates:[]});continue}
    if(current==='join')joins--;if(current==='sub')substitutes--;
    if(addRole==='join')joins++;else substitutes++;
    nextRegs[id]=addRole;nextUnder[id]=chosen;
@@ -171,7 +182,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
      <button type="button" style={{...btn,background:'transparent',border:0,padding:'8px 2px',minHeight:34,color:'#a9c4dc',fontSize:13}} onClick={()=>setShowPaste(v=>!v)}>{showPaste?'Hide bulk import':'＋ Paste multiple players'}</button>
    </div>
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} troop power</small></span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
-   {showPaste&&<div style={style}><label style={{display:'block',fontSize:13,marginBottom:8}}>Paste names or Username, troop power</label><textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={5} placeholder={'Erth, 8997\nVanellope, 4717\nLaw'} style={{...btn,width:'100%',boxSizing:'border-box'}}/><button style={{...btn,marginTop:8,width:'100%'}} onClick={importRows}>Match and register players</button>{pasteIssues.length>0&&<div style={{marginTop:10,color:'#f5bd5b',fontSize:12}}><strong>Needs review ({pasteIssues.length})</strong>{pasteIssues.map((issue,i)=><div key={i} style={{paddingTop:5}}>{issue}</div>)}</div>}</div>}
+   {showPaste&&<div style={style}><label style={{display:'block',fontSize:13,marginBottom:8}}>Paste names or Username, troop power</label><textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={5} placeholder={'Erth, 8997\nVanellope, 4717\nLaw'} style={{...btn,width:'100%',boxSizing:'border-box'}}/><button style={{...btn,marginTop:8,width:'100%'}} onClick={importRows}>Match and register players</button>{pasteIssues.length>0&&<div style={{marginTop:10,color:'#f5bd5b',fontSize:12}}><strong>Needs review ({pasteIssues.length})</strong>{pasteIssues.map((issue,i)=><div key={i} style={{paddingTop:8}}><div>{issue.name} · {issue.reason}</div>{issue.candidates?.length>0&&<div style={{display:'grid',gap:5,marginTop:6}}>{issue.candidates.map(p=><button key={p.id} style={{...btn,textAlign:'left',fontSize:12}} onClick={()=>{setManualMatches(prev=>({...prev,[issue.name]:p.id}));setNotice('Match selected for '+issue.name+'. Tap Match and register players again.')}}>Use {p.name} · {p.alliance}</button>)}</div>}</div>)}</div>}</div>}
    {editingPower&&<div style={style}><strong>Edit Foundry troop power · {entries.find(p=>p.id===editingPower)?.name}</strong><p style={{fontSize:12,color:'#a9bfd0'}}>Updates the player's profile with today's date.</p><input aria-label="Foundry troop power" inputMode="numeric" value={powerInput} onChange={e=>setPowerInput(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',marginBottom:8}} placeholder="Troop power"/><div style={{display:'flex',gap:8}}><button style={{...btn,flex:1}} onClick={()=>setEditingPower(null)}>Cancel</button><button style={{...btn,flex:1,background:'#32694d'}} onClick={savePower}>Save power</button></div></div>}
    <div style={style}><h2 style={{fontSize:16,margin:'0 0 10px'}}>Registered players <span style={{float:'right',color:'#a9bfd0',fontSize:13}}>{joined.length+subs.length} total</span></h2>
    {[...joined,...subs].length?[...joined,...subs].map(p=><div key={p.id} style={{borderBottom:'1px solid #2c4155',padding:'12px 0'}}>
