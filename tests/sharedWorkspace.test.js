@@ -74,3 +74,29 @@ test('invalid teamwork fields and self relationships are rejected by workspace v
  assert.throws(()=>validateWorkspace({...base,talTeamPreferences:{players:{},pairs:[['a','a']]}}),/Invalid TAL teamwork pairing/);
  assert.doesNotThrow(()=>validateWorkspace({...base,talTeamPreferences:{players:{a:{reliable:false,voice:true}},pairs:[['a','b']]}}));
 });
+
+test('TAL registration and availability edits persist through a device reload',async()=>{
+ const s=server(),a=client(s);await a.c.initialize();await a.c.publish();
+ a.c.update(data=>({...data,talPlan:{...data.talPlan,availability:{a:['12:00','19:00']},teams:[{id:'HOT:1',host:'HOT',number:1,slots:['02:00','12:00','19:00'],members:[{id:'a',role:'combatant',registered:true}],candidates:[]}]} }));
+ await a.c.sync();
+ assert.equal(s.data.talPlan.teams[0].members[0].registered,true);
+ assert.deepEqual(s.data.talPlan.availability.a,['12:00','19:00']);
+ const b=client(s,initial(),a.cache);await b.c.initialize();
+ assert.equal(b.c.getState().local.talPlan.teams[0].members[0].registered,true);
+ assert.deepEqual(b.c.getState().local.talPlan.availability.a,['12:00','19:00']);
+ a.c.dispose();b.c.dispose();
+});
+test('simultaneous TAL edits to different players merge without losing registration',async()=>{
+ const s=server(),a=client(s);await a.c.initialize();await a.c.publish();
+ a.c.update(data=>({...data,talPlan:{...data.talPlan,teams:[{id:'HOT:1',host:'HOT',number:1,slots:['02:00','12:00','19:00'],members:[{id:'a',role:'combatant',registered:false},{id:'b',role:'substitute',registered:false}],candidates:[]}],availability:{a:['12:00'],b:['19:00']}}}));
+ await a.c.sync();
+ const b=client(s,initial(),a.cache);await b.c.initialize();
+ a.c.update(data=>({...data,talPlan:{...data.talPlan,teams:data.talPlan.teams.map(t=>({...t,members:t.members.map(m=>m.id==='a'?{...m,registered:true}:m)}))}}));
+ b.c.update(data=>({...data,talPlan:{...data.talPlan,availability:{...data.talPlan.availability,b:['12:00','19:00']},teams:data.talPlan.teams.map(t=>({...t,members:t.members.map(m=>m.id==='b'?{...m,registered:true}:m)}))}}));
+ await a.c.sync();await b.c.sync();await a.c.sync();
+ assert.equal(s.data.talPlan.teams[0].members.find(m=>m.id==='a').registered,true);
+ assert.equal(s.data.talPlan.teams[0].members.find(m=>m.id==='b').registered,true);
+ assert.deepEqual(s.data.talPlan.availability.b,['12:00','19:00']);
+ assert.equal(a.c.getState().conflicts.length,0);
+ a.c.dispose();b.c.dispose();
+});
