@@ -79,6 +79,36 @@ try{
   assert.equal(errors.length,0,'Browser runtime errors: '+errors.join('; '));
   await context.close();
  }
+ // Exercise the TAL screens with real-looking assignments in an isolated mocked workspace.
+ const populated={...fixture,talPlan:{name:'3573 TAL test',times:['02:00','07:00','12:00','14:00','19:00'],availability:{'1':['12:00'],'2':['12:00']},records:{},teams:[{id:'HOT:1',host:'HOT',number:1,members:[{id:'1',role:'combatant',registered:true},{id:'2',role:'substitute',registered:false}]}]}};
+ for(const width of [390,1280]){
+  const context=await browser.newContext({viewport:{width,height:844}});
+  const page=await context.newPage();record(page);
+  const writes=[];
+  await page.route('**/api/**',route=>{
+   const request=route.request(),url=new URL(request.url());
+   if(request.method()!=='GET')writes.push(url.pathname);
+   if(url.pathname==='/api/session')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authenticated:true,role:'leader'})});
+   if(url.pathname==='/api/workspace')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:populated,revision:1,updatedAt:'2026-11-01T00:00:00Z',role:'leader'})});
+   return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Mocked test environment'})});
+  });
+  await page.goto(origin,{waitUntil:'domcontentloaded'});
+  await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
+  const tour=page.getByRole('dialog',{name:/Load your alliances/i});
+  if(await tour.isVisible())await tour.getByRole('button',{name:'Skip'}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  const sections=page.getByRole('navigation',{name:'TAL Planner sections'});
+  await sections.waitFor();
+  await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
+  for(const section of ['Registration','TAL Prep','Teams']){
+   await sections.getByRole('button',{name:section,exact:true}).click();
+   await page.waitForTimeout(150);
+   assert.equal(errors.length,0,'Populated TAL '+section+' runtime errors: '+errors.join('; '));
+   assert.equal(await sections.getByRole('button',{name:section,exact:true}).getAttribute('aria-current'),'page');
+  }
+  assert.deepEqual(writes,[],'Populated TAL navigation must not write to the workspace');
+  await context.close();
+ }
  console.log('PASS: 3573 browser login, navigation, 390px/1280px viewports and read-only workspace smoke checks');
 }finally{
  await browser?.close();
