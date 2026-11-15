@@ -77,7 +77,7 @@ export function useAppState() {
         lastUpdated: new Date().toISOString(),
       };
     });
-    showToast('Player updated on this device. Cloud save pending.');
+    showToast(isCloudConfigured() ? 'Player updated on this device. Cloud save pending.' : 'Player updated on this device. Cloud sync unavailable.');
     if (isCloudConfigured()) {
       pushPlayer(stamped, allianceTag()).then(ok => {
         if (!ok) showToast('Cloud save failed. Your local change remains; retry syncing before switching devices.', 'error');
@@ -93,7 +93,7 @@ export function useAppState() {
       players: [...prev.players, ...stamped],
       lastUpdated: new Date().toISOString(),
     }));
-    if (stamped.length) showToast(`${stamped.length} added on this device. Cloud save pending.`);
+    if (stamped.length) showToast(isCloudConfigured() ? `${stamped.length} added on this device. Cloud save pending.` : `${stamped.length} added on this device. Cloud sync unavailable.`);
     if (stamped.length && isCloudConfigured()) {
       Promise.all(stamped.map(p => pushPlayer(p, allianceTag()))).then(results => {
         const failed = results.filter(ok => !ok).length;
@@ -112,7 +112,7 @@ export function useAppState() {
       }),
       lastUpdated: new Date().toISOString(),
     }));
-    if (stamped.length) showToast(`${stamped.length} updated on this device. Cloud save pending.`);
+    if (stamped.length) showToast(isCloudConfigured() ? `${stamped.length} updated on this device. Cloud save pending.` : `${stamped.length} updated on this device. Cloud sync unavailable.`);
     if (stamped.length && isCloudConfigured()) {
       Promise.all(stamped.map(p => pushPlayer(p, allianceTag()))).then(results => {
         const failed = results.filter(ok => !ok).length;
@@ -127,7 +127,7 @@ export function useAppState() {
       players: prev.players.filter(p => p.id !== id),
       lastUpdated: new Date().toISOString(),
     }));
-    showToast('Player removed on this device. Cloud deletion pending.');
+    showToast(isCloudConfigured() ? 'Player removed on this device. Cloud deletion pending.' : 'Player removed on this device. Cloud sync unavailable.');
     if (isCloudConfigured()) {
       deletePlayerRemote(id).then(ok => showToast(ok ? 'Player removed from cloud ✓' : 'Cloud deletion failed. Player may return after sync.', ok ? 'success' : 'error'));
     }
