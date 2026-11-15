@@ -170,8 +170,43 @@ function mergeLabyrinthEntries(existing, incoming) {
   return [...lm.values()];
 }
 
+// Deletion markers are state-scoped inside the exported app data. An older
+// import or stale cloud pull must not silently recreate deleted records.
+const DELETION_COLLECTIONS = ['players','events','svsPlans','customRoles','labyrinthEntries'];
+const RECORD_TIMESTAMPS = {players:'profileLastUpdated',events:'updatedAt',svsPlans:'updatedAt',customRoles:'updatedAt',labyrinthEntries:'updatedAt'};
+export function recordDeletion(data, collection, id, at = new Date().toISOString()) {
+  if (!DELETION_COLLECTIONS.includes(collection)) throw new Error('Unsupported deletion collection');
+  return {...data,deletedRecords:{
+    ...(data.deletedRecords||{}),
+    [collection]:{...(data.deletedRecords?.[collection]||{}),[String(id)]:at},
+  }};
+}
+export function clearDeletion(data, collection, id) {
+  const markers={...(data.deletedRecords?.[collection]||{})};
+  delete markers[String(id)];
+  return {...data,deletedRecords:{...(data.deletedRecords||{}),[collection]:markers}};
+}
+function mergeDeletionMarkers(current, incoming) {
+  return Object.fromEntries(DELETION_COLLECTIONS.map(collection=>{
+    const merged={...(current?.[collection]||{})};
+    for (const [id,deletedAt] of Object.entries(incoming?.[collection]||{})) {
+      if (!merged[id] || Date.parse(deletedAt)>Date.parse(merged[id])) merged[id]=deletedAt;
+    }
+    return [collection,merged];
+  }));
+}
+function retainNotDeleted(records, collection, markers) {
+  return records.filter(record=>{
+    const deletedAt=markers[collection]?.[String(record.id)];
+    if (!deletedAt) return true;
+    const updatedAt=record?.[RECORD_TIMESTAMPS[collection]];
+    return !!updatedAt && Date.parse(updatedAt)>Date.parse(deletedAt);
+  });
+}
+
 export function mergeImportedData(current, incoming) {
-  const pm = new Map(current.players.map(p => [p.id, p]));
+  const deletedRecords=mergeDeletionMarkers(current.deletedRecords,incoming.deletedRecords);
+  const pm = new Map((current.players||[]).map(p => [p.id, p]));
   (incoming.players || []).forEach(p => pm.set(p.id, pm.has(p.id) ? mergePlayer(pm.get(p.id), p) : p));
 
   const em = new Map((current.events || []).map(e => [e.id, e]));
@@ -187,11 +222,12 @@ export function mergeImportedData(current, incoming) {
     ...current,
     ...incoming,
     allianceWatches: mergeAllianceWatches(current.allianceWatches, incoming.allianceWatches),
-    players:     [...pm.values()],
-    events:      [...em.values()],
-    svsPlans:    [...sm.values()],
-    customRoles: mergedRoles,
-    labyrinthEntries: mergedLabyrinth,
+    players:     retainNotDeleted([...pm.values()],'players',deletedRecords),
+    events:      retainNotDeleted([...em.values()],'events',deletedRecords),
+    svsPlans:    retainNotDeleted([...sm.values()],'svsPlans',deletedRecords),
+    customRoles: retainNotDeleted(mergedRoles,'customRoles',deletedRecords),
+    labyrinthEntries: retainNotDeleted(mergedLabyrinth,'labyrinthEntries',deletedRecords),
+    deletedRecords,
     lastUpdated: new Date().toISOString(),
   };
 }
