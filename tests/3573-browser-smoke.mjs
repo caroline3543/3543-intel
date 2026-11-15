@@ -54,6 +54,12 @@ try{
   await search.fill('681766603');
   await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
   await search.fill('');
+  await page.getByRole('button',{name:/Options/}).click();
+  await page.getByRole('button',{name:'Select players'}).click();
+  await page.getByRole('button',{name:'Select shown'}).click();
+  await page.getByRole('button',{name:'Update selected'}).click();
+  assert.equal(await page.getByRole('button',{name:'Apply changes'}).isDisabled(),true,'Bulk editor should not submit an empty change');
+  await page.getByRole('button',{name:'Done selecting'}).click();
   assert.deepEqual(writes,[],'Read-only smoke test must not write to a workspace');
   assert.equal(errors.length,0,'Browser runtime errors: '+errors.join('; '));
   await context.close();
