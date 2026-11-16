@@ -66,7 +66,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  useEffect(()=>setInstructions(saved.shareInstructions||FOUNDRY_DEFAULT_INSTRUCTIONS),[saved.shareInstructions]);
  const avatarFor=p=>players.find(x=>String(x.id??x.fid??name(x))===p.id)||{username:p.name};
  const entries=useMemo(()=>{
-  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:power(p),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim(),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String)}]}));
+  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:power(p),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),furnaceLevel:p.furnaceLevel??p.furnace??p.furnace_level??null,cityPower:p.cityPower??p.powerLevel??p.power??null,language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim(),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String)}]}));
   for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:p.power??current.power}:{...p,alliance:p.alliance||'Unassigned',matched:false});}
   return [...map.values()].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
  },[players,saved.imports]);
