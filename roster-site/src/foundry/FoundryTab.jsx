@@ -1,3 +1,4 @@
+import {foundryShareMessages,foundryMessageStats,FOUNDRY_DEFAULT_INSTRUCTIONS} from './foundryShare.js';
 import {useMemo,useState,useRef,useEffect} from 'react';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
 import {playerSearchFields} from '../../../src/services/playerNames.js';
@@ -56,12 +57,12 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const [generationMode,setGenerationMode]=useState('all'),[expanded,setExpanded]=useState({Blue:true,Yellow:true,Green:true,Pink:true});
  const [teamMessage,setTeamMessage]=useState(null),[teamMessageOpen,setTeamMessageOpen]=useState(false);
  const [teamNames,setTeamNames]=useState(()=>saved.teamNames||{});
- const [instructions,setInstructions]=useState(()=>saved.shareInstructions||'Save 1 march to refill the closest building, another to join a rally and use the rest to garrison buildings.');
+ const [instructions,setInstructions]=useState(()=>saved.shareInstructions||FOUNDRY_DEFAULT_INSTRUCTIONS);
  const [dragging,setDragging]=useState(null);
  const touchDrag=useRef(null);
  const finishTouchDrag=e=>{const source=touchDrag.current;touchDrag.current=null;if(!source)return;const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-foundry-building]');const destination=target?.getAttribute('data-foundry-building');if(destination&&destination!==source.building)move(source.id,destination);setDragging(null);};
  useEffect(()=>setTeamNames(saved.teamNames||{}),[saved.teamNames]);
- useEffect(()=>setInstructions(saved.shareInstructions||'Save 1 march to refill the closest building, another to join a rally and use the rest to garrison buildings.'),[saved.shareInstructions]);
+ useEffect(()=>setInstructions(saved.shareInstructions||FOUNDRY_DEFAULT_INSTRUCTIONS),[saved.shareInstructions]);
  const avatarFor=p=>players.find(x=>String(x.id??x.fid??name(x))===p.id)||{username:p.name};
  const entries=useMemo(()=>{
   const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:power(p),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim(),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String)}]}));
@@ -176,15 +177,9 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const generatedTeamMessage=()=>colours.map(c=>c.toUpperCase()+' TEAM\n'+joined.filter(p=>teams[p.id]===c).sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name)).map(p=>p.name).join(', ')).join('\n\n');
  const copyTeamMessage=async()=>{const message=teamMessage===null?generatedTeamMessage():teamMessage;try{await navigator.clipboard.writeText(message);setNotice('Team message copied')}catch{setNotice('Copy failed. Select the text and copy manually.')}};
  const teamTitle=c=>(teamNames[c]||c).trim()||c;
- const buildingLabel=b=>({'Prototype Site I':'Prototype I','Prototype Site II':'Prototype II','Boiler Room':'Boiler','Central Transit Station':'Transit','Repair Facility I':'Repair I','Repair Facility II':'Repair II','Repair Facility III':'Repair III','Repair Facility IV':'Repair IV'})[b]||b;
- const teamBlock=c=>[teamTitle(c).toUpperCase()+' · '+({Blue:'Top left',Pink:'Top right',Green:'Bottom left',Yellow:'Bottom right'})[c],...buildings[c].map(b=>buildingLabel(b)+' · '+active.filter(p=>teams[p.id]===c&&validAssignments[p.id]===b).map(p=>p.name).join(', '))].join('\n');
- const shareMessages=[
-  ['Blue + Pink',['INITIAL ASSIGNMENTS (1/2)',teamBlock('Blue'),teamBlock('Pink')].join('\n\n')],
-  ['Green + Yellow',['INITIAL ASSIGNMENTS (2/2)',teamBlock('Green'),teamBlock('Yellow')].join('\n\n')],
-  ['Foundry instructions',['FOUNDRY INSTRUCTIONS',instructions].join('\n\n')]
- ];
+ const shareMessages=foundryShareMessages({teamNames,buildings,active,teams,assignments:validAssignments,instructions});
  const copyText=()=>shareMessages.map(([,body])=>body).join('\n\n');
- const messageStats=message=>({characters:[...message].length,lines:message.split('\n').length});
+ const messageStats=foundryMessageStats;
  const copyShare=async message=>{try{await navigator.clipboard.writeText(message);setNotice('Message copied')}catch{setNotice('Copy failed. Select the preview and copy manually.')}};
  const saveTeamName=(c,value)=>{const next={...teamNames,[c]:value};setTeamNames(next);update({teamNames:next},'Team name updated')};
  const saveInstructions=value=>{setInstructions(value);update({shareInstructions:value},'Instructions updated')};
