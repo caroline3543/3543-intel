@@ -73,6 +73,8 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const [filters,setFilters]=useState({...EMPTY_FILTERS});
   const [filtersOpen,setFiltersOpen]=useState(false);
   const [optionsOpen,setOptionsOpen]=useState(false);
+  const [allianceMoreOpen,setAllianceMoreOpen]=useState(false);
+  const [trackingView,setTrackingView]=useState('current');
   const [moreSorts,setMoreSorts]=useState(false);
   const [showIds,setShowIds]=useState(false);
   const [visibleCount,setVisibleCount]=useState(20);
@@ -118,7 +120,10 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   },[initialPlayerId,players,onInitialPlayerOpened]);
   // Keep open profiles current after API refreshes and manual edits.
   const currentPlayer=players.find(p=>p.id===viewingPlayer?.id)||viewingPlayer;
-  const visible=players.filter(p=>filters.alliance==='__review'?p.membershipStatus==='unverified'&&(!search||[p.username,p.alias,p.fid,...(p.pastUsernames||[])].some(v=>String(v||'').toLocaleLowerCase().includes(search.toLocaleLowerCase()))):matchesRosterFilters(p,search,filters)&&(filters.alliance? p.membershipStatus!=='unverified':true)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
+  const matchesSearch=p=>!search||[p.username,p.alias,p.fid,...(p.pastUsernames||[])].some(v=>String(v||'').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+  const isTransferred=p=>p.membershipStatus==='transferred_out';
+  const isReview=p=>p.membershipStatus==='unverified'||p.membershipStatus==='transfer_review';
+  const visible=players.filter(p=>trackingView==='transferred'?isTransferred(p)&&matchesSearch(p):trackingView==='review'?isReview(p)&&matchesSearch(p):!isTransferred(p)&&!isReview(p)&&matchesRosterFilters(p,search,filters)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
   const key=JSON.stringify([search,filters,sort,sortDirection,grouped]);
   const displayed=visible.slice(0,visibleCount);
   useEffect(()=>{setVisibleCount(20);},[key]);
@@ -129,7 +134,10 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const changeSort=id=>{setMoreSorts(false);if(id===sort)setSortDirection(d=>d==='asc'?'desc':'asc');else{setSort(id);setSortDirection(id==='name'||id==='labyrinth'?'asc':'desc');}};
   const extraSelected=EXTRA_SORTS.some(([id])=>id===sort);
   const filterCount=rosterFilterCount(filters);
-  const allianceTags=[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].sort();
+  const mainAllianceTags=['ARC','HOT','RKG','LUN'];
+  const allianceTags=[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].filter(tag=>!mainAllianceTags.includes(tag)).sort();
+  const reviewCount=players.filter(p=>isReview(p)).length;
+  function markMembership(player,status){onSavePlayer({...player,membershipStatus:status,membershipReviewedAt:new Date().toISOString(),...(status==='transferred_out'?{lastKnownAlliance:player.allianceTag}:{} )});showToast?.(status==='transferred_out'?'Transfer confirmed':status==='transfer_review'?'Added to transfer review':'Player restored to current roster');}
   const lastFetch=latestRosterFetch(players);
   function toggle(id){setSelected(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);return next;});}
   function stopSelection(){setSelecting(false);setSelected(new Set());setEditingSelection(false);}
@@ -151,10 +159,17 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     {players.length>0 && <>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'3px 0 8px'}}><h2 style={{fontSize:20,letterSpacing:'-.03em',margin:0}}>Members</h2><button style={{background:'transparent',border:0,color:C.gold,fontSize:12,fontWeight:650,minHeight:38,padding:'5px 0 5px 10px'}} aria-expanded={optionsOpen} onClick={()=>setOptionsOpen(v=>!v)}>☷ Options</button></div>
       <PlayerSearch label="Search roster" players={players} value={search} onChange={setSearch} onSelect={p=>{setSearch(p.fid||p.username||p.alias);openProfile(p);}}/>
-      <div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,marginBottom:6,alignItems:'center',scrollbarWidth:'none'}}><span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Alliance</span>
-        {[['','All'],...allianceTags.map(tag=>[tag,tag]),['__review','Needs review']].map(([tag,label])=><button key={tag||'all'} aria-pressed={filters.alliance===tag} onClick={()=>{setFilters({...filters,alliance:filters.alliance===tag?'':tag});}} style={{background:filters.alliance===tag?'#45351F':'#182A3F',color:filters.alliance===tag?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{tag?` · ${players.filter(p=>tag==='__review'?p.membershipStatus==='unverified':p.allianceTag===tag&&p.membershipStatus!=='unverified').length}`:''}</button>)}
-      </div>
-      {players.some(p=>p.membershipStatus==='unverified')&&<p style={{fontSize:12,color:C.icy,margin:'3px 0 9px'}}>Players missing from a refreshed alliance appear under Needs review. Their last known alliance and profile are retained until membership is verified.</p>}
+      {trackingView==='current'&&<div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:6,overflowX:'auto',flexWrap:'nowrap',paddingBottom:4,marginBottom:6,alignItems:'center',scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}>
+        <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Alliance</span>
+        {[['','All'],...mainAllianceTags.map(tag=>[tag,tag]),['__more','More']].map(([tag,label])=><button key={tag||'all'} aria-pressed={tag==='__more'?allianceMoreOpen:filters.alliance===tag} onClick={()=>{if(tag==='__more'){setAllianceMoreOpen(v=>!v);return;}setFilters({...filters,alliance:tag});setAllianceMoreOpen(false);}} style={{background:(tag==='__more'?allianceMoreOpen:filters.alliance===tag)?'#45351F':'#182A3F',color:(tag==='__more'?allianceMoreOpen:filters.alliance===tag)?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{mainAllianceTags.includes(tag)?` · ${players.filter(p=>p.allianceTag===tag&&!isTransferred(p)&&!isReview(p)).length}`:''}{tag==='__more'?' ⌄':''}</button>)}
+      </div>}
+      {trackingView==='current'&&allianceMoreOpen&&<div role="group" aria-label="Other alliances" style={{display:'flex',gap:6,flexWrap:'wrap',background:C.card,borderRadius:12,padding:10,marginBottom:9}}>
+        {allianceTags.map(tag=><button key={tag} style={{...button,fontSize:12,background:filters.alliance===tag?C.gold:C.section,color:filters.alliance===tag?C.bg:C.icy}} onClick={()=>{setFilters({...filters,alliance:tag});setAllianceMoreOpen(false);}}>{tag} · {players.filter(p=>p.allianceTag===tag&&!isTransferred(p)&&!isReview(p)).length}</button>)}
+        {!allianceTags.length&&<span style={{fontSize:12,color:C.icy}}>No other alliances recorded</span>}
+      </div>}
+      {trackingView==='current'&&reviewCount>0&&<button type="button" onClick={()=>{setTrackingView('review');setOptionsOpen(false);}} style={{border:0,background:'transparent',color:'#E8B766',padding:'8px 0',minHeight:38,textAlign:'left',fontSize:12,cursor:'pointer'}}>{reviewCount} possible transfer{reviewCount===1?'':'s'} need review ›</button>}
+      {trackingView!=='current'&&<button type="button" style={{...button,marginBottom:10}} onClick={()=>setTrackingView('current')}>‹ Back to Members</button>}
+      {trackingView!=='current'&&<h3 style={{fontSize:17,margin:'0 0 10px'}}>{trackingView==='review'?'Transfers to review':'Transferred out'}</h3>}
       <div role="group" aria-label="Sort roster" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,scrollbarWidth:'none',alignItems:'center'}}><span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Sort</span>
         {PRIMARY_SORTS.map(([id,label])=><button key={id} aria-pressed={sort===id} onClick={()=>changeSort(id)} style={{background:sort===id?'#45351F':'#182A3F',color:sort===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',minHeight:35,fontSize:12,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
         <button onClick={()=>setMoreSorts(v=>!v)} style={{background:extraSelected?'#45351F':'#182A3F',color:extraSelected?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',minHeight:35,fontSize:12,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{extraSelected?EXTRA_SORTS.find(([id])=>id===sort)?.[1]:'More'} {extraSelected?(sortDirection==='asc'?'↑':'↓'):'⌄'}</button>
@@ -163,7 +178,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
         {EXTRA_SORTS.map(([id,label])=><button key={id} style={{...button,background:sort===id?C.gold:C.section,color:sort===id?C.bg:C.icy,fontSize:12}} onClick={()=>changeSort(id)}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
       </div>}
       {optionsOpen&&<div style={{display:'grid',gap:9,padding:12,background:'#15273A',borderRadius:12,marginBottom:10}}>
-        <div style={{fontSize:14,fontWeight:700}}>Roster options</div><div style={{display:'flex',gap:7}}><button style={{...button,flex:1}} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button><button style={{...button,flex:1}} onClick={()=>selecting?stopSelection():setSelecting(true)}>{selecting?'Done selecting':'Select players'}</button></div>
+        <div style={{fontSize:14,fontWeight:700}}>Roster options</div><button style={button} onClick={()=>{setTrackingView("current");setOptionsOpen(false);}}>Current roster</button><button style={button} onClick={()=>{setTrackingView("review");setOptionsOpen(false);}}>Transfers to review ({reviewCount})</button><button style={button} onClick={()=>{setTrackingView("transferred");setOptionsOpen(false);}}>Transferred out ({players.filter(isTransferred).length})</button><div style={{display:'flex',gap:7}}><button style={{...button,flex:1}} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button><button style={{...button,flex:1}} onClick={()=>selecting?stopSelection():setSelecting(true)}>{selecting?'Done selecting':'Select players'}</button></div>
         <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:13,color:C.icy}}>Show player IDs <input type="checkbox" checked={showIds} onChange={e=>setShowIds(e.target.checked)} style={{width:20,height:20,accentColor:C.gold}}/></label>
         <button style={button} onClick={()=>{setGrouped(!grouped);setOptionsOpen(false);}}>{grouped?'Show one list':'Group by role'}</button>
         <button style={button} onClick={()=>{setFieldsOpen(true);setOptionsOpen(false);}}>Update player details</button>
@@ -180,8 +195,9 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     </>}
     {!players.length && <section style={{textAlign:'center',padding:'32px 0'}}><h2 style={{fontSize:20}}>Load your alliance roster</h2><p style={{fontSize:16,color:C.icy,lineHeight:1.5}}>Choose an alliance to retrieve its players and available game data.</p><button style={{...button,background:C.gold,color:C.bg}} onClick={onLoadAlliance}>Load alliance</button></section>}
     {players.length>0&&!visible.length && <p style={{textAlign:'center',padding:24,color:C.icy}}>No players match. Clear filters or try another search.</p>}
-    {grouped?groups.filter(g=>g.members.length).map(group=><section key={group.name}><h3 style={{fontSize:16,color:C.icy}}>{group.name} · {group.members.length}</h3>{group.members.map(card)}</section>):displayed.map(card)}
-    {visibleCount<visible.length&&<div ref={loadRef} role="status" style={{textAlign:'center',padding:18,color:C.icy,fontSize:13}}>Showing {displayed.length} of {visible.length} · More players load as you scroll <button style={{...button,marginLeft:8}} onClick={()=>setVisibleCount(n=>Math.min(n+20,visible.length))}>Load more</button></div>}
+    {trackingView!=='current'&&displayed.map(p=><div key={p.id} style={{background:C.card,borderRadius:12,padding:12,marginBottom:9}}><div style={{fontWeight:700,overflowWrap:'anywhere'}}>{p.username||p.alias||p.fid||'Unknown player'}</div><div style={{fontSize:12,color:C.icy,margin:'5px 0 10px'}}>ID {p.fid||p.id} · Last known alliance: {p.lastKnownAlliance||p.allianceTag||'Unknown'}</div><div style={{display:'flex',gap:7,flexWrap:'wrap'}}>{trackingView==='review'&&<button style={button} onClick={()=>markMembership(p,'transferred_out')}>Confirm transferred out</button>}<button style={button} onClick={()=>markMembership(p,'active')}>Still in 3573 / Restore</button></div></div>)}
+    {trackingView==='current'&&(grouped?groups.filter(g=>g.members.length).map(group=><section key={group.name}><h3 style={{fontSize:16,color:C.icy}}>{group.name} · {group.members.length}</h3>{group.members.map(card)}</section>):displayed.map(card))}
+    {trackingView==='current'&&visibleCount<visible.length&&<div ref={loadRef} role="status" style={{textAlign:'center',padding:18,color:C.icy,fontSize:13}}>Showing {displayed.length} of {visible.length} · More players load as you scroll <button style={{...button,marginLeft:8}} onClick={()=>setVisibleCount(n=>Math.min(n+20,visible.length))}>Load more</button></div>}
     {filtersOpen && <RosterFilters players={players} roles={roles} filters={filters} onChange={next=>setFilters(next)} onClose={()=>setFiltersOpen(false)} count={visible.length}/>}
     <ProfileView player={currentPlayer} playerLookup={playerLookup} onCheckPlayerName={checkPlayerName} onApplyCheckedName={applyCheckedName} players={players} teamworkPreferences={teamworkPreferences} onSaveTeamworkPreferences={onSaveTeamworkPreferences} roles={roles} open={profileOpen} onClose={()=>setProfileOpen(false)} onEdit={()=>{setProfileOpen(false);setEditingPlayer(currentPlayer);}} events={events} onOpenLeaderProfile={()=>setLeaderOpen(true)} onSave={savePlayer}/>
     <RallyLeaderProfileSheet player={currentPlayer} open={leaderOpen} onClose={()=>setLeaderOpen(false)} onSave={savePlayer}/>
