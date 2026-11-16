@@ -210,7 +210,8 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   try{const raw=window.localStorage.getItem(draftKey);if(raw)saved=JSON.parse(raw);}catch{}
   const source=remoteDraft||saved;
   autoSelectionPending.current=source?'':draftKey;
-  restoringDraft.current=draftKey;
+  // A new match has no saved state to restore; allow its first autosave.
+  restoringDraft.current=source?draftKey:'';
   applyDraft(source||{chosen:preferredIds});
   remoteApplied.current=remoteDraft?.updatedAt||'';
   setDraftState(remoteDraft?'Shared draft restored':saved?'Device draft restored':'Available players selected for this time');
