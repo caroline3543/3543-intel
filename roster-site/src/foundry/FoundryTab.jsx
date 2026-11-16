@@ -1,3 +1,4 @@
+import {BulkPlayerImport} from '../components/BulkPlayerImport.jsx';
 import {foundryShareMessages,foundryMessageStats,FOUNDRY_DEFAULT_INSTRUCTIONS} from './foundryShare.js';
 import {useMemo,useState,useRef,useEffect} from 'react';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
@@ -171,6 +172,34 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
   else setNotice(issues.length?issues.length+' names need review':'No new players to add');
   if(!issues.length){setPaste('');setShowPaste(false)}
  };
+ const confirmBulkImport=rows=>{
+  const ids=new Set(),nextRegs={...registrations},nextUnder={...registeredUnder};
+  const nextTeams={...teams},nextAssignments={...assignments},imports=[...(saved.imports||[])];
+  let joins=joined.length,substitutes=subs.length,added=0,already=0;
+  for(const row of rows){
+   const id=String(row.id),p=entries.find(x=>x.id===id&&x.matched);
+   if(!p)return {error:'A selected player is no longer in the roster. Review the import.'};
+   if(ids.has(id))return {error:'Duplicate Player ID. Review the import.'};ids.add(id);
+   const current=nextRegs[id],under=nextUnder[id];
+   if(current&&under!==chosen)return {error:p.name+' is registered under '+under+'. Review before importing.'};
+   if(current===addRole&&under===chosen){already++;}
+   else {
+    if(current==='join')joins--;if(current==='sub')substitutes--;
+    if(addRole==='join')joins++;else substitutes++;
+    if(joins>30||substitutes>10)return {error:'Not enough '+(addRole==='join'?'combatant':'substitute')+' slots. Adjust registration before importing.'};
+    nextRegs[id]=addRole;nextUnder[id]=chosen;
+    if(addRole!=='join'){delete nextTeams[id];delete nextAssignments[id]}
+    added++;
+   }
+   if(row.power!==null){
+    if(!Number.isSafeInteger(row.power)||row.power<0)return {error:'Invalid troop power for '+p.name};
+    const record={id,name:p.name,power:row.power,rank:p.rank,alliance:p.alliance,matched:true};
+    const index=imports.findIndex(x=>x.id===id);if(index>=0)imports[index]=record;else imports.push(record);
+   }
+  }
+  update({imports,registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments},added+' registered · '+already+' already registered');
+  return {message:added+' registered · '+already+' already registered'};
+ };
  const savePower=()=>{const value=Number(String(powerInput).replace(/,/g,'').trim());if(!Number.isFinite(value)||value<0||!Number.isInteger(value)||!String(powerInput).trim()){setNotice('Enter a valid whole-number troop power');return;}const p=entries.find(x=>x.id===editingPower);if(!p||!p.matched){setNotice('Player profile not found');return;}onSaveTroopPower?.(editingPower,value);setEditingPower(null);setNotice('Foundry troop power saved to '+p.name+'\'s profile');};
  const assign=(id,colour)=>{const nextTeams={...teams,[id]:colour};const nextAlloc={...assignments};if(!buildings[colour].includes(nextAlloc[id]))nextAlloc[id]=buildings[colour][0];update({teams:nextTeams,assignments:nextAlloc},'Team updated')};
  const move=(id,building)=>{const colour=colours.find(c=>buildings[c].includes(building));if(!colour)return;update({teams:{...teams,[id]:colour},assignments:{...assignments,[id]:building}},'Building updated');setSelected(null)};
@@ -211,7 +240,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
      <button type="button" style={{...btn,background:'transparent',border:0,padding:'5px 2px',minHeight:30,color:'#a9c4dc',fontSize:13}} onClick={()=>setShowPaste(v=>!v)}>{showPaste?'Hide bulk import':'＋ Paste multiple players'}</button>
    </div>
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} troop power</small></span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
-   {showPaste&&<div style={style}><label style={{display:'block',fontSize:13,marginBottom:8}}>Paste names or Username, troop power</label><textarea value={paste} onChange={e=>setPaste(e.target.value)} rows={5} placeholder={'Erth, 8997\nVanellope, 4717\nLaw'} style={{...btn,width:'100%',boxSizing:'border-box'}}/><button style={{...btn,marginTop:8,width:'100%'}} onClick={importRows}>Match and register players</button>{pasteIssues.length>0&&<div style={{marginTop:10,color:'#f5bd5b',fontSize:12}}><strong>Needs review ({pasteIssues.length})</strong>{pasteIssues.map((issue,i)=><div key={i} style={{paddingTop:8}}><div>{issue.name} · {issue.reason}</div>{issue.candidates?.length>0&&<div style={{display:'grid',gap:5,marginTop:6}}>{issue.candidates.map(p=><button key={p.id} style={{...btn,textAlign:'left',fontSize:12}} onClick={()=>{setManualMatches(prev=>({...prev,[issue.name]:p.id}));setNotice('Match selected for '+issue.name+'. Tap Match and register players again.')}}>Use {p.name} · {p.alliance}</button>)}</div>}</div>)}</div>}</div>}
+   {showPaste&&<BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={addRole==='join'?'Combatants':'Substitutes'} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
    {editingPower&&<div style={style}><strong>Edit Foundry troop power · {entries.find(p=>p.id===editingPower)?.name}</strong><p style={{fontSize:12,color:'#a9bfd0'}}>Updates the player's profile with today's date.</p><input aria-label="Foundry troop power" inputMode="numeric" value={powerInput} onChange={e=>setPowerInput(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',marginBottom:8}} placeholder="Troop power"/><div style={{display:'flex',gap:8}}><button style={{...btn,flex:1}} onClick={()=>setEditingPower(null)}>Cancel</button><button style={{...btn,flex:1,background:'#32694d'}} onClick={savePower}>Save power</button></div></div>}
    <div style={{...style,padding:12}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:6}}>
