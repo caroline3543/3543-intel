@@ -34,9 +34,8 @@ function InlinePower({player,onSave}){
    if(number!==player.power)onSave(player.id,number);
    setValue(String(number));
  };
- return <div style={{width:98,flexShrink:0}}>
-  <label htmlFor={'foundry-power-'+player.id} style={{display:'block',fontSize:10,color:'#a9bfd0',marginBottom:4}}>Troop power</label>
-  <input id={'foundry-power-'+player.id} aria-label={'Troop power for '+player.name} inputMode="numeric" type="text" value={focused?value:latest} onFocus={()=>{setValue(latest);setFocused(true)}} onChange={e=>{setValue(e.target.value);setError(false)}} onBlur={commit} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape'){setValue(latest);e.currentTarget.blur()}}} style={{width:'100%',boxSizing:'border-box',minHeight:42,padding:'8px 7px',fontSize:14,fontWeight:650,textAlign:'right',color:'#eef5fc',background:'#20344a',border:'1px solid '+(error?'#f1a9a9':'#496077'),borderRadius:10}} placeholder="0"/>
+ return <div style={{width:82,flexShrink:0}}>
+  <input id={'foundry-power-'+player.id} aria-label={'Troop power for '+player.name} inputMode="numeric" type="text" value={focused?value:latest} onFocus={()=>{setValue(latest);setFocused(true)}} onChange={e=>{setValue(e.target.value);setError(false)}} onBlur={commit} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape'){setValue(latest);e.currentTarget.blur()}}} style={{width:'100%',boxSizing:'border-box',height:32,minHeight:32,padding:'4px 6px',fontSize:13,fontWeight:600,textAlign:'center',fontVariantNumeric:'tabular-nums',color:'#eef5fc',background:'#20344a',border:'1px solid '+(error?'#f1a9a9':'#496077'),borderRadius:999}} placeholder="0"/>
   {error&&<span role="alert" style={{fontSize:10,color:'#f1a9a9'}}>Whole number only</span>}
  </div>;
 }
@@ -249,17 +248,18 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
        <button type="button" style={{...btn,background:bulkMode?'#344c63':'#21354b'}} onClick={()=>{setBulkMode(v=>!v);setBulkSelected([]);setConfirmRemoval(false)}}>{bulkMode?'Done':'Select'}</button>
      </div>
      {bulkMode&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',fontSize:12,color:'#b9cad9'}}><span>{bulkSelected.length} selected</span><button style={{...btn,minHeight:34,padding:'6px 10px'}} onClick={()=>setBulkSelected(filteredRegistrations.map(p=>p.id))}>Select all</button></div>}
+     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 2px 6px',fontSize:11,color:'#a9bfd0'}}><span>Player</span><div style={{display:'flex',alignItems:'center',gap:9}}><span style={{width:82,textAlign:'center'}}>Troop power</span><span style={{width:42}} aria-hidden="true"/></div></div>
      {groupedRanks.map(group=>{const ranked=filteredRegistrations.filter(p=>p.rank===group).sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));const eligible=entries.filter(p=>p.rank===group&&p.alliance===chosen).length;return <div key={group} style={{marginTop:8}}>
-       <button type="button" aria-expanded={rankExpanded[group]!==false} onClick={()=>setRankExpanded(v=>({...v,[group]:v[group]===false}))} style={{...btn,width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#20344a',textAlign:'left',borderRadius:12,minHeight:46}}>
-         <span style={{display:'flex',gap:9,alignItems:'center'}}><strong style={{color:'#f0c176'}}>{group}</strong><span style={{fontSize:12,color:'#a9bfd0'}}>{group==='R5'?'Alliance leader':group==='R4'?'Officers':group==='Unranked'?'Rank not recorded':'Members'}</span></span>
-         <span style={{fontSize:13,color:'#c8d7e4'}}>{ranked.length}/{group==='R5'&&eligible<=1?1:eligible||ranked.length} {rankExpanded[group]===false?'⌄':'⌃'}</span>
+       <button type="button" aria-expanded={rankExpanded[group]!==false} onClick={()=>setRankExpanded(v=>({...v,[group]:v[group]===false}))} style={{...btn,width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#20344a',textAlign:'left',borderRadius:9,minHeight:34,padding:'6px 10px',fontSize:12}}>
+         <span style={{display:'flex',gap:7,alignItems:'center'}}><strong style={{fontSize:12,color:'#f0c176'}}>{group}</strong><span style={{fontSize:12,color:'#a9bfd0'}}>{group==='R5'?'Alliance leader':group==='R4'?'Officers':group==='Unranked'?'Rank not recorded':'Members'}</span></span>
+         <span style={{fontSize:12,color:'#c8d7e4',fontVariantNumeric:'tabular-nums'}}>{ranked.length}/{group==='R5'&&eligible<=1?1:eligible||ranked.length} {rankExpanded[group]===false?'⌄':'⌃'}</span>
        </button>
-       {rankExpanded[group]!==false&&(ranked.length?ranked.map(p=><div key={p.id} style={{borderBottom:'1px solid #2c4155',padding:'12px 0'}}>
+       {rankExpanded[group]!==false&&(ranked.length?ranked.map(p=><div key={p.id} style={{borderBottom:'1px solid #2c4155',padding:'8px 0'}}>
          <div style={{display:'flex',alignItems:'center',gap:9}}>
-           {bulkMode?<input type="checkbox" aria-label={'Select '+p.name} checked={bulkSelected.includes(p.id)} onChange={e=>setBulkSelected(v=>e.target.checked?[...v,p.id]:v.filter(x=>x!==p.id))} style={{width:22,height:22,accentColor:'#eab14f'}}/>:<PlayerAvatar player={avatarFor(p)} size={38}/>}
+           {bulkMode?<input type="checkbox" aria-label={'Select '+p.name} checked={bulkSelected.includes(p.id)} onChange={e=>setBulkSelected(v=>e.target.checked?[...v,p.id]:v.filter(x=>x!==p.id))} style={{width:22,height:22,accentColor:'#eab14f'}}/>:<PlayerAvatar player={avatarFor(p)} size={34}/>}
            <div style={{flex:1,minWidth:0}}><strong style={{fontSize:14,overflowWrap:'anywhere'}}>{p.name}</strong><div style={{fontSize:11,color:'#a9bfd0'}}>{p.alliance}{!p.matched?' · Needs matching':''}</div></div>
            <InlinePower player={p} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power saved for '+p.name)}}/>
-           {!bulkMode&&<button aria-label={'Manage '+p.name} aria-expanded={managing===p.id} style={{...btn,minWidth:42,fontSize:20,padding:7}} onClick={()=>setManaging(managing===p.id?null:p.id)}>⋯</button>}
+           {!bulkMode&&<button aria-label={'Manage '+p.name} aria-expanded={managing===p.id} style={{...btn,width:42,minWidth:42,minHeight:44,fontSize:20,padding:5,background:'transparent',border:'none'}} onClick={()=>setManaging(managing===p.id?null:p.id)}>⋯</button>}
          </div>
          {!bulkMode&&managing===p.id&&<div style={{display:'grid',gap:8,marginTop:10}}>
            <div style={{fontSize:12,color:'#a9bfd0'}}>Registration role</div>
