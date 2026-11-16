@@ -122,7 +122,7 @@ test('two live workspace clients surface conflicting TAL leader edits and retain
  const draft=leader=>({chosen:['a','b'],groups:[{key:1,color:'blue',leader,members:[]}],updatedAt:'2026-11-16T01:00:00Z'});
  const put=(c,leader)=>c.update(data=>({...data,talTeamPreferences:{...(data.talTeamPreferences||{}),drafts:{...(data.talTeamPreferences?.drafts||{}),[key]:draft(leader)}}}));
  put(first.c,'a');await first.c.sync();await second.c.sync();
- put(first.c,'b');put(second.c,'a');
+ put(first.c,'b');put(second.c,'c');
  second.c.update(data=>({...data,players:data.players.map(p=>p.id==='b'?{...p,notes:'Second leader note'}:p)}));
  await first.c.sync();await second.c.sync();
  assert.ok(second.c.getState().conflicts.length,'Same-match leader edits must surface an explicit conflict');
