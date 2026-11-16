@@ -18,7 +18,8 @@ try{
   await page.getByRole('button',{name:/Find roster matches/}).click();
   assert.equal(await page.getByRole('button',{name:/Review/}).first().count(),1);
   assert.equal(await page.getByRole('button',{name:/Confirm 2 matched players/}).isDisabled(),true);
-  await page.getByRole('button',{name:/REINTLESSRKG/}).first().click();
+  // The compact reviewer automatically expands the first unresolved entry.
+  assert.equal(await page.getByRole('button',{name:/REINTLESSRKG/}).first().getAttribute('aria-expanded'),'true');
   await page.getByRole('button',{name:'Match',exact:true}).first().click();
   await page.getByRole('button',{name:'Match',exact:true}).first().click();
   await page.getByRole('button',{name:/Confirm 4 matched players/}).click();
