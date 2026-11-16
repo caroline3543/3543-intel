@@ -16,6 +16,8 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
  const duplicates=selected.filter((r,i)=>selected.findIndex(x=>x.player.id===r.player.id)!==i);
  const invalid=selected.filter(r=>r.power!==null&&(!Number.isSafeInteger(r.power)||r.power<0));
  const ready=!pending.length&&!duplicates.length&&!invalid.length&&(!requirePower||selected.every(r=>r.power!==null))&&selected.length>0;
+ const visibleReview=evaluated.filter(r=>r.status==='review');
+ const visibleMatched=evaluated.filter(r=>r.status!=='review');
  const reset=()=>{setSource(initialText);setStage('paste');setChoices({});setPowers({});setFilter('review');setStatus('')};
  const resolve=(key,id)=>setChoices(p=>({...p,[key]:id}));
  const editSource=value=>{setSource(value);setChoices({});setPowers({});setStatus('')};
@@ -31,38 +33,47 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
   {stage==='paste'&&<>
    <label style={{fontSize:14,fontWeight:650}}>Paste names and troop power<textarea aria-label="Paste names and troop power" value={source} onChange={e=>editSource(e.target.value)} rows={10} placeholder={'Username, power\nPlayer One, 3500\nPlayer Two, 4.2M'} style={{...control,width:'100%',marginTop:8,resize:'vertical',lineHeight:1.6,fontFamily:'inherit'}}/></label>
    <div style={{...secondary,display:'flex',justifyContent:'space-between'}}><span>{rows.length} players detected</span><span>Name, power · One per line</span></div>
-   <button type="button" disabled={!rows.length} onClick={()=>{setStage('review');setFilter('review');setExpanded(null)}} style={{...button,background:palette.accent,color:'#0B1525',opacity:rows.length?1:.5}}>Find roster matches →</button>
+   <button type="button" disabled={!rows.length} onClick={()=>{setStage('review');setFilter('review');setExpanded(evaluated.find(r=>r.status==='review')?.key??null)}} style={{...button,background:palette.accent,color:'#0B1525',opacity:rows.length?1:.5}}>Find roster matches →</button>
   </>}
   {stage==='review'&&<>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,fontSize:13}}>
     <strong>{pending.length} to review</strong><span style={secondary}>{matched.length} matched · {evaluated.length} total</span>
    </div>
    <div aria-label="Match progress" style={{height:5,borderRadius:8,background:palette.border,overflow:'hidden'}}><div style={{width:(evaluated.length?100*(evaluated.length-pending.length)/evaluated.length:0)+'%',height:'100%',background:palette.success}}/></div>
-   <div role="group" aria-label="Filter matches" style={{display:'flex',gap:4}}>
-    {[['review','Needs review'],['matched','Matched'],['all','All']].map(([id,label])=><button type="button" key={id} aria-pressed={filter===id} onClick={()=>setFilter(id)} style={{...button,flex:1,minHeight:38,padding:'7px 4px',fontSize:12,border:0,background:filter===id?palette.elevated:'transparent'}}>{label}</button>)}
+   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+    <button type="button" aria-pressed={filter==='review'} onClick={()=>setFilter('review')} style={{...button,background:filter==='review'?palette.elevated:'transparent',border:0,fontSize:12}}>Needs review ({pending.length})</button>
+    <button type="button" aria-pressed={filter==='matched'} onClick={()=>setFilter(filter==='matched'?'review':'matched')} style={{...button,background:filter==='matched'?palette.elevated:'transparent',border:0,fontSize:12}}>Matched ({visibleMatched.length}) {filter==='matched'?'⌃':'⌄'}</button>
    </div>
-   <div style={{border:'1px solid '+palette.border,borderRadius:12,overflow:'hidden'}}>
-   {evaluated.filter(r=>filter==='all'||filter==='review'&&r.status==='review'||filter==='matched'&&r.status!=='review').map((r,i)=>{
-    const open=expanded===r.key,top=r.candidates[0];
+   <div style={{borderTop:'1px solid '+palette.border,borderBottom:'1px solid '+palette.border}}>
+   {(filter==='matched'?visibleMatched:visibleReview).map((r,i)=>{
+    const open=expanded===r.key,top=r.candidates[0],current=r.player||top;
     const metadata=p=>[p?.alliance||'Alliance unknown',p?.furnaceLevel?'FC '+p.furnaceLevel:'FC unknown',p?.cityPower!=null?'City '+Number(p.cityPower).toLocaleString():'City power unknown'].join(' · ');
-    return <div key={r.key} style={{borderBottom:i<evaluated.length-1?'1px solid '+palette.border:'none'}}>
-     <button type="button" aria-expanded={open} onClick={()=>setExpanded(open?null:r.key)} style={{width:'100%',border:0,background:'transparent',color:palette.text,padding:'11px 12px',display:'flex',gap:10,alignItems:'center',textAlign:'left',cursor:'pointer',minHeight:54}}>
-      <span style={{color:r.player?palette.success:r.status==='review'?palette.warning:palette.secondary,fontSize:17}}>{r.player?'✓':r.status==='review'?'○':'–'}</span>
-      <span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13,overflowWrap:'anywhere'}}>{r.username}</strong><span style={secondary}>{r.power===null?'Power missing':Number(r.power).toLocaleString()+' troop power'}{r.player?' · '+r.player.alliance:''}</span></span>
-      <span style={{...secondary,fontSize:12}}>{r.status==='review'?'Review':r.status==='new'?'New':r.status==='skip'?'Skipped':'Matched'}</span><span aria-hidden="true" style={{color:palette.secondary}}>{open?'⌃':'⌄'}</span>
+    const advance=()=>{const next=evaluated.find(x=>x.key!==r.key&&x.status==='review');setExpanded(next?.key??null);};
+    const choose=id=>{resolve(r.key,id);advance();};
+    const q=String(search[r.key]||'').trim().toLocaleLowerCase();
+    const alternatives=players.filter(p=>q.length>=2&&[p.name,p.id,...(p.searchFields||[])].some(v=>String(v||'').toLocaleLowerCase().includes(q))).slice(0,8);
+    return <div key={r.key} style={{borderBottom:i<(filter==='matched'?visibleMatched:visibleReview).length-1?'1px solid '+palette.border:'none'}}>
+     <button type="button" aria-expanded={open} onClick={()=>setExpanded(open?null:r.key)} style={{width:'100%',border:0,background:'transparent',color:palette.text,padding:'9px 2px',display:'flex',gap:9,alignItems:'center',textAlign:'left',cursor:'pointer',minHeight:56}}>
+      <span style={{color:r.player?palette.success:palette.warning,fontSize:17,width:18}}>{r.player?'✓':'○'}</span>
+      <span style={{flex:1,minWidth:0}}><strong style={{display:'block',fontSize:13,overflowWrap:'anywhere'}}>{r.username}</strong><span style={secondary}>{r.power===null?'Power missing':Number(r.power).toLocaleString()+' troop power'}{r.player?' · '+(r.player.alliance||'Alliance unknown'):''}</span></span>
+      <span style={{...secondary,fontSize:11}}>{r.status==='review'?'Review':r.status==='new'?'New':r.status==='skip'?'Skipped':'Matched'}</span><span aria-hidden="true" style={{color:palette.secondary}}>{open?'⌃':'⌄'}</span>
      </button>
-     {open&&<div style={{padding:'0 12px 12px 36px',display:'grid',gap:9}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}><span style={secondary}>Troop power</span><input aria-label={'Troop power for '+r.username} value={powers[r.key]===undefined?String(r.power??''):powers[r.key]} onChange={e=>setPowers(p=>({...p,[r.key]:e.target.value}))} inputMode="numeric" style={{...control,width:105,minHeight:40}}/></div>
-      {(r.status==='review'?r.candidates.slice(0,3):r.player?[r.player]:[]).map(p=><div key={p.id} style={{background:palette.elevated,borderRadius:10,padding:10,display:'flex',alignItems:'center',gap:8}}>
-       <div style={{minWidth:0,flex:1}}><strong style={{display:'block',fontSize:13,overflowWrap:'anywhere'}}>{p.name}</strong><span style={{...secondary,display:'block',overflowWrap:'anywhere'}}>{metadata(p)}</span><span style={{...secondary,display:'block'}}>ID {p.searchFields?.find(x=>/^\d{7,}$/.test(String(x)))||p.id}</span></div>
-       {r.status==='review'?<button type="button" onClick={()=>{resolve(r.key,p.id);const next=evaluated.find(x=>x.key!==r.key&&x.status==='review');setExpanded(next?.key??null)}} style={{...button,minHeight:40,padding:'8px 11px',background:palette.accent,color:'#0B1525'}}>Match</button>:<span style={{color:palette.success}}>✓</span>}
-      </div>)}
-      <button type="button" onClick={()=>setSearching(p=>({...p,[r.key]:!p[r.key]}))} style={{...button,minHeight:38,fontSize:12,textAlign:'left'}}>Search other matches {searching[r.key]?'⌃':'⌄'}</button>
-      {searching[r.key]&&<><input aria-label={'Search roster for '+r.username} value={search[r.key]||''} onChange={e=>setSearch(p=>({...p,[r.key]:e.target.value}))} placeholder="Username or Player ID" style={{...control,width:'100%'}}/>{String(search[r.key]||'').length>=2&&players.filter(p=>[p.name,p.id,...(p.searchFields||[])].some(v=>normaliseBulkName(v).includes(normaliseBulkName(search[r.key])))).slice(0,5).map(p=><button type="button" key={p.id} onClick={()=>{resolve(r.key,p.id);setExpanded(null)}} style={{...button,textAlign:'left',fontSize:12}}>{p.name} · {metadata(p)}</button>)}</>}
-      <div style={{display:'flex',gap:8}}><button type="button" onClick={()=>resolve(r.key,'new')} style={{...button,flex:1,minHeight:38,fontSize:12}}>New player</button><button type="button" onClick={()=>resolve(r.key,'skip')} style={{...button,flex:1,minHeight:38,fontSize:12}}>Skip</button>{r.status!=='review'&&<button type="button" onClick={()=>resolve(r.key,null)} style={{...button,minHeight:38,fontSize:12}}>Change</button>}</div>
+     {open&&<div style={{padding:'0 2px 12px 27px',display:'grid',gap:8}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}><span style={secondary}>Troop power</span><input aria-label={'Troop power for '+r.username} value={powers[r.key]===undefined?String(r.power??''):powers[r.key]} onChange={e=>setPowers(p=>({...p,[r.key]:e.target.value}))} inputMode="numeric" style={{...control,width:112}}/></div>
+      {current&&<div style={{borderTop:'1px solid '+palette.border,padding:'9px 0',display:'flex',alignItems:'center',gap:8}}>
+       <div style={{minWidth:0,flex:1}}><span style={{...secondary,fontSize:11}}>Suggested roster match</span><strong style={{display:'block',fontSize:13,overflowWrap:'anywhere'}}>{current.name}</strong><span style={{...secondary,display:'block'}}>{metadata(current)}</span><span style={{...secondary,display:'block'}}>ID {current.playerId||current.fid||current.searchFields?.find(x=>/^\\d{7,}$/.test(String(x)))||current.id}</span></div>
+       {r.status==='review'?<button type="button" onClick={()=>choose(current.id)} style={{...button,background:palette.accent,color:'#0B1525'}}>Match</button>:<span style={{color:palette.success}}>✓</span>}
+      </div>}
+      <button type="button" aria-expanded={!!searching[r.key]} onClick={()=>setSearching(p=>({...p,[r.key]:!p[r.key]}))} style={{...button,background:'transparent',textAlign:'left',fontSize:12}}>Other matches {searching[r.key]?'⌃':'⌄'}</button>
+      {searching[r.key]&&<><input aria-label={'Search roster for '+r.username} value={search[r.key]||''} onChange={e=>setSearch(p=>({...p,[r.key]:e.target.value}))} placeholder="Search username or Player ID" style={{...control,width:'100%'}}/>
+       {alternatives.map(p=><button type="button" key={p.id} onClick={()=>choose(p.id)} style={{...button,background:'transparent',textAlign:'left',fontSize:12,display:'grid',gap:3}}><strong>{p.name}</strong><span style={secondary}>{metadata(p)} · ID {p.playerId||p.fid||p.id}</span></button>)}
+       {q.length>=2&&!alternatives.length&&<span style={secondary}>No roster matches. Try another name or Player ID.</span>}
+      </>}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button type="button" onClick={()=>choose('new')} style={{...button,background:'transparent',fontSize:12}}>New player</button><button type="button" onClick={()=>choose('skip')} style={{...button,background:'transparent',fontSize:12}}>Skip</button>{r.status!=='review'&&<button type="button" onClick={()=>{resolve(r.key,null);setFilter('review');setExpanded(r.key)}} style={{...button,background:'transparent',fontSize:12}}>Change match</button>}</div>
      </div>}
     </div>;
    })}
+   {filter==='review'&&!pending.length&&<div style={{padding:12,...secondary}}>All names resolved. Expand Matched to inspect or change any selection.</div>}
    </div>
    {newPlayers.length>0&&<p style={{...secondary,margin:0}}>New profiles must be created separately. Only matched players are imported.</p>}
    {duplicates.length>0&&<p role="alert" style={{color:palette.warning,fontSize:13}}>Duplicate player IDs. Change the matches before confirming.</p>}
