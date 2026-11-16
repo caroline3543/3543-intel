@@ -20,7 +20,6 @@ try{
   assert.equal(await page.getByRole('button',{name:/Confirm 2 matched players/}).isDisabled(),true);
   await page.getByRole('button',{name:/REINTLESSRKG/}).first().click();
   await page.getByRole('button',{name:'Match',exact:true}).first().click();
-  await page.getByRole('button',{name:/8ARI/}).first().click();
   await page.getByRole('button',{name:'Match',exact:true}).first().click();
   await page.getByRole('button',{name:/Confirm 4 matched players/}).click();
   await page.getByRole('heading',{name:'Import complete'}).waitFor();
