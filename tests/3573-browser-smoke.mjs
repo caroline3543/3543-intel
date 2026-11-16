@@ -158,12 +158,13 @@ try{
   await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
   await page.getByRole('navigation',{name:'TAL Planner sections'}).getByRole('button',{name:'Teams',exact:true}).click();
   await page.getByLabel('Match time UTC').selectOption('12:00');
-  await page.waitForFunction(()=>{
-   const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
-   if(!key)return false;
-   const saved=JSON.parse(localStorage.getItem(key));
-   return saved.groups?.filter(g=>g.leader).length===4;
+  await page.waitForTimeout(1200);
+  const afterReload=await page.evaluate(()=>{
+   const keys=Object.keys(localStorage).filter(k=>k.startsWith('caroline-3573-tal-teams-v1:'));
+   return keys.map(key=>({key,chosen:JSON.parse(localStorage.getItem(key))?.chosen,groups:JSON.parse(localStorage.getItem(key))?.groups}));
   });
+  assert.ok(afterReload.some(entry=>entry.key.endsWith(':12:00')&&entry.groups?.filter(g=>g.leader).length===4),
+   'Reload must preserve four leaders. Observed local drafts: '+JSON.stringify(afterReload));
   const reloaded=await page.evaluate(()=>{
    const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
    return JSON.parse(localStorage.getItem(key));
