@@ -152,6 +152,24 @@ try{
   const assigned=draft.groups.flatMap(g=>[g.leader,...g.members].filter(Boolean).map(String));
   assert.deepEqual([...assigned].sort(),['1','2','3','4'],'Each of the four selected players must be assigned exactly once');
   assert.equal(draft.groups.filter(g=>g.leader).length,4,'Every team must have a leader');
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
+  await page.getByRole('navigation',{name:'TAL Planner sections'}).getByRole('button',{name:'Teams',exact:true}).click();
+  await page.getByLabel('Match time UTC').selectOption('12:00');
+  await page.waitForFunction(()=>{
+   const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
+   if(!key)return false;
+   const saved=JSON.parse(localStorage.getItem(key));
+   return saved.groups?.filter(g=>g.leader).length===4;
+  });
+  const reloaded=await page.evaluate(()=>{
+   const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
+   return JSON.parse(localStorage.getItem(key));
+  });
+  assert.deepEqual(reloaded.groups,draft.groups,'Generated teams must survive a browser reload unchanged');
+
   assert.equal(errors.length,0,'Four-player TAL generation runtime errors: '+errors.join('; '));
   await context.close();
  }
