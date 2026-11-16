@@ -143,6 +143,15 @@ try{
   const generator=page.getByRole('region',{name:'Generate four teams'});
   await generator.getByRole('button',{name:'Regenerate all teams'}).click();
   await generator.getByRole('status').getByText('4 of 4 eligible players assigned across four teams.').waitFor({timeout:10000});
+  const draft=await page.evaluate(()=>{
+   const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
+   return key?JSON.parse(localStorage.getItem(key)):null;
+  });
+  assert.ok(draft,'Generated TAL teams should be saved to the device draft');
+  assert.equal(draft.groups?.length,4,'Generator must create four colour teams');
+  const assigned=draft.groups.flatMap(g=>[g.leader,...g.members].filter(Boolean).map(String));
+  assert.deepEqual([...assigned].sort(),['1','2','3','4'],'Each of the four selected players must be assigned exactly once');
+  assert.equal(draft.groups.filter(g=>g.leader).length,4,'Every team must have a leader');
   assert.equal(errors.length,0,'Four-player TAL generation runtime errors: '+errors.join('; '));
   await context.close();
  }
