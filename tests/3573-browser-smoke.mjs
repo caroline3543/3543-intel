@@ -174,6 +174,48 @@ try{
   assert.equal(errors.length,0,'Four-player TAL generation runtime errors: '+errors.join('; '));
   await context.close();
  }
+ // Adding a fifth combatant must preserve every existing leader and assignment.
+ const fivePlayers=[...fourPlayers,player('5','Newcomer')];
+ const fivePlan={...fourPlan,players:fivePlayers,talPlan:{...fourPlan.talPlan,availability:{...fourPlan.talPlan.availability,'5':['12:00']},records:{...fourPlan.talPlan.records,'5':{troopPower:2500}},teams:[{...fourPlan.talPlan.teams[0],members:fivePlayers.map(p=>({id:p.id,role:'combatant',registered:true}))}]}};
+ for(const width of [390,1280]){
+  const context=await browser.newContext({viewport:{width,height:844}});
+  const page=await context.newPage();record(page);
+  await page.addInitScript(()=>{
+   const date=new Date().toISOString().slice(0,10);
+   const key='caroline-3573-tal-teams-v1:HOT:1:'+date+':12:00';
+   localStorage.setItem('caroline-3573-last-tal-match',JSON.stringify({legion:'HOT:1',date,time:'12:00'}));
+   localStorage.setItem(key,JSON.stringify({chosen:['1','2','3','4','5'],powers:{},groups:['blue','yellow','green','pink'].map((color,i)=>({key:i+1,color,leader:String(i+1),members:[]})),assignment:{},mode:'balanced',leaderStrategy:'power',confirmed:false,absentIds:[]}));
+  });
+  await page.route('**/api/**',route=>{
+   const url=new URL(route.request().url());
+   if(url.pathname==='/api/session')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authenticated:true,role:'leader'})});
+   if(url.pathname==='/api/workspace'&&route.request().method()==='GET')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:fivePlan,revision:1,updatedAt:'2026-11-01T00:00:00Z',role:'leader'})});
+   return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Mocked test environment'})});
+  });
+  await page.goto(origin,{waitUntil:'domcontentloaded'});
+  await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
+  const tour=page.getByRole('dialog',{name:/Load your alliances/i});
+  if(await tour.isVisible())await tour.getByRole('button',{name:'Skip'}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
+  await page.getByRole('navigation',{name:'TAL Planner sections'}).getByRole('button',{name:'Teams',exact:true}).click();
+  const generator=page.getByRole('region',{name:'Generate four teams'});
+  await generator.getByRole('button',{name:'Add unassigned only'}).click();
+  await generator.getByRole('status').getByText('5 of 5 eligible players assigned. Added 1 without changing existing teams.').waitFor({timeout:10000});
+  await page.waitForFunction(()=>{
+   const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
+   const groups=key&&JSON.parse(localStorage.getItem(key)).groups;
+   return groups?.some(g=>g.members.includes('5'));
+  });
+  const groups=await page.evaluate(()=>{
+   const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
+   return JSON.parse(localStorage.getItem(key)).groups;
+  });
+  assert.deepEqual(groups.map(g=>g.leader),['1','2','3','4'],'Adding a newcomer must preserve the four original leaders');
+  assert.deepEqual(groups.flatMap(g=>[g.leader,...g.members]).sort(),['1','2','3','4','5'],'Each player must appear exactly once');
+  assert.equal(errors.length,0,'Add-unassigned runtime errors: '+errors.join('; '));
+  await context.close();
+ }
  console.log('PASS: 3573 browser login, navigation, 390px/1280px viewports and read-only workspace smoke checks');
 }finally{
  await browser?.close();
