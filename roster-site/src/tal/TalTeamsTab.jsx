@@ -1,3 +1,4 @@
+import {BulkPlayerImport} from '../components/BulkPlayerImport.jsx';
 import {comparePriority} from '../../../src/components/players/PlayerCard.jsx';
 import {useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
@@ -359,17 +360,11 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   }else setChosen(old=>[...new Set([...old.map(String),key])]);
   setConfirmed(false);setGenerationError('');
  }
- function saveBatch(){
-  const lines=bulk.split(/\r?\n/).filter(s=>s.trim()),updates={},problems=[];
-  for(const line of lines){
-   const i=line.lastIndexOf(',');if(i<1){problems.push(line);continue;}
-   const identifier=line.slice(0,i).trim(),n=valueNumber(line.slice(i+1).trim());
-   const matches=pool.filter(p=>[p.fid,p.username,p.alias,p.id].some(v=>String(v||'').toLowerCase()===identifier.toLowerCase()));
-   if(matches.length!==1||n===null||n<0){problems.push(identifier);continue;}
-   updates[String(matches[0].id)]=n;
-  }
-  if(problems.length){setCopyMessage('Review unmatched or invalid: '+problems.slice(0,5).join(', '));return;}
-  setPowers(p=>({...p,...updates}));setCopyMessage('Updated '+Object.keys(updates).length+' troop power values in this preview.');setShowBulk(false);
+ function saveBatch(rows){
+  const updates=Object.fromEntries(rows.map(r=>[String(r.id),r.power]));
+  setPowers(p=>({...p,...updates}));
+  setCopyMessage('Updated '+rows.length+' troop power values in this match draft.');
+  return {message:rows.length+' troop power values saved in this match draft.'};
  }
  function clearTeams(){
   setGenerationSuccess('');
@@ -559,7 +554,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
      {[['all','All'],['combatant','Combatants'],['substitute','Substitutes'],['absent','Absent']].map(([key,label])=><button key={key} type="button" aria-pressed={roleFilter===key} style={{...btn,minHeight:36,padding:'7px 12px',flexShrink:0,border:0,borderRadius:22,fontSize:12,background:roleFilter===key?'#614824':'#1B2B42',color:roleFilter===key?'#F2C77B':C.icy}} onClick={()=>setRoleFilter(key)}>{label}</button>)}
     </div>
     <div aria-label="Sort players" style={{display:'flex',gap:7,overflowX:'auto',whiteSpace:'nowrap',margin:'8px 0 12px',paddingBottom:3,WebkitOverflowScrolling:'touch'}}>{[['name','Name'],['strength','Troop tiers'],['troop','Troop power'],['city','City power'],['lab','Labyrinth rank']].map(([key,label])=><button type="button" key={key} aria-pressed={playerSort===key} onClick={()=>{if(playerSort===key)setSortDirection(d=>d==='asc'?'desc':'asc');else{setPlayerSort(key);setSortDirection(key==='name'||key==='lab'?'asc':'desc');}}} style={{...btn,minHeight:36,padding:'7px 12px',flexShrink:0,border:0,borderRadius:22,fontSize:12,color:playerSort===key?'#F2C77B':C.icy,background:playerSort===key?'#614824':'#1B2B42'}}>{label}{playerSort===key?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}</div>
-    {showBulk&&<div style={{marginBottom:10}}><p style={{...small,fontSize:11}}>Paste Username, Troop power on separate lines.</p><textarea aria-label="Paste troop power" placeholder={'LOVE, 4250\nMaliD, 3880'} value={bulk} onChange={e=>setBulk(e.target.value)} rows={4} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16}}/><button type="button" style={{...btn,width:'100%',marginTop:6,minHeight:44}} onClick={saveBatch}>Apply power</button></div>}
+    {showBulk&&<BulkPlayerImport title="Import troop power" context="TAL Planner" roleLabel="Match troop power" requirePower alliance={selectedLegion?.host||''} players={pool.map(p=>({id:String(p.id),name:name(p),alliance:p.allianceTag||p.alliance||selectedLegion?.host||'',searchFields:[p.fid,p.alias,...(p.pastUsernames||[])].filter(Boolean)}))} onConfirm={saveBatch} onClose={()=>setShowBulk(false)}/>}
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:3}}>
      <span style={{...small,fontSize:11}}>Match-specific troop power</span>
      <button type="button" style={{border:0,background:'transparent',color:C.icy,fontSize:11,textDecoration:'underline',padding:'8px 2px',minHeight:36,cursor:'pointer'}} onClick={chooseAll}>Reset selection</button>
