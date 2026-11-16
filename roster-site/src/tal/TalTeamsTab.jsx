@@ -241,8 +241,16 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   // React may render once with the previous match's state after draftLoaded changes.
   // Never autosave that stale snapshot over the draft we are restoring.
   if(restoringDraft.current===draftKey){
-   if(lastSaved.current!==snapshotSignature)return;
+   // applyDraft serialises fields in a different order from snapshot.
+   // Compare the restored values in snapshot's canonical field order.
+   let restoredMatches=false;
+   try{
+    const restored=JSON.parse(lastSaved.current);
+    restoredMatches=Object.keys(snapshot).every(key=>JSON.stringify(restored[key])===JSON.stringify(snapshot[key]));
+   }catch{}
+   if(!restoredMatches)return;
    restoringDraft.current='';
+   lastSaved.current=snapshotSignature;
   }
   if(lastSaved.current===snapshotSignature)return;
   lastSaved.current=snapshotSignature;
