@@ -20,8 +20,8 @@ export function ProfileTeamwork({player,players=[],preferences={},onSavePreferen
    setPartner('');setPartnerQuery('');
  }
  function removePair(a,b){save({...preferences,pairs:(preferences.pairs||[]).filter(([x,y])=>pairKey(x,y)!==pairKey(a,b))});}
- return <ProfileSection title="TAL teamwork">
-   <p style={{fontSize:13,color:C.icy,lineHeight:1.5}}>Officer-recorded preferences, shared across TAL battles. Not an automatic assessment of the player.</p>
+ return <ProfileSection title="Teamwork">
+   <p style={{fontSize:13,color:C.icy,lineHeight:1.5}}>Officer-recorded preferences for working together. Not an automatic assessment of the player.</p>
    <label style={{fontSize:13,color:C.icy,display:'block',margin:'10px 0 14px'}}>Voice communication language
      <select aria-label="Preferred voice communication language" value={player.communicationLanguage||''}
        onChange={e=>onSavePlayer?.({...player,communicationLanguage:e.target.value,profileLastUpdated:new Date().toISOString()})}
