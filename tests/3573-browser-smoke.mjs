@@ -215,6 +215,45 @@ try{
   assert.equal(errors.length,0,'Add-unassigned runtime errors: '+errors.join('; '));
   await context.close();
  }
+ // Two independent browser devices must restore the same shared TAL draft, not depend on localStorage.
+ const sharedDate=new Date().toISOString().slice(0,10);
+ const sharedMatchKey='HOT:1:'+sharedDate+':12:00';
+ const sharedGroups=['blue','yellow','green','pink'].map((color,i)=>({key:i+1,color,leader:String(i+1),members:[]}));
+ const sharedDraft={chosen:['1','2','3','4'],powers:{},groups:sharedGroups,assignment:{},mode:'balanced',leaderStrategy:'power',confirmed:false,absentIds:[],updatedAt:'2026-11-16T01:00:00Z'};
+ const sharedPlan={...fourPlan,talTeamPreferences:{players:{},pairs:[],drafts:{[sharedMatchKey]:sharedDraft}}};
+ for(const width of [390,1280]){
+  const context=await browser.newContext({viewport:{width,height:844}});
+  const page=await context.newPage();record(page);
+  const writes=[];
+  await page.addInitScript(()=>{
+   const date=new Date().toISOString().slice(0,10);
+   localStorage.setItem('caroline-3573-last-tal-match',JSON.stringify({legion:'HOT:1',date,time:'12:00'}));
+  });
+  await page.route('**/api/**',route=>{
+   const request=route.request(),url=new URL(request.url());
+   if(request.method()!=='GET')writes.push(url.pathname);
+   if(url.pathname==='/api/session')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authenticated:true,role:'leader'})});
+   if(url.pathname==='/api/workspace'&&request.method()==='GET')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:sharedPlan,revision:2,updatedAt:'2026-11-16T01:00:00Z',role:'leader'})});
+   return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Mocked test environment'})});
+  });
+  await page.goto(origin,{waitUntil:'domcontentloaded'});
+  await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
+  const tour=page.getByRole('dialog',{name:/Load your alliances/i});
+  if(await tour.isVisible())await tour.getByRole('button',{name:'Skip'}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
+  await page.getByRole('navigation',{name:'TAL Planner sections'}).getByRole('button',{name:'Teams',exact:true}).click();
+  await page.getByLabel('Match time UTC').selectOption('12:00');
+  await page.getByText('Shared draft restored').waitFor({timeout:10000});
+  const restored=await page.evaluate(()=>{
+   const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
+   return key?JSON.parse(localStorage.getItem(key)):null;
+  });
+  assert.deepEqual(restored?.groups,sharedGroups,'Each independent browser must restore the shared four leaders');
+  assert.deepEqual(writes,[],'Reading a shared TAL draft must not modify the workspace');
+  assert.equal(errors.length,0,'Shared draft browser runtime errors: '+errors.join('; '));
+  await context.close();
+ }
  console.log('PASS: 3573 browser login, navigation, 390px/1280px viewports and read-only workspace smoke checks');
 }finally{
  await browser?.close();
