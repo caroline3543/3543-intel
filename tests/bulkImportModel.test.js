@@ -39,3 +39,14 @@ test('clearing edited troop power is missing, never zero',()=>{
  const rows=resolveBulkRows(parseBulkPlayers('Бакит Кыргыз,5049'),players,{}, {0:''},'HOT');
  assert.equal(rows[0].power,null);
 });
+
+test('duplicate exact usernames are never automatically selected',()=>{
+ const roster=[...players,{id:'5',name:'Бакит Кыргыз',alliance:'HOT'}];
+ const rows=resolveBulkRows(parseBulkPlayers('Бакит Кыргыз,5049'),roster,{}, {},'HOT');
+ assert.equal(rows[0].status,'review');
+ assert.equal(rows[0].player,null);
+});
+test('previous username alias requires review even when identical',()=>{
+ const rows=resolveBulkRows(parseBulkPlayers('OldRKG,5049'),players,{}, {},'HOT');
+ assert.equal(rows[0].status,'review');
+});
