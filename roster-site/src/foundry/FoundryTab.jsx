@@ -39,7 +39,7 @@ function InlinePower({player,onSave}){
   {error&&<span role="alert" style={{fontSize:10,color:'#f1a9a9'}}>Whole number only</span>}
  </div>;
 }
-export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroopPower,teamworkPreferences={}}){
+export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroopPower,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
  const saved=sharedFoundry||{};
  const [view,setView]=useState('players'),[query,setQuery]=useState('');
  const [paste,setPaste]=useState(''),[showPaste,setShowPaste]=useState(false),[notice,setNotice]=useState(''),[selected,setSelected]=useState(null);
@@ -52,6 +52,7 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const [managing,setManaging]=useState(null);
  const [roleFilter,setRoleFilter]=useState('join'),[bulkMode,setBulkMode]=useState(false),[bulkSelected,setBulkSelected]=useState([]),[confirmRemoval,setConfirmRemoval]=useState(false),[rankExpanded,setRankExpanded]=useState({R5:true,R4:true,R3:true,R2:true,R1:true});
  const [pasteIssues,setPasteIssues]=useState([]);
+ const [bulkAction,setBulkAction]=useState(''),[bulkLanguage,setBulkLanguage]=useState(''),[bulkRelationshipMode,setBulkRelationshipMode]=useState('add');
  const [manualMatches,setManualMatches]=useState({});
  const [editingPower,setEditingPower]=useState(null),[powerInput,setPowerInput]=useState('');
  const [generationMode,setGenerationMode]=useState('all'),[expanded,setExpanded]=useState({Blue:true,Yellow:true,Green:true,Pink:true});
@@ -135,6 +136,9 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
  const filteredRegistrations=roleFilter==='join'?joined:subs;
  const groupedRanks=['R5','R4','R3','R2','R1','Unranked'];
  const bulkUpdate=(role)=>{const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};let joins=joined.length,substitutes=subs.length;for(const id of ids){if(nextRegs[id]===role)continue;if(nextRegs[id]==='join')joins--;else if(nextRegs[id]==='sub')substitutes--;if(role==='join')joins++;else substitutes++;nextRegs[id]=role;if(role!=='join'){delete nextTeams[id];delete nextAssignments[id]}}if(joins>30||substitutes>10){setNotice('Not enough registration slots for this change');return}update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' registration roles updated');setRoleFilter(role);setBulkSelected([]);setBulkMode(false)};
+ const selectedIds=()=>bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));
+ const applyBulkLanguage=()=>{const ids=selectedIds();if(!bulkLanguage.trim()){setNotice('Choose a language');return;}onUpdatePlayerLanguage?.(ids,bulkLanguage);setNotice('Language updated for '+ids.length+' players');setBulkAction('');setBulkSelected([]);setBulkMode(false)};
+ const applyBulkRelationships=()=>{const ids=selectedIds();if(ids.length<2){setNotice('Select at least two players');return;}const existing=Array.isArray(teamworkPreferences.pairs)?teamworkPreferences.pairs:[];const pairKey=p=>Array.isArray(p)?p.map(String).sort().join('|'):'';const selectedPairs=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)selectedPairs.push([ids[i],ids[j]]);const keys=new Set(selectedPairs.map(pairKey));const pairs=bulkRelationshipMode==='add'?[...existing.filter(p=>!keys.has(pairKey(p))),...selectedPairs]:existing.filter(p=>!keys.has(pairKey(p)));onSaveTeamworkPreferences?.({...teamworkPreferences,pairs});setNotice('Teammate preferences updated');setBulkAction('');setBulkSelected([]);setBulkMode(false)};
  const bulkRemove=()=>{const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};ids.forEach(id=>{delete nextRegs[id];delete nextTeams[id];delete nextAssignments[id]});update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' removed from Foundry registration');setBulkSelected([]);setBulkMode(false);setConfirmRemoval(false)};
  const add=(id,role=addRole)=>{
   const p=entries.find(x=>x.id===id);
@@ -249,15 +253,15 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
      </div>
      {bulkMode&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',fontSize:12,color:'#b9cad9'}}><span>{bulkSelected.length} selected</span><button style={{...btn,minHeight:34,padding:'6px 10px'}} onClick={()=>setBulkSelected(filteredRegistrations.map(p=>p.id))}>Select all</button></div>}
      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 2px 6px',fontSize:11,color:'#a9bfd0'}}><span>Player</span><div style={{display:'flex',alignItems:'center',gap:9}}><span style={{width:82,textAlign:'center'}}>Troop power</span><span style={{width:42}} aria-hidden="true"/></div></div>
-     {groupedRanks.map(group=>{const ranked=filteredRegistrations.filter(p=>p.rank===group).sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));const eligible=entries.filter(p=>p.rank===group&&p.alliance===chosen).length;return <div key={group} style={{marginTop:8}}>
+     {groupedRanks.map(group=>{const ranked=filteredRegistrations.filter(p=>p.rank===group).sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));const eligible=entries.filter(p=>p.rank===group&&p.alliance===chosen).length;if(!ranked.length)return null;return <div key={group} style={{marginTop:8}}>
        <button type="button" aria-expanded={rankExpanded[group]!==false} onClick={()=>setRankExpanded(v=>({...v,[group]:v[group]===false}))} style={{...btn,width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#20344a',textAlign:'left',borderRadius:9,minHeight:34,padding:'6px 10px',fontSize:12}}>
          <span style={{display:'flex',gap:7,alignItems:'center'}}><strong style={{fontSize:12,color:'#f0c176'}}>{group}</strong><span style={{fontSize:12,color:'#a9bfd0'}}>{group==='R5'?'Alliance leader':group==='R4'?'Officers':group==='Unranked'?'Rank not recorded':'Members'}</span></span>
          <span style={{fontSize:12,color:'#c8d7e4',fontVariantNumeric:'tabular-nums'}}>{ranked.length}/{group==='R5'&&eligible<=1?1:eligible||ranked.length} {rankExpanded[group]===false?'⌄':'⌃'}</span>
        </button>
        {rankExpanded[group]!==false&&(ranked.length?ranked.map(p=><div key={p.id} style={{borderBottom:'1px solid #2c4155',padding:'8px 0'}}>
          <div style={{display:'flex',alignItems:'center',gap:9}}>
-           {bulkMode?<input type="checkbox" aria-label={'Select '+p.name} checked={bulkSelected.includes(p.id)} onChange={e=>setBulkSelected(v=>e.target.checked?[...v,p.id]:v.filter(x=>x!==p.id))} style={{width:22,height:22,accentColor:'#eab14f'}}/>:<PlayerAvatar player={avatarFor(p)} size={34}/>}
-           <div style={{flex:1,minWidth:0}}><strong style={{fontSize:14,overflowWrap:'anywhere'}}>{p.name}</strong><div style={{fontSize:11,color:'#a9bfd0'}}>{p.alliance}{!p.matched?' · Needs matching':''}</div></div>
+           {bulkMode?<input type="checkbox" aria-label={'Select '+p.name} checked={bulkSelected.includes(p.id)} onChange={e=>setBulkSelected(v=>e.target.checked?[...v,p.id]:v.filter(x=>x!==p.id))} style={{width:22,height:22,accentColor:'#eab14f'}}/>:<button type="button" aria-label={'Open profile for '+p.name} onClick={()=>onOpenPlayerProfile?.(p.id)} style={{background:'transparent',border:0,padding:0,cursor:'pointer',minWidth:44,minHeight:44,display:'flex',alignItems:'center',justifyContent:'center'}}><PlayerAvatar player={avatarFor(p)} size={34}/></button>}
+           <div style={{flex:1,minWidth:0}}><button type="button" onClick={()=>onOpenPlayerProfile?.(p.id)} style={{background:'none',border:0,padding:0,color:'#eef5fc',fontSize:14,fontWeight:700,textAlign:'left',overflowWrap:'anywhere',cursor:'pointer'}}>{p.name}</button><div style={{fontSize:11,color:'#a9bfd0',display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}><span>{p.alliance}{!p.matched?' · Needs matching':''}</span>{p.language&&<span style={{borderRadius:6,background:'#263b50',padding:'2px 5px',color:'#c9d9e8'}}>{p.language}</span>}</div></div>
            <InlinePower player={p} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power saved for '+p.name)}}/>
            {!bulkMode&&<button aria-label={'Manage '+p.name} aria-expanded={managing===p.id} style={{...btn,width:42,minWidth:42,minHeight:44,fontSize:20,padding:5,background:'transparent',border:'none'}} onClick={()=>setManaging(managing===p.id?null:p.id)}>⋯</button>}
          </div>
@@ -268,10 +272,17 @@ export function FoundryTab({players=[],sharedFoundry={},onSaveFoundry,onSaveTroo
          </div>}
        </div>):<div style={{padding:'12px 4px',fontSize:12,color:'#839bae'}}>No {roleFilter==='join'?'combatants':'substitutes'} at this rank</div>)}
      </div>})}
-     {bulkMode&&bulkSelected.length>0&&<div style={{position:'sticky',bottom:75,zIndex:4,...style,marginTop:14,background:'#26384d',borderColor:'#eab14f'}}>
-       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><strong>{bulkSelected.length} selected</strong><button style={{...btn,minHeight:32,padding:'5px 10px'}} onClick={()=>setBulkSelected([])}>Clear</button></div>
-       <div style={{display:'flex',flexWrap:'wrap',gap:7}}><button style={btn} onClick={()=>bulkUpdate('join')}>Make combatants</button><button style={btn} onClick={()=>bulkUpdate('sub')}>Make substitutes</button><button style={{...btn,color:'#f1a9a9'}} onClick={()=>setConfirmRemoval(true)}>Remove from Foundry</button></div>
-       {confirmRemoval&&<div style={{marginTop:10}}><p style={{fontSize:13}}>Remove {bulkSelected.length} registration(s)? Player profiles will be kept.</p><button style={{...btn,color:'#f1a9a9',marginRight:8}} onClick={bulkRemove}>Confirm removal</button><button style={btn} onClick={()=>setConfirmRemoval(false)}>Cancel</button></div>}
+     {bulkMode&&bulkSelected.length>0&&<div style={{position:'sticky',bottom:75,zIndex:4,...style,marginTop:14,background:'#26384d',borderColor:'#eab14f',maxHeight:'65vh',overflowY:'auto'}}>
+       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><strong>{bulkSelected.length} selected · Actions</strong><button style={{...btn,minHeight:32,padding:'5px 10px'}} onClick={()=>{setBulkSelected([]);setBulkAction('')}}>Clear</button></div>
+       {[['join','Make combatants'],['sub','Make substitutes'],['language','Set language'],['relationships','Works well together'],['remove','Remove from Foundry']].map(([key,label])=><div key={key}>
+         <button type="button" aria-expanded={bulkAction===key} onClick={()=>{setBulkAction(bulkAction===key?'':key);setConfirmRemoval(false)}} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',textAlign:'left',marginBottom:5,color:key==='remove'?'#f1a9a9':'#e9f2fa',background:bulkAction===key?'#344c63':'#21354b'}}><span>{label}</span><span aria-hidden="true">{bulkAction===key?'⌃':'›'}</span></button>
+         {bulkAction===key&&<div style={{padding:'8px 4px 12px'}}>
+           {key==='language'&&<select aria-label="Language for selected players" value={bulkLanguage} onChange={e=>setBulkLanguage(e.target.value)} style={{...btn,width:'100%',marginBottom:8}}><option value="">Choose language</option>{['English','Traditional Chinese','Simplified Chinese','Korean','Turkish','Arabic','Russian','Spanish','Polish','Ukrainian','Italian','French','Georgian','German','Other'].map(lang=><option key={lang} value={lang}>{lang}</option>)}</select>}
+           {key==='relationships'&&<><p style={{fontSize:12,color:'#b9cad9',margin:'0 0 8px'}}>Create mutual preferences between each selected pair.</p><select aria-label="Relationship action" value={bulkRelationshipMode} onChange={e=>setBulkRelationshipMode(e.target.value)} style={{...btn,width:'100%',marginBottom:8}}><option value="add">Add mutual relationships</option><option value="remove">Remove mutual relationships</option></select></>}
+           {key==='remove'&&<p style={{fontSize:12,color:'#b9cad9'}}>Remove {bulkSelected.length} registrations? Player profiles will be kept.</p>}
+           <button style={{...btn,width:'100%',background:key==='remove'?'#633d48':'#32694d'}} onClick={()=>{if(key==='join'||key==='sub')bulkUpdate(key);else if(key==='language')applyBulkLanguage();else if(key==='relationships')applyBulkRelationships();else bulkRemove()}}>{key==='remove'?'Confirm removal':'Apply to '+bulkSelected.length+' players'}</button>
+         </div>}
+       </div>)}
      </div>}
    </div>
   </>}
