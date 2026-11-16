@@ -38,7 +38,7 @@ function editDistance(a,b){
 export function resolveBulkRows(rows,players,choices={},powers={},alliance=''){
  return rows.map(row=>{
   const candidates=bulkCandidates(row.username,players,alliance);
-  const automatic=candidates.filter(p=>p.score>=100);
+  const automatic=candidates.filter(p=>p.score>=100&&(!alliance||p.alliance===alliance));
   const choice=choices[row.key];
   const id=choice===undefined&&automatic.length===1?automatic[0].id:choice;
   const player=players.find(p=>p.id===id)||null;
