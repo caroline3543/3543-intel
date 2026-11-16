@@ -3,11 +3,13 @@ const equal=sameWorkspaceValue;
 const meaningful=data=>Boolean(data?.players?.length||data?.events?.length||data?.customRoles?.length||data?.talPlan);
 export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onStatus=()=>{}}){
  let state={local:sharedData(initial),base:null,revision:0,joined:false,updatedAt:null,conflicts:[],mode:'connecting',issue:null,status:'Opening shared workspace…',ready:false,deviceBackup:null,syncing:false,checkedAt:null};
- let running=false,disposed=false,timer=null,persisting=Promise.resolve();
+ let running=false,disposed=false,timer=null,persisting=Promise.resolve(),retryTimer=null,retryDelay=2000;
  function emit(){if(!disposed){onChange(state.local);onStatus({...state,dirty:!equal(state.local,state.base)});}}
  function persist(){const value=structuredClone(state);persisting=persisting.catch(()=>{}).then(()=>cache.write(value));return persisting;}
  function schedule(){clearTimeout(timer);if(!disposed)timer=setTimeout(()=>{sync();},600);}
- function error(error){state.status=error?.message||'Offline · changes waiting on this device';state.issue=state.status;emit();}
+ function scheduleRetry(){if(disposed||retryTimer||!state.joined||state.conflicts.length)return;retryTimer=setTimeout(()=>{retryTimer=null;sync();},retryDelay);retryDelay=Math.min(retryDelay*2,60000);}
+ function recovered(){clearTimeout(retryTimer);retryTimer=null;retryDelay=2000;}
+ function error(failure){const message=failure?.name==='TimeoutError'||failure?.name==='AbortError'?'Connection timed out. Your changes are saved on this device; retrying automatically.':failure?.message||'Connection unavailable. Your changes are saved on this device.';state.status=message;state.issue=message;emit();scheduleRetry();}
  function integrate(remote){
   if(!Number.isSafeInteger(remote.revision)||remote.revision<state.revision)throw Error('Unable to verify shared data. Retry sync.');
   if(remote.data==null){
@@ -45,11 +47,11 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
    state.base=structuredClone(result.data);state.local=merged.data;state.revision=result.revision;state.updatedAt=result.updatedAt;state.conflicts=merged.conflicts;state.issue=null;
    state.status=state.conflicts.length?'Conflicting edits · review below':equal(state.local,state.base)?'Shared · all changes saved':'Syncing changes…';await persist();emit();
    if(!equal(state.local,state.base)&&!state.conflicts.length)schedule();
-   state.checkedAt=new Date().toISOString();
+   state.checkedAt=new Date().toISOString();recovered();
   }catch(e){error(e);}
-  finally{running=false;state.syncing=false;if(!state.issue)state.checkedAt=new Date().toISOString();emit();}
+  finally{running=false;state.syncing=false;if(!state.issue){state.checkedAt=new Date().toISOString();recovered();}emit();}
  }
- function update(value){state.local=sharedData(typeof value==='function'?value(state.local):value);state.status='Saving on this device…';emit();persist().then(()=>{state.status=state.joined?'Saved on this device · waiting to sync':'Saved on this device · not shared yet';emit();if(state.joined)schedule();}).catch(()=>error(Error('Device storage is full. Download a backup before closing.')));}
+ function update(value){state.local=sharedData(typeof value==='function'?value(state.local):value);const snapshot=state.local;state.status='Saving on this device…';emit();persist().then(()=>{if(disposed)return;if(state.local===snapshot&&!state.issue&&(!state.joined||!equal(state.local,state.base)))state.status=state.joined?'Saved on this device · waiting to sync':'Saved on this device · not shared yet';emit();if(state.joined)schedule();}).catch(()=>error(Error('Device storage is full. Download a backup before closing.')));}
  async function publish(){
   if(running||state.joined||state.mode!=='unpublished')return;
   state.joined=true;state.base=null;state.revision=0;state.mode='active';state.status='Starting shared workspace…';
@@ -74,7 +76,7 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
   catch(e){state=previous;error(e);}
  }
 
- return {initialize,sync,update,publish,join,resolve,getState:()=>structuredClone(state),dispose(){disposed=true;clearTimeout(timer);}};
+ return {initialize,sync,update,publish,join,resolve,getState:()=>structuredClone(state),dispose(){disposed=true;clearTimeout(timer);clearTimeout(retryTimer);}};
 }
 export function workspaceCache(){
  const db=new Promise((resolve,reject)=>{const request=indexedDB.open('caroline-shared-workspace',1);request.onupgradeneeded=()=>request.result.createObjectStore('workspace');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
