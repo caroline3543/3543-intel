@@ -17,10 +17,12 @@ try{
   await input.fill('Caroline,3675\nREINTLESSRKG,5472\n8ARI,3593\nБакит Кыргыз,5049');
   await page.getByRole('button',{name:/Find roster matches/}).click();
   assert.equal(await page.getByRole('button',{name:/Review/}).first().count(),1);
-  assert.equal(await page.getByRole('button',{name:/Review and confirm/}).isDisabled(),true);
-  await page.getByRole('button',{name:/REINTLESS RKG/}).first().click();
+  assert.equal(await page.getByRole('button',{name:/Confirm 2 matched players/}).isDisabled(),true);
+  await page.getByRole('button',{name:/REINTLESSRKG/}).first().click();
+  await page.getByRole('button',{name:'Match',exact:true}).first().click();
   await page.getByRole('button',{name:/8ARI/}).first().click();
-  await page.getByRole('button',{name:/Review and confirm/}).click();
+  await page.getByRole('button',{name:'Match',exact:true}).first().click();
+  await page.getByRole('button',{name:/Confirm 4 matched players/}).click();
   await page.getByRole('heading',{name:'Import complete'}).waitFor();
   const saved=JSON.parse(await page.getByLabel('Saved import').textContent());
   assert.deepEqual(saved.map(r=>r.id),['1','2','3','4']);
