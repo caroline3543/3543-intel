@@ -42,3 +42,6 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Browser acceptance smoke test
         run: node tests/3573-browser-smoke.mjs
+
+      - name: Bulk import mobile and desktop interaction test
+        run: node tests/3573-bulk-import-browser.mjs
