@@ -24,7 +24,7 @@ function dayGroup(value,now){
  return date>=today?'Today':date>=yesterday?'Yesterday':'Earlier';
 }
 export function NameChanges({players,plan,onOpen}){
- const [query,setQuery]=useState(''),[limit,setLimit]=useState(40),[assignedOnly,setAssignedOnly]=useState(false),[changeType,setChangeType]=useState('all'),[now,setNow]=useState(()=>Date.now()),[copied,setCopied]=useState('');
+ const [query,setQuery]=useState(''),[limit,setLimit]=useState(40),[assignedOnly,setAssignedOnly]=useState(false),[changeType,setChangeType]=useState('name'),[now,setNow]=useState(()=>Date.now()),[copied,setCopied]=useState('');
  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),30000);return ()=>clearInterval(timer);},[]);
  const q=query.trim().toLocaleLowerCase();
  const playerById=new Map(players.map(p=>[p.id,p]));
