@@ -198,9 +198,13 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
         if(stopRefresh.current)break;
         setApiProgress('Refreshing '+tag+' · '+(checked+1)+'/'+targets.length);
         try{
-          const rows=allianceRows(await fetchMightpulseAlliance(3573,tag),'3573',tag);
+          const response=await fetchMightpulseAlliance(3573,tag);
+          const rows=allianceRows(response,'3573',tag);
           if(!rows.length)throw Error('No roster returned');
-          const result=importRoster(rows,{reconcileTag:tag});
+          // Absence is only evidence of departure when the provider explicitly confirms a complete roster.
+          // A successful HTTP response or 100 returned members alone is not proof of completeness.
+          const complete=response?.data?.complete===true || response?.data?.is_complete===true;
+          const result=importRoster(rows,{reconcileTag:complete?tag:null});
           successes.push(tag);updated+=result.updated;added+=result.added;
         }catch(e){
           failures.push({tag,reason:e.message||'API request failed'});
