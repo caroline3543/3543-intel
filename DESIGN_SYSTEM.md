@@ -539,3 +539,62 @@ All four requirements in Section 20 are **approved conceptual design requirement
 5. Regression evidence is recorded per app, including its permitted feature differences and accessibility behaviour.
 
 All three requirements in Section 21 are **approved conceptual design requirements**. The eight-stage design review remains **100% approved**. This standalone draft is not an implementation authorisation. No repository modification, commit, migration or deployment is authorised.
+
+
+## 22. Proposed design: AI/OCR-assisted Foundry bulk matching (3573 only)
+
+**Status: discussion draft, not implementation approval.** This section records the user's 16 November 2026 request to improve bulk pasted names and troop powers extracted from game screenshots by AI/OCR. Applies to 3573 Caroline Foundry; does not change 3739 or other apps. Preserve all source usernames and player IDs. No code, production data, or deployment changes are authorised by this section.
+
+### 22.1 Problem observed
+
+- A screenshot-to-AI/OCR workflow produces text such as `Name,Power` or `Username, troop power`, often without spaces and with inconsistent punctuation. The current Foundry bulk importer expects lines with optional comma/tab and numeric power.
+- OCR and language models may alter stylised Unicode, Cyrillic, Korean, symbols, spaces and punctuation, even when the correct person exists in the roster. Examples observed include shortened names (`8ARI` vs `8ARI` plus power), stylised spellings, and ambiguous aliases.
+- The current flow attempts exact Player ID, exact name/alias, then a restrictive normalised comparison; it shows `No exact match` and candidate suggestions for unresolved lines. A suggested candidate requires a manual selection followed by rerunning `Match and register players`. This is cumbersome for batches and obscures what will be saved.
+- OCR output is untrusted input, **not** proof of identity. An incorrect automatic match can register the wrong player or overwrite troop power. Avoid automatic creation or silent fuzzy merging.
+
+### 22.2 Proposed user journey
+
+1. **Paste or import:** One clearly labelled `Add players` surface accepts `Name, power`, `Name power` where unambiguous, tab-separated rows, optional header, or names alone. Accept direct paste from OCR/AI; image upload and on-device OCR are separate future options, not prerequisites. Preserve original text verbatim alongside parsed fields.
+2. **Parse and preview:** Show a compact summary such as `18 rows · 12 ready · 5 review · 1 invalid`, plus a table of source name, proposed roster match, extracted troop power and status. Never register or edit profiles at this stage.
+3. **Suggest matches:** Use the canonical roster for the selected state and permitted alliance scope. Rank exact Player ID first, then exact current username, verified previous username/alias, safe Unicode/case/spacing variants, and finally fuzzy candidates. Explain why a candidate is shown. Never treat fuzzy confidence alone as authorisation.
+4. **Resolve uncertain rows inline:** Display up to three plausible players with avatar, canonical username, alliance and Player ID where available. Let the officer tap the correct profile, search manually, choose `Skip`, or mark `Not in roster`. Distinguish `No candidate`, `Several candidates`, `Possible OCR error`, `Duplicate row` and `Already registered`. Preserve original OCR text next to any suggested correction.
+5. **Review changes:** Show exact totals for registrations, troop-power updates, unchanged entries, skipped rows and conflicts. Indicate whether the power is imported event power or a profile field, with timestamp and source. Existing stronger/newer or manually entered values must not be overwritten silently.
+6. **Confirm once:** `Register N players` applies only reviewed eligible rows. Provide per-row results, Undo where supported, and a clear retry path for failed rows without duplicating successes. Keep unresolved rows available to resolve later.
+
+### 22.3 Matching and identity safeguards
+
+- Use **(state ID, immutable Player ID/FID)** as canonical identity when present; a displayed username is never a unique key.
+- Apply Unicode-aware matching carefully: compare normalised forms without mutating stored/displayed usernames. Preserve diacritics, script, decorative glyphs and invisible combining marks in the source preview and copied text. A transliteration or aggressive symbol-stripped comparison is a *candidate hint*, not an exact match.
+- Distinguish **exact**, **strong candidate**, **needs review** and **unmatched**. Only an unambiguous canonical Player ID or unique exact verified roster name/alias may be proposed as ready, and all changes remain subject to final confirmation.
+- Never infer a match from troop power alone. Power may help an officer visually disambiguate, but is mutable and may be outdated.
+- Do not infer that two different rows with similar usernames represent one person. Flag repeated source rows, repeated resolved FIDs and contradictory powers before confirmation.
+- A manual match selection is scoped to that exact source row and current import session, not globally to a name string; identical OCR strings can refer to different players.
+- Keep event-registration and troop-power updates separate. Explicitly respect player locks, eligibility, role limits (30 combatants / 10 substitutes), alliance scope, existing registration, provenance and last-update rules. Failed or skipped rows must not be reported as registered.
+- If an AI service is later considered, require explicit opt-in, privacy/security review, transparent processing destination, no secrets in the browser and a deterministic offline/manual fallback. AI may suggest parsing or candidates but never directly commit identity changes.
+
+### 22.4 Mobile layout and copy
+
+- One primary search/add field with a visible `Paste list` action. The bulk review opens as a full-height mobile sheet, not a cramped alert below a textarea.
+- Top summary and primary action remain visible; show a segmented `All / Ready / Review` filter, with review rows first by default. Each row has a readable source-name line, suggested profile, match-reason label, troop-power field and an obvious `Change match` action.
+- Candidate choices have at least 44 × 44 pt touch targets. Support keyboard selection, screen-reader labels, long names, non-Latin scripts, and an explicit cancel/close action that retains the draft.
+- Suggested copy: `Review 5 matches` rather than `No exact match` for all cases; `Matched by previous username` and `Possible OCR spelling` explain why. Use neutral status colours plus text; do not imply a probability is measured when it is not.
+- Keep the raw OCR paste editable, with a side-by-side or expandable `Original text` view. A correction changes the parsed row, not the source evidence.
+- Show a post-import outcome such as `12 registered · 2 skipped · 1 needs review` only after confirmed writes.
+
+### 22.5 Open product decisions for discussion
+
+1. Should **unique exact current-name matches** be preselected as ready, or should every row require a tap? Recommendation: preselect exact verified matches, with one final batch confirmation; manually review alias/fuzzy candidates.
+2. Should importing power update **Foundry event power only**, or the player's shared profile field? Recommendation: default to Foundry event power, explicitly label any shared-profile update.
+3. Should users be able to **upload screenshots directly** for OCR? Recommendation: phase 2, after reliable pasted-text matching, with opt-in and privacy review.
+4. Should the app remember confirmed OCR-to-FID corrections? Recommendation: remember verified previous usernames as provenance-backed aliases only after explicit officer approval; never create a global fuzzy override.
+
+### 22.6 Acceptance tests before implementation or release
+
+- Parse pasted `Name,Power`, comma-thousands, tabs, extra spaces, mixed newlines, headers, missing power and invalid/negative/decimal power without shifting values to the wrong row.
+- Verify exact FID, exact current username, verified alias, visually similar Unicode, mixed scripts, combining marks, Cyrillic/Latin lookalikes, truncated OCR, punctuation changes and unrelated near matches. Preserve original strings byte-for-byte in review.
+- Two rows with identical OCR names but different possible FIDs must not share a manual resolution; duplicated FIDs and contradictory powers must block unsafe bulk commit.
+- Check selected alliance vs other alliances, transferred/unverified players, registration caps, locks, stale powers, manual overrides, concurrent edits, partial save failures and idempotent retries.
+- Simulate 5, 20, 50 and 100 pasted rows on iPhone-sized screens, VoiceOver, keyboard and touch; verify that the reviewer can resolve every row without repeated full imports.
+- Validate zero incorrect automatic identity assignments on adversarial test fixtures; log false-positive suggestions and unmatched rates separately. Run integration and browser tests on the 3573 development branch; do not deploy without separate authorisation.
+
+**Decision state:** Added to the design system for discussion. No matching algorithm, OCR integration, bulk-import UI or registration logic is approved for implementation yet.
