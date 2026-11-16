@@ -21,8 +21,8 @@ export function bulkCandidates(name,players,preferredAlliance){
  const raw=String(name||'').trim().toLocaleLowerCase(),key=normaliseBulkName(name);
  return players.map(player=>{
   const fields=[player.name,...(player.searchFields||[]),player.id].filter(Boolean).map(String);
-  const idExact=fields.some(v=>/^\d+$/.test(v)&&v===name.trim());
-  const exact=fields.some(v=>v.trim().toLocaleLowerCase()===raw);
+  const idExact=String(player.playerId||player.fid||player.id)===String(name).trim()&&/^\d+$/.test(String(name).trim());
+  const exact=String(player.name||'').trim()===String(name).trim();
   const normalized=key.length>=3&&fields.some(v=>normaliseBulkName(v)===key);
   const fuzzy=key.length>=4&&fields.some(v=>{const k=normaliseBulkName(v);return k.length>=4&&(k.includes(key)||key.includes(k)||editDistance(k,key)<=2)});
   const score=idExact?110:exact?100:normalized?90:fuzzy?60:0;
@@ -39,8 +39,10 @@ export function resolveBulkRows(rows,players,choices={},powers={},alliance=''){
  return rows.map(row=>{
   const candidates=bulkCandidates(row.username,players,alliance);
   const automatic=candidates.filter(p=>p.score>=100&&(!alliance||p.alliance===alliance));
+  const exactAcrossRoster=players.filter(p=>String(p.name||'').trim()===row.username||/^\d+$/.test(row.username)&&String(p.playerId||p.fid||p.id)===row.username);
+  const safeAutomatic=automatic.length===1&&exactAcrossRoster.length===1&&automatic[0].id===exactAcrossRoster[0].id;
   const choice=choices[row.key];
-  const id=choice===undefined&&automatic.length===1?automatic[0].id:choice;
+  const id=choice===undefined&&safeAutomatic?automatic[0].id:choice;
   const player=players.find(p=>p.id===id)||null;
   const rawPower=powers[row.key]===undefined?row.power:String(powers[row.key]).trim()===''?null:Number(powers[row.key]);
   const status=choice==='skip'?'skip':choice==='new'?'new':player?(choice!==undefined?'approved':'exact'):'review';
