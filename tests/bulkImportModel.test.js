@@ -13,7 +13,9 @@ test('exact identity beats fuzzy suggestions across alliances',()=>{
  assert.equal(candidates[0].id,'3');
  assert.equal(candidates[0].score,100);
  const rows=resolveBulkRows(parseBulkPlayers('8ARI,3593'),players,{}, {},'HOT');
- assert.equal(rows[0].player.id,'3');
+ assert.equal(rows[0].status,'review');
+ assert.equal(rows[0].player,null);
+ assert.equal(rows[0].candidates[0].id,'3');
 });
 test('OCR variants are suggested but never silently approved',()=>{
  const rows=resolveBulkRows(parseBulkPlayers('REINTLESSRKG,5472'),players);
@@ -25,4 +27,10 @@ test('explicit review can select a suggested player, and skip excludes it',()=>{
  const source=parseBulkPlayers('REINTLESSRKG,5472');
  assert.equal(resolveBulkRows(source,players,{0:'1'})[0].status,'approved');
  assert.equal(resolveBulkRows(source,players,{0:'skip'})[0].status,'skip');
+});
+
+test('exact match within selected alliance can be preselected',()=>{
+ const rows=resolveBulkRows(parseBulkPlayers('Бакит Кыргыз,5049'),players,{}, {},'HOT');
+ assert.equal(rows[0].status,'exact');
+ assert.equal(rows[0].player.id,'4');
 });
