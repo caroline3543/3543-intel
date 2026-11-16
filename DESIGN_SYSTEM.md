@@ -552,6 +552,25 @@ All three requirements in Section 21 are **approved conceptual design requiremen
 - The current flow attempts exact Player ID, exact name/alias, then a restrictive normalised comparison; it shows `No exact match` and candidate suggestions for unresolved lines. A suggested candidate requires a manual selection followed by rerunning `Match and register players`. This is cumbersome for batches and obscures what will be saved.
 - OCR output is untrusted input, **not** proof of identity. An incorrect automatic match can register the wrong player or overwrite troop power. Avoid automatic creation or silent fuzzy merging.
 
+### 22.1a Screenshot-specific examples and parsing boundaries
+
+The supplied LM Studio screenshot and Foundry paste screenshot show why matching and parsing must be treated as two distinct operations:
+
+| OCR/AI output | Review requirement |
+|---|---|
+| `A L F is ENFJ,3280` | Preserve the entire source string and suggest plausible roster candidates. Do not assume `ENFJ` is removable or part of a particular player's name. |
+| `G ~ is INTJ,3429` | Treat spaces, tilde and words as potentially significant. Suggest candidates, never auto-merge from visual similarity. |
+| `8ARI,3593` | Parse the final comma-delimited numeric value as power, leaving `8ARI` as the source name. Do not compare `8ARI,3593` to usernames as one string. |
+| `REINTLESSRKG,5472` | Offer name variants and roster search, but do not assume the `RKG` suffix can safely be removed. |
+| `Бакит Кыргыз,5049` | Preserve Cyrillic exactly; transliteration is a suggestion aid only. |
+| `MotherEarth` | If power is absent, allow a name-only match and mark power as missing rather than guessing. |
+
+The two screenshots represent different import stages and may contain different sets of names. Do not assume they are row-for-row paired or use them to establish a definitive player identity. All examples are illustrative; a saved roster/FID must resolve actual matches.
+
+**Parsing rule:** Extract power from the **rightmost clearly numeric field** only when the delimiter and numeric format are unambiguous. Names can contain spaces, punctuation, digits, non-Latin characters and symbols. If a row could reasonably be interpreted in two ways, ask for review instead of guessing.
+
+**Suggested compact review layout:** `Source: G ~ is INTJ · 3,429` → `Possible match: [username] · [alliance] · [FID]` → `Choose / Search / Skip`. Show the original line in an expandable detail. The primary bulk action remains disabled for unresolved or conflicting rows unless the officer explicitly skips them.
+
 ### 22.2 Proposed user journey
 
 1. **Paste or import:** One clearly labelled `Add players` surface accepts `Name, power`, `Name power` where unambiguous, tab-separated rows, optional header, or names alone. Accept direct paste from OCR/AI; image upload and on-device OCR are separate future options, not prerequisites. Preserve original text verbatim alongside parsed fields.
