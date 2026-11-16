@@ -115,6 +115,23 @@ test('two leaders editing different TAL match drafts synchronize without overwri
  assert.equal(a.c.getState().conflicts.length,0);
  a.c.dispose();b.c.dispose();
 });
+test('two live workspace clients surface conflicting TAL leader edits and retain unrelated updates',async()=>{
+ const remote=server(),first=client(remote);await first.c.initialize();await first.c.publish();
+ const second=client(remote,initial(),first.cache);await second.c.initialize();
+ const key='HOT:1:2026-11-16:12:00';
+ const draft=leader=>({chosen:['a','b'],groups:[{key:1,color:'blue',leader,members:[]}],updatedAt:'2026-11-16T01:00:00Z'});
+ const put=(c,leader)=>c.update(data=>({...data,talTeamPreferences:{...(data.talTeamPreferences||{}),drafts:{...(data.talTeamPreferences?.drafts||{}),[key]:draft(leader)}}}));
+ put(first.c,'a');await first.c.sync();await second.c.sync();
+ put(first.c,'b');put(second.c,'a');
+ second.c.update(data=>({...data,players:data.players.map(p=>p.id==='b'?{...p,notes:'Second leader note'}:p)}));
+ await first.c.sync();await second.c.sync();
+ assert.ok(second.c.getState().conflicts.length,'Same-match leader edits must surface an explicit conflict');
+ assert.equal(remote.data.talTeamPreferences.drafts[key].groups[0].leader,'b','Remote leader must not be silently replaced');
+ await second.c.resolve('shared');await second.c.sync();
+ assert.equal(remote.data.talTeamPreferences.drafts[key].groups[0].leader,'b','Choosing shared must retain the remote team leader');
+ assert.equal(remote.data.players.find(p=>p.id==='b').notes,'Second leader note','Unrelated notes must still synchronize');
+ first.c.dispose();second.c.dispose();
+});
 test('simultaneous changes to the same TAL team leader produce an explicit conflict',()=>{
  const base=initial();base.talTeamPreferences={drafts:{'HOT:1:2026-11-16:12:00':{groups:[{key:1,color:'blue',leader:'a',members:[]}]}}};
  const mine=structuredClone(base),shared=structuredClone(base);
