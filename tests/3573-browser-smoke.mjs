@@ -245,12 +245,18 @@ try{
   await page.getByRole('navigation',{name:'TAL Planner sections'}).getByRole('button',{name:'Teams',exact:true}).click();
   await page.getByLabel('Match time UTC').selectOption('12:00');
   await page.getByText('Shared draft restored').waitFor({timeout:10000});
+  // Shared drafts are restored to React state. They are not necessarily written
+  // into localStorage until edited, so verify the restored leaders via a real
+  // user action instead of assuming the device cache was populated.
+  const generator=page.getByRole('region',{name:'Generate four teams'});
+  await generator.getByRole('button',{name:'Add unassigned only'}).click();
+  await generator.getByRole('status').getByText('4 of 4 eligible players assigned. Added 0 without changing existing teams.').waitFor({timeout:10000});
   const restored=await page.evaluate(()=>{
    const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
    return key?JSON.parse(localStorage.getItem(key)):null;
   });
-  assert.deepEqual(restored?.groups,sharedGroups,'Each independent browser must restore the shared four leaders');
-  assert.deepEqual(writes,[],'Reading a shared TAL draft must not modify the workspace');
+  assert.deepEqual(restored?.groups,sharedGroups,'Adding zero players must preserve the four restored shared leaders');
+  assert.deepEqual(writes,[],'Working with a shared TAL draft must not send writes when workspace sync is unavailable');
   assert.equal(errors.length,0,'Shared draft browser runtime errors: '+errors.join('; '));
   await context.close();
  }
