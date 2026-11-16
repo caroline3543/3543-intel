@@ -110,6 +110,11 @@ try{
     assert.equal(await page.getByLabel('Match time UTC').count(),1,'Match time selector must exist for assigned legion');
     assert.equal(await page.getByRole('button',{name:'Show all available players'}).count(),1,'Attendance summary must be accessible');
     assert.equal(await page.getByRole('group',{name:'Filter participants'}).count(),1,'Participant filters must be accessible');
+    const generator=page.getByRole('region',{name:'Generate four teams'});
+    await generator.getByRole('button',{name:'Regenerate all teams'}).click();
+    await generator.getByRole('alert').getByText('Select at least four registered players who can attend.').waitFor();
+    await generator.getByRole('button',{name:'Add unassigned only'}).click();
+    await generator.getByRole('alert').getByText('Assign four team leaders first, or choose Regenerate all teams.').waitFor();
    }
   }
   assert.deepEqual(writes,[],'Populated TAL navigation must not write to the workspace');
