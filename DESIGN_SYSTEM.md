@@ -617,3 +617,46 @@ The two screenshots represent different import stages and may contain different 
 - Validate zero incorrect automatic identity assignments on adversarial test fixtures; log false-positive suggestions and unmatched rates separately. Run integration and browser tests on the 3573 development branch; do not deploy without separate authorisation.
 
 **Decision state:** Added to the design system for discussion. No matching algorithm, OCR integration, bulk-import UI or registration logic is approved for implementation yet.
+
+
+### 22.7 Approved 3573 compact bulk-match review and exact-match behaviour (16 November 2026)
+
+**Design decision: approved for the 3573 bulk-entry experience in Foundry, TAL and Battle Planner.** This documents UX and matching behaviour; it does not authorise a code change or deployment. Preserve each workflow's existing registration, power and save semantics. Other apps remain out of scope.
+
+**Default mobile layout**
+- Replace large per-player matching cards with a dense, single-column list of approximately 60–70px collapsed rows. Use restrained separators rather than repeated borders, panels and headings.
+- The header contains the event/alliance/role context, one compact `N matched · M to review · T total` summary and a slim progress indicator. Do not duplicate statistics in tiles and a second filter bar.
+- Show **Needs review** first. Automatically matched entries stay collapsed under an expandable **Exact matches (N)** group, available for inspection or correction.
+- Each row shows the **verbatim pasted username**, pasted troop power (if supplied), and a clear status. Show the candidate's **current alliance, furnace level and city power** as identifying context, using `Unknown` for unavailable values, never fabricated or zero-filled data. Player ID/FID must be available in expanded results.
+- Expand only one unresolved row at a time. Resolving one collapses it and advances to the next. The full-height mobile review sheet keeps the final confirmation action accessible above the bottom safe area. All interactive touch targets remain at least 44 × 44px.
+- Only the expanded row displays editable troop power, candidate selection and an optional manual search. Put **Other matches**, **New player** and **Skip** behind restrained contextual controls rather than repeating large buttons and input fields on every row.
+
+**Expanded search and alternate selection**
+- Keep the original pasted identity and power visible while searching by current username, previous name, alias or immutable Player ID.
+- Offer an inline, compact list of alternatives with each candidate's exact display username, current alliance, furnace level, city power and Player ID. Allow optional alliance filtering without hiding transfers from other alliances by default.
+- The best suggested candidate appears first, but a fuzzy/OCR suggestion must be explicitly selected. Selecting a result highlights it; **Confirm match** commits the choice to the local import draft, not the server. No accidental auto-save or silent profile merge.
+- Empty results offer clear-filter, new-player and skip paths. Corrected power remains distinct from the original pasted source text.
+
+**Exact-match rules and safeguards**
+
+| Input match | Local draft behaviour |
+|---|---|
+| Unique, valid exact immutable Player ID/FID in the authorised state | Preselect automatically |
+| Unique exact current username in the selected alliance, with no conflicting identity evidence | Preselect automatically |
+| Exact username found in a different alliance | Require explicit review, even if unique |
+| Duplicate exact usernames or conflicting Player IDs | Require explicit review |
+| Normalised, alias, previous-name, partial or fuzzy/OCR name | Suggest only; require explicit review |
+| No matching authorised roster identity | Require manual search, explicit new-player action or skip |
+
+- Exact username comparison must preserve the actual Unicode display value; do not conflate a normalised/OCR-similar name with an exact match.
+- Automatic preselection is **not a save**. The user can expand and override any preselected exact match. No roster/event mutation occurs until the final **Confirm import**.
+- Revalidate canonical identity, selected alliance/event eligibility, duplicate identities and concurrent changes at final confirmation. Show blocking conflicts instead of silently selecting a different player.
+- City power and furnace level are **human disambiguation cues**, not automatic identity keys; they may change over time.
+- Keep skipped and unresolved rows visible in the final outcome, and do not imply that creating a new player happened unless a real authorised create operation succeeded.
+
+**Acceptance criteria**
+1. Paste 30 entries with 27 unique exact same-alliance usernames and 3 ambiguous names: show **27 matched · 3 to review**, with only the three unresolved entries expanded or needing interaction.
+2. Exact Player ID, duplicate usernames, cross-alliance exact names, visually similar Unicode names and conflicting identifiers follow the rules above without false automatic matches.
+3. An officer can review an alternative candidate's alliance, furnace, city power and ID without leaving the import screen; one-tap progression keeps the next unresolved entry in view.
+4. Edited missing troop power remains missing, not zero. The user can inspect the original OCR text before final confirmation.
+5. Verify compact list density, 44px targets, VoiceOver labels, keyboard access, iPhone Safari touch interactions and screenshot fidelity to the approved 3573 styling before release.
