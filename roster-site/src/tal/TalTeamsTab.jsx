@@ -162,6 +162,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  },[selectedLegion?.id,matchTime,matchDate]);
  const remoteDraft=drafts?.[matchKey];
  const lastSaved=useRef('');
+ const restoringDraft=useRef('');
  const bootstrapped=useRef(new Set());
  const autoSelectionPending=useRef('');
  const remoteApplied=useRef('');
@@ -209,6 +210,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   try{const raw=window.localStorage.getItem(draftKey);if(raw)saved=JSON.parse(raw);}catch{}
   const source=remoteDraft||saved;
   autoSelectionPending.current=source?'':draftKey;
+  restoringDraft.current=draftKey;
   applyDraft(source||{chosen:preferredIds});
   remoteApplied.current=remoteDraft?.updatedAt||'';
   setDraftState(remoteDraft?'Shared draft restored':saved?'Device draft restored':'Available players selected for this time');
@@ -234,7 +236,14 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   setDraftState('Updated from another device');
  },[draftKey,draftLoaded,remoteDraft?.updatedAt]);
  useEffect(()=>{
-  if(draftLoaded!==draftKey||lastSaved.current===snapshotSignature)return;
+  if(draftLoaded!==draftKey)return;
+  // React may render once with the previous match's state after draftLoaded changes.
+  // Never autosave that stale snapshot over the draft we are restoring.
+  if(restoringDraft.current===draftKey){
+   if(lastSaved.current!==snapshotSignature)return;
+   restoringDraft.current='';
+  }
+  if(lastSaved.current===snapshotSignature)return;
   lastSaved.current=snapshotSignature;
   try{
    window.localStorage.setItem(draftKey,JSON.stringify({...snapshot,updatedAt:new Date().toISOString()}));
