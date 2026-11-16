@@ -5,7 +5,7 @@ const card={border:'1px solid '+palette.border,borderRadius:16,padding:12,backgr
 const control={background:palette.elevated,border:'1px solid '+palette.border,borderRadius:12,color:palette.text,minHeight:44,padding:'9px 12px',fontSize:14,boxSizing:'border-box'};
 const button={...control,fontWeight:650,cursor:'pointer'};
 const secondary={fontSize:12,color:palette.secondary};
-export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',onConfirm,onClose,initialText='',title='Import players'}){
+export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',onConfirm,onClose,initialText='',title='Import players',context='Foundry',requirePower=false}){
  const [source,setSource]=useState(initialText),[stage,setStage]=useState('paste'),[choices,setChoices]=useState({}),[powers,setPowers]=useState({}),[filter,setFilter]=useState('review'),[search,setSearch]=useState({}),[status,setStatus]=useState('');
  const rows=useMemo(()=>parseBulkPlayers(source),[source]);
  const evaluated=useMemo(()=>resolveBulkRows(rows,players,choices,powers,alliance),[rows,players,choices,powers,alliance]);
@@ -15,14 +15,14 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
  const selected=evaluated.filter(r=>r.player);
  const duplicates=selected.filter((r,i)=>selected.findIndex(x=>x.player.id===r.player.id)!==i);
  const invalid=selected.filter(r=>r.power!==null&&(!Number.isSafeInteger(r.power)||r.power<0));
- const ready=!pending.length&&!duplicates.length&&!invalid.length&&selected.length>0;
+ const ready=!pending.length&&!duplicates.length&&!invalid.length&&(!requirePower||selected.every(r=>r.power!==null))&&selected.length>0;
  const reset=()=>{setSource(initialText);setStage('paste');setChoices({});setPowers({});setFilter('review');setStatus('')};
  const resolve=(key,id)=>setChoices(p=>({...p,[key]:id}));
  const editSource=value=>{setSource(value);setChoices({});setPowers({});setStatus('')};
  const submit=()=>{if(!ready)return;const result=onConfirm?.(selected.map(r=>({id:r.player.id,name:r.player.name,power:r.power,source:r.raw})));if(result?.error){setStatus(result.error);return;}setStage('done');setStatus(result?.message||'Import prepared');};
  return <section aria-label={title} style={{...card,padding:14,display:'grid',gap:12,color:palette.text}}>
   <header style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:8}}>
-   <div><h2 style={{fontSize:18,margin:0}}>{title}</h2><div style={secondary}>Foundry · {alliance||'All alliances'} · {roleLabel}</div></div>
+   <div><h2 style={{fontSize:18,margin:0}}>{title}</h2><div style={secondary}>{context} · {alliance||'All alliances'} · {roleLabel}</div></div>
    <button type="button" onClick={reset} style={{...button,fontSize:12,minHeight:44}}>↻ Reset</button>
   </header>
   <div aria-label="Import progress" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
@@ -55,7 +55,7 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
    {newPlayers.length>0&&<p style={{...secondary,margin:0}}>New players are not registered automatically. Create their profiles separately; this import will include matched players only.</p>}
    {duplicates.length>0&&<p role="alert" style={{color:palette.warning,fontSize:13}}>Duplicate player IDs detected. Change the matches before confirming.</p>}
    {invalid.length>0&&<p role="alert" style={{color:palette.warning,fontSize:13}}>Check troop power. Use a non-negative whole number.</p>}
-   <div style={{...card,background:palette.elevated,display:'grid',gap:8}}><div style={{display:'flex',justifyContent:'space-between',fontSize:14,fontWeight:650}}><span>Ready to import</span><span>{selected.length} of {evaluated.length}</span></div><button type="button" disabled={!ready} onClick={submit} style={{...button,background:palette.accent,color:'#0B1525',opacity:ready?1:.45}}>Review and confirm →</button>{!ready&&<div style={secondary}>Resolve {pending.length} unmatched names, invalid power values or duplicate identities first.</div>}<button type="button" onClick={()=>setStage('paste')} style={{...button,background:'transparent'}}>Edit pasted text</button></div>
+   <div style={{...card,background:palette.elevated,display:'grid',gap:8}}><div style={{display:'flex',justifyContent:'space-between',fontSize:14,fontWeight:650}}><span>Ready to import</span><span>{selected.length} of {evaluated.length}</span></div><button type="button" disabled={!ready} onClick={submit} style={{...button,background:palette.accent,color:'#0B1525',opacity:ready?1:.45}}>Review and confirm →</button>{!ready&&<div style={secondary}>Resolve {pending.length} unmatched names, missing or invalid power values, or duplicate identities first.</div>}<button type="button" onClick={()=>setStage('paste')} style={{...button,background:'transparent'}}>Edit pasted text</button></div>
   </>}
   {stage==='done'&&<div style={{textAlign:'center',padding:'24px 8px',display:'grid',gap:12}}><div style={{fontSize:32,color:palette.success}}>✓</div><h3 style={{fontSize:18,margin:0}}>Import complete</h3><p style={{...secondary,margin:0}}>{status}</p><button type="button" onClick={onClose} style={{...button,background:palette.accent,color:'#0B1525'}}>Done</button></div>}
   {status&&stage!=='done'&&<p role="alert" style={{fontSize:13,color:palette.warning,margin:0}}>{status}</p>}
