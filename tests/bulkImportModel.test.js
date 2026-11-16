@@ -34,3 +34,8 @@ test('exact match within selected alliance can be preselected',()=>{
  assert.equal(rows[0].status,'exact');
  assert.equal(rows[0].player.id,'4');
 });
+
+test('clearing edited troop power is missing, never zero',()=>{
+ const rows=resolveBulkRows(parseBulkPlayers('Бакит Кыргыз,5049'),players,{}, {0:''},'HOT');
+ assert.equal(rows[0].power,null);
+});
