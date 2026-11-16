@@ -100,3 +100,26 @@ test('simultaneous TAL edits to different players merge without losing registrat
  assert.equal(a.c.getState().conflicts.length,0);
  a.c.dispose();b.c.dispose();
 });
+
+test('two leaders editing different TAL match drafts synchronize without overwriting either',async()=>{
+ const serverState=server(),a=client(serverState);await a.c.initialize();await a.c.publish();
+ const b=client(serverState,initial(),a.cache);await b.c.initialize();
+ const draft=(leader)=>({chosen:[leader],groups:[{key:1,color:'blue',leader,members:[]}],updatedAt:'2026-11-16T01:00:00Z'});
+ const keyA='HOT:1:2026-11-16:12:00',keyB='ARC:1:2026-11-16:19:00';
+ const put=(c,key,value)=>c.update(data=>({...data,talTeamPreferences:{...(data.talTeamPreferences||{}),drafts:{...(data.talTeamPreferences?.drafts||{}),[key]:value}}}));
+ put(a.c,keyA,draft('a'));put(b.c,keyB,draft('b'));
+ await a.c.sync();await b.c.sync();await a.c.sync();
+ assert.deepEqual(serverState.data.talTeamPreferences.drafts[keyA],draft('a'));
+ assert.deepEqual(serverState.data.talTeamPreferences.drafts[keyB],draft('b'));
+ assert.deepEqual(a.c.getState().local.talTeamPreferences.drafts[keyB],draft('b'));
+ assert.equal(a.c.getState().conflicts.length,0);
+ a.c.dispose();b.c.dispose();
+});
+test('simultaneous changes to the same TAL team leader produce an explicit conflict',()=>{
+ const base=initial();base.talTeamPreferences={drafts:{'HOT:1:2026-11-16:12:00':{groups:[{key:1,color:'blue',leader:'a',members:[]}]}}};
+ const mine=structuredClone(base),shared=structuredClone(base);
+ mine.talTeamPreferences.drafts['HOT:1:2026-11-16:12:00'].groups[0].leader='b';
+ shared.talTeamPreferences.drafts['HOT:1:2026-11-16:12:00'].groups[0].leader='c';
+ const result=mergeWorkspace(base,mine,shared);
+ assert.ok(result.conflicts.length,'Conflicting team leaders must not silently overwrite each other');
+});
