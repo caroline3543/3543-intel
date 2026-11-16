@@ -569,6 +569,31 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     })}
     {!visibleRoster.filter(p=>roleFilter==='all'||roleFilter==='absent'&&absentIds.includes(String(p.id))||roleFilter==='combatant'&&isCombatant(p.id)&&!absentIds.includes(String(p.id))||roleFilter==='substitute'&&isSubstitute(p.id)&&!absentIds.includes(String(p.id))).length&&<p style={{...small,padding:'12px 0'}}>No players match this filter.</p>}
    </section>
+   <section aria-label="Generate four teams" style={{...panel,padding:14,marginBottom:12}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,marginBottom:6}}>
+     <strong style={{fontSize:16}}>Build four teams</strong>
+     <span style={{...small,fontSize:11}}>{effectiveIds.length} selected</span>
+    </div>
+    <p style={{...small,margin:'0 0 12px'}}>Use registered, available players. Enter each player's troop power before generating.</p>
+    <label style={{...small,display:'block',marginBottom:10}}>Team strategy
+     <select aria-label="Team generation strategy" value={mode} onChange={e=>setMode(e.target.value)} style={{...btn,display:'block',width:'100%',marginTop:5,minHeight:44}}>
+      <option value="balanced">Balance troop power</option>
+      <option value="stack">Concentrate strongest teams</option>
+     </select>
+    </label>
+    <label style={{...small,display:'block',marginBottom:12}}>Team leaders
+     <select aria-label="Team leader selection" value={leaderStrategy} onChange={e=>setLeaderStrategy(e.target.value)} style={{...btn,display:'block',width:'100%',marginTop:5,minHeight:44}}>
+      <option value="power">Highest troop power</option>
+      <option value="manual">Keep manually chosen leaders</option>
+     </select>
+    </label>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
+     <button type="button" onClick={generate} style={{...btn,minHeight:48,background:C.gold,color:C.bg,fontWeight:700}}>Regenerate all teams</button>
+     <button type="button" onClick={addUnassigned} style={{...btn,minHeight:48}}>Add unassigned only</button>
+    </div>
+    {generationError&&<p role="alert" style={{...small,color:C.gold,margin:'10px 0 0'}}>{generationError}</p>}
+    {generationSuccess&&<p role="status" style={{...small,color:'#7ADDAB',margin:'10px 0 0'}}>{generationSuccess}</p>}
+   </section>
    <section id="tal-substitute-entry-order" aria-label="Substitute entry order" style={{padding:'14px 2px',marginBottom:12,borderTop:'1px solid '+C.border}}>
  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><div><strong style={{fontSize:16}}>Substitute entry order</strong><div style={{...small,fontSize:11}}>3:00+ · Priority as slots become available</div></div><button type="button" style={{...btn,border:0,borderRadius:22,background:C.section,fontSize:12}} onClick={()=>copy(subCopy)}>Copy order</button></div>
  <label style={{...small,fontSize:11,display:'block',marginTop:12}}>Ranking strategy<select aria-label="Substitute ranking strategy" value={subMetric} onChange={e=>{setSubMetric(e.target.value);setSubOverride(false);setSubManual([])}} style={{...btn,display:'block',width:'100%',marginTop:5,minHeight:44}}><option value="balanced">Balanced ranking (default)</option><option value="tiers">Highest troop tiers first</option><option value="troop">Highest troop power first</option></select></label>
