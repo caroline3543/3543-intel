@@ -42,7 +42,7 @@ export function resolveBulkRows(rows,players,choices={},powers={},alliance=''){
   const choice=choices[row.key];
   const id=choice===undefined&&automatic.length===1?automatic[0].id:choice;
   const player=players.find(p=>p.id===id)||null;
-  const rawPower=powers[row.key]===undefined?row.power:Number(powers[row.key]);
+  const rawPower=powers[row.key]===undefined?row.power:String(powers[row.key]).trim()===''?null:Number(powers[row.key]);
   const status=choice==='skip'?'skip':choice==='new'?'new':player?(choice!==undefined?'approved':'exact'):'review';
   return {...row,candidates,player,status,power:rawPower};
  });
