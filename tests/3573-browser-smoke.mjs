@@ -43,7 +43,8 @@ try{
   await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
   const tour=page.getByRole('dialog',{name:/Load your alliances/i});
   if(await tour.isVisible()) await tour.getByRole('button',{name:'Skip'}).click();
-  for(const name of ['Members','TAL Planner','Compare','Changes','Foundry'])assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name}).count(),1);
+  for(const name of ['Members','TAL Planner','Changes'])assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name}).count(),1);
+  for(const name of ['Compare','Foundry'])assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name}).count(),0,'Unfinished '+name+' tab must remain hidden');
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
   const talSections=page.getByRole('navigation',{name:'TAL Planner sections'});
   await talSections.waitFor();
