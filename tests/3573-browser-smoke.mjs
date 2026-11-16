@@ -120,6 +120,32 @@ try{
   assert.deepEqual(writes,[],'Populated TAL navigation must not write to the workspace');
   await context.close();
  }
+ // Generate four distinct teams from four registered players without touching production data.
+ const fourPlayers=[player('1','Caroline'),player('2','Carolinne'),player('3','Spicy'),player('4','Dinu')];
+ const fourPlan={...populated,players:fourPlayers,talPlan:{...populated.talPlan,availability:{'1':['12:00'],'2':['12:00'],'3':['12:00'],'4':['12:00']},records:Object.fromEntries(fourPlayers.map((p,i)=>[p.id,{troopPower:5000-i*500}])),teams:[{id:'HOT:1',host:'HOT',number:1,slots:[],members:fourPlayers.map(p=>({id:p.id,role:'combatant',registered:true}))}]}};
+ for(const width of [390,1280]){
+  const context=await browser.newContext({viewport:{width,height:844}});
+  const page=await context.newPage();record(page);
+  await page.route('**/api/**',route=>{
+   const url=new URL(route.request().url());
+   if(url.pathname==='/api/session')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authenticated:true,role:'leader'})});
+   if(url.pathname==='/api/workspace'&&route.request().method()==='GET')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:fourPlan,revision:1,updatedAt:'2026-11-01T00:00:00Z',role:'leader'})});
+   return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Mocked test environment'})});
+  });
+  await page.goto(origin,{waitUntil:'domcontentloaded'});
+  await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
+  const tour=page.getByRole('dialog',{name:/Load your alliances/i});
+  if(await tour.isVisible())await tour.getByRole('button',{name:'Skip'}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
+  await page.getByRole('navigation',{name:'TAL Planner sections'}).getByRole('button',{name:'Teams',exact:true}).click();
+  await page.getByLabel('Match time UTC').selectOption('12:00');
+  const generator=page.getByRole('region',{name:'Generate four teams'});
+  await generator.getByRole('button',{name:'Regenerate all teams'}).click();
+  await generator.getByRole('status').getByText('4 of 4 eligible players assigned across four teams.').waitFor({timeout:10000});
+  assert.equal(errors.length,0,'Four-player TAL generation runtime errors: '+errors.join('; '));
+  await context.close();
+ }
  console.log('PASS: 3573 browser login, navigation, 390px/1280px viewports and read-only workspace smoke checks');
 }finally{
  await browser?.close();
