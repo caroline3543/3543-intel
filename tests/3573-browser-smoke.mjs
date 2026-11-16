@@ -202,11 +202,10 @@ try{
   const generator=page.getByRole('region',{name:'Generate four teams'});
   await generator.getByRole('button',{name:'Add unassigned only'}).click();
   await generator.getByRole('status').getByText('5 of 5 eligible players assigned. Added 1 without changing existing teams.').waitFor({timeout:10000});
-  await page.waitForFunction(()=>{
-   const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
-   const groups=key&&JSON.parse(localStorage.getItem(key)).groups;
-   return groups?.some(g=>g.members.includes('5'));
-  });
+  await page.waitForTimeout(1000);
+  const draftDiagnostics=await page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('caroline-3573-tal-teams-v1:')).map(key=>({key,groups:JSON.parse(localStorage.getItem(key))?.groups,chosen:JSON.parse(localStorage.getItem(key))?.chosen})));
+  assert.ok(draftDiagnostics.some(d=>d.key.endsWith(':12:00')&&d.groups?.some(g=>g.members.includes('5'))),
+   'Adding newcomer must save their assignment. Drafts: '+JSON.stringify(draftDiagnostics));
   const groups=await page.evaluate(()=>{
    const key=Object.keys(localStorage).find(k=>k.startsWith('caroline-3573-tal-teams-v1:HOT:1:')&&k.endsWith(':12:00'));
    return JSON.parse(localStorage.getItem(key)).groups;
