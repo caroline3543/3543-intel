@@ -1,7 +1,7 @@
-const names={en:'English',zh:'Chinese','zh-CN':'Chinese (Simplified)','zh-TW':'Chinese (Traditional)',es:'Spanish',pt:'Portuguese',ru:'Russian',ar:'Arabic',tr:'Turkish',de:'German',fr:'French',id:'Indonesian',vi:'Vietnamese',th:'Thai',ko:'Korean',ja:'Japanese',pl:'Polish',it:'Italian',nl:'Dutch',hi:'Hindi',ms:'Malay',uk:'Ukrainian',cs:'Czech',ro:'Romanian',sv:'Swedish',fi:'Finnish',da:'Danish',no:'Norwegian',hu:'Hungarian',el:'Greek',he:'Hebrew'};
+const names={en:'English',zh:'Chinese','zh-CN':'Simplified Chinese','zh-TW':'Traditional Chinese',es:'Spanish',pt:'Portuguese',ru:'Russian',ar:'Arabic',tr:'Turkish',de:'German',fr:'French',id:'Indonesian',vi:'Vietnamese',th:'Thai',ko:'Korean',ja:'Japanese',pl:'Polish',it:'Italian',nl:'Dutch',hi:'Hindi',ms:'Malay',uk:'Ukrainian',cs:'Czech',ro:'Romanian',sv:'Swedish',fi:'Finnish',da:'Danish',no:'Norwegian',hu:'Hungarian',el:'Greek',he:'Hebrew'};
 export function gameLanguageCode(value){
  if(typeof value!=='string' || !value.trim())return null;
- const raw=value.trim(),named=Object.entries(names).find(([,name])=>name.toLowerCase()===raw.toLowerCase());
+ const raw=value.trim(),legacy={'chinese (simplified)':'zh-CN','chinese (traditional)':'zh-TW',georgian:'ka'};if(legacy[raw.toLowerCase()])return legacy[raw.toLowerCase()];const named=Object.entries(names).find(([,name])=>name.toLowerCase()===raw.toLowerCase());
  if(named)return named[0];
  const code=raw.replaceAll('_','-');
  if(!/^[a-z]{2,3}(?:-[a-z0-9]{2,8}){0,2}$/i.test(code))return null;
@@ -17,7 +17,7 @@ export function providerField(player,key){
  return records.filter(r=>r.raw?.[key]!=null && r.raw[key]!=='').sort((a,b)=>(Date.parse(b.at)||0)-(Date.parse(a.at)||0))[0]?.raw?.[key];
 }
 export function withGameLanguage(player,previousCode=player.gameLanguage){
- const code=gameLanguageCode(providerField(player,'language')) || gameLanguageCode(player.gameLanguage);
+ const code=gameLanguageCode(player.gameLanguage) || gameLanguageCode(providerField(player,'language'));
  if(!code)return player;
  const name=gameLanguageName(code),oldName=gameLanguageName(previousCode);
  const additional=(player.languages || []).filter(l=>l!==oldName && l!==name);
