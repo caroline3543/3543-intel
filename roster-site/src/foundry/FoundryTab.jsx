@@ -6,7 +6,7 @@ import {playerSearchFields} from '../../../src/services/playerNames.js';
 import {gameLanguageName,gameLanguageCode} from '../../../src/services/gameLanguageService.js';
 const languageOptions=['English','Korean','Traditional Chinese','Simplified Chinese','Turkish','Arabic','Russian','Spanish','Polish','Ukrainian','Italian','French','Georgian','German','Portuguese','Japanese'];
 const languageAliases={kr:'ko',kor:'ko',eng:'en',tw:'zh-TW',cn:'zh-CN',ua:'uk',jp:'ja',geo:'ka'};
-const resolveLanguage=value=>{const raw=String(value||'').trim();if(!raw)return null;const alias=languageAliases[raw.toLowerCase()];return alias||({'traditional chinese':'zh-TW','simplified chinese':'zh-CN'}[raw.toLowerCase()])||gameLanguageCode(raw)};
+const resolveLanguage=value=>{const raw=String(value||'').trim();if(!raw)return null;const alias=languageAliases[raw.toLowerCase()];const names={'traditional chinese':'zh-TW','simplified chinese':'zh-CN',georgian:'ka'};return alias||names[raw.toLowerCase()]||gameLanguageCode(raw)};
 const languageLabel=value=>gameLanguageName(value)||String(value||'');
 const colours=['Blue','Yellow','Green','Pink'];
 const teamColors={Blue:'#397DB6',Yellow:'#D8A13C',Green:'#348D68',Pink:'#F05A9D'};
