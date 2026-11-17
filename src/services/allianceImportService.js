@@ -1,3 +1,4 @@
+import { assessAllianceRoster } from './allianceRosterValidation.js';
 import {withGameLanguage} from './gameLanguageService.js';
 import { recordPlayerObservation, PROFILE_HISTORY_FIELDS } from './playerObservationService.js';
 import { newPlayer } from '../data/playerSchema.js';
@@ -70,15 +71,33 @@ export function newAlliancePlayers(existing, rows, stateId) {
 }
 
 /**
- * A successful alliance roster observation only confirms the returned members.
- * Missing players are unverified, not assumed to have transferred or left.
- * Retain the last known alliance and every profile/event field for review.
+ * Reconcile a successfully fetched roster without inventing departures.
+ * Missing players remain unverified unless the provider explicitly certifies
+ * that the returned list is complete and passes all validation checks.
  */
-export function reconcileAllianceMembership(players,rows,tag,checkedAt=new Date().toISOString()){
- const observed=new Set(rows.map(row=>String(row.fid)));
- return players.map(player=>{
-  if(String(player.allianceTag||'').toUpperCase()!==String(tag).toUpperCase())return player;
-  if(observed.has(String(player.fid)))return {...player,membershipStatus:'confirmed',membershipCheckedAt:checkedAt};
-  return {...player,membershipStatus:'unverified',membershipCheckedAt:checkedAt};
- });
+export function reconcileAllianceMembership(players, rows, tag, checkedAt=new Date().toISOString(), assessment=null) {
+  const observed=new Set(rows.map(row=>String(row.fid)));
+  const authoritative=assessment?.authoritative===true;
+  return players.map(player=>{
+    if(String(player.allianceTag||'').toUpperCase()!==String(tag).toUpperCase())return player;
+    if(observed.has(String(player.fid)))return {...player,membershipStatus:'confirmed',membershipCheckedAt:checkedAt};
+    return {...player,membershipStatus:authoritative?'not_in_roster':'unverified',membershipCheckedAt:checkedAt};
+  });
+}
+
+/** Preview the reconciliation result before writing any records. */
+export function previewAllianceMembershipReconciliation(players, response, stateId, tag) {
+  const assessment=assessAllianceRoster(response,{stateId,allianceTag:tag});
+  if(assessment.problems.some(problem=>problem!=='completeness_unverified'))
+    return {assessment,changes:[],safeToApply:false};
+  const rows=allianceRows(response,stateId,tag);
+  const next=reconcileAllianceMembership(players,rows,tag,response.retrieved_at||new Date().toISOString(),assessment);
+  const changes=next.flatMap((player,index)=>{
+    const previous=players[index];
+    return previous.membershipStatus===player.membershipStatus?[]:[{
+      fid:String(player.fid),from:previous.membershipStatus||'unknown',
+      to:player.membershipStatus,allianceTag:player.allianceTag
+    }];
+  });
+  return {assessment,changes,safeToApply:true};
 }
