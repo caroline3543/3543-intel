@@ -46,3 +46,14 @@ export function latestRosterFetch(players) {
   const dates=players.map(p=>p.providerStats?.retrievedAt).filter(value=>Number.isFinite(Date.parse(value)));
   return dates.sort((a,b)=>Date.parse(b)-Date.parse(a))[0] || null;
 }
+
+/** Stale player API data is a review signal, never proof of transfer. */
+export function suspectedTransferOut(player, now=Date.now()) {
+  if(!['RKG','LUN','ARC','HOT'].includes(String(player?.allianceTag||'').toUpperCase()))return false;
+  if(['transferred_out','transfer_review','unverified'].includes(player?.membershipStatus))return false;
+  const refreshed=Date.parse(player?.providerStats?.retrievedAt||'');
+  if(!Number.isFinite(refreshed))return false; // No successful fetch timestamp: unknown, not stale.
+  const reviewed=Date.parse(player?.membershipReviewedAt||'');
+  if(Number.isFinite(reviewed)&&reviewed>=refreshed)return false; // A human already dismissed this signal.
+  return now-refreshed>=3*24*60*60*1000;
+}
