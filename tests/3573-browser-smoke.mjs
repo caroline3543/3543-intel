@@ -47,11 +47,9 @@ try{
   const mainNav=page.getByRole('navigation',{name:'Main navigation'});
   assert.deepEqual(await mainNav.getByRole('button').allTextContents(),expectedTabs,'Main navigation must retain the requested seven-tab order');
   await mainNav.getByRole('button',{name:'Events',exact:true}).click();
-  await page.getByRole('button',{name:/Castle Battle/}).click();
-  await page.getByRole('region',{name:'Castle Battle coming soon'}).getByText('Coming soon').waitFor();
-  await page.getByRole('button',{name:/Back to Events/}).click();
-  await page.getByRole('button',{name:/Canyon Clash/}).click();
-  await page.getByRole('region',{name:'Canyon Clash coming soon'}).getByText('Coming soon').waitFor();
+  assert.equal(await page.getByRole('button',{name:/Castle Battle/}).isDisabled(),true,'Unavailable Castle Battle must not be clickable');
+  assert.equal(await page.getByRole('button',{name:/Canyon Clash/}).isDisabled(),true,'Unavailable Canyon Clash must not be clickable');
+  assert.equal(await page.getByRole('region',{name:'Events'}).count(),1);
   await mainNav.getByRole('button',{name:'TAL',exact:true}).click();
   const talSections=page.getByRole('navigation',{name:'TAL Planner sections'});
   await talSections.waitFor();
