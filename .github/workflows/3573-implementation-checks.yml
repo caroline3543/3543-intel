@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - feat/3573-independent-tal-locks-alliance-moves
+      - release/3573-production
   push:
     branches:
       - work/3573-design-system-implementation
