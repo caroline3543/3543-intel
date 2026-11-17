@@ -55,7 +55,6 @@ export default function App() {
   const [dataPanel, setDataPanel]   = useState(false);
   const [settingsPanel, setSettingsPanel] = useState(false);
   const [alliancePanel, setAlliancePanel] = useState(false);
-  const [selectedAlliance, setSelectedAlliance] = useState('');
   const importFileRef = useRef();
 
   function handleGetStarted() {
@@ -96,7 +95,7 @@ export default function App() {
 
       {tab===4 && <TabErrorBoundary><HiveTab players={players} settings={settings} onSavePlayer={savePlayer} onImportAlliance={()=>setAlliancePanel(true)} onViewPlayer={id=>{setRankingPlayerId(id);setTab(0);}} /></TabErrorBoundary>}
 
-      {alliancePanel && <AllianceImportPanel initialTag={selectedAlliance} stateId={settings.stateId} players={players} onClose={() => setAlliancePanel(false)} onImport={importAllianceProfiles} />}
+      {alliancePanel && <AllianceImportPanel stateId={settings.stateId} players={players} onClose={() => setAlliancePanel(false)} onImport={importAllianceProfiles} />}
       {deleteTarget && <DeleteConfirmModal message="This player will be permanently removed." onConfirm={()=>{deletePlayer(deleteTarget);setDeleteTarget(null);}} onCancel={()=>setDeleteTarget(null)} />}
       {dataPanel    && (
         <DataPanel
@@ -111,7 +110,7 @@ export default function App() {
           isCloudConfigured={isCloudConfigured}
         />
       )}
-      {settingsPanel && <SettingsPanel onRefreshAlliance={tag=>{setSelectedAlliance(tag);setSettingsPanel(false);setAlliancePanel(true);}} settings={settings} onSave={s=>{saveSettings(s);setSettingsPanel(false);vibe(8);}} onClose={()=>setSettingsPanel(false)} />}
+      {settingsPanel && <SettingsPanel settings={settings} onSave={s=>{saveSettings(s);setSettingsPanel(false);vibe(8);}} onClose={()=>setSettingsPanel(false)} />}
       {toast && <Toast msg={toast.msg} type={toast.type} />}
 
       <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:480, display:'grid', gridTemplateColumns:'repeat(5,1fr)', background:'#0A1628', borderTop:'1px solid #2A4A64', height:60, zIndex:100 }}>
