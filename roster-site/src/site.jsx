@@ -8,6 +8,7 @@ import {applyBattleAction} from './battle/model.js';
 import {withAutomaticRoles} from './tal/autoRoles.js';
 import {fetchMightpulseAlliance,fetchMightpulsePlayer} from '../../src/services/mightpulseService.js';
 import {allianceRows} from '../../src/services/allianceImportService.js';
+import {assessAllianceRoster} from '../../src/services/allianceRosterValidation.js';
 import {WorkspaceOptions,WorkspaceAttention} from './components/WorkspaceOptions.jsx';
 import {plannedMemberIds} from '../../src/services/talRosterService.js';
 import {useSharedWorkspace} from './useSharedWorkspace.js';
@@ -237,7 +238,9 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
           if(!rows.length)throw Error('No roster returned');
           // Absence is only evidence of departure when the provider explicitly confirms a complete roster.
           // A successful HTTP response or 100 returned members alone is not proof of completeness.
-          const complete=isExplicitlyCompleteAllianceRoster(response);
+          const assessment=assessAllianceRoster(response,{stateId:'3573',allianceTag:tag});
+          if(assessment.problems.some(problem=>problem!=='completeness_unverified'))throw Error('Alliance roster validation failed: '+assessment.problems.join(', '));
+          const complete=assessment.authoritative;
           if(complete)completeTags.add(tag);
           for(const row of rows)observedFids.add(row.fid);
           const result=importRoster(rows,{reconcileTag:complete?tag:null});
