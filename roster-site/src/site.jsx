@@ -328,7 +328,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
         <div style={{display:'flex',alignItems:'center',gap:7}}>
           <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:syncProblem?'#F07575':C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
             <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:syncColor}}/>
-            {syncLabel}
+            <span style={{display:'grid',textAlign:'left',gap:2}}><span>{syncLabel}</span><span style={{fontSize:10,color:C.icy,whiteSpace:'nowrap'}}>API: {apiRefreshAge}</span></span>
           </button>
           <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
@@ -361,7 +361,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
         <div style={{display:'flex',alignItems:'center',gap:7}}>
           <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:syncProblem?'#F07575':C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
             <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:syncColor}}/>
-            {syncLabel}
+            <span style={{display:'grid',textAlign:'left',gap:2}}><span>{syncLabel}</span><span style={{fontSize:10,color:C.icy,whiteSpace:'nowrap'}}>API: {apiRefreshAge}</span></span>
           </button>
           <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
