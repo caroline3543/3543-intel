@@ -81,3 +81,36 @@ test('transfer location button uses the shared FID validator and the visible ros
  assert.match(handler,/if\(!validPlayerFid\(fid\)\)/);
  assert.doesNotMatch(handler,/if\(!\/\^\[1-9\]/,'no duplicate local regex that can diverge from tested validation');
 });
+
+test('verified transfers are archived without deleting player data and returns restore existing profile',async()=>{
+ const {archiveStateTransfer,restoreStateTransfer,eligibleFor3573Allocation}=await import('../src/services/rosterViewService.js');
+ const original={id:'p1',fid:'609595807',username:'Example',allianceTag:'RKG',languages:['German','English'],troops:{infantry:'FC7'},allianceHistory:[{from:'ARC',to:'RKG',at:'2026-01-01'}],notes:'retain',membershipStatus:'active'};
+ const away={status:'verified',state:'3588',tag:'ABC',at:'2026-11-17T00:00:00Z'};
+ const archived=archiveStateTransfer(original,away,'2026-11-17T01:00:00Z');
+ assert.equal(archived.membershipStatus,'transferred_out');
+ assert.equal(archived.transferDestinationState,'3588');
+ assert.equal(archived.lastKnownAlliance,'RKG');
+ assert.equal(eligibleFor3573Allocation(archived),false);
+ assert.deepEqual(archived.languages,original.languages);
+ assert.deepEqual(archived.troops,original.troops);
+ assert.equal(archived.notes,'retain');
+ assert.throws(()=>archiveStateTransfer(original,{...away,state:'3573'}));
+ const back=restoreStateTransfer(archived,{status:'verified',state:'3573',tag:'HOT',at:'2027-01-02T00:00:00Z'});
+ assert.equal(back.fid,original.fid);
+ assert.equal(back.membershipStatus,'active');
+ assert.equal(back.allianceTag,'HOT');
+ assert.equal(back.transferDestinationState,null);
+ assert.equal(eligibleFor3573Allocation(back),true);
+ assert.deepEqual(back.languages,original.languages);
+ assert.equal(back.allianceHistory.at(-1).to,'HOT');
+ assert.throws(()=>restoreStateTransfer(archived,away));
+});
+
+test('3573 team allocation components receive active players only',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('../roster-site/src/site.jsx',import.meta.url),'utf8');
+ assert.match(source,/const activePlayers=players\\.filter\\(p=>p\\.membershipStatus!=='transferred_out'\\)/);
+ assert.match(source,/<FoundryTab players=\\{activePlayers\\}/);
+ assert.match(source,/<TalTab workspace=\\{\\{\\.\\.\\.data,players:activePlayers\\}\\} value=\\{data\\.talPlan\\} players=\\{activePlayers\\}/);
+ assert.match(source,/<BattlePlanner[^>]+players=\\{activePlayers\\}/);
+});
