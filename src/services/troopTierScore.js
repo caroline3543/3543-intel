@@ -8,11 +8,11 @@ const BASE_POWER={
 const TYPES=['infantry','lancer','marksman'];
 export function troopUnitPower(label){
   if(typeof label!=='string')return null;
-  const fc=label.match(/\\bFC\\s*(\\d+)\\b/i);
+  const fc=label.match(/\bFC\s*(\d+)\b/i);
   if(!fc)return null;
   const entry=BASE_POWER[Number(fc[1])];
   if(!entry)return null;
-  return /\\bHelios\\b/i.test(label)?entry.helios:entry.standard;
+  return /\bHelios\b/i.test(label)?entry.helios:entry.standard;
 }
 export function troopTierScore(player){
   const values=TYPES.map(type=>troopUnitPower(player?.troops?.[type]));
