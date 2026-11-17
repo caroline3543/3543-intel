@@ -254,7 +254,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   if(lastSaved.current===snapshotSignature)return;
   // Viewing an empty match must not create a shared workspace draft.
   // Existing drafts can still be cleared and saved deliberately.
-  const hasContent=snapshot.chosen.length>0||snapshot.groups.some(g=>g.leader||g.members?.length)||Object.keys(snapshot.assignment).length>0;
+  const hasContent=snapshot.groups.some(g=>g.leader||g.members?.length)||Object.keys(snapshot.assignment).length>0;
   let hasSavedDraft=!!remoteDraft;
   try{hasSavedDraft=hasSavedDraft||window.localStorage.getItem(draftKey)!=null;}catch{}
   if(!hasContent&&!hasSavedDraft){lastSaved.current=snapshotSignature;return;}
