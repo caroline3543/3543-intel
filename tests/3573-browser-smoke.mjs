@@ -1,5 +1,6 @@
 import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
+import {gunzipSync} from 'node:zlib';
 import {chromium} from 'playwright';
 
 const origin='http://127.0.0.1:4173';
@@ -82,11 +83,16 @@ try{
   await search.fill('');
   stage='bulk-selection';
   await page.getByRole('button',{name:'☷ Options',exact:true}).click();
+  stage='select-players';
   await page.getByRole('button',{name:'Select players'}).click();
+  stage='select-shown';
   await page.getByRole('button',{name:'Select shown'}).click();
+  stage='update-selected';
   await page.getByRole('button',{name:'Update selected'}).click();
   assert.equal(await page.getByRole('button',{name:/Review changes for/}).isDisabled(),true,'Bulk editor should not submit an empty change');
+  stage='done-selecting';
   await page.getByRole('button',{name:'Done selecting'}).click();
+  for(const write of writes){try{const parsed=JSON.parse(write.body);const decoded=JSON.parse(gunzipSync(Buffer.from(parsed.encoded,'base64')).toString('utf8'));write.diff=Object.keys(decoded).filter(k=>JSON.stringify(decoded[k])!==JSON.stringify(fixture[k])).map(k=>({key:k,before:JSON.stringify(fixture[k])?.slice(0,350),after:JSON.stringify(decoded[k])?.slice(0,350)}));delete write.body;}catch(e){write.decodeError=e.message;}}
   assert.deepEqual(writes,[],'Read-only smoke test must not write to a workspace');
   assert.equal(errors.length,0,'Browser runtime errors: '+errors.join('; '));
   await context.close();
