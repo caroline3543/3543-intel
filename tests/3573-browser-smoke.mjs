@@ -43,9 +43,11 @@ try{
   await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
   const tour=page.getByRole('dialog',{name:/Load your alliances/i});
   if(await tour.isVisible()) await tour.getByRole('button',{name:'Skip'}).click();
-  const expectedTabs=['Members','TAL','Foundry','Compare','Canyon Clash','Changes'];
+  const expectedTabs=['Members','TAL','Foundry','Castle','Compare','Canyon Clash','Changes'];
   const mainNav=page.getByRole('navigation',{name:'Main navigation'});
-  assert.deepEqual(await mainNav.getByRole('button').allTextContents(),expectedTabs,'Main navigation must retain the requested five-tab order');
+  assert.deepEqual(await mainNav.getByRole('button').allTextContents(),expectedTabs,'Main navigation must retain the requested seven-tab order');
+  await mainNav.getByRole('button',{name:'Castle',exact:true}).click();
+  await page.getByRole('region',{name:'Castle Battle coming soon'}).getByText('Coming soon').waitFor();
   await mainNav.getByRole('button',{name:'Canyon Clash'}).click();
   await page.getByRole('region',{name:'Canyon Clash coming soon'}).getByText('Coming soon').waitFor();
   await mainNav.getByRole('button',{name:'TAL',exact:true}).click();
