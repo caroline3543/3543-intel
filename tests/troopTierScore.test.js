@@ -42,3 +42,19 @@ test('substitute order shares the roster tier scorer and exposes real scores',as
  assert.ok(!teams.includes('const T10='));
  assert.ok(!teams.includes('const tierPower='));
 });
+
+
+test('3573 TAL summary counts are interactive role and registration filters',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const tal=readFileSync(new URL('../roster-site/src/tal/TalTab.jsx',import.meta.url),'utf8');
+ assert.ok(tal.includes("function chooseSummaryFilter(kind)"));
+ assert.ok(tal.includes("aria-pressed={active}"));
+ assert.ok(tal.includes("chooseSummaryFilter('pending')"));
+ assert.ok(tal.includes("setRoleFilter(same?'all':kind==='combatant'||kind==='substitute'?kind:'all')"));
+});
+
+test('substitute troop-power sorting uses recorded power, not percentile fallback',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const teams=readFileSync(new URL('../roster-site/src/tal/TalTeamsTab.jsx',import.meta.url),'utf8');
+ assert.ok(teams.includes("subMetric==='troop'?(compare('troop')||compare('rawTiers'))"));
+});
