@@ -32,6 +32,19 @@ import {withBuiltinRole} from '../../src/utils/roles.js';
 import {withGameLanguage} from '../../src/services/gameLanguageService.js';
 const button={minHeight:44,padding:'10px 14px',fontSize:14,fontWeight:600,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,cursor:'pointer'};
 const empty={players:[],events:[],customRoles:[],settings:{stateId:'3573'}};
+export function relativeRefreshAge(timestamp,now=Date.now()){
+  const ms=Date.parse(timestamp||'');
+  if(!Number.isFinite(ms)||ms>now+60000)return 'Never refreshed';
+  const elapsed=Math.max(0,now-ms);
+  if(elapsed<60000)return 'Just now';
+  const minutes=Math.floor(elapsed/60000);
+  if(minutes<60)return minutes+' min ago';
+  const hours=Math.floor(minutes/60);
+  if(hours<24)return hours+' hr'+(hours===1?'':'s')+' ago';
+  const days=Math.floor(hours/24);
+  return days+' day'+(days===1?'':'s')+' ago';
+}
+
 export function SiteApp(){
   const [preferences,setPreferences]=useState(()=>readPreferences());
   function updatePreferences(patch){setPreferences(savePreferences(patch));}
@@ -140,6 +153,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const syncProblem=Boolean(sync.issue||sync.conflicts?.length||syncLate);
   const syncLabel=syncProblem?'Sync not working':sync.dirty||sync.syncing?'Syncing':'Synced';
   const syncColor=syncProblem?'#F07575':sync.dirty||sync.syncing?'#E6BF7B':'#72CBA9';
+  const apiRefreshAge=relativeRefreshAge(data.settings?.lastApiRefresh?.at,Date.now());
   const [importing,setImporting]=useState(false),[deleting,setDeleting]=useState(null),[message,setMessage]=useState('');
   const latest=useRef(data);latest.current=data;
   const pendingTalSync=useRef({active:false,sawDirty:false});
