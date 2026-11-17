@@ -69,3 +69,13 @@ test('TAL team preparation provides accessible section shortcuts and compact sub
  assert.ok(teams.includes('aria-expanded={!!subDetailsOpen[String(p.id)]}'));
  assert.ok(teams.includes('minWidth:44,padding:\'8px\',minHeight:44'));
 });
+
+
+test('TAL page separates players, teams, assignments and share without extra app tabs',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const tal=readFileSync(new URL('../roster-site/src/tal/TalTab.jsx',import.meta.url),'utf8');
+ for(const label of ["['registration','Players']","['teams','Teams']","['prep','Assignments']","['share','Share']"])assert.ok(tal.includes(label));
+ assert.ok(tal.includes("{talView==='share'&&<>"));
+ assert.ok(tal.includes('Alliance move lists'));
+ assert.ok(tal.includes("saved==='share'"));
+});
