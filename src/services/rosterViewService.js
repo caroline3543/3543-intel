@@ -57,3 +57,6 @@ export function suspectedTransferOut(player, now=Date.now()) {
   if(Number.isFinite(reviewed)&&reviewed>=refreshed)return false; // A human already dismissed this signal.
   return now-refreshed>=3*24*60*60*1000;
 }
+
+/** Validate the immutable Whiteout player FID before an individual location lookup. */
+export function validPlayerFid(value){return /^[1-9]\d{3,14}$/.test(String(value??'').trim());}
