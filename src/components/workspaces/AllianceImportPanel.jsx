@@ -1,3 +1,4 @@
+import { assessAllianceRoster } from '../../services/allianceRosterValidation.js';
 import { PlayerAvatar } from '../players/PlayerAvatar.jsx';
 import { profileChanges, providerFurnaceLevel } from '../../services/providerProfileService.js';
 import { useState } from 'react';
@@ -13,12 +14,18 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
   const [rows, setRows] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [rosterAssessment, setRosterAssessment] = useState(null);
   const existing = new Set(players.filter(p => p.fid).map(p => String(p.fid).trim()));
   const newRows = (rows || []).filter(row => !existing.has(row.fid));
   async function lookup(e) {
-    e.preventDefault(); setBusy(true); setError(''); setRows(null); setResult(null);
+    e.preventDefault(); setBusy(true); setError(''); setRows(null); setResult(null); setRosterAssessment(null);
     try {
       const response = await fetchMightpulseAlliance(Number(stateId), tag.trim());
+      const assessment = assessAllianceRoster(response, {stateId, allianceTag:tag.trim()});
+      setRosterAssessment(assessment);
+      if (assessment.problems.some(p => p !== 'completeness_unverified')) {
+        throw new Error('Roster validation failed: '+assessment.problems.join(', ')+'. Nothing was imported.');
+      }
       setRows(allianceRows(response, stateId, tag));
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -46,6 +53,7 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
       {busy && <p role="status" style={{color:C.icy,fontSize:14}}>Fetching [{tag}] in State {stateId}…</p>}
       {result && <div role="status" style={{padding:14,background:C.card,borderRadius:10,marginTop:14}}><strong>{result.updated} players updated · {result.added} added</strong><p style={{color:C.icy,fontSize:14}}>Saved to this roster. Notes, assignments and event history were preserved.</p><button style={{...button,width:'100%'}} onClick={onClose}>Done</button></div>}
       {error && <p role="alert" style={{ color:C.red }}>{error}</p>}
+      {rosterAssessment && <div role="status" style={{padding:12,background:C.card,borderRadius:10,marginTop:12,fontSize:13}}><strong>{rosterAssessment.authoritative ? 'Complete API roster verified' : 'API roster completeness not verified'}</strong><p style={{color:C.icy,marginBottom:0}}>{rosterAssessment.uniqueFidCount} unique player IDs returned. {rosterAssessment.authoritative ? 'Roster passed validation.' : 'Returned profiles can be refreshed, but absent players must not be removed or counted as departed.'}</p></div>}
       {rows && <>
         <p style={{ color:C.gold }}>{rows.length} players · {newRows.length} new · {rows.length-newRows.length} profiles to update</p>
         <p style={{ color:C.icy, fontSize:13 }}>Matches players by ID and updates available game data. Notes, troop records, heroes, assignments and event history are kept. Missing game data does not erase saved values.</p>
