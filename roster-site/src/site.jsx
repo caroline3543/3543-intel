@@ -214,9 +214,9 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   useEffect(()=>{const fail=()=>setMessage('Unable to save. Export a backup before closing this page.');window.addEventListener('app:storage-full',fail);return()=>window.removeEventListener('app:storage-full',fail);},[]);
   function save(player){const next=withGameLanguage({...player,profileLastUpdated:new Date().toISOString()});setData(prev=>({...prev,players:prev.players.map(p=>p.id===next.id?next:p)}));setMessage('Player updated');}
   function update(updated){const byId=new Map(updated.map(p=>[p.id,p]));setData(prev=>({...prev,players:prev.players.map(p=>byId.get(p.id)||p)}));}
-  function importRoster(rows,{reconcileTag=null}={}){
+  function importRoster(rows,{reconcileTag=null,assessment=null}={}){
     const result=mergeAllianceProfiles(latest.current.players||[],rows,'3573');
-    setData(prev=>({...prev,players:reconcileTag?reconcileAllianceMembership(mergeAllianceProfiles(prev.players,rows,'3573').players,rows,reconcileTag):mergeAllianceProfiles(prev.players,rows,'3573').players,settings:{...prev.settings,lastApiRefresh:{at:new Date().toISOString(),scope:'Alliance roster',count:rows.length}}}));return {updated:result.updated.length,added:result.added.length};
+    setData(prev=>({...prev,players:reconcileTag?reconcileAllianceMembership(mergeAllianceProfiles(prev.players,rows,'3573').players,rows,reconcileTag,new Date().toISOString(),assessment):mergeAllianceProfiles(prev.players,rows,'3573').players,settings:{...prev.settings,lastApiRefresh:{at:new Date().toISOString(),scope:'Alliance roster',count:rows.length}}}));return {updated:result.updated.length,added:result.added.length};
   }
   async function syncNow(){setMessage('Syncing shared workspace…');const result=await retry();setMessage(result?.issue?result.issue:result?.conflicts?.length?'Edits need review.':result?.dirty||result?.syncing?'Changes are still syncing.':'Synced. All shared changes are up to date.');}
   async function refreshAll(onlyTags=null){
@@ -242,7 +242,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
           const complete=assessment.authoritative;
           if(complete)completeTags.add(tag);
           for(const row of rows)observedFids.add(row.fid);
-          const result=importRoster(rows,{reconcileTag:complete?tag:null});
+          const result=importRoster(rows,{reconcileTag:complete?tag:null,assessment});
           successes.push(tag);updated+=result.updated;added+=result.added;
         }catch(e){
           failures.push({tag,reason:e.message||'API request failed'});
