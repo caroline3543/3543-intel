@@ -6,28 +6,9 @@ import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
 import {PlayerSearch} from '../../../src/components/players/PlayerSearch.jsx';
 import {plannedMemberIds,allianceCheck,legionLabel} from '../../../src/services/talRosterService.js';
 import {comparePriority} from '../../../src/components/players/PlayerCard.jsx';
+import {troopTierScore,compareByTroopTier} from '../../../src/services/troopTierScore.js';
 import {C} from '../../../src/utils/constants.js';
 
-// Rank troop composition by the three troop tiers, not the independently recorded TAL power.
-// Helios is an upgrade within the same FC tier; compare weakest troop tier first to
-// avoid ranking a single strong troop type above a consistently stronger army.
-function troopTierRank(player){
- const values=['infantry','lancer','marksman'].map(type=>{
-  const label=String(player.troops?.[type]??'');
-  const fc=label.match(/FC\\s*(\\d+)/i);
-  const t=label.match(/(?:^|\\s)T\\s*(\\d+)/i);
-  const level=fc?Number(fc[1])+10:t?Number(t[1]):null;
-  return level===null?null:level*2+(/Helios/i.test(label)?1:0);
- });
- if(values.some(v=>v===null))return null;
- return values.sort((a,b)=>a-b);
-}
-function compareTroopTiers(a,b){
- const left=troopTierRank(a),right=troopTierRank(b);
- if(!left||!right)return 0;
- for(let i=0;i<3;i++)if(left[i]!==right[i])return left[i]-right[i];
- return 0;
-}
 const button={minHeight:44,padding:'10px 12px',fontSize:14,fontWeight:600,borderRadius:10,border:'1px solid '+C.border,background:C.section,color:C.icy,cursor:'pointer'};
 const muted={fontSize:12,color:C.icy,lineHeight:1.45};
 const compareNames=(a,b)=>(a.username||a.alias||'').localeCompare(b.username||b.alias||'',undefined,{sensitivity:'base',numeric:true});
@@ -170,7 +151,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const gameLanguages=player=>[...new Set([player.gameLanguage,...(Array.isArray(player.languages)?player.languages:[])].filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))];
  const tierChips=player=>[['infantry','Inf',C.inf],['lancer','Lan',C.lan],['marksman','Mar',C.mar]].filter(([key])=>player.troops?.[key]&&String(player.troops[key]).toLowerCase()!=='unknown');
  const roster=entries.filter(e=>(check==='all'||e.check.status===check)&&matchesSearch(e.player)&&matchesTime(e.player)&&(!missingFilter||(missingFilter==='any'?(missingTroopTypes(e.player).length>0||missingAvailability(e.player)):missingFilter==='tiers'?missingTroopTypes(e.player).length:missingAvailability(e.player)))&&(registrationFilter==='all'||registrationFilter==='unregistered'&&e.member&&!e.member.registered||registrationFilter==='registered'&&e.member?.registered)&&(roleFilter==='all'||(roleFilter==='matchmaking'?!!e.member?.matchmakingOnly:roleFilter==='unallocated'?!e.member||e.member.role==='pending'||!['combatant','substitute'].includes(e.member.role):e.member?.role===roleFilter))).sort((a,b)=>{
-  if(sort==='troop'){const aKnown=!!troopTierRank(a.player),bKnown=!!troopTierRank(b.player);if(aKnown!==bKnown)return aKnown?-1:1;const av=compareTroopTiers(a.player,b.player);return av*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
+  if(sort==='troop')return compareByTroopTier(a.player,b.player,sortDirection)||compareNames(a.player,b.player);
   if(sort==='city'){const av=numeric(a.player.power??a.player.providerStats?.power),bv=numeric(b.player.power??b.player.providerStats?.power);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='labyrinth'){const av=numeric(a.player.providerRankings?.labyrinth?.rank),bv=numeric(b.player.providerRankings?.labyrinth?.rank);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='joiner')return comparePriority(a.player,b.player)*(sortDirection==='asc'?1:-1);
@@ -694,7 +675,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     </section>}
     {roster.slice(0,listLimit).map(({team:entryTeam,player,check:status,member})=>{
       const available=availabilityFor(player),isMove=status.status==='move',isCorrect=status.status==='in-host';
-      const shownStat=sort==='troop'?'Troop tier '+(['infantry','lancer','marksman'].map(type=>String(player.troops?.[type]||'—')).join(' · ')):sort==='city'?'City power '+compact(player.power??player.providerStats?.power):sort==='labyrinth'?'Labyrinth '+(player.providerRankings?.labyrinth?.rank?'#'+player.providerRankings.labyrinth.rank:'Not recorded'):sort==='joiner'?'Joiner strength '+([player.troops?.infantry,player.troops?.lancer,player.troops?.marksman].every(t=>String(t||'').startsWith('Helios'))?'Full Helios':'See troop tiers'):null;
+      const shownStat=sort==='troop'?'Tier score '+(troopTierScore(player)===null?'Incomplete':troopTierScore(player).toFixed(1)):sort==='city'?'City power '+compact(player.power??player.providerStats?.power):sort==='labyrinth'?'Labyrinth '+(player.providerRankings?.labyrinth?.rank?'#'+player.providerRankings.labyrinth.rank:'Not recorded'):sort==='joiner'?'Joiner strength '+([player.troops?.infantry,player.troops?.lancer,player.troops?.marksman].every(t=>String(t||'').startsWith('Helios'))?'Full Helios':'See troop tiers'):null;
       const editable=!value?.locked&&tournamentStatus(entryTeam)!=='eliminated';
       const revealed=swipeId===String(player.id);
       const selectedEditing=editingTimes===String(player.id);
