@@ -1,3 +1,4 @@
+import { assessAllianceRoster } from './allianceRosterValidation.js';
 import {withGameLanguage} from './gameLanguageService.js';
 import { recordPlayerObservation, PROFILE_HISTORY_FIELDS } from './playerObservationService.js';
 import { newPlayer } from '../data/playerSchema.js';
@@ -19,6 +20,7 @@ export function allianceRows(response, stateId, tag) {
       furnaceLabel: member.furnace_level_label ?? member.tg_label ?? null,
       allianceRank: rank, raw: structuredClone(member),
       retrievedAt: response.retrieved_at || new Date().toISOString(),
+      capturedAt: member.cached_at ?? member.captured_at ?? data.cached_at ?? data.meta?.cached_at ?? null,
     };
   }).filter(row => {
     if (!/^\d+$/.test(row.fid) || seen.has(row.fid)) return false;
@@ -40,12 +42,17 @@ export function mergeAllianceProfiles(existing, rows, stateId) {
     if (matches.length > 1) throw new Error(`FID ${row.fid} matches multiple profiles. Resolve the duplicates before importing.`);
     const index = matches[0];
     const previous = index == null ? null : players[index];
+    // Never replace a newer verified provider snapshot with an older cached capture.
+    const priorCapture=Date.parse(previous?.providerStats?.capturedAt || '');
+    const incomingCapture=Date.parse(row.capturedAt || '');
+    if (previous && Number.isFinite(priorCapture) && Number.isFinite(incomingCapture) && incomingCapture < priorCapture) continue;
     const patch = providerProfilePatch(row);
     const at = new Date().toISOString();
     const snapshot = {...(previous?.providerStats || {})};
     for (const [key,value] of Object.entries(row)) if (value != null && value !== '') snapshot[key] = value;
     snapshot.raw = {...previous?.providerStats?.raw, ...row.raw};
     snapshot.source = 'Whiteout Stats';
+    snapshot.capturedAt = row.capturedAt ?? previous?.providerStats?.capturedAt ?? null;
     if(row.allianceTag?.trim())snapshot.allianceObservation={tag:row.allianceTag.trim(),at:row.retrievedAt,noAlliance:false};
     const player = {
       ...(previous || newPlayer({fid:row.fid})), ...patch,
@@ -59,7 +66,7 @@ export function mergeAllianceProfiles(existing, rows, stateId) {
     if (previous && patch.allianceTag && previous.allianceTag !== patch.allianceTag) {
       player.allianceHistory = [...(previous.allianceHistory || []), {from:previous.allianceTag || '',to:patch.allianceTag,at}];
     }
-    const tracked=recordPlayerObservation(previous,withGameLanguage(player,previous?.gameLanguage),{stateId,stream:'profile',observedAt:row.retrievedAt,values:Object.fromEntries(PROFILE_HISTORY_FIELDS.filter(key=>patch[key]!=null).map(key=>[key,patch[key]]))});
+    const tracked=recordPlayerObservation(previous,withGameLanguage(player,previous?.gameLanguage),{stateId,stream:'profile',observedAt:row.capturedAt || row.retrievedAt,values:Object.fromEntries(PROFILE_HISTORY_FIELDS.filter(key=>patch[key]!=null).map(key=>[key,patch[key]]))});
     if (previous) { players[index] = tracked; updated.push(tracked); }
     else { players.push(tracked); added.push(tracked); }
   }
@@ -70,15 +77,33 @@ export function newAlliancePlayers(existing, rows, stateId) {
 }
 
 /**
- * A successful alliance roster observation only confirms the returned members.
- * Missing players are unverified, not assumed to have transferred or left.
- * Retain the last known alliance and every profile/event field for review.
+ * Reconcile a successfully fetched roster without inventing departures.
+ * Missing players remain unverified unless the provider explicitly certifies
+ * that the returned list is complete and passes all validation checks.
  */
-export function reconcileAllianceMembership(players,rows,tag,checkedAt=new Date().toISOString()){
- const observed=new Set(rows.map(row=>String(row.fid)));
- return players.map(player=>{
-  if(String(player.allianceTag||'').toUpperCase()!==String(tag).toUpperCase())return player;
-  if(observed.has(String(player.fid)))return {...player,membershipStatus:'confirmed',membershipCheckedAt:checkedAt};
-  return {...player,membershipStatus:'unverified',membershipCheckedAt:checkedAt};
- });
+export function reconcileAllianceMembership(players, rows, tag, checkedAt=new Date().toISOString(), assessment=null) {
+  const observed=new Set(rows.map(row=>String(row.fid)));
+  const authoritative=assessment?.authoritative===true;
+  return players.map(player=>{
+    if(String(player.allianceTag||'').toUpperCase()!==String(tag).toUpperCase())return player;
+    if(observed.has(String(player.fid)))return {...player,membershipStatus:'confirmed',membershipCheckedAt:checkedAt};
+    return {...player,membershipStatus:authoritative?'not_in_roster':'unverified',membershipCheckedAt:checkedAt};
+  });
+}
+
+/** Preview the reconciliation result before writing any records. */
+export function previewAllianceMembershipReconciliation(players, response, stateId, tag) {
+  const assessment=assessAllianceRoster(response,{stateId,allianceTag:tag});
+  if(assessment.problems.some(problem=>problem!=='completeness_unverified'))
+    return {assessment,changes:[],safeToApply:false};
+  const rows=allianceRows(response,stateId,tag);
+  const next=reconcileAllianceMembership(players,rows,tag,response.retrieved_at||new Date().toISOString(),assessment);
+  const changes=next.flatMap((player,index)=>{
+    const previous=players[index];
+    return previous.membershipStatus===player.membershipStatus?[]:[{
+      fid:String(player.fid),from:previous.membershipStatus||'unknown',
+      to:player.membershipStatus,allianceTag:player.allianceTag
+    }];
+  });
+  return {assessment,changes,safeToApply:true};
 }
