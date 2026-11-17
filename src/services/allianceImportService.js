@@ -20,6 +20,7 @@ export function allianceRows(response, stateId, tag) {
       furnaceLabel: member.furnace_level_label ?? member.tg_label ?? null,
       allianceRank: rank, raw: structuredClone(member),
       retrievedAt: response.retrieved_at || new Date().toISOString(),
+      capturedAt: member.cached_at ?? member.captured_at ?? data.cached_at ?? data.meta?.cached_at ?? null,
     };
   }).filter(row => {
     if (!/^\d+$/.test(row.fid) || seen.has(row.fid)) return false;
@@ -41,12 +42,17 @@ export function mergeAllianceProfiles(existing, rows, stateId) {
     if (matches.length > 1) throw new Error(`FID ${row.fid} matches multiple profiles. Resolve the duplicates before importing.`);
     const index = matches[0];
     const previous = index == null ? null : players[index];
+    // Never replace a newer verified provider snapshot with an older cached capture.
+    const priorCapture=Date.parse(previous?.providerStats?.capturedAt || '');
+    const incomingCapture=Date.parse(row.capturedAt || '');
+    if (previous && Number.isFinite(priorCapture) && Number.isFinite(incomingCapture) && incomingCapture < priorCapture) continue;
     const patch = providerProfilePatch(row);
     const at = new Date().toISOString();
     const snapshot = {...(previous?.providerStats || {})};
     for (const [key,value] of Object.entries(row)) if (value != null && value !== '') snapshot[key] = value;
     snapshot.raw = {...previous?.providerStats?.raw, ...row.raw};
     snapshot.source = 'Whiteout Stats';
+    snapshot.capturedAt = row.capturedAt ?? previous?.providerStats?.capturedAt ?? null;
     if(row.allianceTag?.trim())snapshot.allianceObservation={tag:row.allianceTag.trim(),at:row.retrievedAt,noAlliance:false};
     const player = {
       ...(previous || newPlayer({fid:row.fid})), ...patch,
@@ -60,7 +66,7 @@ export function mergeAllianceProfiles(existing, rows, stateId) {
     if (previous && patch.allianceTag && previous.allianceTag !== patch.allianceTag) {
       player.allianceHistory = [...(previous.allianceHistory || []), {from:previous.allianceTag || '',to:patch.allianceTag,at}];
     }
-    const tracked=recordPlayerObservation(previous,withGameLanguage(player,previous?.gameLanguage),{stateId,stream:'profile',observedAt:row.retrievedAt,values:Object.fromEntries(PROFILE_HISTORY_FIELDS.filter(key=>patch[key]!=null).map(key=>[key,patch[key]]))});
+    const tracked=recordPlayerObservation(previous,withGameLanguage(player,previous?.gameLanguage),{stateId,stream:'profile',observedAt:row.capturedAt || row.retrievedAt,values:Object.fromEntries(PROFILE_HISTORY_FIELDS.filter(key=>patch[key]!=null).map(key=>[key,patch[key]]))});
     if (previous) { players[index] = tracked; updated.push(tracked); }
     else { players.push(tracked); added.push(tracked); }
   }
