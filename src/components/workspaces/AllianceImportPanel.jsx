@@ -1,3 +1,4 @@
+import { membershipSummary } from '../../services/membershipSummary.js';
 import { assessAllianceRoster } from '../../services/allianceRosterValidation.js';
 import { PlayerAvatar } from '../players/PlayerAvatar.jsx';
 import { profileChanges, providerFurnaceLevel } from '../../services/providerProfileService.js';
@@ -18,6 +19,7 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
   const existing = new Set(players.filter(p => p.fid).map(p => String(p.fid).trim()));
   const newRows = (rows || []).filter(row => !existing.has(row.fid));
   const observedFids = new Set((rows || []).map(row => row.fid));
+  const membership = membershipSummary(players,tag);
   const previouslyLoaded = players.filter(p => String(p.allianceTag || '').toUpperCase() === tag.trim().toUpperCase() && p.fid);
   const absentFromResponse = previouslyLoaded.filter(p => !observedFids.has(String(p.fid).trim()));
   async function lookup(e) {
@@ -53,6 +55,7 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
           style={{ boxSizing:'border-box', width:'100%', minHeight:48, margin:'8px 0', padding:12, background:C.section, color:C.white, border:`1px solid ${C.border}`, borderRadius:10, fontSize:16 }} />
         <button style={{ ...button, width:'100%' }} disabled={busy || !tag.trim()}>{busy ? 'Fetching roster…' : 'Preview roster'}</button>
       </form>
+      {tag.trim() && <div style={{fontSize:13,color:C.icy,padding:'8px 0'}}>Saved membership: <strong>{membership.confirmed} API-confirmed</strong> · {membership.unverified} unverified · {membership.absent} absent from verified roster. {membership.verifiedAt ? 'Oldest confirmation: '+new Date(membership.verifiedAt).toLocaleString() : 'No confirmed timestamp.'} These are saved observations, not necessarily a complete current alliance count.</div>}
       {busy && <p role="status" style={{color:C.icy,fontSize:14}}>Fetching [{tag}] in State {stateId}…</p>}
       {result && <div role="status" style={{padding:14,background:C.card,borderRadius:10,marginTop:14}}><strong>{result.updated} players updated · {result.added} added</strong><p style={{color:C.icy,fontSize:14}}>Saved to this roster. Notes, assignments and event history were preserved.</p><button style={{...button,width:'100%'}} onClick={onClose}>Done</button></div>}
       {error && <p role="alert" style={{ color:C.red }}>{error}</p>}
