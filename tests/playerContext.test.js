@@ -146,3 +146,20 @@ test('Events uses compact accessible rows and locks unavailable events',async()=
  assert.ok(source.includes("['castle','Castle Battle','Coming soon',false]"));
  assert.ok(source.includes("['canyon','Canyon Clash','Coming soon',false]"));
 });
+
+test('No alliance is a distinct roster filter and a verified same-state allocation',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const roster=readFileSync(new URL('../src/components/players/RosterTab.jsx',import.meta.url),'utf8');
+ const service=readFileSync(new URL('../src/services/rosterViewService.js',import.meta.url),'utf8');
+ assert.ok(roster.includes("['__no_alliance','No alliance']"));
+ assert.ok(roster.includes("'Confirm no alliance'"));
+ assert.ok(service.includes("filters.alliance==='__no_alliance'"));
+ const original={id:'123',allianceTag:'LUN',allianceHistory:[]};
+ const {restoreStateTransfer}=await import('../src/services/rosterViewService.js');
+ const updated=restoreStateTransfer(original,{status:'verified',state:'3573',tag:'',at:'2026-11-17T09:00:00Z'});
+ assert.equal(updated.allianceTag,'');
+ assert.equal(updated.lastKnownAlliance,'LUN');
+ assert.equal(updated.membershipStatus,'active');
+ assert.equal(updated.allianceHistory.at(-1).from,'LUN');
+ assert.equal(updated.allianceHistory.at(-1).to,'');
+});
