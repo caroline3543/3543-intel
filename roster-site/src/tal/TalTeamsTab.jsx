@@ -269,7 +269,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  },[draftKey,draftLoaded,snapshotSignature,syncReady]);
  useEffect(()=>{
   if(!syncReady||!onDraftChange||remoteDraft||draftLoaded!==draftKey||bootstrapped.current.has(matchKey))return;
-  const hasPlan=snapshot.chosen.length>0||snapshot.groups.some(g=>g.leader||g.members?.length)||Object.keys(snapshot.assignment).length>0;
+  const hasPlan=snapshot.groups.some(g=>g.leader||g.members?.length)||Object.keys(snapshot.assignment).length>0;
   if(!hasPlan)return;
   bootstrapped.current.add(matchKey);
   onDraftChange(matchKey,{...snapshot,updatedAt:new Date().toISOString()});
