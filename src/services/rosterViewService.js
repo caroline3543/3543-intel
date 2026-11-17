@@ -26,7 +26,7 @@ export function troopGaps(player) {
 export function matchesRosterFilters(player, search, filters) {
   const query=normalizeName(search);
   if (query && !playerSearchFields(player).some(value => normalizeName(String(value??'')).includes(query))) return false;
-  if (filters.alliance && player.allianceTag!==filters.alliance) return false;
+  if (filters.alliance==='__no_alliance' ? Boolean(String(player.allianceTag||'').trim()) : filters.alliance && player.allianceTag!==filters.alliance) return false;
   const leader=player.roles?.includes('Rally Lead');
   if (filters.role==='joiner' ? leader || player.blacklisted : filters.role && !player.roles?.includes(filters.role)) return false;
   if (filters.language && gameLanguageName(player.gameLanguage)!==filters.language) return false;
