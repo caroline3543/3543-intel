@@ -10,7 +10,7 @@ import { RallyLeaderProfileSheet } from './RallyLeaderProfileSheet.jsx';
 import FieldRegistry from './FieldRegistry.jsx';
 import { RosterFilters } from './RosterFilters.jsx';
 import { RosterBulkEditor } from './RosterBulkEditor.jsx';
-import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch } from '../../services/rosterViewService.js';
+import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch, suspectedTransferOut } from '../../services/rosterViewService.js';
 const button={minHeight:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,padding:'10px 12px',fontSize:14,fontWeight:600,cursor:'pointer'};
 
 const PRIMARY_SORTS=[['name','Name'],['power','City power'],['labyrinth','Labyrinth'],['progression','Troop tiers']];
