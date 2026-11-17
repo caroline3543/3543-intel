@@ -66,7 +66,7 @@ export function eligibleFor3573Allocation(player){return player?.membershipStatu
 
 /** Archive an externally confirmed state transfer without erasing profile data. */
 export function archiveStateTransfer(player,location,confirmedAt=new Date().toISOString()){
-  if(!player||location?.status!=='verified'||!/^\\d+$/.test(String(location.state))||String(location.state)==='3573')throw Error('A verified external state is required.');
+  if(!player||location?.status!=='verified'||!/^\d+$/.test(String(location.state))||String(location.state)==='3573')throw Error('A verified external state is required.');
   return {...player,membershipStatus:'transferred_out',lastKnownAlliance:player.allianceTag||player.lastKnownAlliance||'',transferDestinationState:String(location.state),transferDestinationAlliance:location.tag||'',membershipCheckedAt:location.at,transferredOutAt:confirmedAt,membershipReviewedAt:confirmedAt};
 }
 
