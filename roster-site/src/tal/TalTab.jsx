@@ -227,6 +227,13 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  },[talView,check,search,timeFilters,timeMode,sort,sortDirection,registrationFilter,roleFilter,missingFilter,filtersOpen,listLimit]);
  function chooseLegion(id){setPrepOptionsOpen(false);setRoleFilter('all');setSelecting(false);setBulkSelected([]);setBulkPanel('');setSelected(id);setCheck('all');setRegistrationFilter('all');setAdding(false);setAddSelected([]);setAddSearch('');setAddTimes([]);setBatchStatus('needs');setTimeMerge('add');setRemoveId('');setActionsId('');setSwipeId('');setEditingTimes('');setPreviewOpen(false);setTournamentConfirm('');setListLimit(40);}
  function focusPlayers(){playersAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'});}
+ function chooseSummaryFilter(kind){
+  const same=kind==='registered'?registrationFilter==='registered'&&roleFilter==='all':kind==='pending'?registrationFilter==='unregistered'&&roleFilter==='all':registrationFilter==='all'&&roleFilter===kind;
+  setCheck('all');setSearch('');setTimeFilters([]);setMissingFilter('');setListLimit(40);
+  setRegistrationFilter(same?'all':kind==='registered'?'registered':kind==='pending'?'unregistered':'all');
+  setRoleFilter(same?'all':kind==='combatant'||kind==='substitute'?kind:'all');
+  requestAnimationFrame(()=>playersAnchor.current?.scrollIntoView({behavior:'smooth',block:'start'}));
+ }
  function chooseReadiness(next){setCheck(current=>current===next?'all':next);setListLimit(40);focusPlayers();}
  function resetFilters(){setCheck('all');setSearch('');setTimeFilters([]);setRegistrationFilter('all');setRoleFilter('all');setMissingFilter('');setListLimit(40);}
  function changeTime(time){setTimeFilters(old=>old.includes(time)?old.filter(t=>t!==time):[...old,time]);setListLimit(40);}
@@ -491,8 +498,9 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
      <span style={{color:pendingRegistrationCount?C.gold:C.green,fontSize:12}}>{pendingRegistrationCount?pendingRegistrationCount+' pending':'✓ Complete'}</span>
     </div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:6,marginTop:12}}>
-     {[{label:'Registered',value:registrationCount+'/'+registrationMembers.length},{label:'Combatants',value:combatantCount},{label:'Substitutes',value:substituteCount}].map(item=><div key={item.label} style={{minWidth:0}}><strong style={{fontSize:20,display:'block',fontVariantNumeric:'tabular-nums'}}>{item.value}</strong><span style={{...muted,fontSize:11}}>{item.label}</span></div>)}
+     {[{id:'registered',label:'Registered',value:registrationCount+'/'+registrationMembers.length},{id:'combatant',label:'Combatants',value:combatantCount},{id:'substitute',label:'Substitutes',value:substituteCount}].map(item=>{const active=item.id==='registered'?registrationFilter==='registered'&&roleFilter==='all':registrationFilter==='all'&&roleFilter===item.id;return <button type="button" key={item.id} aria-pressed={active} aria-label={'Filter players: '+item.label} onClick={()=>chooseSummaryFilter(item.id)} style={{minWidth:0,minHeight:58,textAlign:'center',cursor:'pointer',borderRadius:10,border:'1px solid '+(active?C.icy:C.border),background:active?'#243E58':C.section,color:C.white,padding:'7px 3px'}}><strong style={{fontSize:20,display:'block',fontVariantNumeric:'tabular-nums'}}>{item.value}</strong><span style={{...muted,fontSize:11}}>{item.label}{active?' ✓':''}</span></button>})}
     </div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginTop:9}}><button type="button" aria-pressed={registrationFilter==='unregistered'&&roleFilter==='all'} onClick={()=>chooseSummaryFilter('pending')} style={{...button,minHeight:44,fontSize:12,background:registrationFilter==='unregistered'?'#243E58':C.section,borderColor:registrationFilter==='unregistered'?C.icy:C.border}}>Needs registration ({pendingRegistrationCount})</button>{(registrationFilter!=='all'||roleFilter!=='all')&&<button type="button" onClick={()=>chooseSummaryFilter(registrationFilter==='registered'?'registered':registrationFilter==='unregistered'?'pending':roleFilter)} style={{...button,minHeight:44,fontSize:12,background:'transparent'}}>Clear filter</button>}</div>
     <div role="progressbar" aria-label="In-game registration progress" aria-valuemin={0} aria-valuemax={registrationMembers.length||1} aria-valuenow={registrationCount} style={{height:5,background:C.border,borderRadius:20,overflow:'hidden',margin:'12px 0 8px'}}>
      <div style={{height:'100%',width:(registrationMembers.length?Math.round(registrationCount/registrationMembers.length*100):0)+'%',background:C.gold,borderRadius:20}}/>
     </div>
