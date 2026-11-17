@@ -58,3 +58,14 @@ test('substitute troop-power sorting uses recorded power, not percentile fallbac
  const teams=readFileSync(new URL('../roster-site/src/tal/TalTeamsTab.jsx',import.meta.url),'utf8');
  assert.ok(teams.includes("subMetric==='troop'?(compare('troop')||compare('rawTiers'))"));
 });
+
+
+test('TAL team preparation provides accessible section shortcuts and compact substitute details',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const teams=readFileSync(new URL('../roster-site/src/tal/TalTeamsTab.jsx',import.meta.url),'utf8');
+ assert.ok(teams.includes('Team planning shortcuts'));
+ assert.ok(teams.includes('id="tal-team-generator"'));
+ assert.ok(teams.includes('id="tal-substitute-entry-order"'));
+ assert.ok(teams.includes('aria-expanded={!!subDetailsOpen[String(p.id)]}'));
+ assert.ok(teams.includes('minWidth:44,padding:\'8px\',minHeight:44'));
+});
