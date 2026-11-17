@@ -53,7 +53,7 @@ try{
   await mainNav.getByRole('button',{name:'TAL',exact:true}).click();
   const talSections=page.getByRole('navigation',{name:'TAL Planner sections'});
   await talSections.waitFor();
-  for(const section of ['Registration','TAL Prep','Teams']){
+  for(const section of ['Players','Teams','Assignments','Share']){
    await talSections.getByRole('button',{name:section,exact:true}).click();
    await page.waitForTimeout(150);
    assert.equal(errors.length,0,'TAL '+section+' runtime error: '+errors.join('; '));
@@ -64,8 +64,9 @@ try{
     assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).count(),1,'Main navigation should remain available with no TAL legions');
    }
   }
-  await talSections.getByRole('button',{name:'Registration',exact:true}).click();
-  assert.equal(await talSections.getByRole('button',{name:'Registration',exact:true}).getAttribute('aria-current'),'page');
+  assert.deepEqual(await talSections.getByRole('button').allTextContents(),['Players','Teams','Assignments','Share'],'TAL navigation must expose four sections');
+  await talSections.getByRole('button',{name:'Players',exact:true}).click();
+  assert.equal(await talSections.getByRole('button',{name:'Players',exact:true}).getAttribute('aria-current'),'page');
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Members'}).click();
   const search=page.getByRole('combobox',{name:'Search roster'});
   await search.fill('Spic');
@@ -106,7 +107,7 @@ try{
   const sections=page.getByRole('navigation',{name:'TAL Planner sections'});
   await sections.waitFor();
   await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
-  for(const section of ['Registration','TAL Prep','Teams']){
+  for(const section of ['Players','Teams','Assignments','Share']){
    await sections.getByRole('button',{name:section,exact:true}).click();
    await page.waitForTimeout(150);
    assert.equal(errors.length,0,'Populated TAL '+section+' runtime errors: '+errors.join('; '));
