@@ -32,3 +32,13 @@ test('missing tiers remain last in both directions; numeric TAL power does not a
  assert.ok(compareByTroopTier(incomplete,low,'asc')>0);
  assert.equal(troopTierScore(high),135);
 });
+
+test('substitute order shares the roster tier scorer and exposes real scores',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const teams=readFileSync(new URL('../roster-site/src/tal/TalTeamsTab.jsx',import.meta.url),'utf8');
+ assert.ok(teams.includes("import {troopTierScore} from '../../../src/services/troopTierScore.js'"));
+ assert.ok(teams.includes("compare('rawTiers')||compare('troop')"));
+ assert.ok(teams.includes("'Tier '+(rankDetails.get(String(p.id))?.rawTiers?.toFixed(1)"));
+ assert.ok(!teams.includes('const T10='));
+ assert.ok(!teams.includes('const tierPower='));
+});
