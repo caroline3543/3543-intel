@@ -112,7 +112,7 @@ test('3573 team allocation components receive active players only',async()=>{
  assert.ok(source.includes("const activePlayers=players.filter(p=>p.membershipStatus!=='transferred_out')"));
  assert.ok(source.includes('<FoundryTab players={activePlayers}'));
  assert.ok(source.includes('<TalTab workspace={{...data,players:activePlayers}} value={data.talPlan} players={activePlayers}'));
- assert.ok(source.includes('players={activePlayers} plan={data.talPlan}'));
+ assert.ok(source.includes('players={activePlayers} plan={data.talPlan||newPlan()}'));
 
 });
 
