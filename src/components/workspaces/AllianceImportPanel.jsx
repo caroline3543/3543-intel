@@ -1,3 +1,4 @@
+import { describeFreshness } from '../../services/apiFreshnessService.js';
 import { membershipSummary } from '../../services/membershipSummary.js';
 import { assessAllianceRoster } from '../../services/allianceRosterValidation.js';
 import { PlayerAvatar } from '../players/PlayerAvatar.jsx';
@@ -8,14 +9,15 @@ import { allianceRows } from '../../services/allianceImportService.js';
 import { C } from '../../utils/constants.js';
 const button = { minHeight:44, border:0, borderRadius:10, padding:'10px 14px', background:C.gold, color:C.bg, fontWeight:700, cursor:'pointer' };
 const fmt = value => value === null ? '—' : Number(value).toLocaleString('en-US');
-export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
+export function AllianceImportPanel({ stateId, players, onImport, onClose, initialTag='' }) {
   const tags=[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].sort();
-  const [tag, setTag] = useState(tags.length===1?tags[0]:'');
+  const [tag, setTag] = useState(initialTag || (tags.length===1?tags[0]:''));
   const [result,setResult]=useState(null);
   const [rows, setRows] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [rosterAssessment, setRosterAssessment] = useState(null);
+  const [freshness, setFreshness] = useState(null);
   const existing = new Set(players.filter(p => p.fid).map(p => String(p.fid).trim()));
   const newRows = (rows || []).filter(row => !existing.has(row.fid));
   const observedFids = new Set((rows || []).map(row => row.fid));
@@ -23,9 +25,10 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
   const previouslyLoaded = players.filter(p => String(p.allianceTag || '').toUpperCase() === tag.trim().toUpperCase() && p.fid);
   const absentFromResponse = previouslyLoaded.filter(p => !observedFids.has(String(p.fid).trim()));
   async function lookup(e) {
-    e.preventDefault(); setBusy(true); setError(''); setRows(null); setResult(null); setRosterAssessment(null);
+    e.preventDefault(); setBusy(true); setError(''); setRows(null); setResult(null); setRosterAssessment(null); setFreshness(null);
     try {
       const response = await fetchMightpulseAlliance(Number(stateId), tag.trim());
+      setFreshness(describeFreshness(response));
       const assessment = assessAllianceRoster(response, {stateId, allianceTag:tag.trim()});
       setRosterAssessment(assessment);
       if (assessment.problems.some(p => p !== 'completeness_unverified')) {
@@ -58,6 +61,7 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
       {tag.trim() && <div style={{fontSize:13,color:C.icy,padding:'8px 0'}}>Saved membership: <strong>{membership.confirmed} API-confirmed</strong> · {membership.unverified} unverified · {membership.absent} absent from verified roster. {membership.verifiedAt ? 'Oldest confirmation: '+new Date(membership.verifiedAt).toLocaleString() : 'No confirmed timestamp.'} These are saved observations, not necessarily a complete current alliance count.</div>}
       {busy && <p role="status" style={{color:C.icy,fontSize:14}}>Fetching [{tag}] in State {stateId}…</p>}
       {result && <div role="status" style={{padding:14,background:C.card,borderRadius:10,marginTop:14}}><strong>{result.updated} players updated · {result.added} added</strong><p style={{color:C.icy,fontSize:14}}>Saved to this roster. Notes, assignments and event history were preserved.</p><button style={{...button,width:'100%'}} onClick={onClose}>Done</button></div>}
+      {freshness && <div role="status" style={{padding:12,background:C.card,borderRadius:10,fontSize:13,marginTop:12,color:C.white}}><strong>{freshness.label}</strong><p style={{margin:'8px 0',color:C.icy}}>Data captured: {freshness.captured}</p><p style={{margin:'8px 0',color:C.icy}}>Last checked: {freshness.checked}</p><p style={{margin:'8px 0',color:C.icy}}>Next check: {freshness.retry}</p><p style={{margin:'8px 0',color:C.muted}}>{freshness.detail}</p></div>}
       {error && <p role="alert" style={{ color:C.red }}>{error}</p>}
       {rosterAssessment && <div role="status" style={{padding:12,background:C.card,borderRadius:10,marginTop:12,fontSize:13}}><strong>{rosterAssessment.authoritative ? 'Complete API roster verified' : 'API roster completeness not verified'}</strong><p style={{color:C.icy,marginBottom:0}}>{rosterAssessment.uniqueFidCount} unique player IDs returned. {rosterAssessment.authoritative ? 'Roster passed validation.' : 'Returned profiles can be refreshed, but absent players must not be removed or counted as departed.'}</p></div>}
       {rows && <>
