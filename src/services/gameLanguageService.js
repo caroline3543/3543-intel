@@ -18,7 +18,7 @@ export function providerField(player,key){
 }
 export function withGameLanguage(player,previousCode=player.gameLanguage){
  const providerCode=gameLanguageCode(providerField(player,'language'));
- const code=providerCode || gameLanguageCode(player.gameLanguage);
+ const code=(player.gameLanguageSource==='manual' && gameLanguageCode(player.gameLanguage)) || providerCode || gameLanguageCode(player.gameLanguage);
  if(!code)return player;
  const name=gameLanguageName(code),oldName=gameLanguageName(previousCode);
  const additional=(player.languages || []).filter(l=>l!==oldName && l!==name);
