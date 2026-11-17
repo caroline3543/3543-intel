@@ -47,3 +47,19 @@ test('three-day stale API signal only flags unreviewed main-alliance players',()
  assert.equal(suspectedTransferOut({...p,membershipReviewedAt:'2026-11-13T12:00:00Z'},now),true);
  for(const allianceTag of ['ARC','HOT','LUN'])assert.equal(suspectedTransferOut({...p,allianceTag},now),true);
 });
+
+test('main-alliance membership reconciles only after explicit complete roster',async()=>{
+ const {reconcileAllianceMembership,mergeAllianceProfiles}=await import('../src/services/allianceImportService.js');
+ const old={id:'old',fid:'594023568',username:'Example',allianceTag:'RKG',membershipStatus:'confirmed',allianceHistory:[]};
+ const missing=reconcileAllianceMembership([old],[], 'RKG','2026-11-17T00:00:00Z')[0];
+ assert.equal(missing.membershipStatus,'unverified');
+ assert.equal(missing.allianceTag,'RKG');
+ const rows=[{fid:'594023568',username:'Example',stateId:'3573',allianceTag:'MBT',retrievedAt:'2026-11-17T00:00:00Z',raw:{}}];
+ const moved=mergeAllianceProfiles([missing],rows,'3573').players[0];
+ assert.equal(moved.allianceTag,'MBT');
+ assert.equal(moved.membershipStatus,'confirmed');
+ assert.equal(moved.allianceHistory.at(-1).from,'RKG');
+ assert.equal(moved.allianceHistory.at(-1).to,'MBT');
+ const again=mergeAllianceProfiles([moved],rows,'3573').players[0];
+ assert.equal(again.allianceHistory.length,1);
+});
