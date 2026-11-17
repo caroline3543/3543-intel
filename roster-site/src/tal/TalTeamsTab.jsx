@@ -297,7 +297,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const autoSubs=[...subCandidates].sort((a,b)=>{
   const x=rankDetails.get(String(a.id)),y=rankDetails.get(String(b.id));
   const compare=(k)=>x[k]==null&&y[k]!=null?1:y[k]==null&&x[k]!=null?-1:x[k]===y[k]?0:y[k]-x[k];
-  const n=subMetric==='tiers'?(compare('rawTiers')||compare('troop')):subMetric==='troop'?(compare('performance')||compare('tiers')||compare('city')):(compare('score')||compare('tiers')||compare('performance'));
+  const n=subMetric==='tiers'?(compare('rawTiers')||compare('troop')):subMetric==='troop'?(compare('troop')||compare('rawTiers')):(compare('score')||compare('tiers')||compare('performance'));
   return n||name(a).localeCompare(name(b));
  });
  const orderedSubs=subOverride?[...autoSubs].sort((a,b)=>(subManual.indexOf(String(a.id))<0?9999:subManual.indexOf(String(a.id)))-(subManual.indexOf(String(b.id))<0?9999:subManual.indexOf(String(b.id)))):autoSubs;
