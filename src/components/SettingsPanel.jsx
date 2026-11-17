@@ -17,7 +17,7 @@ const GENERATIONS = HEROES_BY_GEN.map((g, i) => {
   };
 });
 
-export function SettingsPanel({ settings, onSave, onClose }) {
+export function SettingsPanel({ settings, onSave, onClose, onRefreshAlliance }) {
   const [s, setS] = useState(settings || {});
   function upd(k, v) { setS(prev => ({ ...prev, [k]: v })); }
 
@@ -79,6 +79,11 @@ export function SettingsPanel({ settings, onSave, onClose }) {
           )}
         </Field>
 
+        {String(s.stateId)==='3573' && <section aria-label="Alliance data sync" style={{margin:'20px 0',padding:16,borderRadius:14,background:C.section}}>
+          <h3 style={{margin:'0 0 6px',color:C.white,fontSize:16}}>Data &amp; Sync</h3>
+          <p style={{color:C.muted,fontSize:12,margin:'0 0 12px'}}>Refresh one alliance at a time. A successful request can still return cached data.</p>
+          {['ARC','HOT','RKG','LUN'].map(tag=><button key={tag} onClick={()=>onRefreshAlliance?.(tag)} style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',minHeight:46,marginBottom:7,padding:'0 12px',background:C.card,border:'1px solid '+C.border,borderRadius:10,color:C.white,cursor:'pointer'}}><strong>{tag}</strong><span>Review refresh</span></button>)}
+        </section>}
         <AdminAccessPanel />
 
         <button onClick={() => onSave(s)} style={{ width:'100%', height:54, borderRadius:12, background:C.gold, color:C.bg, fontWeight:700, fontSize:17, border:'none', cursor:'pointer' }}>
