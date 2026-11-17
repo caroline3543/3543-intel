@@ -87,7 +87,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const [playerLookup,setPlayerLookup]=useState({status:'idle'});
   async function checkPlayerName(player){
     const fid=String(player?.fid||'').trim();
-    if(!/^[1-9]\\d{3,14}$/.test(fid)){setPlayerLookup({status:'error',message:'This player needs a valid Player ID.'});return;}
+    if(!/^[1-9]\d{3,14}$/.test(fid)){setPlayerLookup({status:'error',message:'This player needs a valid Player ID.'});return;}
     setPlayerLookup({status:'loading',fid});
     try{
       const response=await mightpulseRequest('player',{fid});
@@ -108,7 +108,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const [locationChecks,setLocationChecks]=useState({});
   const [locationBusy,setLocationBusy]=useState(false);
   async function checkLocation(player){
-    const fid=String(player.fid||'').trim();
+    const fid=String(player.fid??player.playerId??'').trim();
     if(!/^[1-9]\\d{3,14}$/.test(fid)){setLocationChecks(v=>({...v,[player.id]:{status:'error',message:'Valid player ID required'}}));return;}
     setLocationChecks(v=>({...v,[player.id]:{status:'loading'}}));
     try{
@@ -118,8 +118,9 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       const state=String(base.kid??response?.data?.kid??'').trim();
       const alliance=base.alliance;
       const tag=typeof alliance?.abbr==='string'?alliance.abbr.trim():alliance===null?'':null;
-      if(!/^\\d+$/.test(state)||tag===null)throw Error('API did not confirm both state and alliance');
-      setLocationChecks(v=>({...v,[player.id]:{status:'verified',state,tag,at:response.retrieved_at||new Date().toISOString()}}));
+      if(!/^\d+$/.test(state)||tag===null)throw Error('API did not confirm both state and alliance');
+      const at=response.retrieved_at||new Date().toISOString();
+      setLocationChecks(v=>({...v,[player.id]:{status:'verified',state,tag,at}}));
     }catch(e){setLocationChecks(v=>({...v,[player.id]:{status:'error',message:e.message||'Location unavailable'}}));}
   }
   async function checkAllLocations(){
@@ -130,7 +131,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     const found=locationChecks[player.id];if(found?.status!=='verified'||found.state!=='3573')return;
     const tag=found.tag;
     const changed=String(player.allianceTag||'')!==tag;
-    onSavePlayer({...player,allianceTag:tag,lastKnownAlliance:player.allianceTag,membershipStatus:'confirmed',membershipReviewedAt:new Date().toISOString(),membershipCheckedAt:found.at,allianceHistory:changed?[...(player.allianceHistory||[]),{from:player.allianceTag||'',to:tag,at:found.at}]:player.allianceHistory});
+    onSavePlayer({...player,allianceTag:tag,lastKnownAlliance:changed?player.allianceTag:player.lastKnownAlliance,membershipStatus:'active',membershipReviewedAt:new Date().toISOString(),membershipCheckedAt:found.at,allianceHistory:changed?[...(player.allianceHistory||[]),{from:player.allianceTag||'',to:tag,at:found.at}]:player.allianceHistory});
     showToast?.('Current alliance confirmed: '+(tag||'No alliance'));
   }
   const [editingPlayer,setEditingPlayer]=useState(null);
