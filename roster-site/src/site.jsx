@@ -80,10 +80,10 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   useEffect(()=>{if(sync.ready&&sync.joined&&!sync.conflicts?.length){const normalized=withAutomaticRoles(data);if(normalized!==data)setSharedData(normalized);}},[data,sync.ready,sync.joined,sync.conflicts?.length]);
   const [apiProgress,setApiProgress]=useState('');
   const [apiResult,setApiResult]=useState(null);
-  const [nameRefresh,setNameRefresh]=useState({status:'idle',done:0,total:0,changes:[],failed:0});
+  const [nameRefresh,setNameRefresh]=useState({status:'idle',done:0,total:0,changes:[],failed:0,error:''});
   const nameRefreshStop=useRef(false);
   async function refreshUsernames(){
-    if(refreshing.current)return;
+    if(refreshing.current){setMessage('Another API refresh is already running.');return;}
     refreshing.current=true;nameRefreshStop.current=false;
     const unique=new Map();
     for(const p of latest.current.players||[]){
@@ -91,8 +91,8 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
       if(/^[1-9]\\d{3,14}$/.test(fid)&&!unique.has(fid))unique.set(fid,p);
     }
     const targets=[...unique.values()];
-    const changes=[];let failed=0,done=0;
-    setNameRefresh({status:'running',done:0,total:targets.length,changes:[],failed:0});
+    const changes=[];let failed=0,done=0,firstError='';
+    setNameRefresh({status:'running',done:0,total:targets.length,changes:[],failed:0,error:''});
     try{
       for(const p of targets){
         if(nameRefreshStop.current)break;
@@ -100,21 +100,24 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
           const response=await mightpulseRequest('player',{fid:String(p.fid)});
           const base=response?.data?.player||response?.data;
           const id=String(base?.chief_id??base?.fid??response?.data?.chief_id??'');
-          const username=String(base?.nick_name||'').trim();
+          const username=String(base?.nick_name??base?.nickname??base?.name??'').trim();
           if(id!==String(p.fid)||!username)throw Error('Invalid player response');
           if(username!==p.username)changes.push({id:p.id,fid:String(p.fid),before:p.username||'',after:username});
         }catch(e){
-          failed++;
+          failed++;if(!firstError)firstError=e.message||'Player lookup failed';
           if([401,403,429].includes(e.status)||[401,403,429].includes(e.providerStatus)){
             setMessage(e.status===429||e.providerStatus===429?'API rate limit reached. Review the partial results.':'Username refresh stopped: '+e.message);
             done++;break;
           }
         }
         done++;
-        setNameRefresh({status:'running',done,total:targets.length,changes:[...changes],failed});
+        setNameRefresh({status:'running',done,total:targets.length,changes:[...changes],failed,error:firstError});
       }
-      setNameRefresh({status:'review',done,total:targets.length,changes,failed});
-    }finally{refreshing.current=false;}
+      setNameRefresh({status:'review',done,total:targets.length,changes,failed,error:firstError});
+      if(failed)setMessage(`${failed} username lookup(s) failed. ${firstError}`);
+      else if(!targets.length)setMessage('No valid player IDs found to check.');
+    }catch(e){setNameRefresh(v=>({...v,status:'review',error:e.message||'Unexpected refresh error'}));setMessage(e.message||'Username refresh failed');}
+    finally{refreshing.current=false;}
   }
   function applyUsernameChanges(){
     const changes=nameRefresh.changes||[];
@@ -299,7 +302,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
               <button style={button} onClick={refreshUsernames} disabled={!!apiProgress||!!legionRefresh||nameRefresh.status==='running'||sync.mode==='join'||!!sync.conflicts?.length}>{nameRefresh.status==='running'?'Checking usernames…':'Refresh usernames'}</button>
               {nameRefresh.status!=='idle'&&<div role="status" style={{padding:10,borderRadius:10,background:C.section,fontSize:12,lineHeight:1.6}}>
                 <strong>{nameRefresh.status==='running'?'Checking usernames':nameRefresh.status==='applied'?'Names saved':'Username review'}</strong>
-                <div>{nameRefresh.done} of {nameRefresh.total} checked · {nameRefresh.changes.length} differences · {nameRefresh.failed} failed</div>
+                <div>{nameRefresh.done} of {nameRefresh.total} checked · {nameRefresh.changes.length} differences · {nameRefresh.failed} failed</div>{nameRefresh.error&&<div role="alert" style={{color:'#F0B25C'}}>{nameRefresh.error}</div>}
                 {nameRefresh.status==='running'&&<button style={button} onClick={()=>{nameRefreshStop.current=true;}}>Stop</button>}
                 {nameRefresh.status==='review'&&<div style={{maxHeight:220,overflowY:'auto',marginTop:6}}>
                   {nameRefresh.changes.length===0?<div>No username differences found in successful lookups.</div>:nameRefresh.changes.map(c=><div key={c.id} style={{padding:'6px 0',borderBottom:'1px solid '+C.border,overflowWrap:'anywhere'}}>{c.before||'Unknown'} → <strong>{c.after}</strong> · {c.fid}</div>)}
