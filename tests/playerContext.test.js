@@ -126,3 +126,23 @@ test('transferred-out archive is nested under More and confirmation requires ver
  assert.ok(source.includes("archiveStateTransfer(player,found)"));
  assert.ok(source.includes("restoreStateTransfer(player,found)"));
 });
+
+test('3573 transfer lookup allows global player search while details stay state-bound',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const route=readFileSync(new URL('../roster-site/api/lookup.js',import.meta.url),'utf8');
+ const edge=readFileSync(new URL('../supabase/functions/caroline3573/index.ts',import.meta.url),'utf8');
+ assert.ok(route.includes("'player_details','rankings','player'"));
+ assert.ok(route.includes("input.action==='player'"));
+ assert.ok(route.includes("body.fid=String(input.fid)"));
+ assert.ok(edge.includes('"player_details", "player"'));
+ assert.ok(edge.includes('include=base'));
+ assert.ok(route.includes("input.action==='player_details'&&Number(input.state)!==3573"));
+});
+test('Events uses compact accessible rows and locks unavailable events',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('../roster-site/src/site.jsx',import.meta.url),'utf8');
+ assert.ok(source.includes("tab==='events'?'Events'"));
+ assert.ok(source.includes("disabled={!available} aria-disabled={!available}"));
+ assert.ok(source.includes("['castle','Castle Battle','Coming soon',false]"));
+ assert.ok(source.includes("['canyon','Canyon Clash','Coming soon',false]"));
+});
