@@ -115,3 +115,14 @@ test('3573 team allocation components receive active players only',async()=>{
  assert.ok(source.includes('players={activePlayers} plan={data.talPlan}'));
 
 });
+
+test('transferred-out archive is nested under More and confirmation requires verified external state',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('../src/components/players/RosterTab.jsx',import.meta.url),'utf8');
+ assert.ok(source.includes('Transferred out · {players.filter(isTransferred).length}'));
+ assert.ok(source.includes("trackingView==='transferred'?isTransferred(p)&&matchesSearch(p)"));
+ assert.ok(source.includes("disabled={!(locationChecks[p.id]?.status==='verified'&&locationChecks[p.id]?.state!=='3573')}"));
+ assert.ok(source.includes("trackingView==='transferred'&&p.transferDestinationState"));
+ assert.ok(source.includes("archiveStateTransfer(player,found)"));
+ assert.ok(source.includes("restoreStateTransfer(player,found)"));
+});
