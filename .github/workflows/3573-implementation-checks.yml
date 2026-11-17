@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - work/3573-design-system-implementation
+      - work/3573-production-backlog-reconciliation
 
 permissions:
   contents: read
