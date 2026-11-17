@@ -1,4 +1,3 @@
-import {isExplicitlyCompleteAllianceRoster} from './services/allianceRosterCompleteness.js';
 import {applyTalBulk} from './tal/bulkActions.js';
 import {applyTalSheetSnapshot} from './tal/sheetSync.js';
 import {BattlePlanner} from './battle/BattlePlanner.jsx';
