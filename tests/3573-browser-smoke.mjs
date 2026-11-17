@@ -43,10 +43,10 @@ try{
   await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
   const tour=page.getByRole('dialog',{name:/Load your alliances/i});
   if(await tour.isVisible()) await tour.getByRole('button',{name:'Skip'}).click();
-  const expectedTabs=['Members','TAL Planner','Foundry','Compare','Changes'];
+  const expectedTabs=['Members','TAL','Foundry','Compare','Changes'];
   const mainNav=page.getByRole('navigation',{name:'Main navigation'});
   assert.deepEqual(await mainNav.getByRole('button').allTextContents(),expectedTabs,'Main navigation must retain the requested five-tab order');
-  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL',exact:true}).click();
   const talSections=page.getByRole('navigation',{name:'TAL Planner sections'});
   await talSections.waitFor();
   for(const section of ['Registration','TAL Prep','Teams']){
@@ -98,7 +98,7 @@ try{
   await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
   const tour=page.getByRole('dialog',{name:/Load your alliances/i});
   if(await tour.isVisible())await tour.getByRole('button',{name:'Skip'}).click();
-  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL',exact:true}).click();
   const sections=page.getByRole('navigation',{name:'TAL Planner sections'});
   await sections.waitFor();
   await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
@@ -138,7 +138,7 @@ try{
   await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
   const tour=page.getByRole('dialog',{name:/Load your alliances/i});
   if(await tour.isVisible())await tour.getByRole('button',{name:'Skip'}).click();
-  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL',exact:true}).click();
   await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
   await page.getByRole('navigation',{name:'TAL Planner sections'}).getByRole('button',{name:'Teams',exact:true}).click();
   await page.getByLabel('Match time UTC').selectOption('12:00');
@@ -156,7 +156,7 @@ try{
   assert.equal(draft.groups.filter(g=>g.leader).length,4,'Every team must have a leader');
   await page.reload({waitUntil:'domcontentloaded'});
   await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
-  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL',exact:true}).click();
   await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
   await page.getByRole('navigation',{name:'TAL Planner sections'}).getByRole('button',{name:'Teams',exact:true}).click();
   await page.getByLabel('Match time UTC').selectOption('12:00');
@@ -198,7 +198,7 @@ try{
   await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
   const tour=page.getByRole('dialog',{name:/Load your alliances/i});
   if(await tour.isVisible())await tour.getByRole('button',{name:'Skip'}).click();
-  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL',exact:true}).click();
   await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
   await page.getByRole('navigation',{name:'TAL Planner sections'}).getByRole('button',{name:'Teams',exact:true}).click();
   const generator=page.getByRole('region',{name:'Generate four teams'});
@@ -242,7 +242,7 @@ try{
   await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
   const tour=page.getByRole('dialog',{name:/Load your alliances/i});
   if(await tour.isVisible())await tour.getByRole('button',{name:'Skip'}).click();
-  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL Planner'}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'TAL',exact:true}).click();
   await page.getByLabel('Working on legion. Select to change legion').selectOption('HOT:1');
   await page.getByRole('navigation',{name:'TAL Planner sections'}).getByRole('button',{name:'Teams',exact:true}).click();
   await page.getByLabel('Match time UTC').selectOption('12:00');
