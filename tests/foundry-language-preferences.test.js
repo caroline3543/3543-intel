@@ -11,7 +11,7 @@ test('language display uses full names including Chinese script variants',()=>{
 });
 
 test('manual language takes precedence over imported provider language',()=>{
- const player={gameLanguage:'ko',providerDetails:{raw:{player:{language:'en'}},retrievedAt:'2026-11-17T00:00:00Z'}};
+ const player={gameLanguage:'ko',gameLanguageSource:'manual',providerDetails:{raw:{player:{language:'en'}},retrievedAt:'2026-11-17T00:00:00Z'}};
  const result=withGameLanguage(player);
  assert.equal(result.gameLanguage,'ko');
  assert.equal(result.languages[0],'Korean');
@@ -22,4 +22,11 @@ test('provider language fills an unset language',()=>{
  const result=withGameLanguage(player);
  assert.equal(result.gameLanguage,'tr');
  assert.equal(result.languages[0],'Turkish');
+});
+
+test('new provider language replaces an older imported language',()=>{
+ const player={gameLanguage:'en',languages:['English','Portuguese'],providerDetails:{raw:{player:{language:'ru'}},retrievedAt:'2026-11-17T00:00:00Z'}};
+ const result=withGameLanguage(player);
+ assert.equal(result.gameLanguage,'ru');
+ assert.deepEqual(result.languages,['Russian','Portuguese']);
 });
