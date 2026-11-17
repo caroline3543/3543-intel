@@ -8,6 +8,26 @@ import {plannedMemberIds,allianceCheck,legionLabel} from '../../../src/services/
 import {comparePriority} from '../../../src/components/players/PlayerCard.jsx';
 import {C} from '../../../src/utils/constants.js';
 
+// Rank troop composition by the three troop tiers, not the independently recorded TAL power.
+// Helios is an upgrade within the same FC tier; compare weakest troop tier first to
+// avoid ranking a single strong troop type above a consistently stronger army.
+function troopTierRank(player){
+ const values=['infantry','lancer','marksman'].map(type=>{
+  const label=String(player.troops?.[type]??'');
+  const fc=label.match(/FC\\s*(\\d+)/i);
+  const t=label.match(/(?:^|\\s)T\\s*(\\d+)/i);
+  const level=fc?Number(fc[1])+10:t?Number(t[1]):null;
+  return level===null?null:level*2+(/Helios/i.test(label)?1:0);
+ });
+ if(values.some(v=>v===null))return null;
+ return values.sort((a,b)=>a-b);
+}
+function compareTroopTiers(a,b){
+ const left=troopTierRank(a),right=troopTierRank(b);
+ if(!left||!right)return left? -1:right?1:0;
+ for(let i=0;i<3;i++)if(left[i]!==right[i])return left[i]-right[i];
+ return 0;
+}
 const button={minHeight:44,padding:'10px 12px',fontSize:14,fontWeight:600,borderRadius:10,border:'1px solid '+C.border,background:C.section,color:C.icy,cursor:'pointer'};
 const muted={fontSize:12,color:C.icy,lineHeight:1.45};
 const compareNames=(a,b)=>(a.username||a.alias||'').localeCompare(b.username||b.alias||'',undefined,{sensitivity:'base',numeric:true});
@@ -150,7 +170,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const gameLanguages=player=>[...new Set([player.gameLanguage,...(Array.isArray(player.languages)?player.languages:[])].filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))];
  const tierChips=player=>[['infantry','Inf',C.inf],['lancer','Lan',C.lan],['marksman','Mar',C.mar]].filter(([key])=>player.troops?.[key]&&String(player.troops[key]).toLowerCase()!=='unknown');
  const roster=entries.filter(e=>(check==='all'||e.check.status===check)&&matchesSearch(e.player)&&matchesTime(e.player)&&(!missingFilter||(missingFilter==='any'?(missingTroopTypes(e.player).length>0||missingAvailability(e.player)):missingFilter==='tiers'?missingTroopTypes(e.player).length:missingAvailability(e.player)))&&(registrationFilter==='all'||registrationFilter==='unregistered'&&e.member&&!e.member.registered||registrationFilter==='registered'&&e.member?.registered)&&(roleFilter==='all'||(roleFilter==='matchmaking'?!!e.member?.matchmakingOnly:roleFilter==='unallocated'?!e.member||e.member.role==='pending'||!['combatant','substitute'].includes(e.member.role):e.member?.role===roleFilter))).sort((a,b)=>{
-  if(sort==='troop'){const score=p=>numeric(value?.records?.[p.id]?.troopPower);const av=score(a.player),bv=score(b.player);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
+  if(sort==='troop'){const av=compareTroopTiers(a.player,b.player);return av*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='city'){const av=numeric(a.player.power??a.player.providerStats?.power),bv=numeric(b.player.power??b.player.providerStats?.power);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='labyrinth'){const av=numeric(a.player.providerRankings?.labyrinth?.rank),bv=numeric(b.player.providerRankings?.labyrinth?.rank);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='joiner')return comparePriority(a.player,b.player)*(sortDirection==='asc'?1:-1);
@@ -601,7 +621,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     </div>}
     <div role="group" aria-label="Sort TAL players" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,alignItems:'center',scrollbarWidth:'none'}}>
      <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Sort</span>
-     {[['name','Name'],['city','City power'],['labyrinth','Labyrinth'],['troop','Troop strength']].map(([id,label])=><button type="button" key={id} aria-pressed={sort===id} onClick={()=>switchSort(id)} style={{background:sort===id?'#45351F':'#182A3F',color:sort===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
+     {[['name','Name'],['city','City power'],['labyrinth','Labyrinth'],['troop','Troop tier']].map(([id,label])=><button type="button" key={id} aria-pressed={sort===id} onClick={()=>switchSort(id)} style={{background:sort===id?'#45351F':'#182A3F',color:sort===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
      <button type="button" aria-expanded={filtersOpen} aria-controls="tal-advanced-filters" onClick={()=>setFiltersOpen(v=>!v)} style={{background:filtersOpen?'#45351F':'#182A3F',color:filtersOpen?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>More filters{timeFilters.length||registrationFilter!=='all'||missingFilter?' •':''} ⌄</button>
     </div>
     {filtersOpen&&<section id="tal-advanced-filters" aria-label="Advanced player filters" style={{background:C.card,border:'1px solid '+C.border,borderRadius:12,padding:11,marginBottom:10}}>
@@ -674,7 +694,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
     </section>}
     {roster.slice(0,listLimit).map(({team:entryTeam,player,check:status,member})=>{
       const available=availabilityFor(player),isMove=status.status==='move',isCorrect=status.status==='in-host';
-      const shownStat=sort==='troop'?'TAL troop power '+compact(value?.records?.[player.id]?.troopPower):sort==='city'?'City power '+compact(player.power??player.providerStats?.power):sort==='labyrinth'?'Labyrinth '+(player.providerRankings?.labyrinth?.rank?'#'+player.providerRankings.labyrinth.rank:'Not recorded'):sort==='joiner'?'Joiner strength '+([player.troops?.infantry,player.troops?.lancer,player.troops?.marksman].every(t=>String(t||'').startsWith('Helios'))?'Full Helios':'See troop tiers'):null;
+      const shownStat=sort==='troop'?'Troop tier '+(['infantry','lancer','marksman'].map(type=>String(player.troops?.[type]||'—')).join(' · ')):sort==='city'?'City power '+compact(player.power??player.providerStats?.power):sort==='labyrinth'?'Labyrinth '+(player.providerRankings?.labyrinth?.rank?'#'+player.providerRankings.labyrinth.rank:'Not recorded'):sort==='joiner'?'Joiner strength '+([player.troops?.infantry,player.troops?.lancer,player.troops?.marksman].every(t=>String(t||'').startsWith('Helios'))?'Full Helios':'See troop tiers'):null;
       const editable=!value?.locked&&tournamentStatus(entryTeam)!=='eliminated';
       const revealed=swipeId===String(player.id);
       const selectedEditing=editingTimes===String(player.id);
