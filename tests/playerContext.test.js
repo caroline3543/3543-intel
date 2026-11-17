@@ -6,7 +6,7 @@ import {applyPlayerDetails} from '../src/services/playerDetailsService.js';
 import {buildRosterDataSheet} from '../src/services/xlsxDataSheets.js';
 import * as XLSX from 'xlsx';
 test('game locale codes resolve to readable existing language names',()=>{
- for(const [code,name] of [['en','English'],['en_US','English'],['ru','Russian'],['zh-TW','Chinese (Traditional)'],['pt-BR','Portuguese'],['ko','Korean']])assert.equal(gameLanguageName(code),name);
+ for(const [code,name] of [['en','English'],['en_US','English'],['ru','Russian'],['zh-TW','Traditional Chinese'],['pt-BR','Portuguese'],['ko','Korean']])assert.equal(gameLanguageName(code),name);
  for(const invalid of [null,'',0,{},'not supplied','<script>'])assert.equal(gameLanguageCode(invalid),null);
 });
 test('saved provider language becomes primary and preserves additional manual languages without mutation',()=>{
