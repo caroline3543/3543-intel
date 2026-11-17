@@ -63,3 +63,9 @@ test('main-alliance membership reconciles only after explicit complete roster',a
  const again=mergeAllianceProfiles([moved],rows,'3573').players[0];
  assert.equal(again.allianceHistory.length,1);
 });
+
+test('transfer location lookup accepts real numeric player IDs and rejects malformed FIDs',async()=>{
+ const {validPlayerFid}=await import('../src/services/rosterViewService.js');
+ for(const fid of ['609595807','821953994','596277993','764325708'])assert.equal(validPlayerFid(fid),true,fid);
+ for(const fid of ['','abc','609595807x','0','000000000','123'])assert.equal(validPlayerFid(fid),false,fid);
+});
