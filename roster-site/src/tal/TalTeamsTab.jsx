@@ -1,8 +1,10 @@
+import {BulkPlayerImport} from '../components/BulkPlayerImport.jsx';
 import {comparePriority} from '../../../src/components/players/PlayerCard.jsx';
 import {useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
 import {plannedMemberIds,legionLabel} from '../../../src/services/talRosterService.js';
 import {DEFAULT_TIMES} from './planner.js';
+import {troopTierScore} from '../../../src/services/troopTierScore.js';
 
 const COLORS=[
  {id:'blue',name:'Blue',color:'#69B3FF',bg:'#172E48',buildings:['Proto I','Boiler']},
@@ -19,10 +21,6 @@ const valueNumber=n=>n!==''&&n!=null&&Number.isFinite(Number(String(n).replace(/
 const powerFormat=n=>n==null?'—':Number(n).toLocaleString('en-US');
 const troopTierLabels=p=>['infantry','lancer','marksman'].map((key,i)=>({key,label:['Inf','Lan','Mar'][i],tier:p.troops?.[key]||null}));
 const hasTroopTiers=p=>troopTierLabels(p).some(t=>t.tier);
-// Match the Members roster's per-tier troop power scale (not match troop power).
-const T10=[66,71,76,83,88,94,99,104,110,115,121],T11=[80,86,92,100,106,114,120,126,135,141,148];
-const tierPower=raw=>{const x=String(raw||'').trim().toUpperCase();if(!x)return null;const fc=Number(x.match(/FC\s*(\d+)/)?.[1]||0);if(/T12|EXALTED/.test(x))return 96;if(/HELIOS|T11/.test(x))return T11[Math.min(fc,10)]??null;if(/FC\s*\d+|T10/.test(x))return T10[Math.min(fc,10)]??null;return ({7:28,8:38,9:50})[Number(x.match(/T\s*(\d+)/)?.[1]||0)]??null;};
-const troopTierScore=p=>{const values=troopTierLabels(p).map(t=>tierPower(t.tier));return values.every(v=>v!==null)?values.reduce((sum,v)=>sum+v,0)/3:null;};
 const percentile=(value,all,higher=true)=>{if(value==null)return null;const nums=all.filter(v=>v!=null&&Number.isFinite(v));if(!nums.length)return null;return 100*nums.filter(v=>higher?v<value:v>value).length/nums.length+50*nums.filter(v=>v===value).length/nums.length;};
 const priorityWeights={tiers:40,performance:40,city:20};
 const sortValue=(p,key,records)=>{if(key==='name')return name(p);if(key==='strength')return hasTroopTiers(p)?1:null;const raw=key==='troop'?(records?.[p.id]?.troopPower??p.troopPower):key==='city'?(p.cityPower??p.power??p.providerStats?.power):(p.labyrinthRank??p.providerRankings?.labyrinth?.rank??p.providerStats?.labyrinthRank);return valueNumber(raw);};
@@ -62,7 +60,7 @@ function WeightSlider({metric,label,value,onCommit}){
 }
 const draftPrefix='caroline-3573-tal-teams-v1:';
 export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGroups=[],drafts={},onDraftChange,syncReady=false,selectedLegionId}){
- const legions=(value?.teams||[]).filter(t=>['HOT','ARC','RKG'].includes(String(t.host||'').toUpperCase()));
+ const legions=(value?.teams||[]).filter(t=>t&&['HOT','ARC','RKG'].includes(String(t.host||'').toUpperCase()));
  const [legionId,setLegionId]=useState(()=>{
   try{return JSON.parse(window.localStorage.getItem('caroline-3573-last-tal-match')||'null')?.legion||legions[0]?.id||''}catch{return legions[0]?.id||''}
  });
@@ -75,6 +73,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  const [playerSort,setPlayerSort]=useState('name');
  const [sortDirection,setSortDirection]=useState('asc');
  const [subMetric,setSubMetric]=useState('balanced');
+ const [subDetailsOpen,setSubDetailsOpen]=useState({});
  const [subWeights,setSubWeights]=useState({...priorityWeights});
  const [copyReasons,setCopyReasons]=useState(true);
  const [copyScores,setCopyScores]=useState(false);
@@ -162,6 +161,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  },[selectedLegion?.id,matchTime,matchDate]);
  const remoteDraft=drafts?.[matchKey];
  const lastSaved=useRef('');
+ const restoringDraft=useRef('');
  const bootstrapped=useRef(new Set());
  const autoSelectionPending=useRef('');
  const remoteApplied=useRef('');
@@ -209,6 +209,8 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   try{const raw=window.localStorage.getItem(draftKey);if(raw)saved=JSON.parse(raw);}catch{}
   const source=remoteDraft||saved;
   autoSelectionPending.current=source?'':draftKey;
+  // A new match has no saved state to restore; allow its first autosave.
+  restoringDraft.current=source?draftKey:'';
   applyDraft(source||{chosen:preferredIds});
   remoteApplied.current=remoteDraft?.updatedAt||'';
   setDraftState(remoteDraft?'Shared draft restored':saved?'Device draft restored':'Available players selected for this time');
@@ -234,7 +236,28 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   setDraftState('Updated from another device');
  },[draftKey,draftLoaded,remoteDraft?.updatedAt]);
  useEffect(()=>{
-  if(draftLoaded!==draftKey||lastSaved.current===snapshotSignature)return;
+  if(draftLoaded!==draftKey)return;
+  // React may render once with the previous match's state after draftLoaded changes.
+  // Never autosave that stale snapshot over the draft we are restoring.
+  if(restoringDraft.current===draftKey){
+   // applyDraft serialises fields in a different order from snapshot.
+   // Compare the restored values in snapshot's canonical field order.
+   let restoredMatches=false;
+   try{
+    const restored=JSON.parse(lastSaved.current);
+    restoredMatches=Object.keys(snapshot).every(key=>JSON.stringify(restored[key])===JSON.stringify(snapshot[key]));
+   }catch{}
+   if(!restoredMatches)return;
+   restoringDraft.current='';
+   lastSaved.current=snapshotSignature;
+  }
+  if(lastSaved.current===snapshotSignature)return;
+  // Viewing an empty match must not create a shared workspace draft.
+  // Existing drafts can still be cleared and saved deliberately.
+  const hasContent=snapshot.groups.some(g=>g.leader||g.members?.length)||Object.keys(snapshot.assignment).length>0;
+  let hasSavedDraft=!!remoteDraft;
+  try{hasSavedDraft=hasSavedDraft||window.localStorage.getItem(draftKey)!=null;}catch{}
+  if(!hasContent&&!hasSavedDraft){lastSaved.current=snapshotSignature;return;}
   lastSaved.current=snapshotSignature;
   try{
    window.localStorage.setItem(draftKey,JSON.stringify({...snapshot,updatedAt:new Date().toISOString()}));
@@ -246,7 +269,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  },[draftKey,draftLoaded,snapshotSignature,syncReady]);
  useEffect(()=>{
   if(!syncReady||!onDraftChange||remoteDraft||draftLoaded!==draftKey||bootstrapped.current.has(matchKey))return;
-  const hasPlan=snapshot.chosen.length>0||snapshot.groups.some(g=>g.leader||g.members?.length)||Object.keys(snapshot.assignment).length>0;
+  const hasPlan=snapshot.groups.some(g=>g.leader||g.members?.length)||Object.keys(snapshot.assignment).length>0;
   if(!hasPlan)return;
   bootstrapped.current.add(matchKey);
   onDraftChange(matchKey,{...snapshot,updatedAt:new Date().toISOString()});
@@ -276,17 +299,17 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   const score=total?parts.reduce((sum,[key,v])=>sum+normalizedWeights[key]*v,0)/total:null;
   const missing=[x.tiers==null?'Troop tiers':null,x.troop==null&&!usingFallback?'Troop power / Labyrinth rank':null,x.city==null?'City power':null].filter(Boolean);
   const reasons=[x.tiers!=null?'Troop tiers: '+troopTierLabels(x.p).filter(t=>t.tier).map(t=>t.label+' '+t.tier).join(' · '):null,x.troop!=null?'Troop power: '+powerFormat(x.troop):usingFallback?'Labyrinth fallback: rank '+powerFormat(x.lab):null,x.city!=null?'City power: '+powerFormat(x.city):null,missing.length?'Missing: '+missing.join(', '):null].filter(Boolean);
-  return [String(x.p.id),{...x,tier,city,performance,score,usingFallback,reasons}];
+  return [String(x.p.id),{...x,tier,rawTiers:x.tiers,city,performance,score,usingFallback,reasons}];
  }));
  const autoSubs=[...subCandidates].sort((a,b)=>{
   const x=rankDetails.get(String(a.id)),y=rankDetails.get(String(b.id));
   const compare=(k)=>x[k]==null&&y[k]!=null?1:y[k]==null&&x[k]!=null?-1:x[k]===y[k]?0:y[k]-x[k];
-  const n=subMetric==='tiers'?(compare('tiers')||compare('performance')||compare('city')):subMetric==='troop'?(compare('performance')||compare('tiers')||compare('city')):(compare('score')||compare('tiers')||compare('performance'));
+  const n=subMetric==='tiers'?(compare('rawTiers')||compare('troop')):subMetric==='troop'?(compare('troop')||compare('rawTiers')):(compare('score')||compare('tiers')||compare('performance'));
   return n||name(a).localeCompare(name(b));
  });
  const orderedSubs=subOverride?[...autoSubs].sort((a,b)=>(subManual.indexOf(String(a.id))<0?9999:subManual.indexOf(String(a.id)))-(subManual.indexOf(String(b.id))<0?9999:subManual.indexOf(String(b.id)))):autoSubs;
  const priorityLabel=({balanced:'Balanced ranking',tiers:'Highest troop tiers first',troop:'Highest troop power first'})[subMetric];
- const subCopy=['TAL SUBSTITUTE ENTRY ORDER · '+matchTime+' UTC',legionLabel(selectedLegion)+' · '+matchDate,'Priority: '+(subOverride?priorityLabel+' (manually adjusted)':priorityLabel),'',...(orderedSubs.length?orderedSubs.map((p,i)=>{const d=rankDetails.get(String(p.id));return (i+1)+'. '+name(p)+(copyScores&&d.score!=null?' ('+d.score.toFixed(0)+'/100)':'')+(copyReasons?'\n   '+d.reasons.join(' · '):'');}):['No eligible available substitutes']),'','Enter in this order as combatant slots become available.'].join('\n');
+ const subCopy=['TAL SUBSTITUTE ENTRY ORDER · '+matchTime+' UTC',(selectedLegion?legionLabel(selectedLegion):'No legion selected')+' · '+matchDate,'Priority: '+(subOverride?priorityLabel+' (manually adjusted)':priorityLabel),'',...(orderedSubs.length?orderedSubs.map((p,i)=>{const d=rankDetails.get(String(p.id));return (i+1)+'. '+name(p)+(copyScores?(subMetric==='tiers'?(d.rawTiers!=null?' (Tier '+d.rawTiers.toFixed(1)+')':' (Tier incomplete)'):(subMetric==='troop'?(d.troop!=null?' (Power '+powerFormat(d.troop)+')':' (Power missing)'):(d.score!=null?' (Priority '+d.score.toFixed(0)+'/100)':''))):'')+(copyReasons?'\n   '+d.reasons.join(' · '):'');}):['No eligible available substitutes']),'','Enter in this order as combatant slots become available.'].join('\n');
  const teamPower=g=>[g.leader,...g.members].filter(id=>id&&!absentIds.includes(String(id))).reduce((sum,id)=>sum+(powerOf(id)||0),0);
  const groupPairs=cooperationGroups.filter(g=>Array.isArray(g?.ids)&&g.ids.length>1).flatMap(g=>{
   const ids=[...new Set(g.ids.map(String))],pairs=[];
@@ -341,17 +364,11 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
   }else setChosen(old=>[...new Set([...old.map(String),key])]);
   setConfirmed(false);setGenerationError('');
  }
- function saveBatch(){
-  const lines=bulk.split(/\r?\n/).filter(s=>s.trim()),updates={},problems=[];
-  for(const line of lines){
-   const i=line.lastIndexOf(',');if(i<1){problems.push(line);continue;}
-   const identifier=line.slice(0,i).trim(),n=valueNumber(line.slice(i+1).trim());
-   const matches=pool.filter(p=>[p.fid,p.username,p.alias,p.id].some(v=>String(v||'').toLowerCase()===identifier.toLowerCase()));
-   if(matches.length!==1||n===null||n<0){problems.push(identifier);continue;}
-   updates[String(matches[0].id)]=n;
-  }
-  if(problems.length){setCopyMessage('Review unmatched or invalid: '+problems.slice(0,5).join(', '));return;}
-  setPowers(p=>({...p,...updates}));setCopyMessage('Updated '+Object.keys(updates).length+' troop power values in this preview.');setShowBulk(false);
+ function saveBatch(rows){
+  const updates=Object.fromEntries(rows.map(r=>[String(r.id),r.power]));
+  setPowers(p=>({...p,...updates}));
+  setCopyMessage('Updated '+rows.length+' troop power values in this match draft.');
+  return {message:rows.length+' troop power values saved in this match draft.'};
  }
  function clearTeams(){
   setGenerationSuccess('');
@@ -483,7 +500,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
  async function copy(text){try{await navigator.clipboard.writeText(text);setCopyMessage('Copied to clipboard.');}catch{setCopyMessage('Clipboard unavailable. Copy from the preview instead.');}}
  const assignmentText='INITIAL ASSIGNMENTS\n\n'+BUILDINGS.map(b=>'» '+b+': '+activePlayers.filter(({id})=>assignment[id]===b).map(({id})=>name(byId.get(id)||{id})+(isSubstitute(id)?' (3:00+)':'')).join(', ')).join('\n');
  const teamText=textOfTeams(groups.map(g=>({...g,leader:absentIds.includes(String(g.leader))?null:g.leader,members:g.members.filter(id=>!absentIds.includes(String(id)))})),byId,id=>isSubstitute(id)?'3:00+':'0:00');
- const fullBattlePlan='⚔️ TAL · '+legionLabel(selectedLegion)+' · '+matchTime+' UTC\n\n'+teamText+'\n\n'+assignmentText+'\n\nCombatants enter immediately. Assigned substitutes enter after 3 minutes.';
+ const fullBattlePlan='⚔️ TAL · '+(selectedLegion?legionLabel(selectedLegion):'No legion selected')+' · '+matchTime+' UTC\n\n'+teamText+'\n\n'+assignmentText+'\n\nCombatants enter immediately. Assigned substitutes enter after 3 minutes.';
  const copyStale=!!copySource&&copySource!==teamText;
  function openTeamCopy(){if(!copyOpen&&!copyDraft){setCopyDraft(teamText);setCopySource(teamText)}setCopyOpen(v=>!v)}
  function regenerateCopy(){setCopyDraft(teamText);setCopySource(teamText);setCopyMessage('Preview updated from current teams.');}
@@ -509,6 +526,9 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     <label style={{...small,fontSize:11,display:'block',minWidth:0}}>Match date<input type="date" aria-label="TAL match date" value={matchDate} onChange={e=>setMatchDate(e.target.value)} style={{...btn,display:'block',width:'100%',maxWidth:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 10px',colorScheme:'dark'}}/></label>
     <label style={{...small,fontSize:11,display:'block',minWidth:0}}>Match time · UTC<select aria-label="Match time UTC" value={matchTime} onChange={e=>resetForMatch(selectedLegion?.id,e.target.value)} style={{...btn,display:'block',width:'100%',maxWidth:'100%',boxSizing:'border-box',marginTop:5,minWidth:0,fontSize:14,minHeight:44,padding:'7px 10px'}}>{(value?.times||DEFAULT_TIMES).map(t=><option key={t}>{t}</option>)}</select></label>
    </div>
+   <nav aria-label="Team planning shortcuts" style={{display:'flex',gap:7,overflowX:'auto',padding:'3px 0 12px',WebkitOverflowScrolling:'touch'}}>
+    {[['tal-match-players','Players'],['tal-team-generator','Generate'],['tal-substitute-entry-order','Substitutes'],['tal-power-history','Troop power']].map(([id,label])=><button key={id} type="button" onClick={()=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})} style={{...btn,minHeight:44,flexShrink:0,padding:'9px 12px',fontSize:12}}>{label}</button>)}
+   </nav>
    <section aria-label="Match availability" style={{...panel,padding:14,marginBottom:10}}>
     <div style={{...small,fontSize:11,letterSpacing:'.06em',textTransform:'uppercase'}}>Match availability · {matchTime} UTC</div>
     <button type="button" aria-label="Show all available players" onClick={()=>{setRoleFilter('all');setOnlyAvailable(true);document.getElementById('tal-match-players')?.scrollIntoView({behavior:'smooth',block:'start'});}} style={{display:'flex',alignItems:'baseline',gap:9,background:'transparent',border:0,color:C.icy,padding:'8px 0 13px',cursor:'pointer',textAlign:'left',width:'100%'}}>
@@ -541,7 +561,7 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
      {[['all','All'],['combatant','Combatants'],['substitute','Substitutes'],['absent','Absent']].map(([key,label])=><button key={key} type="button" aria-pressed={roleFilter===key} style={{...btn,minHeight:36,padding:'7px 12px',flexShrink:0,border:0,borderRadius:22,fontSize:12,background:roleFilter===key?'#614824':'#1B2B42',color:roleFilter===key?'#F2C77B':C.icy}} onClick={()=>setRoleFilter(key)}>{label}</button>)}
     </div>
     <div aria-label="Sort players" style={{display:'flex',gap:7,overflowX:'auto',whiteSpace:'nowrap',margin:'8px 0 12px',paddingBottom:3,WebkitOverflowScrolling:'touch'}}>{[['name','Name'],['strength','Troop tiers'],['troop','Troop power'],['city','City power'],['lab','Labyrinth rank']].map(([key,label])=><button type="button" key={key} aria-pressed={playerSort===key} onClick={()=>{if(playerSort===key)setSortDirection(d=>d==='asc'?'desc':'asc');else{setPlayerSort(key);setSortDirection(key==='name'||key==='lab'?'asc':'desc');}}} style={{...btn,minHeight:36,padding:'7px 12px',flexShrink:0,border:0,borderRadius:22,fontSize:12,color:playerSort===key?'#F2C77B':C.icy,background:playerSort===key?'#614824':'#1B2B42'}}>{label}{playerSort===key?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}</div>
-    {showBulk&&<div style={{marginBottom:10}}><p style={{...small,fontSize:11}}>Paste Username, Troop power on separate lines.</p><textarea aria-label="Paste troop power" placeholder={'LOVE, 4250\nMaliD, 3880'} value={bulk} onChange={e=>setBulk(e.target.value)} rows={4} style={{...btn,width:'100%',boxSizing:'border-box',fontSize:16}}/><button type="button" style={{...btn,width:'100%',marginTop:6,minHeight:44}} onClick={saveBatch}>Apply power</button></div>}
+    {showBulk&&<BulkPlayerImport title="Import troop power" context="TAL Planner" roleLabel="Match troop power" requirePower alliance={selectedLegion?.host||''} players={pool.map(p=>({id:String(p.id),name:name(p),alliance:p.allianceTag||p.alliance||selectedLegion?.host||'',furnaceLevel:p.furnaceLevel??p.furnace??null,cityPower:p.cityPower??p.powerLevel??null,searchFields:[p.fid,p.alias,...(p.pastUsernames||[])].filter(Boolean)}))} onConfirm={saveBatch} onClose={()=>setShowBulk(false)}/>}
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:3}}>
      <span style={{...small,fontSize:11}}>Match-specific troop power</span>
      <button type="button" style={{border:0,background:'transparent',color:C.icy,fontSize:11,textDecoration:'underline',padding:'8px 2px',minHeight:36,cursor:'pointer'}} onClick={chooseAll}>Reset selection</button>
@@ -569,21 +589,46 @@ export function TalTeamsTab({value,players=[],cooperationPairs=[],cooperationGro
     })}
     {!visibleRoster.filter(p=>roleFilter==='all'||roleFilter==='absent'&&absentIds.includes(String(p.id))||roleFilter==='combatant'&&isCombatant(p.id)&&!absentIds.includes(String(p.id))||roleFilter==='substitute'&&isSubstitute(p.id)&&!absentIds.includes(String(p.id))).length&&<p style={{...small,padding:'12px 0'}}>No players match this filter.</p>}
    </section>
-   <section id="tal-substitute-entry-order" aria-label="Substitute entry order" style={{padding:'14px 2px',marginBottom:12,borderTop:'1px solid '+C.border}}>
+   <section id="tal-team-generator" aria-label="Generate four teams" style={{...panel,padding:14,marginBottom:12,scrollMarginTop:20}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,marginBottom:6}}>
+     <strong style={{fontSize:16}}>Build four teams</strong>
+     <span style={{...small,fontSize:11}}>{effectiveIds.length} selected</span>
+    </div>
+    <p style={{...small,margin:'0 0 12px'}}>Use registered, available players. Enter each player's troop power before generating.</p>
+    <label style={{...small,display:'block',marginBottom:10}}>Team strategy
+     <select aria-label="Team generation strategy" value={mode} onChange={e=>setMode(e.target.value)} style={{...btn,display:'block',width:'100%',marginTop:5,minHeight:44}}>
+      <option value="balanced">Balance troop power</option>
+      <option value="stack">Concentrate strongest teams</option>
+     </select>
+    </label>
+    <label style={{...small,display:'block',marginBottom:12}}>Team leaders
+     <select aria-label="Team leader selection" value={leaderStrategy} onChange={e=>setLeaderStrategy(e.target.value)} style={{...btn,display:'block',width:'100%',marginTop:5,minHeight:44}}>
+      <option value="power">Highest troop power</option>
+      <option value="manual">Keep manually chosen leaders</option>
+     </select>
+    </label>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
+     <button type="button" onClick={generate} style={{...btn,minHeight:48,background:C.gold,color:C.bg,fontWeight:700}}>Regenerate all teams</button>
+     <button type="button" onClick={addUnassigned} style={{...btn,minHeight:48}}>Add unassigned only</button>
+    </div>
+    {generationError&&<p role="alert" style={{...small,color:C.gold,margin:'10px 0 0'}}>{generationError}</p>}
+    {generationSuccess&&<p role="status" style={{...small,color:'#7ADDAB',margin:'10px 0 0'}}>{generationSuccess}</p>}
+   </section>
+   <section id="tal-substitute-entry-order" aria-label="Substitute entry order" style={{scrollMarginTop:20,padding:'14px 2px',marginBottom:12,borderTop:'1px solid '+C.border}}>
  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><div><strong style={{fontSize:16}}>Substitute entry order</strong><div style={{...small,fontSize:11}}>3:00+ · Priority as slots become available</div></div><button type="button" style={{...btn,border:0,borderRadius:22,background:C.section,fontSize:12}} onClick={()=>copy(subCopy)}>Copy order</button></div>
  <label style={{...small,fontSize:11,display:'block',marginTop:12}}>Ranking strategy<select aria-label="Substitute ranking strategy" value={subMetric} onChange={e=>{setSubMetric(e.target.value);setSubOverride(false);setSubManual([])}} style={{...btn,display:'block',width:'100%',marginTop:5,minHeight:44}}><option value="balanced">Balanced ranking (default)</option><option value="tiers">Highest troop tiers first</option><option value="troop">Highest troop power first</option></select></label>
  {subMetric==='balanced'&&<div style={{marginTop:12,background:C.section,borderRadius:12,padding:12}}><strong style={{fontSize:12}}>Ranking weights</strong><div style={{...small,fontSize:11,margin:'4px 0 8px'}}>Troop power uses Labyrinth rank only when power is missing. Scores are relative to eligible substitutes.</div>{[['tiers','Troop tiers'],['performance','Troop power / Labyrinth fallback'],['city','City power']].map(([key,label])=><WeightSlider key={key} metric={key} label={label} value={subWeights[key]} onCommit={next=>setSubWeights(v=>v[key]===next?v:{...v,[key]:next})}/>)}<div style={{...small,fontSize:11,marginTop:6}}>Weights are automatically normalised to 100% when scoring.</div><button type="button" style={{...btn,border:0,fontSize:11,marginTop:6}} onClick={()=>setSubWeights({...priorityWeights})}>Reset weights to 40 / 40 / 20</button></div>}
- <div style={{display:'flex',gap:14,flexWrap:'wrap',marginTop:12}}><label style={{...small,fontSize:12,display:'flex',alignItems:'center',gap:6}}><input type="checkbox" checked={copyReasons} onChange={e=>setCopyReasons(e.target.checked)} style={{accentColor:C.gold}}/>Include explanations when copying</label><label style={{...small,fontSize:12,display:'flex',alignItems:'center',gap:6}}><input type="checkbox" checked={copyScores} onChange={e=>setCopyScores(e.target.checked)} style={{accentColor:C.gold}}/>Include priority scores</label></div>
+ <div style={{display:'flex',gap:14,flexWrap:'wrap',marginTop:12}}><label style={{...small,fontSize:12,display:'flex',alignItems:'center',gap:6}}><input type="checkbox" checked={copyReasons} onChange={e=>setCopyReasons(e.target.checked)} style={{accentColor:C.gold}}/>Include explanations when copying</label><label style={{...small,fontSize:12,display:'flex',alignItems:'center',gap:6}}><input type="checkbox" checked={copyScores} onChange={e=>setCopyScores(e.target.checked)} style={{accentColor:C.gold}}/>Include ranking scores when copying</label></div>
  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,margin:'10px 0 4px'}}><span style={{...small,fontSize:11}}>{orderedSubs.length} selected substitutes · {subOverride?'Manual order':'Automatic order'}</span><button type="button" style={{...btn,border:0,background:'transparent',fontSize:11,minHeight:36}} onClick={()=>{setSubOverride(false);setSubManual([])}}>Reset order</button></div>
  {orderedSubs.map((p,i)=><div key={p.id} style={{display:'flex',alignItems:'center',gap:8,borderBottom:'1px solid '+C.border,padding:'8px 0'}}>
  <span style={{background:C.section,borderRadius:9,minWidth:30,height:30,display:'grid',placeItems:'center',fontSize:12}}>{i+1}</span>
- <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:650,overflowWrap:'anywhere'}}>{name(p)} {rankDetails.get(String(p.id))?.score!=null&&<span style={{fontSize:11,color:C.icy,fontWeight:400}}>· {rankDetails.get(String(p.id)).score.toFixed(0)}/100</span>}{subOverride&&<span style={{fontSize:10,color:C.gold}}> · Manual order</span>}</div><div style={{...small,fontSize:11,marginTop:3}}>{rankDetails.get(String(p.id))?.reasons?.slice(0,2).join(' · ')||'No measurements recorded'}</div>{rankDetails.get(String(p.id))?.usingFallback&&<div style={{...small,fontSize:11,color:C.gold}}>Labyrinth fallback used</div>}</div>
- <button type="button" aria-label={'Move '+name(p)+' earlier'} disabled={i===0} style={{...btn,minWidth:36,padding:'6px',minHeight:38,borderRadius:18,opacity:i===0?0.4:1}} onClick={()=>{const ids=orderedSubs.map(x=>String(x.id));[ids[i-1],ids[i]]=[ids[i],ids[i-1]];setSubManual(ids);setSubOverride(true)}}>↑</button>
- <button type="button" aria-label={'Move '+name(p)+' later'} disabled={i===orderedSubs.length-1} style={{...btn,minWidth:36,padding:'6px',minHeight:38,borderRadius:18,opacity:i===orderedSubs.length-1?0.4:1}} onClick={()=>{const ids=orderedSubs.map(x=>String(x.id));[ids[i+1],ids[i]]=[ids[i],ids[i+1]];setSubManual(ids);setSubOverride(true)}}>↓</button>
+ <div style={{flex:1,minWidth:0}}><button type="button" aria-expanded={!!subDetailsOpen[String(p.id)]} aria-label={'Toggle details for '+name(p)} onClick={()=>setSubDetailsOpen(old=>({...old,[String(p.id)]:!old[String(p.id)]}))} style={{background:'transparent',border:0,color:C.white,textAlign:'left',padding:'7px 0',minHeight:44,width:'100%',cursor:'pointer',fontSize:13,fontWeight:650,overflowWrap:'anywhere'}}>{name(p)} {<span style={{fontSize:11,color:C.icy,fontWeight:400}}> · {subMetric==='tiers'?'Tier '+(rankDetails.get(String(p.id))?.rawTiers?.toFixed(1)??'incomplete'):subMetric==='troop'?'Power '+powerFormat(rankDetails.get(String(p.id))?.troop):'Priority '+(rankDetails.get(String(p.id))?.score?.toFixed(0)??'—')+'/100'}</span>}{subOverride&&<span style={{fontSize:10,color:C.gold}}> · Manual order</span>} <span style={{fontSize:11,color:C.icy}}>{subDetailsOpen[String(p.id)]?'▴':'▾'}</span></button>{subDetailsOpen[String(p.id)]&&<div style={{...small,fontSize:11,marginTop:4,display:'flex',gap:4,flexWrap:'wrap'}}>{troopTierLabels(p).map(t=><span key={t.key} style={{border:'1px solid '+C.border,borderRadius:6,padding:'2px 5px',background:C.section}}>{t.label} {t.tier||'—'}</span>)}</div>}{subDetailsOpen[String(p.id)]&&<div style={{...small,fontSize:11,marginTop:4}}>Troop power: {powerFormat(rankDetails.get(String(p.id))?.troop)}</div>}{subDetailsOpen[String(p.id)]&&rankDetails.get(String(p.id))?.usingFallback&&<div style={{...small,fontSize:11,color:C.gold}}>Labyrinth fallback used</div>}</div>
+ <button type="button" aria-label={'Move '+name(p)+' earlier'} disabled={i===0} style={{...btn,minWidth:44,padding:'8px',minHeight:44,borderRadius:18,opacity:i===0?0.4:1}} onClick={()=>{const ids=orderedSubs.map(x=>String(x.id));[ids[i-1],ids[i]]=[ids[i],ids[i-1]];setSubManual(ids);setSubOverride(true)}}>↑</button>
+ <button type="button" aria-label={'Move '+name(p)+' later'} disabled={i===orderedSubs.length-1} style={{...btn,minWidth:44,padding:'8px',minHeight:44,borderRadius:18,opacity:i===orderedSubs.length-1?0.4:1}} onClick={()=>{const ids=orderedSubs.map(x=>String(x.id));[ids[i+1],ids[i]]=[ids[i],ids[i+1]];setSubManual(ids);setSubOverride(true)}}>↓</button>
  </div>)}
  {!orderedSubs.length&&<p style={{...small,fontSize:12}}>Select available registered substitutes to build an entry order.</p>}
  </section>
- <section aria-label="Carry forward match power" style={{...panel,padding:11}}>
+ <section id="tal-power-history" aria-label="Carry forward match power" style={{...panel,padding:11}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><strong style={{fontSize:13}}>Troop power</strong><span style={{...small,fontSize:11}}>{Object.values(powers).filter(v=>valueNumber(v)!==null).length} recorded</span></div>
     <button type="button" style={{...btn,width:'100%',marginTop:9,minHeight:44,fontSize:12}} onClick={()=>{
      const prior=Object.entries(drafts||{}).filter(([key,d])=>key.startsWith(String(selectedLegion?.id)+':')&&key!==matchKey&&d?.powers&&Object.keys(d.powers).length).sort((a,b)=>String(b[1]?.updatedAt||'').localeCompare(String(a[1]?.updatedAt||'')))[0];

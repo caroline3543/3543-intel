@@ -18,6 +18,19 @@ import { ProviderStatsSection } from './ProviderStatsSection.jsx';
 import { PlayerRankingsSection } from './PlayerRankingsSection.jsx';
 import { PlayerHistorySection } from './PlayerHistorySection.jsx';
 import { TroopPowerChart } from './TroopPowerChart.jsx';
+function relativeProfileAge(raw){
+ if(!raw)return 'Update date unavailable';
+ const ms=Date.parse(raw);if(!Number.isFinite(ms))return 'Update date unavailable';
+ const minutes=Math.max(0,Math.floor((Date.now()-ms)/60000));
+ if(minutes<1)return 'Updated just now';
+ if(minutes<60)return 'Updated '+minutes+' minute'+(minutes===1?'':'s')+' ago';
+ const hours=Math.floor(minutes/60);if(hours<24)return 'Updated '+hours+' hour'+(hours===1?'':'s')+' ago';
+ const days=Math.floor(hours/24);if(days===1)return 'Updated yesterday';
+ if(days<7)return 'Updated '+days+' days ago';
+ const weeks=Math.floor(days/7);if(days<28)return 'Updated '+weeks+' week'+(weeks===1?'':'s')+' ago';
+ const months=Math.floor(days/30);if(days<365)return 'Updated '+Math.max(1,months)+' month'+(months===1?'':'s')+' ago';
+ const years=Math.floor(days/365);return 'Updated '+years+' year'+(years===1?'':'s')+' ago';
+}
 export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,players=[],teamworkPreferences={},onSaveTeamworkPreferences,playerLookup,onCheckPlayerName,onApplyCheckedName}) {
   const panel=useRef(null);
   const close=useRef(onClose);close.current=onClose;
@@ -49,9 +62,13 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
     <section ref={panel} role="dialog" aria-modal="true" aria-label={`Player profile: ${name}`} onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:480,height:'min(94dvh, 94vh)',minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch',touchAction:'pan-y',boxSizing:'border-box',padding:'0 16px max(110px, env(safe-area-inset-bottom))',overscrollBehavior:'contain'}}>
       <header style={{position:'sticky',top:0,zIndex:1,background:C.card,padding:'16px 0 12px',display:'flex',gap:12,alignItems:'center',borderBottom:`1px solid ${C.border}`,marginBottom:16}}>
         <PlayerAvatar player={player} size={48} color={roleColor(player.roles?.[0],roles)} bordered/>
-        <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel].filter(Boolean).join(' · ')}</div><CopyPlayerId fid={player.fid}/></div>
+        <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel].filter(Boolean).join(' · ')}</div><CopyPlayerId fid={player.fid}/><div title={player.profileLastUpdated?new Date(player.profileLastUpdated).toLocaleString():undefined} style={{fontSize:12,color:C.icy,marginTop:5}}>{relativeProfileAge(player.profileLastUpdated)} · Profile edited</div>{player.providerStats?.retrievedAt&&<div title={new Date(player.providerStats.retrievedAt).toLocaleString()} style={{fontSize:12,color:C.icy}}>API data · {relativeProfileAge(player.providerStats.retrievedAt).replace(/^Updated /,'')}</div>}</div>
         <button style={profileButton} aria-label="Close profile" onClick={onClose}>✕</button>
       </header>
+      <ProfileTroops key={`troops:${player.id}`} player={player} onSave={onSave}/>
+      <ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/>
+      <ProfileJoiners key={`heroes:${player.id}`} player={player} onSave={onSave}/>
+      <ProfileTeamwork key={`tal-teamwork:${player.id}`} player={player} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} onSavePlayer={onSave}/>
       <ProfileSection title="Check username with API">
         <p style={{fontSize:13,color:C.icy,margin:'0 0 10px'}}>Look up this Player ID directly. This checks the provider separately from the alliance roster and won't change saved data without confirmation.</p>
         <button type="button" style={profileButton} disabled={!player.fid||playerLookup?.status==='loading'} onClick={()=>onCheckPlayerName?.(player)}>{playerLookup?.status==='loading'?'Checking…':'Refresh player name'}</button>
@@ -67,10 +84,7 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
       {player.blacklisted&&<p style={{fontSize:14,color:C.red}}>Excluded from battle plans{player.blacklistReason?`: ${player.blacklistReason}`:''}</p>}
       <ProfileSection title="Alliance rank"><p style={{fontSize:14,color:C.icy,margin:'0 0 12px'}}>Tap a rank to set it. Tap again to clear.</p><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{ALLIANCE_RANKS.map(rank=><button key={rank} style={{...profileButton,color:player.allianceRank===rank?C.gold:C.icy,borderColor:player.allianceRank===rank?C.gold:C.border}} aria-pressed={player.allianceRank===rank} onClick={()=>setAllianceRank(rank)}>{rank}</button>)}</div></ProfileSection>
       {player.lastFoundryTroopPower!=null&&<ProfileSection title="Last known Foundry troop power"><div style={{fontSize:20,fontWeight:700,color:C.icy}}>{Number(player.lastFoundryTroopPower).toLocaleString()}</div><div style={{fontSize:12,color:C.muted||'#9bb0c4',marginTop:4}}>Recorded {player.lastFoundryTroopPowerAt?new Date(player.lastFoundryTroopPowerAt).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}):'date unknown'}</div></ProfileSection>}
-      <ProfileTroops key={`troops:${player.id}`} player={player} onSave={onSave}/>
       <ProfileTalCapacity key={`tal-capacity:${player.id}`} player={player} onSave={onSave}/>
-      <ProfileTeamwork key={`tal-teamwork:${player.id}`} player={player} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} onSavePlayer={onSave}/>
-      <ProfileJoiners key={`heroes:${player.id}`} player={player} onSave={onSave}/>
       <ProfileRoles key={`roles:${player.id}`} player={player} roles={roles} onSave={onSave}/>
         {(player.leaderProfile?.teams || []).length > 0 && (
           <ProfileSection title="Rally setup">
@@ -104,12 +118,15 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
 
 
       <button onClick={onOpenLeaderProfile} style={{...profileButton,width:'100%',color:C.gold,marginBottom:12}}>Edit rally setup</button>
-      <ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/><ProfileSheetImport player={player}/>
+      <ProfileSheetImport player={player}/>
       <ProfileNotes key={`notes:${player.id}`} player={player} onSave={onSave}/>
       <ProfileDetails title="Game stats"><ProviderStatsSection player={player}/></ProfileDetails>
       <ProfileDetails title="Heroes & equipment"><PlayerEquipmentSection player={player} onSave={onSave}/></ProfileDetails>
       <ProfileDetails title="Rankings"><PlayerRankingsSection player={player}/></ProfileDetails>
       <ProfileDetails title="History & attendance"><PlayerHistorySection player={player}/>
+        <ProfileSection title="Last 4 alliance movements">
+          {(player.allianceHistory||[]).filter(m=>m.from!==m.to).slice(-4).reverse().length===0?<div style={{fontSize:13,color:C.icy}}>No alliance movements recorded yet.</div>:(player.allianceHistory||[]).filter(m=>m.from!==m.to).slice(-4).reverse().map((m,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'9px 0',borderBottom:'1px solid '+C.border,fontSize:13}}><span>{m.from||'No alliance'} → {m.to||'No alliance'}</span><span style={{color:C.icy,whiteSpace:'nowrap'}}>{m.at?new Date(m.at).toLocaleDateString(): 'Date unknown'}</span></div>)}
+        </ProfileSection>
         {metrics&&(
           <ProfileSection title="Event attendance">
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>

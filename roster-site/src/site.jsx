@@ -1,3 +1,4 @@
+import {isExplicitlyCompleteAllianceRoster} from './services/allianceRosterCompleteness.js';
 import {applyTalBulk} from './tal/bulkActions.js';
 import {applyTalSheetSnapshot} from './tal/sheetSync.js';
 import {BattlePlanner} from './battle/BattlePlanner.jsx';
@@ -5,7 +6,7 @@ import {FoundryTab} from './foundry/FoundryTab.jsx';
 import {SvsComparison} from './svs/SvsComparison.jsx';
 import {applyBattleAction} from './battle/model.js';
 import {withAutomaticRoles} from './tal/autoRoles.js';
-import {fetchMightpulseAlliance} from '../../src/services/mightpulseService.js';
+import {fetchMightpulseAlliance,fetchMightpulsePlayer} from '../../src/services/mightpulseService.js';
 import {allianceRows} from '../../src/services/allianceImportService.js';
 import {WorkspaceOptions,WorkspaceAttention} from './components/WorkspaceOptions.jsx';
 import {plannedMemberIds} from '../../src/services/talRosterService.js';
@@ -26,37 +27,63 @@ import {RosterTab} from '../../src/components/players/RosterTab.jsx';
 import {AllianceImportPanel} from '../../src/components/workspaces/AllianceImportPanel.jsx';
 import {DeleteConfirmModal} from '../../src/components/common/DeleteConfirmModal.jsx';
 import {loadFromStorage,saveToStorage} from '../../src/services/exportImportService.js';
-import {mergeAllianceProfiles} from '../../src/services/allianceImportService.js';
+import {mergeAllianceProfiles,reconcileAllianceMembership} from '../../src/services/allianceImportService.js';
 import {withBuiltinRole} from '../../src/utils/roles.js';
 import {withGameLanguage} from '../../src/services/gameLanguageService.js';
 const button={minHeight:44,padding:'10px 14px',fontSize:14,fontWeight:600,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,cursor:'pointer'};
 const empty={players:[],events:[],customRoles:[],settings:{stateId:'3573'}};
+export function relativeRefreshAge(timestamp,now=Date.now()){
+  const ms=Date.parse(timestamp||'');
+  if(!Number.isFinite(ms)||ms>now+60000)return 'Never refreshed';
+  const elapsed=Math.max(0,now-ms);
+  if(elapsed<60000)return 'Just now';
+  const minutes=Math.floor(elapsed/60000);
+  if(minutes<60)return minutes+' min ago';
+  const hours=Math.floor(minutes/60);
+  if(hours<24)return hours+' hr'+(hours===1?'':'s')+' ago';
+  const days=Math.floor(hours/24);
+  return days+' day'+(days===1?'':'s')+' ago';
+}
+
 export function SiteApp(){
   const [preferences,setPreferences]=useState(()=>readPreferences());
   function updatePreferences(patch){setPreferences(savePreferences(patch));}
   useEffect(()=>{
-    const feedback=event=>{const target=event.target.closest?.('button');if(target&&!target.disabled&&target.getAttribute('aria-disabled')!=='true')tapFeedback(preferences.haptics);};
+    const feedback=event=>{const target=event.target.closest?.('button,[role="button"],input[type="checkbox"],input[type="radio"]');if(target&&!target.disabled&&target.getAttribute('aria-disabled')!=='true')tapFeedback(preferences.haptics);};
     document.addEventListener('click',feedback,true);
     return()=>document.removeEventListener('click',feedback,true);
   },[preferences.haptics]);
+  const interactionStyles=<style>{`
+    @media (prefers-reduced-motion: no-preference) {
+      button, [role="button"], input[type="checkbox"], input[type="radio"] { transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 110ms ease, opacity 140ms ease; }
+      button:not(:disabled):active, [role="button"]:not([aria-disabled="true"]):active { transform: scale(.975); }
+      [draggable="true"]:active { opacity:.86; }
+    }
+    button:focus-visible, [role="button"]:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #E6BF7B; outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+  `}</style>;
   const [access,setAccess]=useState('checking'),[password,setPassword]=useState(''),[remember,setRemember]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   useEffect(()=>{fetch('/api/session',{credentials:'same-origin'}).then(r=>r.json()).then(data=>{setAccess(data.authenticated?'open':'locked');if(data.error)setError(data.error);}).catch(()=>{setAccess('locked');setError('Unable to check access. Try again.');});const lock=()=>setAccess('locked');window.addEventListener('roster:locked',lock);return()=>window.removeEventListener('roster:locked',lock);},[]);
   async function login(event){event.preventDefault();setBusy(true);setError('');try{const response=await fetch('/api/session',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({password,remember})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Unable to sign in.');setPassword('');setAccess('open');}catch(e){setError(e.message);}finally{setBusy(false);}}
   async function logout(){try{const r=await fetch('/api/session',{method:'DELETE',credentials:'same-origin',headers:{'Content-Type':'application/json'}});if(!r.ok)throw new Error();setAccess('locked');}catch{setError('Unable to sign out. Try again.');}}
-  if(access==='checking')return <p style={{padding:24,color:C.icy}}>Checking access…</p>;
-  if(access==='open')return <Members onLogout={logout} error={error} preferences={preferences} onPreferencesChange={updatePreferences}/>;
-  return <main style={{maxWidth:420,margin:'12vh auto 0',padding:24}}><div style={{color:C.gold,fontSize:14,fontWeight:700}}>STATE 3573</div><h1 style={{fontSize:30,margin:'10px 0'}}>Caroline’s roster</h1><p style={{fontSize:16,color:C.icy,lineHeight:1.6}}>Enter the leader password to open the shared roster.</p><form onSubmit={login}><label htmlFor="password" style={{fontSize:14,color:C.icy}}>Site password</label><input id="password" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} style={{...button,width:'100%',margin:'8px 0 12px',fontSize:16,color:C.white}}/><label style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 14px',fontSize:14,color:C.icy,minHeight:44,cursor:'pointer'}}><input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} style={{width:20,height:20,accentColor:C.gold,flexShrink:0}}/><span>Remember me for 30 days</span></label>{error&&<p role="alert" style={{color:C.red}}>{error}</p>}<button disabled={busy} style={{...button,width:'100%',background:C.gold,color:C.bg}}>{busy?'Opening…':'Open roster'}</button></form><p style={{fontSize:13,color:C.icy,lineHeight:1.5,marginTop:20}}>Game lookups use Caroline’s API allowance. Your browser can save your password for autofill. Remember me keeps this device signed in using a secure session. Anyone with the leader password can edit the shared roster.</p></main>;
+  if(access==='checking')return <>{interactionStyles}<p style={{padding:24,color:C.icy}}>Checking access…</p></>;
+  if(access==='open')return <>{interactionStyles}<Members onLogout={logout} error={error} preferences={preferences} onPreferencesChange={updatePreferences}/></>;
+  return <>{interactionStyles}<main style={{maxWidth:420,margin:'12vh auto 0',padding:24}}><div style={{color:C.gold,fontSize:14,fontWeight:700}}>STATE 3573</div><h1 style={{fontSize:30,margin:'10px 0'}}>Caroline’s roster</h1><p style={{fontSize:16,color:C.icy,lineHeight:1.6}}>Enter the leader password to open the shared roster.</p><form onSubmit={login}><label htmlFor="password" style={{fontSize:14,color:C.icy}}>Site password</label><input id="password" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} style={{...button,width:'100%',margin:'8px 0 12px',fontSize:16,color:C.white}}/><label style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 14px',fontSize:14,color:C.icy,minHeight:44,cursor:'pointer'}}><input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} style={{width:20,height:20,accentColor:C.gold,flexShrink:0}}/><span>Remember me for 30 days</span></label>{error&&<p role="alert" style={{color:C.red}}>{error}</p>}<button disabled={busy} style={{...button,width:'100%',background:C.gold,color:C.bg}}>{busy?'Opening…':'Open roster'}</button></form><p style={{fontSize:13,color:C.icy,lineHeight:1.5,marginTop:20}}>Game lookups use Caroline’s API allowance. Your browser can save your password for autofill. Remember me keeps this device signed in using a secure session. Anyone with the leader password can edit the shared roster.</p></main></>;
 }
 function Members({onLogout,error,preferences,onPreferencesChange}){
   const [tab,setTab]=useState('members');
   const [workspaceOpen,setWorkspaceOpen]=useState(false);
   const lastAttention=useRef(null);
   const [initialPlayerId,setInitialPlayerId]=useState(null);
+  const [returnToFoundry,setReturnToFoundry]=useState(false);
+  const foundryScroll=useRef(0);
   const [legionRefresh,setLegionRefresh]=useState(null);
   const [refreshingLab,setRefreshingLab]=useState(false);
   const labBusy=useRef(false);
   const refreshing=useRef(false),stopRefresh=useRef(false);
-  function navigate(id){setTab(id==='teams'?'tal':id);window.scrollTo?.({top:0,behavior:'instant'});}
+  function navigate(id){setReturnToFoundry(false);setTab(id==='teams'?'tal':id);window.scrollTo?.({top:0,behavior:'instant'});}
+  function openFoundryProfile(id){foundryScroll.current=window.scrollY||0;setReturnToFoundry(true);setInitialPlayerId(id);setTab('members');window.scrollTo?.({top:0,behavior:'instant'});}
+  function backToFoundry(){setTab('foundry');setReturnToFoundry(false);requestAnimationFrame(()=>window.scrollTo?.({top:foundryScroll.current,behavior:'instant'}));}
   useEffect(()=>()=>{stopRefresh.current=true;},[]);
   const [tourOpen,setTourOpen]=useState(!preferences.tutorialSeen);
   const [exporting,setExporting]=useState(false);
@@ -66,10 +93,10 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   useEffect(()=>{if(sync.ready&&sync.joined&&!sync.conflicts?.length){const normalized=withAutomaticRoles(data);if(normalized!==data)setSharedData(normalized);}},[data,sync.ready,sync.joined,sync.conflicts?.length]);
   const [apiProgress,setApiProgress]=useState('');
   const [apiResult,setApiResult]=useState(null);
-  const [nameRefresh,setNameRefresh]=useState({status:'idle',done:0,total:0,changes:[],failed:0});
+  const [nameRefresh,setNameRefresh]=useState({status:'idle',done:0,total:0,changes:[],failed:0,error:''});
   const nameRefreshStop=useRef(false);
   async function refreshUsernames(){
-    if(refreshing.current)return;
+    if(refreshing.current){setMessage('Another API refresh is already running.');return;}
     refreshing.current=true;nameRefreshStop.current=false;
     const unique=new Map();
     for(const p of latest.current.players||[]){
@@ -77,8 +104,8 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
       if(/^[1-9]\\d{3,14}$/.test(fid)&&!unique.has(fid))unique.set(fid,p);
     }
     const targets=[...unique.values()];
-    const changes=[];let failed=0,done=0;
-    setNameRefresh({status:'running',done:0,total:targets.length,changes:[],failed:0});
+    const changes=[];let failed=0,done=0,firstError='';
+    setNameRefresh({status:'running',done:0,total:targets.length,changes:[],failed:0,error:''});
     try{
       for(const p of targets){
         if(nameRefreshStop.current)break;
@@ -86,21 +113,24 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
           const response=await mightpulseRequest('player',{fid:String(p.fid)});
           const base=response?.data?.player||response?.data;
           const id=String(base?.chief_id??base?.fid??response?.data?.chief_id??'');
-          const username=String(base?.nick_name||'').trim();
+          const username=String(base?.nick_name??base?.nickname??base?.name??'').trim();
           if(id!==String(p.fid)||!username)throw Error('Invalid player response');
           if(username!==p.username)changes.push({id:p.id,fid:String(p.fid),before:p.username||'',after:username});
         }catch(e){
-          failed++;
+          failed++;if(!firstError)firstError=e.message||'Player lookup failed';
           if([401,403,429].includes(e.status)||[401,403,429].includes(e.providerStatus)){
             setMessage(e.status===429||e.providerStatus===429?'API rate limit reached. Review the partial results.':'Username refresh stopped: '+e.message);
             done++;break;
           }
         }
         done++;
-        setNameRefresh({status:'running',done,total:targets.length,changes:[...changes],failed});
+        setNameRefresh({status:'running',done,total:targets.length,changes:[...changes],failed,error:firstError});
       }
-      setNameRefresh({status:'review',done,total:targets.length,changes,failed});
-    }finally{refreshing.current=false;}
+      setNameRefresh({status:'review',done,total:targets.length,changes,failed,error:firstError});
+      if(failed)setMessage(`${failed} username lookup(s) failed. ${firstError}`);
+      else if(!targets.length)setMessage('No valid player IDs found to check.');
+    }catch(e){setNameRefresh(v=>({...v,status:'review',error:e.message||'Unexpected refresh error'}));setMessage(e.message||'Username refresh failed');}
+    finally{refreshing.current=false;}
   }
   function applyUsernameChanges(){
     const changes=nameRefresh.changes||[];
@@ -123,6 +153,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const syncProblem=Boolean(sync.issue||sync.conflicts?.length||syncLate);
   const syncLabel=syncProblem?'Sync not working':sync.dirty||sync.syncing?'Syncing':'Synced';
   const syncColor=syncProblem?'#F07575':sync.dirty||sync.syncing?'#E6BF7B':'#72CBA9';
+  const apiRefreshAge=relativeRefreshAge(data.settings?.lastApiRefresh?.at,Date.now());
   const [importing,setImporting]=useState(false),[deleting,setDeleting]=useState(null),[message,setMessage]=useState('');
   const latest=useRef(data);latest.current=data;
   const pendingTalSync=useRef({active:false,sawDirty:false});
@@ -178,19 +209,22 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const requiredAction=sync.conflicts?.length?'conflict':['join','unpublished'].includes(sync.mode)?sync.mode:null;
   useEffect(()=>{if(requiredAction&&requiredAction!==lastAttention.current)setWorkspaceOpen(true);else if(!requiredAction&&lastAttention.current)setWorkspaceOpen(false);lastAttention.current=requiredAction;},[requiredAction]);
   const players=data.players||[];
+  const activePlayers=players.filter(p=>p.membershipStatus!=='transferred_out');
   useEffect(()=>{saveToStorage(data);},[data]);
   useEffect(()=>{const fail=()=>setMessage('Unable to save. Export a backup before closing this page.');window.addEventListener('app:storage-full',fail);return()=>window.removeEventListener('app:storage-full',fail);},[]);
   function save(player){const next=withGameLanguage({...player,profileLastUpdated:new Date().toISOString()});setData(prev=>({...prev,players:prev.players.map(p=>p.id===next.id?next:p)}));setMessage('Player updated');}
   function update(updated){const byId=new Map(updated.map(p=>[p.id,p]));setData(prev=>({...prev,players:prev.players.map(p=>byId.get(p.id)||p)}));}
-  function importRoster(rows){
+  function importRoster(rows,{reconcileTag=null}={}){
     const result=mergeAllianceProfiles(latest.current.players||[],rows,'3573');
-    setData(prev=>({...prev,players:mergeAllianceProfiles(prev.players,rows,'3573').players,settings:{...prev.settings,lastApiRefresh:{at:new Date().toISOString(),scope:'Alliance roster',count:rows.length}}}));return {updated:result.updated.length,added:result.added.length};
+    setData(prev=>({...prev,players:reconcileTag?reconcileAllianceMembership(mergeAllianceProfiles(prev.players,rows,'3573').players,rows,reconcileTag):mergeAllianceProfiles(prev.players,rows,'3573').players,settings:{...prev.settings,lastApiRefresh:{at:new Date().toISOString(),scope:'Alliance roster',count:rows.length}}}));return {updated:result.updated.length,added:result.added.length};
   }
   async function syncNow(){setMessage('Syncing shared workspace…');const result=await retry();setMessage(result?.issue?result.issue:result?.conflicts?.length?'Edits need review.':result?.dirty||result?.syncing?'Changes are still syncing.':'Synced. All shared changes are up to date.');}
   async function refreshAll(onlyTags=null){
     if(refreshing.current)return;
     refreshing.current=true;stopRefresh.current=false;
     const targets=Array.isArray(onlyTags)?onlyTags:DEFAULT_ALLIANCES;
+    const priorMembers=(latest.current.players||[]).filter(p=>targets.includes(String(p.allianceTag||'').toUpperCase())&&/^\d+$/.test(String(p.fid||''))&&p.membershipStatus!=='transferred_out');
+    const observedFids=new Set();const completeTags=new Set();
     const failures=[],successes=[];let checked=0,updated=0,added=0;
     setApiResult(null);
     try{
@@ -198,9 +232,15 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
         if(stopRefresh.current)break;
         setApiProgress('Refreshing '+tag+' · '+(checked+1)+'/'+targets.length);
         try{
-          const rows=allianceRows(await fetchMightpulseAlliance(3573,tag),'3573',tag);
+          const response=await fetchMightpulseAlliance(3573,tag);
+          const rows=allianceRows(response,'3573',tag);
           if(!rows.length)throw Error('No roster returned');
-          const result=importRoster(rows);
+          // Absence is only evidence of departure when the provider explicitly confirms a complete roster.
+          // A successful HTTP response or 100 returned members alone is not proof of completeness.
+          const complete=isExplicitlyCompleteAllianceRoster(response);
+          if(complete)completeTags.add(tag);
+          for(const row of rows)observedFids.add(row.fid);
+          const result=importRoster(rows,{reconcileTag:complete?tag:null});
           successes.push(tag);updated+=result.updated;added+=result.added;
         }catch(e){
           failures.push({tag,reason:e.message||'API request failed'});
@@ -208,8 +248,25 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
         }
         checked++;
       }
+      // Resolve missing FIDs only after all requested alliance rosters have been checked.
+      // Never infer a departure from a partial roster or an unsuccessful lookup.
+      const missing=priorMembers.filter(p=>completeTags.has(String(p.allianceTag).toUpperCase())&&!observedFids.has(String(p.fid)));
+      let relocated=0,unresolved=0;
+      for(const p of missing){
+        if(stopRefresh.current)break;
+        setApiProgress(`Checking former members · ${relocated+unresolved+1}/${missing.length}`);
+        try{
+          const response=await fetchMightpulsePlayer(p.fid);
+          const updated=applyPlayerDetails(p,response,'3573');
+          setData(prev=>({...prev,players:prev.players.map(old=>String(old.fid)===String(p.fid)?updated:old)}));
+          relocated++;
+        }catch(e){
+          unresolved++;
+          if([401,403,429].includes(e.status)||[401,403,429].includes(e.providerStatus))break;
+        }
+      }
       const status=failures.length||successes.length<targets.length?(successes.length?'partial':'failed'):'success';
-      const result={status,successes,failures,updated,added,checked,requested:targets.length,at:new Date().toISOString()};
+      const result={status,successes,failures,updated,added,checked,requested:targets.length,relocated,unresolved,at:new Date().toISOString()};
       setApiResult(result);
       if(successes.length){
         setData(prev=>({...prev,settings:{...prev.settings,lastApiRefresh:{at:result.at,scope:successes.join(', '),count:updated+added,failed:failures.length,partial:status!=='success'}}}));
@@ -268,20 +325,20 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     <div data-workspace-content="" inert={workspaceOpen?'':undefined} aria-hidden={workspaceOpen?'true':undefined}>
     {tab==='members'?<header style={{padding:'13px 16px 8px'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-        <div style={{minWidth:0}}><h1 style={{margin:0,fontSize:19,letterSpacing:'-.025em',fontWeight:750}}>3573 · Caroline</h1><p style={{margin:'3px 0 0',fontSize:12,color:C.icy}}>{players.length} players</p></div>
+        <div style={{minWidth:0}}><h1 style={{margin:0,fontSize:19,letterSpacing:'-.025em',fontWeight:750}}>3573 · Caroline</h1><p style={{margin:'3px 0 0',fontSize:12,color:C.icy}}>{activePlayers.length} active players</p></div>
         <div style={{display:'flex',alignItems:'center',gap:7}}>
           <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:syncProblem?'#F07575':C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
             <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:syncColor}}/>
-            {syncLabel}
+            <span style={{display:'grid',textAlign:'left',gap:2}}><span>{syncLabel}</span><span style={{fontSize:10,color:C.icy,whiteSpace:'nowrap'}}>API: {apiRefreshAge}</span></span>
           </button>
           <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
               <strong style={{fontSize:13,marginBottom:2}}>Workspace actions</strong>
-              <button style={button} onClick={refreshAll} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button>
+              <button style={button} onClick={()=>refreshAll()} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button>
               <button style={button} onClick={refreshUsernames} disabled={!!apiProgress||!!legionRefresh||nameRefresh.status==='running'||sync.mode==='join'||!!sync.conflicts?.length}>{nameRefresh.status==='running'?'Checking usernames…':'Refresh usernames'}</button>
               {nameRefresh.status!=='idle'&&<div role="status" style={{padding:10,borderRadius:10,background:C.section,fontSize:12,lineHeight:1.6}}>
                 <strong>{nameRefresh.status==='running'?'Checking usernames':nameRefresh.status==='applied'?'Names saved':'Username review'}</strong>
-                <div>{nameRefresh.done} of {nameRefresh.total} checked · {nameRefresh.changes.length} differences · {nameRefresh.failed} failed</div>
+                <div>{nameRefresh.done} of {nameRefresh.total} checked · {nameRefresh.changes.length} differences · {nameRefresh.failed} failed</div>{nameRefresh.error&&<div role="alert" style={{color:'#F0B25C'}}>{nameRefresh.error}</div>}
                 {nameRefresh.status==='running'&&<button style={button} onClick={()=>{nameRefreshStop.current=true;}}>Stop</button>}
                 {nameRefresh.status==='review'&&<div style={{maxHeight:220,overflowY:'auto',marginTop:6}}>
                   {nameRefresh.changes.length===0?<div>No username differences found in successful lookups.</div>:nameRefresh.changes.map(c=><div key={c.id} style={{padding:'6px 0',borderBottom:'1px solid '+C.border,overflowWrap:'anywhere'}}>{c.before||'Unknown'} → <strong>{c.after}</strong> · {c.fid}</div>)}
@@ -301,11 +358,11 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
       {error&&<p role="alert" style={{fontSize:12,color:C.red,margin:'8px 0 0'}}>{error}</p>}
     </header>:<header style={{padding:'13px 16px 8px'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-        <div style={{minWidth:0}}><h1 style={{margin:0,fontSize:19,letterSpacing:'-.025em',fontWeight:750}}>3573 · Caroline</h1><p style={{margin:'3px 0 0',fontSize:12,color:C.icy}}>{tab==='tal'?'TAL Planner':tab==='teams'?'Teams':tab==='changes'?'Name Changes':tab==='battle'?'Battle planner':'SvS comparison'}</p></div>
+        <div style={{minWidth:0}}><h1 style={{margin:0,fontSize:19,letterSpacing:'-.025em',fontWeight:750}}>3573 · Caroline</h1><p style={{margin:'3px 0 0',fontSize:12,color:C.icy}}>{tab==='tal'?'TAL':tab==='teams'?'Teams':tab==='changes'?'Name Changes':tab==='battle'?'Battle planner':tab==='canyon'?'Canyon Clash':tab==='castle'?'Castle Battle':tab==='events'?'Events':tab==='members'?'Members':'SvS comparison'}</p></div>
         <div style={{display:'flex',alignItems:'center',gap:7}}>
           <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:syncProblem?'#F07575':C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
             <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:syncColor}}/>
-            {syncLabel}
+            <span style={{display:'grid',textAlign:'left',gap:2}}><span>{syncLabel}</span><span style={{fontSize:10,color:C.icy,whiteSpace:'nowrap'}}>API: {apiRefreshAge}</span></span>
           </button>
           <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
@@ -338,12 +395,17 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {legionRefresh&&<div role="status" style={{padding:'12px 20px',color:C.icy}}>Refreshing players: {legionRefresh.done} of {legionRefresh.total}<button style={{...button,marginLeft:8}} onClick={()=>{stopRefresh.current=true;}}>Stop after this player</button></div>}
     {sync.mode!=='join'&&!sync.conflicts?.length&&<div>
     {tab==='members'&&!DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag))&&<AllianceSetup players={players} onLoad={importRoster}/>}
-    {tab==='members'&&players.length>0&&<RosterTab teamworkPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamworkPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('TAL teamwork preferences saved.');}} initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} legionPlan={data.talPlan||newPlan()} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
+    {returnToFoundry&&tab==='members'&&<div style={{position:'sticky',top:0,zIndex:10,padding:'10px 16px',background:'#142438',borderBottom:'1px solid #40546a'}}><button type="button" style={button} onClick={backToFoundry}>← Back to Foundry</button></div>}
+    {tab==='members'&&players.length>0&&<RosterTab enable3573Tracking teamworkPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamworkPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('TAL teamwork preferences saved.');}} initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} legionPlan={data.talPlan||newPlan()} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
+    {tab==='events'&&<section aria-label="Events" style={{padding:'12px 16px',display:'grid',gap:8}}>{[['foundry','Foundry','Team planning and assignments',true],['castle','Castle Battle','Coming soon',false],['canyon','Canyon Clash','Coming soon',false]].map(([id,label,description,available])=><button key={id} type="button" disabled={!available} aria-disabled={!available} onClick={()=>available&&navigate(id)} style={{...button,textAlign:'left',padding:'13px 14px',minHeight:64,display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,opacity:available?1:.56,cursor:available?'pointer':'not-allowed',background:available?'#203449':'#172739',borderColor:available?'#40546a':'#293b4d'}}><span style={{display:'grid',gap:3}}><strong style={{fontSize:15,fontWeight:700}}>{label}</strong><span style={{fontSize:12,color:C.icy}}>{description}</span></span><span aria-hidden="true" style={{fontSize:available?20:14,color:C.icy}}>{available?'›':'Locked'}</span></button>)}</section>}
+    {['foundry','castle','canyon'].includes(tab)&&<button type="button" onClick={()=>navigate('events')} style={{...button,margin:'12px 16px'}}>‹ Back to Events</button>}
     {tab==='svs'&&<SvsComparison players={players}/>}
-    {tab==='foundry'&&<FoundryTab players={players} sharedFoundry={data.foundry||{}} onSaveFoundry={foundry=>setData(prev=>({...prev,foundry}))} onSaveTroopPower={(id,value)=>setData(prev=>({...prev,players:prev.players.map(p=>String(p.id??p.fid??'')===String(id)?{...p,lastFoundryTroopPower:value,lastFoundryTroopPowerAt:new Date().toISOString()}:p)}))} teamworkPreferences={data.talTeamPreferences||{}}/>}
-    {tab==='battle'&&<BattlePlanner onOpenMemberProfile={id=>{setInitialPlayerId(id);navigate('members');}} events={data.events||[]} players={players} plan={data.talPlan||newPlan()} sharedTeamPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('Reusable TAL teamwork preferences saved.');}} onMessage={setMessage} onUpdate={action=>{try{setData(prev=>({...prev,events:applyBattleAction(prev.events||[],action)}));return {ok:true};}catch(e){setMessage(e.message);return {ok:false,error:e.message};}}}/>}
+    {tab==='canyon'&&<section aria-label="Canyon Clash coming soon" style={{minHeight:'60vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'32px 20px',textAlign:'center'}}><div style={{maxWidth:320}}><div style={{width:64,height:64,display:'grid',placeItems:'center',borderRadius:20,background:'#203449',margin:'0 auto 18px',color:C.icy}}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h2 style={{fontSize:22,margin:'0 0 8px'}}>Canyon Clash</h2><p style={{color:C.icy,fontSize:14,margin:'0 0 8px'}}>Coming soon</p><p style={{color:'#B8C8D5',fontSize:14,lineHeight:1.5,margin:0}}>Canyon Clash team planning will be available in a future update.</p></div></section>}
+    {tab==='castle'&&<section aria-label="Castle Battle coming soon" style={{minHeight:'60vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'32px 20px',textAlign:'center'}}><div style={{maxWidth:320}}><div style={{width:64,height:64,display:'grid',placeItems:'center',borderRadius:20,background:'#203449',margin:'0 auto 18px',color:C.icy}}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h2 style={{fontSize:22,margin:'0 0 8px'}}>Castle Battle</h2><p style={{color:C.icy,fontSize:14,margin:'0 0 8px'}}>Coming soon</p><p style={{color:'#B8C8D5',fontSize:14,lineHeight:1.5,margin:0}}>Castle Battle team planning will be available in a future update.</p></div></section>}
+    {(tab==='foundry'||returnToFoundry)&&<div style={{display:tab==='foundry'?'block':'none'}}><FoundryTab players={activePlayers} sharedFoundry={data.foundry||{}} onSaveFoundry={foundry=>setData(prev=>({...prev,foundry}))} onSaveTroopPower={(id,value)=>setData(prev=>({...prev,players:prev.players.map(p=>String(p.id??p.fid??'')===String(id)?{...p,lastFoundryTroopPower:value,lastFoundryTroopPowerAt:new Date().toISOString()}:p)}))} teamworkPreferences={data.talTeamPreferences||{}} onSaveTeamworkPreferences={prefs=>setData(prev=>({...prev,talTeamPreferences:prefs}))} onUpdatePlayerLanguage={(ids,language)=>{const selected=new Set(ids.map(String));setData(prev=>({...prev,players:prev.players.map(p=>selected.has(String(p.id??p.fid))?withGameLanguage({...p,gameLanguage:language,gameLanguageSource:'manual',language,profileLastUpdated:new Date().toISOString()}):p)}))}} onOpenPlayerProfile={openFoundryProfile}/></div>}
+    {tab==='battle'&&<BattlePlanner onOpenMemberProfile={id=>{setInitialPlayerId(id);navigate('members');}} events={data.events||[]} players={activePlayers} plan={data.talPlan||newPlan()} sharedTeamPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('Reusable TAL teamwork preferences saved.');}} onMessage={setMessage} onUpdate={action=>{try{setData(prev=>({...prev,events:applyBattleAction(prev.events||[],action)}));return {ok:true};}catch(e){setMessage(e.message);return {ok:false,error:e.message};}}}/>}
     {tab==='changes'&&<NameChanges players={players} plan={data.talPlan||newPlan()} onOpen={id=>{setInitialPlayerId(id);navigate('members');}}/>}
-    {tab==='tal'&&<TalTab workspace={data} value={data.talPlan} players={players} onChange={saveTalPlan} onOpenPlayer={id=>{setInitialPlayerId(id);navigate('members');}} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage} sync={sync} onCheckSync={retry} onReset={resetTalLegion} teamDrafts={data.talTeamPreferences?.drafts||{}} onTeamDraftChange={(key,draft)=>setData(prev=>({...prev,talTeamPreferences:{players:{},pairs:[],...(prev.talTeamPreferences||{}),drafts:{...(prev.talTeamPreferences?.drafts||{}),[key]:draft}}}))} onBulkApply={(ids,action)=>{const result=applyTalBulk(latest.current,ids,action);pendingTalSync.current={active:true,sawDirty:false};setData({...result.data,talPlan:{...result.data.talPlan,autoRoles:false}});setMessage('Bulk changes saved on this device · syncing…');}}/>}
+    {tab==='tal'&&<TalTab workspace={{...data,players:activePlayers}} value={data.talPlan} players={activePlayers} onChange={saveTalPlan} onOpenPlayer={id=>{setInitialPlayerId(id);navigate('members');}} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} onMessage={setMessage} sync={sync} onCheckSync={retry} onReset={resetTalLegion} teamDrafts={data.talTeamPreferences?.drafts||{}} onTeamDraftChange={(key,draft)=>setData(prev=>({...prev,talTeamPreferences:{players:{},pairs:[],...(prev.talTeamPreferences||{}),drafts:{...(prev.talTeamPreferences?.drafts||{}),[key]:draft}}}))} onBulkApply={(ids,action)=>{const result=applyTalBulk(latest.current,ids,action);pendingTalSync.current={active:true,sawDirty:false};setData({...result.data,talPlan:{...result.data.talPlan,autoRoles:false}});setMessage('Bulk changes saved on this device · syncing…');}}/>}
     </div>}
     </div>
     {workspaceOpen&&<WorkspaceOptions sync={sync} data={data} onPublish={publish} onJoin={join} onRetry={syncNow} onResolve={resolve} onClose={()=>setWorkspaceOpen(false)} onLogout={onLogout} onAlliance={()=>{setWorkspaceOpen(false);setImporting(true);}} onHelp={()=>{setWorkspaceOpen(false);setTourOpen(true);}}/>}

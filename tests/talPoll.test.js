@@ -7,10 +7,10 @@ test('bulk matches names aliases FIDs and Unicode, preserving spaces in names',(
  const result=matchPollEntries(players,'lady zap\n234567;Zap,玩家');
  assert.deepEqual(result.map(r=>r.player.id),['a','b','a','e']);
 });
-test('ambiguous or partial names require explicit selection',()=>{
+test('ambiguous names require selection while a unique close name may auto-match',()=>{
  const result=matchPollEntries(players,'Alex\nCarol\nUnknown');
  assert.equal(result[0].player,null);assert.equal(result[0].ambiguous,true);assert.equal(result[0].suggestions.length,2);
- assert.equal(result[1].player,null);assert.equal(result[1].suggestions[0].id,'b');
+ assert.equal(result[1].player?.id,'b');assert.equal(result[1].suggestions[0].id,'b');
  assert.equal(result[2].player,null);
  assert.equal(matchPollEntries(players,'345678')[0].player.id,'c');
 });

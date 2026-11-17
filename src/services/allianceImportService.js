@@ -49,7 +49,7 @@ export function mergeAllianceProfiles(existing, rows, stateId) {
     if(row.allianceTag?.trim())snapshot.allianceObservation={tag:row.allianceTag.trim(),at:row.retrievedAt,noAlliance:false};
     const player = {
       ...(previous || newPlayer({fid:row.fid})), ...patch,
-      providerStats:snapshot, profileLastUpdated:at,
+      providerStats:snapshot, profileLastUpdated:at, membershipStatus:'confirmed',membershipCheckedAt:at,
       ...(patch.furnaceLevel && patch.furnaceLevel !== previous?.furnaceLevel ? {tiersUpdatedAt:at} : {}),
     };
     if (previous?.username && patch.username && previous.username !== patch.username) {
@@ -67,4 +67,18 @@ export function mergeAllianceProfiles(existing, rows, stateId) {
 }
 export function newAlliancePlayers(existing, rows, stateId) {
   return mergeAllianceProfiles(existing,rows,stateId).added;
+}
+
+/**
+ * A successful alliance roster observation only confirms the returned members.
+ * Missing players are unverified, not assumed to have transferred or left.
+ * Retain the last known alliance and every profile/event field for review.
+ */
+export function reconcileAllianceMembership(players,rows,tag,checkedAt=new Date().toISOString()){
+ const observed=new Set(rows.map(row=>String(row.fid)));
+ return players.map(player=>{
+  if(String(player.allianceTag||'').toUpperCase()!==String(tag).toUpperCase())return player;
+  if(observed.has(String(player.fid)))return {...player,membershipStatus:'confirmed',membershipCheckedAt:checkedAt};
+  return {...player,membershipStatus:'unverified',membershipCheckedAt:checkedAt};
+ });
 }

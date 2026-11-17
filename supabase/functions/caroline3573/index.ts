@@ -11,7 +11,7 @@ function allowedOrigins(): string[] {
   return [...new Set([...APP_ORIGINS, ...(Deno.env.get("MIGHTPULSE_ALLOWED_ORIGINS") || "")
     .split(",").map(x => x.trim()).filter(Boolean)])];
 }
-const ALLOWED_ACTIONS = new Set(["alliance", "rankings", "player_details"]);
+const ALLOWED_ACTIONS = new Set(["alliance", "rankings", "player_details", "player"]);
 
 function respond(body: unknown, status = 200, origin = ""): Response {
   const permitted = allowedOrigins();
@@ -60,7 +60,7 @@ Deno.serve(async req => {
   if (typeof action !== "string" || !ALLOWED_ACTIONS.has(action)) {
     return respond({ error: "Unsupported action" }, 400, origin);
   }
-  const state = Number(input.state);
+  const state = Number(input.state ?? (action === "player" ? 3573 : NaN));
   const fid = String(input.fid || "");
   const tag = String(input.tag || "");
   if (!Number.isSafeInteger(state) || state < 1 || state > 99999 || (action === "player_details" && state !== 3573)) return respond({error:"Invalid state for requested action"},400);

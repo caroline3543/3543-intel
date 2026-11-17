@@ -1,4 +1,5 @@
 import { playerSearchFields } from './playerNames.js';
+import { normalizeName } from '../utils/normalize.js';
 import { gameLanguageName } from './gameLanguageService.js';
 export const EMPTY_FILTERS = { alliance:'', role:'', tier:'', infantry:'', lancer:'', marksman:'', hero:'', verified:false, language:'', review:false };
 export const TIER_FILTERS = [
@@ -23,9 +24,9 @@ export function troopGaps(player) {
   return ['infantry','lancer','marksman'].filter(key => !player.troops?.[key]);
 }
 export function matchesRosterFilters(player, search, filters) {
-  const query=search.trim().toLocaleLowerCase();
-  if (query && !playerSearchFields(player).some(value => String(value??'').toLocaleLowerCase().includes(query))) return false;
-  if (filters.alliance && player.allianceTag!==filters.alliance) return false;
+  const query=normalizeName(search);
+  if (query && !playerSearchFields(player).some(value => normalizeName(String(value??'')).includes(query))) return false;
+  if (filters.alliance==='__no_alliance' ? Boolean(String(player.allianceTag||'').trim()) : filters.alliance && player.allianceTag!==filters.alliance) return false;
   const leader=player.roles?.includes('Rally Lead');
   if (filters.role==='joiner' ? leader || player.blacklisted : filters.role && !player.roles?.includes(filters.role)) return false;
   if (filters.language && gameLanguageName(player.gameLanguage)!==filters.language) return false;
@@ -44,4 +45,36 @@ export function rosterFilterCount(filters) {
 export function latestRosterFetch(players) {
   const dates=players.map(p=>p.providerStats?.retrievedAt).filter(value=>Number.isFinite(Date.parse(value)));
   return dates.sort((a,b)=>Date.parse(b)-Date.parse(a))[0] || null;
+}
+
+/** Stale player API data is a review signal, never proof of transfer. */
+export function suspectedTransferOut(player, now=Date.now()) {
+  if(!['RKG','LUN','ARC','HOT'].includes(String(player?.allianceTag||'').toUpperCase()))return false;
+  if(['transferred_out','transfer_review','unverified'].includes(player?.membershipStatus))return false;
+  const refreshed=Date.parse(player?.providerStats?.retrievedAt||'');
+  if(!Number.isFinite(refreshed))return false; // No successful fetch timestamp: unknown, not stale.
+  const reviewed=Date.parse(player?.membershipReviewedAt||'');
+  if(Number.isFinite(reviewed)&&reviewed>=refreshed)return false; // A human already dismissed this signal.
+  return now-refreshed>=3*24*60*60*1000;
+}
+
+/** Validate the immutable Whiteout player FID before an individual location lookup. */
+export function validPlayerFid(value){return /^[1-9]\d{3,14}$/.test(String(value??'').trim());}
+
+/** Archived players stay in the workspace but never enter current-state allocations. */
+export function eligibleFor3573Allocation(player){return player?.membershipStatus!=='transferred_out';}
+
+/** Archive an externally confirmed state transfer without erasing profile data. */
+export function archiveStateTransfer(player,location,confirmedAt=new Date().toISOString()){
+  if(!player||location?.status!=='verified'||!/^\d+$/.test(String(location.state))||String(location.state)==='3573')throw Error('A verified external state is required.');
+  return {...player,membershipStatus:'transferred_out',lastKnownAlliance:player.allianceTag||player.lastKnownAlliance||'',transferDestinationState:String(location.state),transferDestinationAlliance:location.tag||'',membershipCheckedAt:location.at,transferredOutAt:confirmedAt,membershipReviewedAt:confirmedAt};
+}
+
+/** Reactivate an existing profile by immutable ID, retaining history and event records. */
+export function restoreStateTransfer(player,location,confirmedAt=new Date().toISOString()){
+  if(!player||location?.status!=='verified'||String(location.state)!=='3573')throw Error('A verified return to state 3573 is required.');
+  const tag=String(location.tag||'').trim();
+  const old=String(player.allianceTag||'').trim();
+  const movement=old!==tag?{from:old,to:tag,at:location.at}:null;
+  return {...player,membershipStatus:'active',allianceTag:tag,lastKnownAlliance:old||player.lastKnownAlliance||'',membershipCheckedAt:location.at,membershipReviewedAt:confirmedAt,transferDestinationState:null,transferDestinationAlliance:null,allianceHistory:movement?[...(player.allianceHistory||[]),movement].slice(-4):player.allianceHistory};
 }

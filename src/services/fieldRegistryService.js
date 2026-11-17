@@ -165,6 +165,13 @@ function setFieldValue(player, fieldId, value) {
 // Multi-value fields (languages) ADD to the existing array.
 // Single-value fields (troop tiers) REPLACE the existing value.
 export function assignFieldValue(player, field, value) {
+  if (field.id === 'joinerHeroes') {
+    if ((player.joinerHeroes||[]).some(h=>h.hero===value && h.skillLevel>=5)) return player;
+    return {...player,joinerHeroes:[
+      ...(player.joinerHeroes||[]).filter(h=>h.hero!==value),
+      {hero:value,skillLevel:5,verified:false,updatedAt:new Date().toISOString()},
+    ],profileLastUpdated:new Date().toISOString()};
+  }
   if (field.multi) {
     const current = field.get(player);
     if (current.includes(value)) return player;
@@ -174,6 +181,9 @@ export function assignFieldValue(player, field, value) {
 }
 
 export function removeFieldValue(player, field, value) {
+  if (field.id === 'joinerHeroes') {
+    return {...player,joinerHeroes:(player.joinerHeroes||[]).filter(h=>h.hero!==value),profileLastUpdated:new Date().toISOString()};
+  }
   if (field.multi) {
     return setFieldValue(player, field.id, field.get(player).filter(v => v !== value));
   }
