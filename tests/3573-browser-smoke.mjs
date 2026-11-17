@@ -40,7 +40,7 @@ try{
    return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Mocked test environment'})});
   });
   await page.goto(origin,{waitUntil:'domcontentloaded'});
-  await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:20000});
+  try{await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:12000});}catch(e){throw Error('Navigation failed to mount; page errors: '+errors.join(' | ')+'; body: '+(await page.locator('body').innerText()).slice(0,500),{cause:e});}
   const tour=page.getByRole('dialog',{name:/Load your alliances/i});
   if(await tour.isVisible()) await tour.getByRole('button',{name:'Skip'}).click();
   const expectedTabs=['Members','TAL','Foundry','Castle','Compare','Canyon Clash','Changes'];
