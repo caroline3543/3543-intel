@@ -43,12 +43,14 @@ try{
   try{await page.getByRole('navigation',{name:'Main navigation'}).waitFor({timeout:12000});}catch(e){throw Error('Navigation failed to mount; page errors: '+errors.join(' | ')+'; body: '+(await page.locator('body').innerText()).slice(0,500),{cause:e});}
   const tour=page.getByRole('dialog',{name:/Load your alliances/i});
   if(await tour.isVisible()) await tour.getByRole('button',{name:'Skip'}).click();
-  const expectedTabs=['Members','TAL','Foundry','Castle','Compare','Canyon Clash','Changes'];
+  const expectedTabs=['Members','TAL','Events','Compare','Changes'];
   const mainNav=page.getByRole('navigation',{name:'Main navigation'});
   assert.deepEqual(await mainNav.getByRole('button').allTextContents(),expectedTabs,'Main navigation must retain the requested seven-tab order');
-  await mainNav.getByRole('button',{name:'Castle',exact:true}).click();
+  await mainNav.getByRole('button',{name:'Events',exact:true}).click();
+  await page.getByRole('button',{name:/Castle Battle/}).click();
   await page.getByRole('region',{name:'Castle Battle coming soon'}).getByText('Coming soon').waitFor();
-  await mainNav.getByRole('button',{name:'Canyon Clash'}).click();
+  await page.getByRole('button',{name:/Back to Events/}).click();
+  await page.getByRole('button',{name:/Canyon Clash/}).click();
   await page.getByRole('region',{name:'Canyon Clash coming soon'}).getByText('Coming soon').waitFor();
   await mainNav.getByRole('button',{name:'TAL',exact:true}).click();
   const talSections=page.getByRole('navigation',{name:'TAL Planner sections'});
