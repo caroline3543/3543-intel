@@ -106,12 +106,15 @@ test('verified transfers are archived without deleting player data and returns r
  assert.throws(()=>restoreStateTransfer(archived,away));
 });
 
-test('3573 team allocation components receive active players only',async()=>{
+test('3573 active-player allocation and TAL under-development access are preserved',async()=>{
  const {readFileSync}=await import('node:fs');
  const source=readFileSync(new URL('../roster-site/src/site.jsx',import.meta.url),'utf8');
  assert.ok(source.includes("const activePlayers=players.filter(p=>p.membershipStatus!=='transferred_out')"));
  assert.ok(source.includes('<FoundryTab players={activePlayers}'));
- assert.ok(source.includes('<TalTab workspace={{...data,players:activePlayers}} value={data.talPlan} players={activePlayers}'));
+ assert.ok(source.includes('Tundra Arms League under development'));
+ assert.ok(!source.includes('<TalTab workspace='),'TAL editor is intentionally hidden');
+ assert.ok(source.includes('value={data.talPlan}')===false,'TAL editor is not mounted');
+ assert.ok(source.includes('talPlan:')||source.includes('data.talPlan'),'saved TAL data is still referenced');
  assert.ok(source.includes('players={activePlayers} plan={data.talPlan||newPlan()}'));
 
 });
