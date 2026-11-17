@@ -24,7 +24,7 @@ function troopTierRank(player){
 }
 function compareTroopTiers(a,b){
  const left=troopTierRank(a),right=troopTierRank(b);
- if(!left||!right)return left? -1:right?1:0;
+ if(!left||!right)return 0;
  for(let i=0;i<3;i++)if(left[i]!==right[i])return left[i]-right[i];
  return 0;
 }
@@ -170,7 +170,7 @@ export function TalTab({value,players,onChange,onOpenPlayer,onRefreshLegion,legi
  const gameLanguages=player=>[...new Set([player.gameLanguage,...(Array.isArray(player.languages)?player.languages:[])].filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))];
  const tierChips=player=>[['infantry','Inf',C.inf],['lancer','Lan',C.lan],['marksman','Mar',C.mar]].filter(([key])=>player.troops?.[key]&&String(player.troops[key]).toLowerCase()!=='unknown');
  const roster=entries.filter(e=>(check==='all'||e.check.status===check)&&matchesSearch(e.player)&&matchesTime(e.player)&&(!missingFilter||(missingFilter==='any'?(missingTroopTypes(e.player).length>0||missingAvailability(e.player)):missingFilter==='tiers'?missingTroopTypes(e.player).length:missingAvailability(e.player)))&&(registrationFilter==='all'||registrationFilter==='unregistered'&&e.member&&!e.member.registered||registrationFilter==='registered'&&e.member?.registered)&&(roleFilter==='all'||(roleFilter==='matchmaking'?!!e.member?.matchmakingOnly:roleFilter==='unallocated'?!e.member||e.member.role==='pending'||!['combatant','substitute'].includes(e.member.role):e.member?.role===roleFilter))).sort((a,b)=>{
-  if(sort==='troop'){const av=compareTroopTiers(a.player,b.player);return av*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
+  if(sort==='troop'){const aKnown=!!troopTierRank(a.player),bKnown=!!troopTierRank(b.player);if(aKnown!==bKnown)return aKnown?-1:1;const av=compareTroopTiers(a.player,b.player);return av*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='city'){const av=numeric(a.player.power??a.player.providerStats?.power),bv=numeric(b.player.power??b.player.providerStats?.power);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='labyrinth'){const av=numeric(a.player.providerRankings?.labyrinth?.rank),bv=numeric(b.player.providerRankings?.labyrinth?.rank);return av===null&&bv===null?compareNames(a.player,b.player):av===null?1:bv===null?-1:(av-bv)*(sortDirection==='asc'?1:-1)||compareNames(a.player,b.player);}
   if(sort==='joiner')return comparePriority(a.player,b.player)*(sortDirection==='asc'?1:-1);
