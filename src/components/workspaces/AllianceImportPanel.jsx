@@ -34,7 +34,7 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
     finally { setBusy(false); }
   }
   function importRows() {
-    try { const summary=onImport(rows); setResult(summary || {updated:rows.length-newRows.length,added:newRows.length}); setRows(null); }
+    try { const summary=onImport(rows, rosterAssessment); setResult(summary || {updated:rows.length-newRows.length,added:newRows.length}); setRows(null); }
     catch (e) { setError(e.message); }
   }
   return <div style={{ position:'fixed', inset:0, background:C.bg+'ee', zIndex:350, overflowY:'auto' }}>
