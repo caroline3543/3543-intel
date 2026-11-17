@@ -10,7 +10,7 @@ import { RallyLeaderProfileSheet } from './RallyLeaderProfileSheet.jsx';
 import FieldRegistry from './FieldRegistry.jsx';
 import { RosterFilters } from './RosterFilters.jsx';
 import { RosterBulkEditor } from './RosterBulkEditor.jsx';
-import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch, suspectedTransferOut, validPlayerFid } from '../../services/rosterViewService.js';
+import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch, suspectedTransferOut, validPlayerFid, archiveStateTransfer, restoreStateTransfer } from '../../services/rosterViewService.js';
 const button={minHeight:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,padding:'10px 12px',fontSize:14,fontWeight:600,cursor:'pointer'};
 
 const PRIMARY_SORTS=[['name','Name'],['power','City power'],['labyrinth','Labyrinth'],['progression','Troop tiers']];
@@ -128,11 +128,14 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     try{for(const p of players.filter(isReview)){await checkLocation(p);}}finally{setLocationBusy(false);}
   }
   function applyLocation(player){
-    const found=locationChecks[player.id];if(found?.status!=='verified'||found.state!=='3573')return;
-    const tag=found.tag;
-    const changed=String(player.allianceTag||'')!==tag;
-    onSavePlayer({...player,allianceTag:tag,lastKnownAlliance:changed?player.allianceTag:player.lastKnownAlliance,membershipStatus:'active',membershipReviewedAt:new Date().toISOString(),membershipCheckedAt:found.at,allianceHistory:changed?[...(player.allianceHistory||[]),{from:player.allianceTag||'',to:tag,at:found.at}]:player.allianceHistory});
-    showToast?.('Current alliance confirmed: '+(tag||'No alliance'));
+    const found=locationChecks[player.id];if(found?.status!=='verified')return;
+    if(found.state==='3573'){
+      onSavePlayer(restoreStateTransfer(player,found));
+      showToast?.('Confirmed in state 3573 · '+(found.tag||'No alliance'));
+    }else{
+      onSavePlayer(archiveStateTransfer(player,found));
+      showToast?.('Transferred-out profile saved · State '+found.state);
+    }
   }
   const [editingPlayer,setEditingPlayer]=useState(null);
   const [leaderOpen,setLeaderOpen]=useState(false);
@@ -151,7 +154,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const currentPlayer=players.find(p=>p.id===viewingPlayer?.id)||viewingPlayer;
   const matchesSearch=p=>!search||[p.username,p.alias,p.fid,...(p.pastUsernames||[])].some(v=>String(v||'').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   const isTransferred=p=>p.membershipStatus==='transferred_out';
-  const isReview=p=>p.membershipStatus==='unverified'||p.membershipStatus==='transfer_review'||(enable3573Tracking&&suspectedTransferOut(p));
+  const isReview=p=>!isTransferred(p)&&(p.membershipStatus==='unverified'||p.membershipStatus==='transfer_review'||(enable3573Tracking&&suspectedTransferOut(p)));
   const visible=players.filter(p=>!enable3573Tracking?matchesRosterFilters(p,search,filters)&&(filters.alliance?p.membershipStatus!=='unverified':true):trackingView==='transferred'?isTransferred(p)&&matchesSearch(p):trackingView==='review'?isReview(p)&&matchesSearch(p):!isTransferred(p)&&!isReview(p)&&matchesRosterFilters(p,search,filters)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
   const key=JSON.stringify([search,filters,sort,sortDirection,grouped]);
   const displayed=visible.slice(0,visibleCount);
@@ -164,7 +167,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const extraSelected=EXTRA_SORTS.some(([id])=>id===sort);
   const filterCount=rosterFilterCount(filters);
   const mainAllianceTags=['ARC','HOT','RKG','LUN'];
-  const allianceTags=[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].filter(tag=>!mainAllianceTags.includes(tag)).sort();
+  const allianceTags=[...new Set(players.filter(p=>!isTransferred(p)).map(p=>p.allianceTag).filter(Boolean))].filter(tag=>!mainAllianceTags.includes(tag)).sort();
   const reviewCount=players.filter(p=>isReview(p)).length;
   function markMembership(player,status){onSavePlayer({...player,membershipStatus:status,membershipReviewedAt:new Date().toISOString(),...(status==='transferred_out'?{lastKnownAlliance:player.allianceTag}:{} )});showToast?.(status==='transferred_out'?'Transfer confirmed':status==='transfer_review'?'Added to transfer review':'Player restored to current roster');}
   const lastFetch=latestRosterFetch(players);
@@ -196,10 +199,11 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       {enable3573Tracking&&trackingView==='current'&&allianceMoreOpen&&<div role="group" aria-label="Other alliances" style={{display:'flex',gap:6,flexWrap:'wrap',background:C.card,borderRadius:12,padding:10,marginBottom:9}}>
         {allianceTags.map(tag=><button key={tag} style={{...button,fontSize:12,background:filters.alliance===tag?C.gold:C.section,color:filters.alliance===tag?C.bg:C.icy}} onClick={()=>{setFilters({...filters,alliance:tag});setAllianceMoreOpen(false);}}>{tag} · {players.filter(p=>p.allianceTag===tag&&!isTransferred(p)&&!isReview(p)).length}</button>)}
         {!allianceTags.length&&<span style={{fontSize:12,color:C.icy}}>No other alliances recorded</span>}
+        <div style={{width:'100%',borderTop:'1px solid '+C.border,marginTop:4,paddingTop:8}}><button type="button" style={{...button,width:'100%',textAlign:'left',color:C.icy}} onClick={()=>{setTrackingView('transferred');setAllianceMoreOpen(false);setFilters({...filters,alliance:''});setVisibleCount(20);}}>Transferred out · {players.filter(isTransferred).length}</button></div>
       </div>}
-      {enable3573Tracking&&trackingView==='current'&&reviewCount>0&&<button type="button" onClick={()=>{setTrackingView('review');setOptionsOpen(false);}} style={{border:0,background:'transparent',color:'#E8B766',padding:'8px 0',minHeight:38,textAlign:'left',fontSize:12,cursor:'pointer'}}>{reviewCount} possible transfer{reviewCount===1?'':'s'} need review ›</button>}
-      {enable3573Tracking&&trackingView!=='current'&&<button type="button" style={{...button,marginBottom:10}} onClick={()=>setTrackingView('current')}>‹ Back to Members</button>}
-      {trackingView==='review'&&<button type="button" style={{...button,marginBottom:12}} disabled={locationBusy} onClick={checkAllLocations}>{locationBusy?'Checking locations…':'Find current location for all'}</button>}
+      {enable3573Tracking&&trackingView==='current'&&reviewCount>0&&<button type="button" onClick={()=>{setTrackingView('review');setVisibleCount(20);setOptionsOpen(false);}} style={{border:0,background:'transparent',color:'#E8B766',padding:'8px 0',minHeight:38,textAlign:'left',fontSize:12,cursor:'pointer'}}>{reviewCount} possible transfer{reviewCount===1?'':'s'} need review ›</button>}
+      {enable3573Tracking&&trackingView!=='current'&&<button type="button" style={{...button,marginBottom:10}} onClick={()=>{setTrackingView('current');setVisibleCount(20);}}>‹ Back to Members</button>}
+      {trackingView==='review'&&<button type="button" style={{...button,width:'100%',marginBottom:12}} disabled={locationBusy} onClick={checkAllLocations}>{locationBusy?'Checking locations…':'Find current location for all'}</button>}
       {trackingView!=='current'&&<h3 style={{fontSize:17,margin:'0 0 10px'}}>{trackingView==='review'?'Locations to verify':'Transferred out'}</h3>}
       {trackingView==='review'&&<p style={{fontSize:12,color:C.icy,margin:'0 0 12px'}}>A stale API refresh does not mean someone transferred. Check their current state and alliance before changing their status.</p>}
       <div role="group" aria-label="Sort roster" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,scrollbarWidth:'none',alignItems:'center'}}><span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Sort</span>
@@ -227,7 +231,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     </>}
     {!players.length && <section style={{textAlign:'center',padding:'32px 0'}}><h2 style={{fontSize:20}}>Load your alliance roster</h2><p style={{fontSize:16,color:C.icy,lineHeight:1.5}}>Choose an alliance to retrieve its players and available game data.</p><button style={{...button,background:C.gold,color:C.bg}} onClick={onLoadAlliance}>Load alliance</button></section>}
     {players.length>0&&!visible.length && <p style={{textAlign:'center',padding:24,color:C.icy}}>No players match. Clear filters or try another search.</p>}
-    {trackingView!=='current'&&displayed.map(p=><div key={p.id} style={{background:C.card,borderRadius:12,padding:12,marginBottom:9}}><div style={{fontWeight:700,overflowWrap:'anywhere'}}>{p.username||p.alias||p.fid||'Unknown player'}</div><div style={{fontSize:12,color:C.icy,margin:'5px 0 10px'}}>ID {p.fid||p.id} · Last known alliance: {p.lastKnownAlliance||p.allianceTag||'Unknown'}{suspectedTransferOut(p)?' · No successful API refresh for 3+ days · Location unverified':''}</div>{trackingView==='review'&&<div style={{marginBottom:10}}><button type="button" style={button} disabled={locationChecks[p.id]?.status==='loading'} onClick={()=>checkLocation(p)}>{locationChecks[p.id]?.status==='loading'?'Checking…':'Find current location'}</button>{locationChecks[p.id]?.status==='verified'&&<p role="status" style={{fontSize:13,color:C.icy}}>Confirmed: State {locationChecks[p.id].state} · {locationChecks[p.id].tag||'No alliance'} · {new Date(locationChecks[p.id].at).toLocaleString()}</p>}{locationChecks[p.id]?.status==='error'&&<p role="alert" style={{fontSize:12,color:C.red}}>{locationChecks[p.id].message}</p>}{locationChecks[p.id]?.status==='verified'&&locationChecks[p.id].state==='3573'&&<button type="button" style={{...button,marginLeft:7}} onClick={()=>applyLocation(p)}>Update current alliance</button>}</div>}<div style={{display:'flex',gap:7,flexWrap:'wrap'}}>{trackingView==='review'&&<button style={button} onClick={()=>markMembership(p,'transferred_out')}>Confirm transferred out</button>}<button style={button} onClick={()=>markMembership(p,'active')}>Keep in 3573</button></div></div>)}
+    {trackingView!=='current'&&displayed.map(p=><div key={p.id} style={{background:C.card,borderRadius:12,padding:12,marginBottom:9}}><div style={{fontWeight:700,overflowWrap:'anywhere'}}>{p.username||p.alias||p.fid||'Unknown player'}</div><div style={{fontSize:12,color:C.icy,margin:'5px 0 10px'}}>ID {p.fid||p.id} · Last known alliance: {p.lastKnownAlliance||p.allianceTag||'Unknown'}{suspectedTransferOut(p)?' · No successful API refresh for 3+ days · Location unverified':''}</div>{trackingView==='review'&&<div style={{marginBottom:10}}><button type="button" style={button} disabled={locationChecks[p.id]?.status==='loading'} onClick={()=>checkLocation(p)}>{locationChecks[p.id]?.status==='loading'?'Checking…':'Find current location'}</button>{locationChecks[p.id]?.status==='verified'&&<p role="status" style={{fontSize:13,color:C.icy}}>Confirmed: State {locationChecks[p.id].state} · {locationChecks[p.id].tag||'No alliance'} · {new Date(locationChecks[p.id].at).toLocaleString()}</p>}{locationChecks[p.id]?.status==='error'&&<p role="alert" style={{fontSize:12,color:C.red}}>{locationChecks[p.id].message}</p>}{locationChecks[p.id]?.status==='verified'&&<button type="button" style={{...button,marginLeft:7}} onClick={()=>applyLocation(p)}>{locationChecks[p.id].state==='3573'?'Confirm current alliance':'Confirm transfer to state '+locationChecks[p.id].state}</button>}</div>}<div style={{display:'flex',gap:7,flexWrap:'wrap'}}>{trackingView==='review'&&<button style={button} onClick={()=>{const found=locationChecks[p.id];if(found?.status==='verified'&&found.state!=='3573')applyLocation(p);else showToast?.('Verify a different state before confirming transfer.');}}>Confirm transferred out</button>}<button style={button} onClick={()=>{if(trackingView==='transferred'){const found=locationChecks[p.id];if(found?.status==='verified'&&found.state==='3573')applyLocation(p);else showToast?.('Verify the player has returned to 3573 before restoring.');}else markMembership(p,'active');}}>{trackingView==='transferred'?'Restore after verification':'Keep in 3573'}</button></div></div>)}
     {(!enable3573Tracking||trackingView==='current')&&(grouped?groups.filter(g=>g.members.length).map(group=><section key={group.name}><h3 style={{fontSize:16,color:C.icy}}>{group.name} · {group.members.length}</h3>{group.members.map(card)}</section>):displayed.map(card))}
     {(!enable3573Tracking||trackingView==='current')&&visibleCount<visible.length&&<div ref={loadRef} role="status" style={{textAlign:'center',padding:18,color:C.icy,fontSize:13}}>Showing {displayed.length} of {visible.length} · More players load as you scroll <button style={{...button,marginLeft:8}} onClick={()=>setVisibleCount(n=>Math.min(n+20,visible.length))}>Load more</button></div>}
     {filtersOpen && <RosterFilters players={players} roles={roles} filters={filters} onChange={next=>setFilters(next)} onClose={()=>setFiltersOpen(false)} count={visible.length}/>}
