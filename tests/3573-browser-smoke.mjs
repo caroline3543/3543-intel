@@ -34,7 +34,7 @@ try{
   const writes=[];
   await page.route('**/api/**',route=>{
    const request=route.request(),url=new URL(request.url());
-   if(request.method()!=='GET')writes.push(url.pathname);
+   if(request.method()!=='GET')writes.push({path:url.pathname,method:request.method(),body:request.postData()?.slice(0,1200),stack:new Error('write observed').stack});
    if(url.pathname==='/api/session')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authenticated:true,role:'leader'})});
    if(url.pathname==='/api/workspace')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:fixture,revision:1,updatedAt:'2026-11-01T00:00:00Z',role:'leader'})});
    return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Mocked test environment'})});
