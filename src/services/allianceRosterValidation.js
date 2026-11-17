@@ -11,7 +11,7 @@ export function assessAllianceRoster(response, {stateId, allianceTag, capacity=1
   const ids=new Set();
   for (const member of rows) {
     const fid=String(member?.chief_id ?? member?.fid ?? member?.governor_id ?? '').trim();
-    if (!/^\\d+$/.test(fid)) problems.push('invalid_fid');
+    if (!/^\d+$/.test(fid)) problems.push('invalid_fid');
     else if(ids.has(fid)) problems.push('duplicate_fid');
     else ids.add(fid);
     if (member?.kid != null && String(member.kid)!==String(stateId)) problems.push('wrong_member_state');
