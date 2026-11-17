@@ -6,7 +6,7 @@ import {FoundryTab} from './foundry/FoundryTab.jsx';
 import {SvsComparison} from './svs/SvsComparison.jsx';
 import {applyBattleAction} from './battle/model.js';
 import {withAutomaticRoles} from './tal/autoRoles.js';
-import {fetchMightpulseAlliance} from '../../src/services/mightpulseService.js';
+import {fetchMightpulseAlliance,fetchMightpulsePlayer} from '../../src/services/mightpulseService.js';
 import {allianceRows} from '../../src/services/allianceImportService.js';
 import {WorkspaceOptions,WorkspaceAttention} from './components/WorkspaceOptions.jsx';
 import {plannedMemberIds} from '../../src/services/talRosterService.js';
@@ -208,6 +208,8 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     if(refreshing.current)return;
     refreshing.current=true;stopRefresh.current=false;
     const targets=Array.isArray(onlyTags)?onlyTags:DEFAULT_ALLIANCES;
+    const priorMembers=(latest.current.players||[]).filter(p=>targets.includes(String(p.allianceTag||'').toUpperCase())&&/^\d+$/.test(String(p.fid||''))&&p.membershipStatus!=='transferred_out');
+    const observedFids=new Set();const completeTags=new Set();
     const failures=[],successes=[];let checked=0,updated=0,added=0;
     setApiResult(null);
     try{
@@ -221,6 +223,8 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
           // Absence is only evidence of departure when the provider explicitly confirms a complete roster.
           // A successful HTTP response or 100 returned members alone is not proof of completeness.
           const complete=isExplicitlyCompleteAllianceRoster(response);
+          if(complete)completeTags.add(tag);
+          for(const row of rows)observedFids.add(row.fid);
           const result=importRoster(rows,{reconcileTag:complete?tag:null});
           successes.push(tag);updated+=result.updated;added+=result.added;
         }catch(e){
@@ -229,8 +233,25 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
         }
         checked++;
       }
+      // Resolve missing FIDs only after all requested alliance rosters have been checked.
+      // Never infer a departure from a partial roster or an unsuccessful lookup.
+      const missing=priorMembers.filter(p=>completeTags.has(String(p.allianceTag).toUpperCase())&&!observedFids.has(String(p.fid)));
+      let relocated=0,unresolved=0;
+      for(const p of missing){
+        if(stopRefresh.current)break;
+        setApiProgress(`Checking former members · ${relocated+unresolved+1}/${missing.length}`);
+        try{
+          const response=await fetchMightpulsePlayer(p.fid);
+          const updated=applyPlayerDetails(p,response,'3573');
+          setData(prev=>({...prev,players:prev.players.map(old=>String(old.fid)===String(p.fid)?updated:old)}));
+          relocated++;
+        }catch(e){
+          unresolved++;
+          if([401,403,429].includes(e.status)||[401,403,429].includes(e.providerStatus))break;
+        }
+      }
       const status=failures.length||successes.length<targets.length?(successes.length?'partial':'failed'):'success';
-      const result={status,successes,failures,updated,added,checked,requested:targets.length,at:new Date().toISOString()};
+      const result={status,successes,failures,updated,added,checked,requested:targets.length,relocated,unresolved,at:new Date().toISOString()};
       setApiResult(result);
       if(successes.length){
         setData(prev=>({...prev,settings:{...prev.settings,lastApiRefresh:{at:result.at,scope:successes.join(', '),count:updated+added,failed:failures.length,partial:status!=='success'}}}));
@@ -298,7 +319,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
           <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
               <strong style={{fontSize:13,marginBottom:2}}>Workspace actions</strong>
-              <button style={button} onClick={refreshAll} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button>
+              <button style={button} onClick={()=>refreshAll()} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button>
               <button style={button} onClick={refreshUsernames} disabled={!!apiProgress||!!legionRefresh||nameRefresh.status==='running'||sync.mode==='join'||!!sync.conflicts?.length}>{nameRefresh.status==='running'?'Checking usernames…':'Refresh usernames'}</button>
               {nameRefresh.status!=='idle'&&<div role="status" style={{padding:10,borderRadius:10,background:C.section,fontSize:12,lineHeight:1.6}}>
                 <strong>{nameRefresh.status==='running'?'Checking usernames':nameRefresh.status==='applied'?'Names saved':'Username review'}</strong>
