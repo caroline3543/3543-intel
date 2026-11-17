@@ -32,9 +32,10 @@ try{
   const context=await browser.newContext({viewport:{width,height:844}});
   const page=await context.newPage();record(page);
   const writes=[];
+  let stage='initial';
   await page.route('**/api/**',route=>{
    const request=route.request(),url=new URL(request.url());
-   if(request.method()!=='GET')writes.push({path:url.pathname,method:request.method(),body:request.postData()?.slice(0,1200),stack:new Error('write observed').stack});
+   if(request.method()!=='GET')writes.push({stage,path:url.pathname,method:request.method(),body:request.postData()?.slice(0,1200)});
    if(url.pathname==='/api/session')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authenticated:true,role:'leader'})});
    if(url.pathname==='/api/workspace')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:fixture,revision:1,updatedAt:'2026-11-01T00:00:00Z',role:'leader'})});
    return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Mocked test environment'})});
@@ -46,10 +47,12 @@ try{
   const expectedTabs=['Members','TAL','Events','Compare','Changes'];
   const mainNav=page.getByRole('navigation',{name:'Main navigation'});
   assert.deepEqual(await mainNav.getByRole('button').allTextContents(),expectedTabs,'Main navigation must retain the requested seven-tab order');
+  stage='events';
   await mainNav.getByRole('button',{name:'Events',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:/Castle Battle/}).isDisabled(),true,'Unavailable Castle Battle must not be clickable');
   assert.equal(await page.getByRole('button',{name:/Canyon Clash/}).isDisabled(),true,'Unavailable Canyon Clash must not be clickable');
   assert.equal(await page.getByRole('region',{name:'Events'}).count(),1);
+  stage='tal';
   await mainNav.getByRole('button',{name:'TAL',exact:true}).click();
   const talSections=page.getByRole('navigation',{name:'TAL Planner sections'});
   await talSections.waitFor();
@@ -67,6 +70,7 @@ try{
   assert.deepEqual(await talSections.getByRole('button').allTextContents(),['Players','Teams','Assignments','Share'],'TAL navigation must expose four sections');
   await talSections.getByRole('button',{name:'Players',exact:true}).click();
   assert.equal(await talSections.getByRole('button',{name:'Players',exact:true}).getAttribute('aria-current'),'page');
+  stage='members';
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Members'}).click();
   const search=page.getByRole('combobox',{name:'Search roster'});
   await search.fill('Spic');
@@ -76,6 +80,7 @@ try{
   await search.fill('681766603');
   await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
   await search.fill('');
+  stage='bulk-selection';
   await page.getByRole('button',{name:'☷ Options',exact:true}).click();
   await page.getByRole('button',{name:'Select players'}).click();
   await page.getByRole('button',{name:'Select shown'}).click();
