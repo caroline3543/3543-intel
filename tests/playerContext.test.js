@@ -109,8 +109,9 @@ test('verified transfers are archived without deleting player data and returns r
 test('3573 team allocation components receive active players only',async()=>{
  const {readFileSync}=await import('node:fs');
  const source=readFileSync(new URL('../roster-site/src/site.jsx',import.meta.url),'utf8');
- assert.match(source,/const activePlayers=players\\.filter\\(p=>p\\.membershipStatus!=='transferred_out'\\)/);
- assert.match(source,/<FoundryTab players=\\{activePlayers\\}/);
- assert.match(source,/<TalTab workspace=\\{\\{\\.\\.\\.data,players:activePlayers\\}\\} value=\\{data\\.talPlan\\} players=\\{activePlayers\\}/);
- assert.match(source,/<BattlePlanner[^>]+players=\\{activePlayers\\}/);
+ assert.ok(source.includes("const activePlayers=players.filter(p=>p.membershipStatus!=='transferred_out')"));
+ assert.ok(source.includes('<FoundryTab players={activePlayers}'));
+ assert.ok(source.includes('<TalTab workspace={{...data,players:activePlayers}} value={data.talPlan} players={activePlayers}'));
+ assert.ok(source.includes('players={activePlayers} plan={data.talPlan}'));
+
 });
