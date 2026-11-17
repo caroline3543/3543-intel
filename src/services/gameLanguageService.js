@@ -17,7 +17,8 @@ export function providerField(player,key){
  return records.filter(r=>r.raw?.[key]!=null && r.raw[key]!=='').sort((a,b)=>(Date.parse(b.at)||0)-(Date.parse(a.at)||0))[0]?.raw?.[key];
 }
 export function withGameLanguage(player,previousCode=player.gameLanguage){
- const code=gameLanguageCode(player.gameLanguage) || gameLanguageCode(providerField(player,'language'));
+ const providerCode=gameLanguageCode(providerField(player,'language'));
+ const code=providerCode || gameLanguageCode(player.gameLanguage);
  if(!code)return player;
  const name=gameLanguageName(code),oldName=gameLanguageName(previousCode);
  const additional=(player.languages || []).filter(l=>l!==oldName && l!==name);
