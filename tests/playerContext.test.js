@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {suspectedTransferOut} from '../src/services/rosterViewService.js';
 import assert from 'node:assert/strict';
 import {gameLanguageCode,gameLanguageName,withGameLanguage,providerField} from '../src/services/gameLanguageService.js';
 import {recordedTimestamp,recordedActivity} from '../src/services/recordedActivityService.js';
@@ -32,4 +33,17 @@ test('relative activity uses the recorded timestamp, handles future times and ke
  const t=1792546846000;
  assert.deepEqual(recordedActivity(1792546846,t+3720000),{iso:'2026-10-21T01:40:46.000Z',utc:'2026-10-21 01:40:46 UTC',relative:'1h 2m ago'});
  assert.equal(recordedActivity(t,t+90000000).relative,'1d 1h ago');assert.equal(recordedActivity(t,t-3600000).relative,'1h 0m in the future');assert.equal(recordedActivity(null),null);
+});
+
+test('three-day stale API signal only flags unreviewed main-alliance players',()=>{
+ const now=Date.parse('2026-11-17T12:00:00Z');
+ const p={allianceTag:'RKG',membershipStatus:'active',providerStats:{retrievedAt:'2026-11-14T12:00:00Z'}};
+ assert.equal(suspectedTransferOut(p,now),true);
+ assert.equal(suspectedTransferOut({...p,allianceTag:'FARM'},now),false);
+ assert.equal(suspectedTransferOut({...p,providerStats:{retrievedAt:'2026-11-15T12:00:00Z'}},now),false);
+ assert.equal(suspectedTransferOut({...p,providerStats:{}},now),false);
+ assert.equal(suspectedTransferOut({...p,membershipStatus:'transferred_out'},now),false);
+ assert.equal(suspectedTransferOut({...p,membershipReviewedAt:'2026-11-16T12:00:00Z'},now),false);
+ assert.equal(suspectedTransferOut({...p,membershipReviewedAt:'2026-11-13T12:00:00Z'},now),true);
+ for(const allianceTag of ['ARC','HOT','LUN'])assert.equal(suspectedTransferOut({...p,allianceTag},now),true);
 });
