@@ -17,6 +17,9 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
   const [rosterAssessment, setRosterAssessment] = useState(null);
   const existing = new Set(players.filter(p => p.fid).map(p => String(p.fid).trim()));
   const newRows = (rows || []).filter(row => !existing.has(row.fid));
+  const observedFids = new Set((rows || []).map(row => row.fid));
+  const previouslyLoaded = players.filter(p => String(p.allianceTag || '').toUpperCase() === tag.trim().toUpperCase() && p.fid);
+  const absentFromResponse = previouslyLoaded.filter(p => !observedFids.has(String(p.fid).trim()));
   async function lookup(e) {
     e.preventDefault(); setBusy(true); setError(''); setRows(null); setResult(null); setRosterAssessment(null);
     try {
@@ -55,6 +58,7 @@ export function AllianceImportPanel({ stateId, players, onImport, onClose }) {
       {error && <p role="alert" style={{ color:C.red }}>{error}</p>}
       {rosterAssessment && <div role="status" style={{padding:12,background:C.card,borderRadius:10,marginTop:12,fontSize:13}}><strong>{rosterAssessment.authoritative ? 'Complete API roster verified' : 'API roster completeness not verified'}</strong><p style={{color:C.icy,marginBottom:0}}>{rosterAssessment.uniqueFidCount} unique player IDs returned. {rosterAssessment.authoritative ? 'Roster passed validation.' : 'Returned profiles can be refreshed, but absent players must not be removed or counted as departed.'}</p></div>}
       {rows && <>
+        <div style={{padding:'10px 0',fontSize:13,color:C.icy}}><strong>{absentFromResponse.length} previously loaded player{absentFromResponse.length===1?'':'s'} absent from this response</strong><div>{rosterAssessment?.authoritative ? 'Complete roster evidence available; absence may be flagged after reconciliation.' : 'Not evidence of departure. Their history and last known alliance will be retained.'}</div></div>
         <p style={{ color:C.gold }}>{rows.length} players · {newRows.length} new · {rows.length-newRows.length} profiles to update</p>
         <p style={{ color:C.icy, fontSize:13 }}>Matches players by ID and updates available game data. Notes, troop records, heroes, assignments and event history are kept. Missing game data does not erase saved values.</p>
         <button style={{ ...button, width:'100%', marginBottom:12 }} disabled={!rows.length} onClick={importRows}>Save roster · {rows.length} players</button>
