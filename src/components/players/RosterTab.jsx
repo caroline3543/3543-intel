@@ -108,8 +108,8 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const [locationChecks,setLocationChecks]=useState({});
   const [locationBusy,setLocationBusy]=useState(false);
   async function checkLocation(player){
-    const fid=String(player.fid??player.playerId??'').trim();
-    if(!/^[1-9]\\d{3,14}$/.test(fid)){setLocationChecks(v=>({...v,[player.id]:{status:'error',message:'Valid player ID required'}}));return;}
+    const fid=String(player.fid||player.playerId||player.id||'').trim();
+    if(!validPlayerFid(fid)){setLocationChecks(v=>({...v,[player.id]:{status:'error',message:'Valid player ID required'}}));return;}
     setLocationChecks(v=>({...v,[player.id]:{status:'loading'}}));
     try{
       const response=await mightpulseRequest('player',{fid});
