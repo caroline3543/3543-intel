@@ -60,3 +60,21 @@ export function suspectedTransferOut(player, now=Date.now()) {
 
 /** Validate the immutable Whiteout player FID before an individual location lookup. */
 export function validPlayerFid(value){return /^[1-9]\d{3,14}$/.test(String(value??'').trim());}
+
+/** Archived players stay in the workspace but never enter current-state allocations. */
+export function eligibleFor3573Allocation(player){return player?.membershipStatus!=='transferred_out';}
+
+/** Archive an externally confirmed state transfer without erasing profile data. */
+export function archiveStateTransfer(player,location,confirmedAt=new Date().toISOString()){
+  if(!player||location?.status!=='verified'||!/^\\d+$/.test(String(location.state))||String(location.state)==='3573')throw Error('A verified external state is required.');
+  return {...player,membershipStatus:'transferred_out',lastKnownAlliance:player.allianceTag||player.lastKnownAlliance||'',transferDestinationState:String(location.state),transferDestinationAlliance:location.tag||'',membershipCheckedAt:location.at,transferredOutAt:confirmedAt,membershipReviewedAt:confirmedAt};
+}
+
+/** Reactivate an existing profile by immutable ID, retaining history and event records. */
+export function restoreStateTransfer(player,location,confirmedAt=new Date().toISOString()){
+  if(!player||location?.status!=='verified'||String(location.state)!=='3573')throw Error('A verified return to state 3573 is required.');
+  const tag=String(location.tag||'').trim();
+  const old=String(player.allianceTag||'').trim();
+  const movement=old!==tag?{from:old,to:tag,at:location.at}:null;
+  return {...player,membershipStatus:'active',allianceTag:tag,lastKnownAlliance:old||player.lastKnownAlliance||'',membershipCheckedAt:location.at,membershipReviewedAt:confirmedAt,transferDestinationState:null,transferDestinationAlliance:null,allianceHistory:movement?[...(player.allianceHistory||[]),movement].slice(-4):player.allianceHistory};
+}
