@@ -69,3 +69,15 @@ test('transfer location lookup accepts real numeric player IDs and rejects malfo
  for(const fid of ['609595807','821953994','596277993','764325708'])assert.equal(validPlayerFid(fid),true,fid);
  for(const fid of ['','abc','609595807x','0','000000000','123'])assert.equal(validPlayerFid(fid),false,fid);
 });
+
+test('transfer location button uses the shared FID validator and the visible roster ID fallback',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('../src/components/players/RosterTab.jsx',import.meta.url),'utf8');
+ const start=source.indexOf('async function checkLocation(player)');
+ const end=source.indexOf('async function checkAllLocations()',start);
+ assert.ok(start>=0&&end>start,'location lookup handler must exist');
+ const handler=source.slice(start,end);
+ assert.match(handler,/player\.fid\|\|player\.playerId\|\|player\.id/);
+ assert.match(handler,/if\(!validPlayerFid\(fid\)\)/);
+ assert.doesNotMatch(handler,/if\(!\/\^\[1-9\]/,'no duplicate local regex that can diverge from tested validation');
+});
