@@ -8,9 +8,9 @@ const numeric=v=>v===null||v===undefined||v===''?null:Number.isFinite(Number(v))
 export function furnaceProgress(value){
  const label=providerFurnaceLevel(value);
  if(!label)return null;
- const fc=/^FC(\\d+)$/.exec(label);
+ const fc=/^FC(\d+)$/.exec(label);
  if(fc)return Number(fc[1]);
- const pre=/^F(\\d+)$/.exec(label);
+ const pre=/^F(\d+)$/.exec(label);
  return pre?Math.max(0,(Number(pre[1])-30)/5):null;
 }
 export function allianceStandings(players,rankings){
