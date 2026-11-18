@@ -4,6 +4,7 @@ import {normalizeRankings,rankingScore} from '../../../src/services/stateRanking
 import {normalizeRosterResponse} from './RosterFurnace.jsx';
 import {RosterFurnace} from './RosterFurnace.jsx';
 import {ScoreDistribution} from './ScoreDistribution.jsx';
+import {StateFourFurnace} from './StateFourFurnace.jsx';
 
 const panel={background:'#15273A',border:'1px solid #344F69',borderRadius:15,padding:12};
 const field={boxSizing:'border-box',width:'100%',minWidth:0,borderRadius:9,background:'#0F1D30',border:'1px solid #344F69',color:'#F2F7FD',fontSize:16,padding:'10px 9px'};
@@ -28,7 +29,7 @@ const topEightLead=(a,b)=>{
 };
 const valid=s=>/^[1-9][0-9]{0,4}$/.test(s);
 function Side({label,value,color}){return <div style={{minWidth:0}}><div style={{color,fontSize:11,fontWeight:700}}>{label}</div><div style={{fontSize:25,fontWeight:800,marginTop:5,fontVariantNumeric:'tabular-nums'}}>{value}</div></div>}
-export function SvsComparison(){
+export function SvsComparison({players=[]}){
  const [mode,setMode]=useState('state'),[ourState,setOurState]=useState('3573'),[theirState,setTheirState]=useState('');
  const [ourTag,setOurTag]=useState('HOT'),[theirTag,setTheirTag]=useState('');
  const [rankings,setRankings]=useState(null),[rosters,setRosters]=useState(null),[busy,setBusy]=useState(''),[errors,setErrors]=useState([]);
@@ -79,12 +80,13 @@ export function SvsComparison(){
  const metrics=rosterData?.sides.map(list=>{if(!list)return null;const summarize=field=>{const values=list.map(p=>p[field]).filter(v=>v!=null&&Number.isFinite(v)).sort((a,b)=>a-b);return {count:values.length,total:values.reduce((a,b)=>a+b,0),average:values.length?values.reduce((a,b)=>a+b,0)/values.length:null,median:values.length?(values[Math.floor((values.length-1)/2)]+values[Math.floor(values.length/2)])/2:null};};return {power:summarize('power'),lab:summarize('labScore')};});
  return <section style={{padding:'12px 16px 35px',color:'#F2F7FD'}}>
   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:14}}><div><h2 style={{fontSize:23,letterSpacing:'-.5px',margin:'0 0 3px'}}>Compare</h2><div style={{fontSize:12,color:'#A7BED4'}}>Battle intelligence</div></div><button style={{...btn,background:'transparent',border:0}} onClick={()=>setAboutData(v=>!v)}>ⓘ About data</button></div>
-  {aboutData&&<div style={{...panel,fontSize:12,color:'#A8BFD5',lineHeight:1.5,marginBottom:12}}>State Labyrinth rankings use a published top-100 sample. Alliance comparisons use returned roster records. Missing scores are excluded. Alliance tags are case-sensitive. State-wide furnace counts are not available from the published top-100 Labyrinth leaderboard. Alliance furnace distributions use returned roster data.</div>}
+  {aboutData&&<div style={{...panel,fontSize:12,color:'#A8BFD5',lineHeight:1.5,marginBottom:12}}>State Labyrinth rankings use a published top-100 sample. Alliance comparisons use returned roster records. Missing scores are excluded. Alliance tags are case-sensitive. The 3573 furnace chart uses saved ARC, HOT, RKG and LUN records rather than the Labyrinth leaderboard. Alliance furnace distributions use returned roster data.</div>}
   <div style={{background:'#15273A',borderRadius:14,padding:4,display:'grid',gridTemplateColumns:'1fr 1fr',gap:5,marginBottom:12}}>{[['state','States'],['alliance','Alliances']].map(([id,label])=><button key={id} aria-pressed={mode===id} onClick={()=>{setMode(id);setErrors([])}} style={{...btn,border:0,background:mode===id?'#416181':'transparent'}}>{label}</button>)}</div>
   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9}}>
    {[0,1].map(i=><div key={i} style={{minWidth:0}}><label style={{color:i?'#EBC18A':'#89C4FF',fontSize:11,fontWeight:700}}>{i?'OPPONENT':'YOUR SIDE'}</label><input style={{...field,marginTop:7}} aria-label={i?'Opponent state':'Your state'} inputMode="numeric" placeholder="State ID" value={i?theirState:ourState} onChange={e=>i?setTheirState(e.target.value):setOurState(e.target.value)}/>{mode==='alliance'&&<input style={{...field,marginTop:7}} aria-label={i?'Opponent alliance':'Your alliance'} placeholder="Alliance tag" value={i?theirTag:ourTag} onChange={e=>i?setTheirTag(e.target.value):setOurTag(e.target.value)}/>}</div>)}
   </div>
 
+  {mode==='state'&&ourState==='3573'&&<StateFourFurnace players={players}/>}
   {mode==='state'&&<div style={{...panel,marginTop:13}}>
    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><h3 style={{margin:'0 0 4px',fontSize:17}}>Labyrinth rankings</h3><div style={{color:'#A8BFD5',fontSize:12}}>Published top 100 per state</div></div><button style={btn} disabled={!ready||!!busy} onClick={loadLab}>{busy==='lab'?'Loading…':rankData?'Refresh':'Compare'}</button></div>
    {rankData&&<><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginTop:16}}>{[0,1].map(i=><Side key={i} label={i?'OPPONENT':'YOUR SIDE'} color={i?'#EBC18A':'#89C4FF'} value={sides[i]?.length??'—'}/>)}</div><div style={{fontSize:12,color:'#A8BFD5',marginTop:8}}>Matching players in the published leaderboard. This is not an overall battle-strength score.</div>
@@ -116,6 +118,6 @@ export function SvsComparison(){
   </div>}
   {errors.length>0&&<div role="alert" style={{...panel,marginTop:12,color:'#F2C58B'}}>{errors.map((e,i)=><div key={i}>{e}</div>)}</div>}
   {copyStatus&&<p role="status" style={{color:'#A8BFD5',fontSize:12}}>{copyStatus}</p>}
-  <p style={{fontSize:11,color:'#91A9BF',lineHeight:1.5,marginTop:15}}>State-wide furnace counts are unavailable without a verified full-state dataset. State Labyrinth rankings are a published top-100 sample. Alliance roster statistics reflect returned members only. Alliance tags are case-sensitive. Missing values are not counted as zero. Read-only lookups do not alter Members or TAL data.</p>
+  <p style={{fontSize:11,color:'#91A9BF',lineHeight:1.5,marginTop:15}}>The 3573 furnace chart covers saved players in ARC, HOT, RKG and LUN only; it is not a complete state census. State Labyrinth rankings are a published top-100 sample. Alliance roster statistics reflect returned members only. Alliance tags are case-sensitive. Missing values are not counted as zero. Read-only lookups do not alter Members or TAL data.</p>
  </section>;
 }
