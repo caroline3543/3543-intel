@@ -29,7 +29,7 @@ export function aggregateRoster(rosters){
 export function RosterFurnace({ours,theirs,ourLabel,theirLabel}){
  const [selected,setSelected]=useState(null);
  const [threshold,setThreshold]=useState(7);
- const [metric,setMetric]=useState('percent');
+ const [metric,setMetric]=useState('count');
  const columns=[{name:ourLabel,players:ours,color:'#89C4FF'},{name:theirLabel,players:theirs,color:'#EBC18A'}];
  const counts=columns.map(side=>Object.fromEntries(tierNames.map(tier=>[tier,side.players.filter(p=>p.tier===tier).length])));
  const known=columns.map(side=>side.players.filter(p=>p.tier!=='Unknown').length);
@@ -74,16 +74,25 @@ export function RosterFurnace({ours,theirs,ourLabel,theirLabel}){
    </div>
   </div>
   <div style={{display:'flex',gap:13,marginBottom:10}}>{columns.map((side,i)=><span key={i} style={{fontSize:12,color:side.color}}>● {side.name}</span>)}</div>
-  <div style={{fontSize:11,color:C.icy,marginBottom:8}}>Tap a level to see players. Bars share the same scale.</div>
+
+  <div style={{fontSize:11,color:C.icy,marginBottom:10}}>Tap a furnace level to see its players. Bars share the same scale.</div>
   {tierNames.map(tier=>{
-   const selectedTier=/^FC\d+$/.test(tier)&&Number(tier.slice(2))>=threshold;
    const series=counts.map((c,i)=>metric==='count'?c[tier]:known[i]?c[tier]/known[i]*100:0);
    const scale=Math.max(1,...tierNames.flatMap(t=>counts.map((c,i)=>metric==='count'?c[t]:known[i]?c[t]/known[i]*100:0)));
-   return <div key={tier} style={{borderTop:'1px solid '+C.border,padding:'7px 0',opacity:selectedTier||!/^FC\d+$/.test(tier)?1:.72}}>
-    <button type="button" aria-expanded={selected===tier} onClick={()=>setSelected(selected===tier?null:tier)} style={{display:'flex',justifyContent:'space-between',width:'100%',border:0,background:'transparent',color:C.white,padding:'0 0 7px',textAlign:'left',minHeight:26}}>
-     <strong style={{fontSize:13}}>{tier}</strong><span style={{fontSize:12,color:C.icy,fontVariantNumeric:'tabular-nums'}}>{series.map(v=>metric==='count'?v:v.toFixed(1)+'%').join(' vs ')}</span>
+   return <div key={tier} style={{borderBottom:'1px solid '+C.border,padding:'8px 0'}}>
+    <button type="button" aria-expanded={selected===tier} onClick={()=>setSelected(selected===tier?null:tier)} style={{width:'100%',border:0,background:selected===tier?C.section:'transparent',borderRadius:8,color:C.white,padding:'7px 3px',cursor:'pointer'}}>
+     <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 52px minmax(0,1fr)',alignItems:'center',gap:5}}>
+      <div style={{display:'flex',alignItems:'center',gap:5,justifyContent:'flex-end'}}>
+       <span style={{fontSize:11,fontVariantNumeric:'tabular-nums'}}>{metric==='count'?series[0]:series[0].toFixed(1)+'%'}</span>
+       <div style={{height:17,width:(series[0]/scale*75)+'%',minWidth:series[0]>0?2:0,background:columns[0].color,borderRadius:'3px 0 0 3px'}}/>
+      </div>
+      <strong style={{fontSize:12,textAlign:'center'}}>{tier}</strong>
+      <div style={{display:'flex',alignItems:'center',gap:5}}>
+       <div style={{height:17,width:(series[1]/scale*75)+'%',minWidth:series[1]>0?2:0,background:columns[1].color,borderRadius:'0 3px 3px 0'}}/>
+       <span style={{fontSize:11,fontVariantNumeric:'tabular-nums'}}>{metric==='count'?series[1]:series[1].toFixed(1)+'%'}</span>
+      </div>
+     </div>
     </button>
-    {series.map((v,i)=><div key={i} style={{height:7,background:C.bg,borderRadius:5,overflow:'hidden',margin:'2px 0 3px'}}><div style={{height:'100%',background:columns[i].color,width:v/scale*100+'%',borderRadius:5}}/></div>)}
     {selected===tier&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,background:C.section,borderRadius:9,padding:9,marginTop:8}}>
      {columns.map((side,i)=><div key={i} style={{minWidth:0}}><strong style={{fontSize:12,color:side.color}}>{side.name}</strong>{side.players.filter(p=>p.tier===tier).map(p=><div key={p.fid} style={{fontSize:12,padding:'5px 0',overflowWrap:'anywhere'}}>{p.name}</div>)}{!counts[i][tier]&&<p style={{fontSize:12,color:C.icy}}>No players</p>}</div>)}
     </div>}
