@@ -55,6 +55,8 @@ export function labGroups(rankings){
 const compact=v=>v==null?'—':v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':Math.round(v).toLocaleString();
 export function AllianceStandings({players=[]}){
  const [snapshot,setSnapshot]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [distributionMetric,setDistributionMetric]=useState('count');
+ const [selectedFurnace,setSelectedFurnace]=useState(null);
  const [sort,setSort]=useState('avgPower'),[ascending,setAscending]=useState(false),[showOther,setShowOther]=useState(false);
  const load=async()=>{if(busy)return;setBusy(true);setError('');
   try{const result=await mightpulseRequest('rankings',{state:3573,board:'labyrinth',limit:100});
@@ -94,6 +96,49 @@ export function AllianceStandings({players=[]}){
    <div style={{display:'flex',justifyContent:'space-between',padding:'9px 5px',background:'#1A3045'}}><span>Alliance unknown</span><strong>{lab.unknown}</strong></div>
    <div style={{display:'flex',justifyContent:'space-between',padding:'10px 5px',borderTop:'1px solid #344F69',fontWeight:750}}><span>Top 100 entries returned</span><strong>{lab.total}</strong></div>
   </div>}
+
+  <div style={{marginTop:18,borderTop:'1px solid #344F69',paddingTop:15}}>
+   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+    <div><h3 style={{fontSize:16,margin:0}}>Furnace distribution</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:3}}>Current saved roster · four alliances</div></div>
+    <div role="group" aria-label="Furnace chart units" style={{display:'flex',background:'#102238',borderRadius:9,padding:3}}>
+     {[['count','Players'],['percent','%']].map(([id,label])=><button key={id} type="button" aria-pressed={distributionMetric===id} onClick={()=>setDistributionMetric(id)} style={{border:0,borderRadius:7,minHeight:36,padding:'6px 12px',background:distributionMetric===id?'#365675':'transparent',color:'#F2F7FD',fontSize:12,fontWeight:700}}>{label}</button>)}
+    </div>
+   </div>
+   {(()=>{
+    const tags=['ARC','HOT','RKG','LUN'],colors=['#8EA5C4','#3A9CC2','#43A59B','#E0AC65'],tiers=['FC5','FC6','FC7','FC8','FC9','FC10'];
+    const unique=new Set(),groups=Object.fromEntries(tags.map(t=>[t,{known:0,unknown:0,counts:Object.fromEntries(tiers.map(tier=>[tier,0]))}]));
+    for(const p of players||[]){
+     if(p.membershipStatus==='transferred_out'||String(p.stateId||'3573')!=='3573')continue;
+     const tag=String(p.allianceTag||'').trim().toUpperCase(),id=String(p.fid||p.id||'').trim();
+     if(!groups[tag]||!id||unique.has(id))continue;unique.add(id);
+     const label=providerFurnaceLevel(p.furnaceLevel??p.providerStats?.furnaceLabel??p.providerStats?.furnaceLevel);
+     if(tiers.includes(label)){groups[tag].counts[label]++;groups[tag].known++;}
+     else if(label){groups[tag].known++;}
+     else groups[tag].unknown++;
+    }
+    const vals=tiers.flatMap(t=>tags.map(tag=>distributionMetric==='count'?groups[tag].counts[t]:groups[tag].known?groups[tag].counts[t]/groups[tag].known*100:0));
+    const maximum=Math.max(1,...vals);
+    const active=selectedFurnace&&tiers.includes(selectedFurnace)?selectedFurnace:null;
+    return <div style={{marginTop:12}}>
+     <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:10}}>{tags.map((tag,i)=><span key={tag} style={{fontSize:11,color:'#D3E0EC'}}><span style={{color:colors[i]}}>●</span> {tag}</span>)}</div>
+     <div style={{overflowX:'auto',paddingBottom:5}}>
+      <div style={{minWidth:340}}>
+       <div style={{height:178,display:'flex',alignItems:'stretch',gap:7,borderBottom:'1px solid #54708B',background:'repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),#29445D 25%)'}}>
+        {tiers.map(tier=><button key={tier} type="button" aria-label={'Show '+tier+' furnace counts'} aria-pressed={active===tier} onClick={()=>setSelectedFurnace(active===tier?null:tier)} style={{display:'flex',flex:1,alignItems:'flex-end',gap:2,justifyContent:'center',border:0,background:active===tier?'#203C56':'transparent',padding:'0 2px',cursor:'pointer',minWidth:0}}>
+         {tags.map((tag,i)=>{const value=distributionMetric==='count'?groups[tag].counts[tier]:groups[tag].known?groups[tag].counts[tier]/groups[tag].known*100:0;return <span key={tag} title={tag+' '+tier+': '+(distributionMetric==='count'?value:value.toFixed(1)+'%')} style={{height:(value/maximum*100)+'%',width:'23%',minHeight:value>0?2:0,background:colors[i],borderRadius:'3px 3px 0 0'}}/>})}
+        </button>)}
+       </div>
+       <div style={{display:'flex',gap:7,marginTop:7}}>{tiers.map(tier=><div key={tier} style={{flex:1,textAlign:'center',fontSize:11,color:active===tier?'#F2F7FD':'#B9CADB',fontWeight:active===tier?800:500}}>{tier}</div>)}</div>
+      </div>
+     </div>
+     {active&&<div role="status" style={{background:'#102238',padding:10,borderRadius:10,marginTop:9}}>
+      <strong style={{fontSize:13}}>{active}</strong>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:8,marginTop:7}}>{tags.map((tag,i)=><div key={tag}><span style={{color:colors[i],fontSize:11}}>{tag}</span><div style={{fontSize:17,fontWeight:750}}>{distributionMetric==='count'?groups[tag].counts[active]:groups[tag].known?(groups[tag].counts[active]/groups[tag].known*100).toFixed(1)+'%':'—'}</div></div>)}</div>
+     </div>}
+     <div style={{fontSize:11,color:'#A8BFD5',marginTop:9}}>Known furnace levels: {tags.map(tag=>tag+' '+groups[tag].known).join(' · ')}. Unknown: {tags.reduce((n,tag)=>n+groups[tag].unknown,0)}. Saved membership may contain stale records; verify before using these counts for decisions.</div>
+    </div>;
+   })()}
+  </div>
   {error&&<p role="alert" style={{color:'#FFB4AE',fontSize:12}}>{error}</p>}
   <p style={{fontSize:11,color:'#A8BFD5',lineHeight:1.5,margin:'10px 0 0'}}>
    Averages use saved players with valid values; missing values are excluded. Avg FC is a progression-equivalent, not a literal furnace level.
