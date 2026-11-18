@@ -172,7 +172,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const mainAllianceTags=['ARC','HOT','RKG','LUN'];
   const allianceTags=[...new Set(players.filter(p=>!isTransferred(p)).map(p=>p.allianceTag).filter(Boolean))].filter(tag=>!mainAllianceTags.includes(tag)).sort();
   const reviewCount=players.filter(p=>isReview(p)).length;
-  const onlineLabel=p=>{const value=onlineChecks[p.id]??p.providerStats?.lastOnline??p.providerStats?.last_online_at??p.providerStats?.last_online; if(value===null||value===undefined||value==='')return 'Not provided by API';const n=Number(value);const d=typeof value==='number'||(/^\\d{10,13}$/.test(String(value)))?new Date(n<1e12?n*1000:n):new Date(value);return Number.isFinite(d.getTime())?d.toLocaleString():'Not provided by API';};
+  const onlineLabel=p=>{const value=onlineChecks[p.id]??p.providerStats?.lastOnline??p.providerStats?.last_online_at??p.providerStats?.last_online; if(value===null||value===undefined||value==='')return 'Not provided by API';const n=Number(value);const d=typeof value==='number'||(/^\d{10,13}$/.test(String(value)))?new Date(n<1e12?n*1000:n):new Date(value);return Number.isFinite(d.getTime())?d.toLocaleString():'Not provided by API';};
   function markMembership(player,status){onSavePlayer({...player,membershipStatus:status,membershipReviewedAt:new Date().toISOString(),...(status==='transferred_out'?{lastKnownAlliance:player.allianceTag}:{} )});showToast?.(status==='transferred_out'?'Transfer confirmed':status==='transfer_review'?'Added to transfer review':'Player restored to current roster');}
   const lastFetch=latestRosterFetch(players);
   function toggle(id){setSelected(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);return next;});}
