@@ -48,14 +48,15 @@ export function latestRosterFetch(players) {
 }
 
 /** Stale player API data is a review signal, never proof of transfer. */
+export const MEMBERSHIP_REVIEW_ROUND_STARTED_AT = '2026-11-18T07:40:00.000Z';
 export function suspectedTransferOut(player, now=Date.now()) {
   if(!['RKG','LUN','ARC','HOT'].includes(String(player?.allianceTag||'').toUpperCase()))return false;
   if(['transferred_out','transfer_review','unverified'].includes(player?.membershipStatus))return false;
   const refreshed=Date.parse(player?.providerStats?.retrievedAt||'');
   if(!Number.isFinite(refreshed))return false; // No successful fetch timestamp: unknown, not stale.
   const reviewed=Date.parse(player?.membershipReviewedAt||'');
-  if(Number.isFinite(reviewed)&&reviewed>=refreshed)return false; // A human already dismissed this signal.
-  return now-refreshed>=3*24*60*60*1000;
+  if(Number.isFinite(reviewed)&&reviewed>=Math.max(refreshed,Date.parse(MEMBERSHIP_REVIEW_ROUND_STARTED_AT)))return false; // Previous review rounds are reopened once; a decision in this round sticks.
+  return now-refreshed>=24*60*60*1000;
 }
 
 /** Validate the immutable Whiteout player FID before an individual location lookup. */
@@ -77,4 +78,11 @@ export function restoreStateTransfer(player,location,confirmedAt=new Date().toIS
   const old=String(player.allianceTag||'').trim();
   const movement=old!==tag?{from:old,to:tag,at:location.at}:null;
   return {...player,membershipStatus:'active',allianceTag:tag,lastKnownAlliance:old||player.lastKnownAlliance||'',membershipCheckedAt:location.at,membershipReviewedAt:confirmedAt,transferDestinationState:null,transferDestinationAlliance:null,allianceHistory:movement?[...(player.allianceHistory||[]),movement].slice(-4):player.allianceHistory};
+}
+
+/** Manual classification only: preserve the prior main alliance and its movement history. */
+export function moveReviewedPlayerToNoAlliance(player, reviewedAt=new Date().toISOString()) {
+  if (!player || player.membershipStatus==='transferred_out') throw Error('Cannot reclassify an archived transfer.');
+  const previous=String(player.allianceTag||'').trim();
+  return {...player,allianceTag:'',lastKnownAlliance:previous||player.lastKnownAlliance||'',membershipStatus:'active',membershipReviewedAt:reviewedAt,allianceHistory:previous?[...(player.allianceHistory||[]),{from:previous,to:'',at:reviewedAt,source:'manual-review'}].slice(-20):player.allianceHistory};
 }
