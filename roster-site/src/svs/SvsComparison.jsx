@@ -39,7 +39,7 @@ export function SvsComparison(){
  const filter=(rows,i)=>mode==='state'?rows:rows.filter(r=>String(r.allianceTag||'')===(i?theirTag:ourTag).trim());
  const sides=rankData?.sides.map((r,i)=>r?filter(r.rows||[],i):null);
  const entries=sides?.map(r=>r?.slice(0,top)||[]);
- const stateScores=sides?.map(r=>r?.map(p=>rankingScore(p,'labyrinth')).filter(v=>v!=null&&Number.isFinite(Number(v))&&Number(v)>=0)||null);
+ const stateScores=sides?.map(r=>r?.map(p=>p.score).filter(v=>v!=null&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=0)||null);
  const labEight=rosterData?.sides?.map(topEight);
  const labLead=labEight?.length===2?topEightLead(labEight[0],labEight[1]):null;
  const copyLines=()=>{
