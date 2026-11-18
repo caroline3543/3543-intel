@@ -28,7 +28,7 @@ export function aggregateRoster(rosters){
 }
 export function RosterFurnace({ours,theirs,ourLabel,theirLabel}){
  const [selected,setSelected]=useState(null);
- const [threshold,setThreshold]=useState(8);
+ const [threshold,setThreshold]=useState(7);
  const [metric,setMetric]=useState('percent');
  const columns=[{name:ourLabel,players:ours,color:'#89C4FF'},{name:theirLabel,players:theirs,color:'#EBC18A'}];
  const counts=columns.map(side=>Object.fromEntries(tierNames.map(tier=>[tier,side.players.filter(p=>p.tier===tier).length])));
@@ -45,8 +45,7 @@ export function RosterFurnace({ours,theirs,ourLabel,theirLabel}){
   const lo=sorted[Math.floor((sorted.length-1)/2)],hi=sorted[Math.floor(sorted.length/2)];
   return lo===hi?'FC'+lo:'FC'+lo+'–FC'+hi;
  };
- const max=Math.max(1,...counts.flatMap(c=>tierNames.map(t=>metric==='count'?c[t]:(known[0]||known[1])?c[t]:0)));
- return <section style={{background:C.card,borderRadius:16,padding:14,marginTop:16}}>
+  return <section style={{background:C.card,borderRadius:16,padding:14,marginTop:16}}>
   <div style={{fontSize:11,fontWeight:750,color:C.icy,letterSpacing:'.07em'}}>FURNACE STRENGTH PROFILE</div>
   <h3 style={{fontSize:19,margin:'5px 0 4px'}}>Summary of advantages</h3>
   <p style={{color:C.icy,fontSize:12,margin:'0 0 12px'}}>Development comparison · recorded alliance members</p>
