@@ -4,6 +4,7 @@ import {normalizeRankings,rankingScore} from '../../../src/services/stateRanking
 import {normalizeRosterResponse} from './RosterFurnace.jsx';
 import {RosterFurnace} from './RosterFurnace.jsx';
 import {ScoreDistribution} from './ScoreDistribution.jsx';
+import {AllianceStandings} from './AllianceStandings.jsx';
 
 const panel={background:'#15273A',border:'1px solid #344F69',borderRadius:15,padding:12};
 const field={boxSizing:'border-box',width:'100%',minWidth:0,borderRadius:9,background:'#0F1D30',border:'1px solid #344F69',color:'#F2F7FD',fontSize:16,padding:'10px 9px'};
@@ -28,7 +29,7 @@ const topEightLead=(a,b)=>{
 };
 const valid=s=>/^[1-9][0-9]{0,4}$/.test(s);
 function Side({label,value,color}){return <div style={{minWidth:0}}><div style={{color,fontSize:11,fontWeight:700}}>{label}</div><div style={{fontSize:25,fontWeight:800,marginTop:5,fontVariantNumeric:'tabular-nums'}}>{value}</div></div>}
-export function SvsComparison(){
+export function SvsComparison({players=[]}){
  const [mode,setMode]=useState('state'),[ourState,setOurState]=useState('3573'),[theirState,setTheirState]=useState('');
  const [ourTag,setOurTag]=useState('HOT'),[theirTag,setTheirTag]=useState('');
  const [rankings,setRankings]=useState(null),[rosters,setRosters]=useState(null),[busy,setBusy]=useState(''),[errors,setErrors]=useState([]);
@@ -85,6 +86,7 @@ export function SvsComparison(){
    {[0,1].map(i=><div key={i} style={{minWidth:0}}><label style={{color:i?'#EBC18A':'#89C4FF',fontSize:11,fontWeight:700}}>{i?'OPPONENT':'YOUR SIDE'}</label><input style={{...field,marginTop:7}} aria-label={i?'Opponent state':'Your state'} inputMode="numeric" placeholder="State ID" value={i?theirState:ourState} onChange={e=>i?setTheirState(e.target.value):setOurState(e.target.value)}/>{mode==='alliance'&&<input style={{...field,marginTop:7}} aria-label={i?'Opponent alliance':'Your alliance'} placeholder="Alliance tag" value={i?theirTag:ourTag} onChange={e=>i?setTheirTag(e.target.value):setOurTag(e.target.value)}/>}</div>)}
   </div>
 
+  {mode==='state'&&ourState==='3573'&&<AllianceStandings players={players}/>}
   {mode==='state'&&<div style={{...panel,marginTop:13}}>
    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><div><h3 style={{margin:'0 0 4px',fontSize:17}}>Labyrinth rankings</h3><div style={{color:'#A8BFD5',fontSize:12}}>Published top 100 per state</div></div><button style={btn} disabled={!ready||!!busy} onClick={loadLab}>{busy==='lab'?'Loading…':rankData?'Refresh':'Compare'}</button></div>
    {rankData&&<><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginTop:16}}>{[0,1].map(i=><Side key={i} label={i?'OPPONENT':'YOUR SIDE'} color={i?'#EBC18A':'#89C4FF'} value={sides[i]?.length??'—'}/>)}</div><div style={{fontSize:12,color:'#A8BFD5',marginTop:8}}>Matching players in the published leaderboard. This is not an overall battle-strength score.</div>
