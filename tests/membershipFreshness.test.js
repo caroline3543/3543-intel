@@ -59,3 +59,17 @@ test('verified membership observation clears stale warning', () => {
 test('unverified membership cannot be applied', () => {
   assert.throws(()=>applyVerifiedMembership(player(null),{status:'error',state:'3573',tag:'',at:new Date(now).toISOString()}),/verified/);
 });
+
+test('fresh request without captured observation stays unverified', () => {
+  const p=player(null);
+  assert.equal(membershipFreshness(p,now),'unknown');
+});
+test('verified membership without alliance change refreshes membership timestamp', () => {
+  const p=player(new Date(now-48*3600000).toISOString());
+  const updated=applyVerifiedMembership(p,{status:'verified',state:'3573',tag:'HOT',at:new Date(now-3600000).toISOString()});
+  assert.equal(updated.allianceTag,'HOT');
+  assert.equal(membershipFreshness(updated,now),'fresh');
+});
+test('archived transfer cannot be manually reallocated', () => {
+  assert.throws(()=>reassignReviewedPlayer(player(null,{membershipStatus:'transferred_out'}),'ARC'),/archived/);
+});
