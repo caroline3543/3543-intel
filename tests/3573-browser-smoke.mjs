@@ -12,7 +12,7 @@ async function ready(){
   for(let i=0;i<80;i++){try{const r=await fetch(origin);if(r.ok)return;}catch{}await delay(250);}
   throw Error('Local 3573 preview server failed to start');
 }
-const player=(id,name)=>({id,username:name,fid:String(681766600+Number(id)),allianceTag:'HOT',cityPower:1000000,profileLastUpdated:'2026-11-01T00:00:00Z'});
+const player=(id,name)=>({id,username:name,fid:String(681766600+Number(id)),allianceTag:'HOT',cityPower:1000000,profileLastUpdated:new Date().toISOString()});
 const fixture={players:[player('1','Caroline'),player('2','Carolinne'),player('3','Spicy')],events:[],customRoles:[],settings:{stateId:'3573'}};
 function record(page){
  page.on('pageerror',error=>errors.push(error.message));
