@@ -98,7 +98,7 @@ try{
   assert.equal(await page.getByRole('button',{name:'FC8',exact:true}).count(),1,'FC8 must remain a threshold');
   assert.equal(await page.getByRole('button',{name:'FC9',exact:true}).count(),0,'FC9 threshold must be removed');
   assert.equal(await page.getByRole('button',{name:'FC10',exact:true}).count(),0,'FC10 threshold must be removed');
-  assert.equal(await page.getByRole('button',{name:/^Pre-FC$/}).count(),1,'Alliance comparison must include Pre-FC');
+  assert.equal(await page.getByText('Pre-FC',{exact:true}).count(),1,'Alliance comparison must include Pre-FC');
   await page.getByRole('group',{name:'Distribution metric'}).getByRole('button',{name:'Roster %'}).click();
   assert.equal(await page.getByRole('group',{name:'Distribution metric'}).getByRole('button',{name:'Roster %'}).getAttribute('aria-pressed'),'true');
   stage='members';
