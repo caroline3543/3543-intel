@@ -57,7 +57,7 @@ export const MEMBERSHIP_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
  */
 export function membershipFreshness(player, now=Date.now()) {
   if (!player || player.membershipStatus === 'transferred_out') return 'excluded';
-  const observedAt = Date.parse(player.membershipObservedAt || player.providerStats?.capturedAt || player.providerStats?.retrievedAt || '');
+  const observedAt = Date.parse(player.membershipObservedAt || player.providerStats?.capturedAt || '');
   if (!Number.isFinite(observedAt) || observedAt > now) return 'unknown';
   return now - observedAt >= MEMBERSHIP_STALE_AFTER_MS ? 'stale' : 'fresh';
 }
@@ -84,7 +84,7 @@ export function restoreStateTransfer(player,location,confirmedAt=new Date().toIS
   const tag=String(location.tag||'').trim();
   const old=String(player.allianceTag||'').trim();
   const movement=old!==tag?{from:old,to:tag,at:location.at}:null;
-  return {...player,membershipStatus:'active',allianceTag:tag,lastKnownAlliance:old||player.lastKnownAlliance||'',membershipCheckedAt:location.at,membershipReviewedAt:confirmedAt,transferDestinationState:null,transferDestinationAlliance:null,allianceHistory:movement?[...(player.allianceHistory||[]),movement].slice(-4):player.allianceHistory};
+  return {...player,membershipStatus:'active',allianceTag:tag,lastKnownAlliance:old||player.lastKnownAlliance||'',membershipCheckedAt:location.at,membershipReviewedAt:confirmedAt,transferDestinationState:null,transferDestinationAlliance:null,allianceHistory:movement?[...(player.allianceHistory||[]),movement].slice(-20):player.allianceHistory};
 }
 
 /** Manual classification only: preserve the prior main alliance and its movement history. */
