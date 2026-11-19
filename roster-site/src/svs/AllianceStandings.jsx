@@ -38,6 +38,7 @@ export function allianceStandings(players,rankings){
 }
 export function labGroups(rankings){
  if(!rankings)return null;
+ if(rankings.stateId==='3573'&&rankings.board==='labyrinth'&&rankings.counts&&rankings.rows===undefined)return rankings;
  const counts=Object.fromEntries(TAGS.map(tag=>[tag,0]));
  const other={},seen=new Set();
  let noAlliance=0,unknown=0,total=0;
@@ -57,7 +58,7 @@ export function labGroups(rankings){
 }
 
 const compact=v=>v==null?'—':v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':Math.round(v).toLocaleString();
-export function AllianceStandings({players=[]}){
+export function AllianceStandings({players=[],lastLabSummary=null,onLabSummary}){
  const [snapshot,setSnapshot]=useState(readLabCache),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [distributionMetric,setDistributionMetric]=useState('count');
  const [selectedFurnace,setSelectedFurnace]=useState(null);
@@ -67,11 +68,14 @@ export function AllianceStandings({players=[]}){
    const next=normalizeRankings(result,'3573','labyrinth');
    if(next?.stateId!=='3573'||next.board!=='labyrinth'||!Array.isArray(next.rows)||next.rows.length>100||!Number.isFinite(Date.parse(next.retrievedAt)))throw new Error('Invalid Labyrinth response');
    setSnapshot(next);writeLabCache(next);
+   onLabSummary?.({...labGroups(next),stateId:'3573',board:'labyrinth',retrievedAt:next.retrievedAt});
   }catch(e){setError((e?.message||'Could not refresh Labyrinth rankings')+'. Previous results retained.');}
   finally{setBusy(false);}
  };
- const rows=allianceStandings(players,snapshot);
- const lab=labGroups(snapshot);
+ const savedSummary=lastLabSummary?.stateId==='3573'&&lastLabSummary?.board==='labyrinth'&&Number.isFinite(Date.parse(lastLabSummary?.retrievedAt))?lastLabSummary:null;
+ const effectiveLab=snapshot&&(!savedSummary||Date.parse(snapshot.retrievedAt)>=Date.parse(savedSummary.retrievedAt))?snapshot:savedSummary;
+ const rows=allianceStandings(players,effectiveLab);
+ const lab=labGroups(effectiveLab);
  const ordered=[...rows].sort((a,b)=>{if(sort==='tag')return ascending?a.tag.localeCompare(b.tag):b.tag.localeCompare(a.tag);
   const av=a[sort],bv=b[sort];if(av==null)return 1;if(bv==null)return -1;return ascending?av-bv:bv-av;});
  const header=(key,label)=><button type="button" onClick={()=>{if(sort===key)setAscending(!ascending);else{setSort(key);setAscending(false);}}}
@@ -82,7 +86,7 @@ export function AllianceStandings({players=[]}){
    <div><h3 style={{margin:0,fontSize:17}}>Alliance standings</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:4}}>Top four · Live roster</div></div>
    <button type="button" onClick={load} disabled={busy} style={{border:'1px solid #344F69',background:'#1E3448',color:'#F1F7FD',borderRadius:9,minHeight:44,padding:'8px 10px',fontSize:12,fontWeight:650}}>{busy?'Refreshing…':'Refresh Lab'}</button>
   </div>
-  <div style={{fontSize:11,color:'#A8BFD5',marginBottom:7}}>Lab Top 100 · {snapshot?'Last lookup '+new Date(snapshot.retrievedAt).toLocaleString():'No saved lookup yet'}</div>
+  <div style={{fontSize:11,color:'#A8BFD5',marginBottom:7}}>Lab Top 100 · {effectiveLab?'Last lookup '+new Date(effectiveLab.retrievedAt).toLocaleString():'No saved lookup yet'}</div>
   <div style={{overflowX:'auto'}}>
    <table style={{width:'100%',borderCollapse:'collapse',fontVariantNumeric:'tabular-nums',minWidth:310}}>
     <thead><tr>{[['tag','Alliance'],['avgPower','Avg power'],['avgFC','Avg FC'],['lab','Top 100 in Lab']].map(([k,label])=><th key={k} scope="col" style={{textAlign:k==='tag'?'left':'right',padding:0,borderBottom:'1px solid #344F69'}}>{header(k,label)}</th>)}</tr></thead>
