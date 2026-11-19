@@ -48,14 +48,22 @@ export function latestRosterFetch(players) {
 }
 
 /** Stale player API data is a review signal, never proof of transfer. */
+export const MEMBERSHIP_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A stale provider observation is not evidence of an alliance transfer.
+ * Review acknowledgements and manual alliance edits never make old data fresh.
+ * Missing timestamps are classified separately as unknown, but need review.
+ */
+export function membershipFreshness(player, now=Date.now()) {
+  if (!player || player.membershipStatus === 'transferred_out') return 'excluded';
+  const observedAt = Date.parse(player.membershipObservedAt || player.providerStats?.capturedAt || '');
+  if (!Number.isFinite(observedAt) || observedAt > now) return 'unknown';
+  return now - observedAt >= MEMBERSHIP_STALE_AFTER_MS ? 'stale' : 'fresh';
+}
+
 export function suspectedTransferOut(player, now=Date.now()) {
-  if(!['RKG','LUN','ARC','HOT'].includes(String(player?.allianceTag||'').toUpperCase()))return false;
-  if(['transferred_out','transfer_review','unverified'].includes(player?.membershipStatus))return false;
-  const refreshed=Date.parse(player?.providerStats?.retrievedAt||'');
-  if(!Number.isFinite(refreshed))return false; // No successful fetch timestamp: unknown, not stale.
-  const reviewed=Date.parse(player?.membershipReviewedAt||'');
-  if(Number.isFinite(reviewed)&&reviewed>=refreshed)return false; // A human already dismissed this signal.
-  return now-refreshed>=3*24*60*60*1000;
+  return ['stale', 'unknown'].includes(membershipFreshness(player, now));
 }
 
 /** Validate the immutable Whiteout player FID before an individual location lookup. */
@@ -76,5 +84,33 @@ export function restoreStateTransfer(player,location,confirmedAt=new Date().toIS
   const tag=String(location.tag||'').trim();
   const old=String(player.allianceTag||'').trim();
   const movement=old!==tag?{from:old,to:tag,at:location.at}:null;
-  return {...player,membershipStatus:'active',allianceTag:tag,lastKnownAlliance:old||player.lastKnownAlliance||'',membershipCheckedAt:location.at,membershipReviewedAt:confirmedAt,transferDestinationState:null,transferDestinationAlliance:null,allianceHistory:movement?[...(player.allianceHistory||[]),movement].slice(-4):player.allianceHistory};
+  return {...player,membershipStatus:'active',allianceTag:tag,lastKnownAlliance:old||player.lastKnownAlliance||'',membershipCheckedAt:location.at,membershipReviewedAt:confirmedAt,transferDestinationState:null,transferDestinationAlliance:null,allianceHistory:movement?[...(player.allianceHistory||[]),movement].slice(-20):player.allianceHistory};
+}
+
+/** Manual classification only: preserve the prior main alliance and its movement history. */
+export function moveReviewedPlayerToNoAlliance(player, reviewedAt=new Date().toISOString()) {
+  if (!player || player.membershipStatus==='transferred_out') throw Error('Cannot reclassify an archived transfer.');
+  const previous=String(player.allianceTag||'').trim();
+  return {...player,allianceTag:'',lastKnownAlliance:previous||player.lastKnownAlliance||'',membershipStatus:'active',membershipReviewedAt:reviewedAt,manualMembershipAt:reviewedAt,allianceHistory:previous?[...(player.allianceHistory||[]),{from:previous,to:'',at:reviewedAt,source:'manual-review'}].slice(-20):player.allianceHistory};
+}
+
+/** Manual alliance classification never updates provider observation freshness. */
+export function reassignReviewedPlayer(player, destination, reviewedAt=new Date().toISOString()) {
+  if (!player || player.membershipStatus === 'transferred_out') throw Error('Cannot reassign an archived transfer.');
+  const to=String(destination ?? '').trim().toUpperCase();
+  if (to && !/^[A-Z0-9]{2,12}$/.test(to)) throw Error('Invalid alliance tag.');
+  const from=String(player.allianceTag||'').trim();
+  if (from===to) return {...player,membershipReviewedAt:reviewedAt,manualMembershipAt:reviewedAt};
+  return {...player,allianceTag:to,lastKnownAlliance:from||player.lastKnownAlliance||'',membershipStatus:'active',membershipReviewedAt:reviewedAt,manualMembershipAt:reviewedAt,allianceHistory:[...(player.allianceHistory||[]),{from,to,at:reviewedAt,source:'manual-review'}].slice(-20)};
+}
+
+/** Persist a verified in-state lookup even when the alliance has not changed. */
+export function applyVerifiedMembership(player, location) {
+  if (!player || location?.status!=='verified' || String(location.state)!=='3573' || !Number.isFinite(Date.parse(location.at))) throw Error('Fresh verified state 3573 membership is required.');
+  const observed=Date.parse(location.at);
+  const previous=Date.parse(player.membershipObservedAt||'');
+  const manual=Date.parse(player.manualMembershipAt||'');
+  if ((Number.isFinite(previous) && observed < previous) || (Number.isFinite(manual) && observed <= manual)) throw Error('Membership observation predates a newer observation or manual reassignment.');
+  const next=restoreStateTransfer(player,location);
+  return {...next,membershipObservedAt:location.at,membershipCheckedAt:location.at};
 }
