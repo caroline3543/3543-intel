@@ -57,7 +57,7 @@ export const MEMBERSHIP_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
  */
 export function membershipFreshness(player, now=Date.now()) {
   if (!player || player.membershipStatus === 'transferred_out') return 'excluded';
-  const observedAt = Date.parse(player.providerStats?.capturedAt || player.providerStats?.retrievedAt || '');
+  const observedAt = Date.parse(player.membershipObservedAt || player.providerStats?.capturedAt || player.providerStats?.retrievedAt || '');
   if (!Number.isFinite(observedAt) || observedAt > now) return 'unknown';
   return now - observedAt >= MEMBERSHIP_STALE_AFTER_MS ? 'stale' : 'fresh';
 }
@@ -102,4 +102,11 @@ export function reassignReviewedPlayer(player, destination, reviewedAt=new Date(
   const from=String(player.allianceTag||'').trim();
   if (from===to) return {...player,membershipReviewedAt:reviewedAt};
   return {...player,allianceTag:to,lastKnownAlliance:from||player.lastKnownAlliance||'',membershipStatus:'active',membershipReviewedAt:reviewedAt,allianceHistory:[...(player.allianceHistory||[]),{from,to,at:reviewedAt,source:'manual-review'}].slice(-20)};
+}
+
+/** Persist a verified in-state lookup even when the alliance has not changed. */
+export function applyVerifiedMembership(player, location) {
+  if (!player || location?.status!=='verified' || String(location.state)!=='3573' || !Number.isFinite(Date.parse(location.at))) throw Error('Fresh verified state 3573 membership is required.');
+  const next=restoreStateTransfer(player,location);
+  return {...next,membershipObservedAt:location.at,membershipCheckedAt:location.at};
 }
