@@ -5,7 +5,8 @@ import {providerFurnaceLevel} from '../../../src/services/providerProfileService
 
 const TAGS=['ARC','HOT','RKG','LUN'];
 const LAB_CACHE_KEY='3573:compare:labyrinth-top-100:v1';
-function readLabCache(){try{const value=JSON.parse(localStorage.getItem(LAB_CACHE_KEY)||'null');return value&&Array.isArray(value.rows)&&Number.isFinite(Date.parse(value.retrievedAt))?value:null;}catch{return null;}}
+const MAX_LAB_CACHE_AGE_MS=30*24*60*60*1000;
+function readLabCache(){try{const value=JSON.parse(localStorage.getItem(LAB_CACHE_KEY)||'null');return value?.stateId==='3573'&&value.board==='labyrinth'&&Array.isArray(value.rows)&&value.rows.length<=100&&Number.isFinite(Date.parse(value.retrievedAt))&&Date.parse(value.retrievedAt)<=Date.now()+60000&&Date.now()-Date.parse(value.retrievedAt)<MAX_LAB_CACHE_AGE_MS?value:null;}catch{return null;}}
 function writeLabCache(value){try{localStorage.setItem(LAB_CACHE_KEY,JSON.stringify(value));}catch{/* Private browsing may disable storage. */}}
 const numeric=v=>v===null||v===undefined||v===''?null:Number.isFinite(Number(v))?Number(v):null;
 export function furnaceProgress(value){
@@ -64,7 +65,7 @@ export function AllianceStandings({players=[]}){
  const load=async()=>{if(busy)return;setBusy(true);setError('');
   try{const result=await mightpulseRequest('rankings',{state:3573,board:'labyrinth',limit:100});
    const next=normalizeRankings(result,'3573','labyrinth');
-   if(!Array.isArray(next?.rows)||!Number.isFinite(Date.parse(next.retrievedAt)))throw new Error('Invalid Labyrinth response');
+   if(next?.stateId!=='3573'||next.board!=='labyrinth'||!Array.isArray(next.rows)||next.rows.length>100||!Number.isFinite(Date.parse(next.retrievedAt)))throw new Error('Invalid Labyrinth response');
    setSnapshot(next);writeLabCache(next);
   }catch(e){setError((e?.message||'Could not refresh Labyrinth rankings')+'. Previous results retained.');}
   finally{setBusy(false);}
