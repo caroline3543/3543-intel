@@ -12,7 +12,7 @@ async function ready(){
   for(let i=0;i<80;i++){try{const r=await fetch(origin);if(r.ok)return;}catch{}await delay(250);}
   throw Error('Local 3573 preview server failed to start');
 }
-const player=(id,name)=>({id,username:name,fid:String(681766600+Number(id)),allianceTag:'HOT',cityPower:1000000,profileLastUpdated:new Date().toISOString()});
+const player=(id,name)=>({id,username:name,fid:String(681766600+Number(id)),allianceTag:'HOT',cityPower:1000000,membershipObservedAt:new Date().toISOString(),providerStats:{capturedAt:new Date().toISOString()}});
 const fixture={players:[player('1','Caroline'),player('2','Carolinne'),player('3','Spicy')],events:[],customRoles:[],settings:{stateId:'3573'}};
 function record(page){
  page.on('pageerror',error=>errors.push(error.message));
@@ -74,6 +74,7 @@ try{
   await search.fill('681766603');
   await page.getByRole('option',{name:/Spicy/}).waitFor({timeout:10000});
   await search.fill('');
+  assert.match(await page.getByRole('status').filter({hasText:/Showing \d+ of \d+ players/}).innerText(),/Showing 3 of 3 players/,'Fresh fixture players must appear in the current roster');
   stage='bulk-selection';
   await page.getByRole('button',{name:'☷ Options',exact:true}).click();
   stage='select-players';
