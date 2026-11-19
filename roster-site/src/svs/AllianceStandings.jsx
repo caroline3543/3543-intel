@@ -83,7 +83,7 @@ export function AllianceStandings({players=[],lastLabSummary=null,onLabSummary})
   {label}{sort===key?(ascending?' ↑':' ↓'):''}</button>;
  return <section aria-label="3573 alliance standings" style={{background:'#15273A',border:'1px solid #344F69',borderRadius:15,padding:12,marginTop:13}}>
   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}>
-   <div><h3 style={{margin:0,fontSize:17}}>Alliance standings</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:4}}>Top four · Live roster</div></div>
+   <div><h3 style={{margin:0,fontSize:17}}>Alliance standings</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:4}}>Top four · App roster</div></div>
    <button type="button" onClick={load} disabled={busy} style={{border:'1px solid #344F69',background:'#1E3448',color:'#F1F7FD',borderRadius:9,minHeight:44,padding:'8px 10px',fontSize:12,fontWeight:650}}>{busy?'Refreshing…':'Refresh Lab'}</button>
   </div>
   <div style={{fontSize:11,color:'#A8BFD5',marginBottom:7}}>Lab Top 100 · {effectiveLab?'Last lookup '+new Date(effectiveLab.retrievedAt).toLocaleString():'No saved lookup yet'}</div>
@@ -110,7 +110,7 @@ export function AllianceStandings({players=[],lastLabSummary=null,onLabSummary})
 
   <div style={{marginTop:18,borderTop:'1px solid #344F69',paddingTop:15}}>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-    <div><h3 style={{fontSize:16,margin:0}}>Furnace distribution</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:3}}>Current roster · four alliances</div></div>
+    <div><h3 style={{fontSize:16,margin:0}}>Furnace distribution</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:3}}>App roster · four alliances</div></div>
     <div role="group" aria-label="Furnace chart units" style={{display:'flex',background:'#102238',borderRadius:9,padding:3}}>
      {[['count','Players'],['percent','%']].map(([id,label])=><button key={id} type="button" aria-pressed={distributionMetric===id} onClick={()=>setDistributionMetric(id)} style={{border:0,borderRadius:7,minHeight:36,padding:'6px 12px',background:distributionMetric===id?'#365675':'transparent',color:'#F2F7FD',fontSize:12,fontWeight:700}}>{label}</button>)}
     </div>
