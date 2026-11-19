@@ -39,6 +39,13 @@ try{
    if(request.method()!=='GET'&&url.pathname!=='/api/lookup')writes.push({stage,path:url.pathname,method:request.method(),body:request.postData()?.slice(0,1200)});
    if(url.pathname==='/api/session')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authenticated:true,role:'leader'})});
    if(url.pathname==='/api/workspace')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:fixture,revision:1,updatedAt:'2026-11-01T00:00:00Z',role:'leader'})});
+   if(url.pathname==='/api/lookup'&&request.method()==='POST'){
+    const body=JSON.parse(request.postData()||'{}');
+    if(body.action==='alliance'&&['HOT','ARC'].includes(body.tag)){
+     const members=[{chief_id:body.tag==='HOT'?'681766601':'681766602',nick_name:'FC8 player',furnace_level:'FC8',power:2000000,labyrinth_score:150},{chief_id:body.tag==='HOT'?'681766603':'681766604',nick_name:'FC9 player',furnace_level:'FC9',power:1000000,labyrinth_score:100}];
+     return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:{alliance:{kid:3573,tag:body.tag},members}})});
+    }
+   }
    return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Mocked test environment'})});
   });
   await page.goto(origin,{waitUntil:'domcontentloaded'});
@@ -82,6 +89,18 @@ try{
   assert.equal(await page.getByRole('row',{name:/HOT/}).getByRole('cell').last().innerText(),'2','Shared Lab summary must supply last known counts');
   await page.getByRole('button',{name:'ⓘ About data'}).click();
   assert.equal(await page.getByText(/The chart shows Pre-FC through FC8/).count(),1,'Methodology must explain range');
+  stage='alliance-compare';
+  await page.getByRole('button',{name:'Alliances',exact:true}).click();
+  await page.getByRole('textbox',{name:'Opponent state'}).fill('3573');
+  await page.getByRole('textbox',{name:'Opponent alliance'}).fill('ARC');
+  await page.getByRole('button',{name:'Load rosters'}).click();
+  await page.getByRole('heading',{name:'Furnace strength'}).waitFor({timeout:10000});
+  assert.equal(await page.getByRole('button',{name:'FC8',exact:true}).count(),1,'FC8 must remain a threshold');
+  assert.equal(await page.getByRole('button',{name:'FC9',exact:true}).count(),0,'FC9 threshold must be removed');
+  assert.equal(await page.getByRole('button',{name:'FC10',exact:true}).count(),0,'FC10 threshold must be removed');
+  assert.equal(await page.getByRole('button',{name:/^Pre-FC$/}).count(),1,'Alliance comparison must include Pre-FC');
+  await page.getByRole('group',{name:'Distribution metric'}).getByRole('button',{name:'Roster %'}).click();
+  assert.equal(await page.getByRole('group',{name:'Distribution metric'}).getByRole('button',{name:'Roster %'}).getAttribute('aria-pressed'),'true');
   stage='members';
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Members'}).click();
   const search=page.getByRole('combobox',{name:'Search roster'});
