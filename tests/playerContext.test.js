@@ -35,16 +35,15 @@ test('relative activity uses the recorded timestamp, handles future times and ke
  assert.equal(recordedActivity(t,t+90000000).relative,'1d 1h ago');assert.equal(recordedActivity(t,t-3600000).relative,'1h 0m in the future');assert.equal(recordedActivity(null),null);
 });
 
-test('three-day stale API signal only flags unreviewed main-alliance players',()=>{
+test('rolling 24-hour membership review covers all alliances and survives manual acknowledgement',()=>{
  const now=Date.parse('2026-11-17T12:00:00Z');
- const p={allianceTag:'RKG',membershipStatus:'active',providerStats:{retrievedAt:'2026-11-14T12:00:00Z'}};
+ const p={allianceTag:'RKG',membershipStatus:'active',providerStats:{capturedAt:'2026-11-16T12:00:00Z'}};
  assert.equal(suspectedTransferOut(p,now),true);
- assert.equal(suspectedTransferOut({...p,allianceTag:'FARM'},now),false);
- assert.equal(suspectedTransferOut({...p,providerStats:{retrievedAt:'2026-11-15T12:00:00Z'}},now),false);
- assert.equal(suspectedTransferOut({...p,providerStats:{}},now),false);
+ assert.equal(suspectedTransferOut({...p,allianceTag:'FARM'},now),true);
+ assert.equal(suspectedTransferOut({...p,providerStats:{capturedAt:'2026-11-17T11:00:00Z'}},now),false);
+ assert.equal(suspectedTransferOut({...p,providerStats:{}},now),true);
  assert.equal(suspectedTransferOut({...p,membershipStatus:'transferred_out'},now),false);
- assert.equal(suspectedTransferOut({...p,membershipReviewedAt:'2026-11-16T12:00:00Z'},now),false);
- assert.equal(suspectedTransferOut({...p,membershipReviewedAt:'2026-11-13T12:00:00Z'},now),true);
+ assert.equal(suspectedTransferOut({...p,membershipReviewedAt:'2026-11-17T12:00:00Z'},now),true);
  for(const allianceTag of ['ARC','HOT','LUN'])assert.equal(suspectedTransferOut({...p,allianceTag},now),true);
 });
 
@@ -127,7 +126,7 @@ test('transferred-out archive is nested under More and confirmation requires ver
  assert.ok(source.includes("disabled={!(locationChecks[p.id]?.status==='verified'&&locationChecks[p.id]?.state!=='3573')}"));
  assert.ok(source.includes("trackingView==='transferred'&&p.transferDestinationState"));
  assert.ok(source.includes("archiveStateTransfer(player,found)"));
- assert.ok(source.includes("restoreStateTransfer(player,found)"));
+ assert.ok(source.includes("applyVerifiedMembership(player,found)"));
 });
 
 test('3573 transfer lookup allows global player search while details stay state-bound',async()=>{
