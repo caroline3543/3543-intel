@@ -1,4 +1,5 @@
 import { mightpulseRequest } from '../../services/mightpulseService.js';
+import { verifiedPlayerLocation } from '../../services/verifiedPlayerLocation.js';
 import {PlayerSearch} from './PlayerSearch.jsx';
 import { useState, useEffect, useRef } from 'react';
 import { C } from '../../utils/constants.js';
@@ -114,16 +115,11 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     setLocationChecks(v=>({...v,[player.id]:{status:'loading'}}));
     try{
       const response=await mightpulseRequest('player',{fid});
-      const base=response?.data?.player;
-      if(!base||String(base.chief_id??base.fid??response?.data?.chief_id??'')!==fid)throw Error('Player ID mismatch or missing player profile');
-      const state=String(base.kid??response?.data?.kid??'').trim();
-      const alliance=base.alliance;
-      const tag=typeof alliance?.abbr==='string'?alliance.abbr.trim():alliance===null?'':null;
-      if(!/^\d+$/.test(state)||tag===null)throw Error('API did not confirm both state and alliance');
-      const at=response.retrieved_at||new Date().toISOString();
+      const found=verifiedPlayerLocation(response,fid);
+      const base=response.data.player;
       const online=base.last_online_at??base.last_online??base.last_login_at??base.last_login??base.lastOnline??null;
       setOnlineChecks(v=>({...v,[player.id]:online}));
-      setLocationChecks(v=>({...v,[player.id]:{status:'verified',state,tag,at}}));
+      setLocationChecks(v=>({...v,[player.id]:found}));
     }catch(e){setLocationChecks(v=>({...v,[player.id]:{status:'error',message:e.message||'Location unavailable'}}));}
   }
   async function checkAllLocations(){
@@ -209,7 +205,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       {enable3573Tracking&&trackingView!=='current'&&<button type="button" style={{...button,marginBottom:10}} onClick={()=>{setTrackingView('current');setVisibleCount(20);}}>‹ Back to Members</button>}
       {trackingView==='review'&&<button type="button" style={{...button,width:'100%',marginBottom:12}} disabled={locationBusy} onClick={checkAllLocations}>{locationBusy?'Checking locations…':'Find current location for all'}</button>}
       {trackingView!=='current'&&<h3 style={{fontSize:17,margin:'0 0 10px'}}>{trackingView==='review'?'Membership to review':'Transferred out'}</h3>}
-      {trackingView==='review'&&<p style={{fontSize:12,color:C.icy,margin:'0 0 12px'}}>Accounts without a successful roster update for 24+ hours are flagged for manual review. Previous review decisions have been reopened for this review round. Last online is separate from alliance membership.</p>}
+      {trackingView==='review'&&<p style={{fontSize:12,color:C.icy,margin:'0 0 12px'}}>Players with provider observations older than 24 hours, or missing timestamps, need review. Manual classification does not clear stale data. Last online is separate from alliance membership.</p>}
       <div role="group" aria-label="Sort roster" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,scrollbarWidth:'none',alignItems:'center'}}><span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Sort</span>
         {PRIMARY_SORTS.map(([id,label])=><button key={id} aria-pressed={sort===id} onClick={()=>changeSort(id)} style={{background:sort===id?'#45351F':'#182A3F',color:sort===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',minHeight:35,fontSize:12,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
         <button onClick={()=>setMoreSorts(v=>!v)} style={{background:extraSelected?'#45351F':'#182A3F',color:extraSelected?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',minHeight:35,fontSize:12,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{extraSelected?EXTRA_SORTS.find(([id])=>id===sort)?.[1]:'More'} {extraSelected?(sortDirection==='asc'?'↑':'↓'):'⌄'}</button>
