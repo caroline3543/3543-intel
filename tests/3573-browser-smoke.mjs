@@ -13,7 +13,7 @@ async function ready(){
   throw Error('Local 3573 preview server failed to start');
 }
 const player=(id,name)=>({id,username:name,fid:String(681766600+Number(id)),allianceTag:'HOT',cityPower:1000000,membershipObservedAt:new Date().toISOString(),providerStats:{capturedAt:new Date().toISOString()}});
-const fixture={players:[player('1','Caroline'),player('2','Carolinne'),player('3','Spicy')],events:[],customRoles:[],settings:{stateId:'3573'}};
+const fixture={players:[player('1','Caroline'),player('2','Carolinne'),player('3','Spicy')],events:[],customRoles:[],settings:{stateId:'3573',compareLabTop100:{stateId:'3573',board:'labyrinth',retrievedAt:'2026-11-18T12:00:00Z',counts:{ARC:3,HOT:2,RKG:1,LUN:0},other:{},noAlliance:0,unknown:0,total:6}}};
 function record(page){
  page.on('pageerror',error=>errors.push(error.message));
 }
@@ -78,7 +78,8 @@ try{
   assert.equal(await page.getByRole('status').filter({hasText:'FC8'}).count(),1,'Chart selection must reveal counts');
   await page.getByRole('button',{name:'Refresh Lab'}).click();
   await page.getByRole('alert').filter({hasText:/Previous results retained/}).waitFor();
-  assert.equal(await page.getByText('No saved lookup yet').count(),1,'Failed first lookup must not invent cached rankings');
+  assert.equal(await page.getByText(/Last lookup/).count(),1,'Shared Lab lookup timestamp must remain visible after refresh failure');
+  assert.equal(await page.getByRole('row',{name:/HOT/}).getByRole('cell').last().innerText(),'2','Shared Lab summary must supply last known counts');
   await page.getByRole('button',{name:'ⓘ About data'}).click();
   assert.equal(await page.getByText(/The chart shows Pre-FC through FC8/).count(),1,'Methodology must explain range');
   stage='members';
