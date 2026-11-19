@@ -4,6 +4,10 @@ import {normalizeRankings} from '../../../src/services/stateRankingsService.js';
 import {providerFurnaceLevel} from '../../../src/services/providerProfileService.js';
 
 const TAGS=['ARC','HOT','RKG','LUN'];
+const LAB_CACHE_KEY='3573:compare:labyrinth-top-100:v1';
+const MAX_LAB_CACHE_AGE_MS=30*24*60*60*1000;
+function readLabCache(){try{const value=JSON.parse(localStorage.getItem(LAB_CACHE_KEY)||'null');return value?.stateId==='3573'&&value.board==='labyrinth'&&Array.isArray(value.rows)&&value.rows.length<=100&&Number.isFinite(Date.parse(value.retrievedAt))&&Date.parse(value.retrievedAt)<=Date.now()+60000&&Date.now()-Date.parse(value.retrievedAt)<MAX_LAB_CACHE_AGE_MS?value:null;}catch{return null;}}
+function writeLabCache(value){try{localStorage.setItem(LAB_CACHE_KEY,JSON.stringify(value));}catch{/* Private browsing may disable storage. */}}
 const numeric=v=>v===null||v===undefined||v===''?null:Number.isFinite(Number(v))?Number(v):null;
 export function furnaceProgress(value){
  const label=providerFurnaceLevel(value);
@@ -34,6 +38,7 @@ export function allianceStandings(players,rankings){
 }
 export function labGroups(rankings){
  if(!rankings)return null;
+ if(rankings.stateId==='3573'&&rankings.board==='labyrinth'&&rankings.counts&&rankings.rows===undefined)return rankings;
  const counts=Object.fromEntries(TAGS.map(tag=>[tag,0]));
  const other={},seen=new Set();
  let noAlliance=0,unknown=0,total=0;
@@ -53,19 +58,24 @@ export function labGroups(rankings){
 }
 
 const compact=v=>v==null?'—':v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':Math.round(v).toLocaleString();
-export function AllianceStandings({players=[]}){
- const [snapshot,setSnapshot]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+export function AllianceStandings({players=[],lastLabSummary=null,onLabSummary}){
+ const [snapshot,setSnapshot]=useState(readLabCache),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [distributionMetric,setDistributionMetric]=useState('count');
  const [selectedFurnace,setSelectedFurnace]=useState(null);
  const [sort,setSort]=useState('avgPower'),[ascending,setAscending]=useState(false),[showOther,setShowOther]=useState(false);
  const load=async()=>{if(busy)return;setBusy(true);setError('');
   try{const result=await mightpulseRequest('rankings',{state:3573,board:'labyrinth',limit:100});
-   setSnapshot(normalizeRankings(result,'3573','labyrinth'));
-  }catch(e){setSnapshot(null);setError(e?.message||'Could not load state Labyrinth rankings');}
+   const next=normalizeRankings(result,'3573','labyrinth');
+   if(next?.stateId!=='3573'||next.board!=='labyrinth'||!Array.isArray(next.rows)||next.rows.length>100||!Number.isFinite(Date.parse(next.retrievedAt)))throw new Error('Invalid Labyrinth response');
+   setSnapshot(next);writeLabCache(next);
+   onLabSummary?.({...labGroups(next),stateId:'3573',board:'labyrinth',retrievedAt:next.retrievedAt});
+  }catch(e){setError((e?.message||'Could not refresh Labyrinth rankings')+'. Previous results retained.');}
   finally{setBusy(false);}
  };
- const rows=allianceStandings(players,snapshot);
- const lab=labGroups(snapshot);
+ const savedSummary=lastLabSummary?.stateId==='3573'&&lastLabSummary?.board==='labyrinth'&&Number.isFinite(Date.parse(lastLabSummary?.retrievedAt))?lastLabSummary:null;
+ const effectiveLab=snapshot&&(!savedSummary||Date.parse(snapshot.retrievedAt)>=Date.parse(savedSummary.retrievedAt))?snapshot:savedSummary;
+ const rows=allianceStandings(players,effectiveLab);
+ const lab=labGroups(effectiveLab);
  const ordered=[...rows].sort((a,b)=>{if(sort==='tag')return ascending?a.tag.localeCompare(b.tag):b.tag.localeCompare(a.tag);
   const av=a[sort],bv=b[sort];if(av==null)return 1;if(bv==null)return -1;return ascending?av-bv:bv-av;});
  const header=(key,label)=><button type="button" onClick={()=>{if(sort===key)setAscending(!ascending);else{setSort(key);setAscending(false);}}}
@@ -73,9 +83,10 @@ export function AllianceStandings({players=[]}){
   {label}{sort===key?(ascending?' ↑':' ↓'):''}</button>;
  return <section aria-label="3573 alliance standings" style={{background:'#15273A',border:'1px solid #344F69',borderRadius:15,padding:12,marginTop:13}}>
   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}>
-   <div><h3 style={{margin:0,fontSize:17}}>Alliance standings</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:4}}>State 3573 · Top four alliances</div></div>
-   <button type="button" onClick={load} disabled={busy} style={{border:'1px solid #344F69',background:'#1E3448',color:'#F1F7FD',borderRadius:9,minHeight:44,padding:'8px 10px',fontSize:12,fontWeight:650}}>{busy?'Loading…':snapshot?'Refresh Lab':'Load Lab Top 100'}</button>
+   <div><h3 style={{margin:0,fontSize:17}}>Alliance standings</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:4}}>Top four · App roster</div></div>
+   <button type="button" onClick={load} disabled={busy} style={{border:'1px solid #344F69',background:'#1E3448',color:'#F1F7FD',borderRadius:9,minHeight:44,padding:'8px 10px',fontSize:12,fontWeight:650}}>{busy?'Refreshing…':'Refresh Lab'}</button>
   </div>
+  <div style={{fontSize:11,color:'#A8BFD5',marginBottom:7}}>Lab Top 100 · {effectiveLab?'Last lookup '+new Date(effectiveLab.retrievedAt).toLocaleString():'No saved lookup yet'}</div>
   <div style={{overflowX:'auto'}}>
    <table style={{width:'100%',borderCollapse:'collapse',fontVariantNumeric:'tabular-nums',minWidth:310}}>
     <thead><tr>{[['tag','Alliance'],['avgPower','Avg power'],['avgFC','Avg FC'],['lab','Top 100 in Lab']].map(([k,label])=><th key={k} scope="col" style={{textAlign:k==='tag'?'left':'right',padding:0,borderBottom:'1px solid #344F69'}}>{header(k,label)}</th>)}</tr></thead>
@@ -99,21 +110,21 @@ export function AllianceStandings({players=[]}){
 
   <div style={{marginTop:18,borderTop:'1px solid #344F69',paddingTop:15}}>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-    <div><h3 style={{fontSize:16,margin:0}}>Furnace distribution</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:3}}>Current saved roster · four alliances</div></div>
+    <div><h3 style={{fontSize:16,margin:0}}>Furnace distribution</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:3}}>App roster · four alliances</div></div>
     <div role="group" aria-label="Furnace chart units" style={{display:'flex',background:'#102238',borderRadius:9,padding:3}}>
      {[['count','Players'],['percent','%']].map(([id,label])=><button key={id} type="button" aria-pressed={distributionMetric===id} onClick={()=>setDistributionMetric(id)} style={{border:0,borderRadius:7,minHeight:36,padding:'6px 12px',background:distributionMetric===id?'#365675':'transparent',color:'#F2F7FD',fontSize:12,fontWeight:700}}>{label}</button>)}
     </div>
    </div>
    {(()=>{
-    const tags=['ARC','HOT','RKG','LUN'],colors=['#8EA5C4','#3A9CC2','#43A59B','#E0AC65'],tiers=['FC5','FC6','FC7','FC8','FC9','FC10'];
+    const tags=['ARC','HOT','RKG','LUN'],colors=['#8EA5C4','#3A9CC2','#43A59B','#E0AC65'],tiers=['Pre-FC','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8'];
     const unique=new Set(),groups=Object.fromEntries(tags.map(t=>[t,{known:0,unknown:0,counts:Object.fromEntries(tiers.map(tier=>[tier,0]))}]));
     for(const p of players||[]){
      if(p.membershipStatus==='transferred_out'||String(p.stateId||'3573')!=='3573')continue;
      const tag=String(p.allianceTag||'').trim().toUpperCase(),id=String(p.fid||p.id||'').trim();
      if(!groups[tag]||!id||unique.has(id))continue;unique.add(id);
      const label=providerFurnaceLevel(p.furnaceLevel??p.providerStats?.furnaceLabel??p.providerStats?.furnaceLevel);
-     if(tiers.includes(label)){groups[tag].counts[label]++;groups[tag].known++;}
-     else if(label){groups[tag].known++;}
+     const tier=label&&/^F\d+$/.test(label)?'Pre-FC':label;
+     if(tiers.includes(tier)){groups[tag].counts[tier]++;groups[tag].known++;}
      else groups[tag].unknown++;
     }
     const vals=tiers.flatMap(t=>tags.map(tag=>distributionMetric==='count'?groups[tag].counts[t]:groups[tag].known?groups[tag].counts[t]/groups[tag].known*100:0));
@@ -135,15 +146,11 @@ export function AllianceStandings({players=[]}){
       <strong style={{fontSize:13}}>{active}</strong>
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:8,marginTop:7}}>{tags.map((tag,i)=><div key={tag}><span style={{color:colors[i],fontSize:11}}>{tag}</span><div style={{fontSize:17,fontWeight:750}}>{distributionMetric==='count'?groups[tag].counts[active]:groups[tag].known?(groups[tag].counts[active]/groups[tag].known*100).toFixed(1)+'%':'—'}</div></div>)}</div>
      </div>}
-     <div style={{fontSize:11,color:'#A8BFD5',marginTop:9}}>Known furnace levels: {tags.map(tag=>tag+' '+groups[tag].known).join(' · ')}. Unknown: {tags.reduce((n,tag)=>n+groups[tag].unknown,0)}. Saved membership may contain stale records; verify before using these counts for decisions.</div>
+     <div style={{fontSize:11,color:'#A8BFD5',marginTop:9}}>Valid levels: {tags.map(tag=>tag+' '+groups[tag].known).join(' · ')} · Unknown/out of range: {tags.reduce((n,tag)=>n+groups[tag].unknown,0)}.</div>
     </div>;
    })()}
   </div>
   {error&&<p role="alert" style={{color:'#FFB4AE',fontSize:12}}>{error}</p>}
-  <p style={{fontSize:11,color:'#A8BFD5',lineHeight:1.5,margin:'10px 0 0'}}>
-   Averages use saved players with valid values; missing values are excluded. Avg FC is a progression-equivalent, not a literal furnace level.
-   Top 100 in Lab counts every published state leaderboard entry by its reported alliance, including players absent from saved rosters{snapshot?' · retrieved '+new Date(snapshot.retrievedAt).toLocaleString():'. Load the leaderboard to see counts.'}
-  </p>
-  <p style={{fontSize:11,color:'#A8BFD5',margin:'5px 0 0'}}>Coverage: {rows.map(g=>g.tag+' '+g.powerCount+'/'+g.players+' power, '+g.fcCount+'/'+g.players+' furnace').join(' · ')}</p>
+  <p style={{fontSize:11,color:'#A8BFD5',margin:'10px 0 0'}}>Averages exclude missing values. Lab counts use the last successful state lookup.</p>
  </section>;
 }
