@@ -73,3 +73,14 @@ test('verified membership without alliance change refreshes membership timestamp
 test('archived transfer cannot be manually reallocated', () => {
   assert.throws(()=>reassignReviewedPlayer(player(null,{membershipStatus:'transferred_out'}),'ARC'),/archived/);
 });
+
+test('older API snapshot cannot overwrite a newer manual assignment', () => {
+  const p=reassignReviewedPlayer(player(new Date(now-48*3600000).toISOString()),'ARC',new Date(now).toISOString());
+  assert.throws(()=>applyVerifiedMembership(p,{status:'verified',state:'3573',tag:'HOT',at:new Date(now-3600000).toISOString()}),/predates/);
+});
+test('newer API snapshot can update a manual assignment', () => {
+  const reviewedAt=new Date(now-7200000).toISOString();
+  const p=reassignReviewedPlayer(player(new Date(now-48*3600000).toISOString()),'ARC',reviewedAt);
+  const updated=applyVerifiedMembership(p,{status:'verified',state:'3573',tag:'RKG',at:new Date(now-3600000).toISOString()});
+  assert.equal(updated.allianceTag,'RKG');
+});
