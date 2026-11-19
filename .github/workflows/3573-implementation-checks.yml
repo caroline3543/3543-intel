@@ -10,6 +10,7 @@ on:
       - work/3573-design-system-implementation
       - work/3573-production-backlog-reconciliation
       - release/3573-membership-integration
+      - work/3573-compare-live-data-redesign
 
 permissions:
   contents: read
