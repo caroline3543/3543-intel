@@ -7,7 +7,7 @@ export function verifiedPlayerLocation(response, expectedFid, now=Date.now()) {
   const fid=String(base?.chief_id??base?.fid??response?.data?.chief_id??'');
   if(!base || fid!==String(expectedFid))throw Error('Player ID mismatch or missing player profile');
   const state=String(base.kid??response?.data?.kid??'').trim();
-  if(!/^\\d+$/.test(state))throw Error('API did not confirm player state');
+  if(!/^\d+$/.test(state))throw Error('API did not confirm player state');
   if(!Object.prototype.hasOwnProperty.call(base,'alliance'))throw Error('API omitted alliance membership');
   const alliance=base.alliance;
   const tag=alliance===null?'':typeof alliance?.abbr==='string'&&alliance.abbr.trim()?alliance.abbr.trim():null;
