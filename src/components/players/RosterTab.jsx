@@ -112,6 +112,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const [membershipNow,setMembershipNow]=useState(()=>Date.now());
   useEffect(()=>{const timer=setInterval(()=>setMembershipNow(Date.now()),60_000);return ()=>clearInterval(timer);},[]);
   const [reviewDestination,setReviewDestination]=useState('');
+  const [reviewOtherTag,setReviewOtherTag]=useState('');
   async function checkLocation(player){
     const fid=String(player.fid||player.playerId||player.id||'').trim();
     if(!validPlayerFid(fid)){setLocationChecks(v=>({...v,[player.id]:{status:'error',message:'Valid player ID required'}}));return;}
@@ -185,7 +186,8 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   function applyReviewBulk(){
     const chosen=players.filter(p=>selected.has(p.id)&&!isTransferred(p));
     if(!chosen.length)return;
-    const destination=reviewDestination==='__no_alliance'?'':reviewDestination;
+    const destination=reviewDestination==='__no_alliance'?'':reviewDestination==='__other'?reviewOtherTag.trim().toUpperCase():reviewDestination;
+    if(destination && !/^[A-Z0-9]{2,12}$/.test(destination)){showToast?.('Enter a valid alliance tag (2–12 letters or digits).','error');return;}
     const reviewedAt=new Date().toISOString();
     onUpdatePlayers(chosen.map(p=>reassignReviewedPlayer(p,destination,reviewedAt)));
     showToast?.(chosen.length+' player(s) reassigned; API warnings remain active');
@@ -251,8 +253,10 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
           <option value="">Choose alliance</option>
           {['ARC','HOT','RKG','LUN',...allianceTags].map(tag=><option key={tag} value={tag}>{tag}</option>)}
           <option value="__no_alliance">No Alliance</option>
+          <option value="__other">Another alliance…</option>
         </select>
-        <button style={button} disabled={!reviewDestination} onClick={applyReviewBulk}>Apply reassignment</button>
+        {reviewDestination==='__other'&&<input aria-label="Other alliance tag" value={reviewOtherTag} onChange={e=>setReviewOtherTag(e.target.value)} placeholder="Alliance tag" maxLength={12} style={{...button,width:'100%',boxSizing:'border-box'}}/>}
+        <button style={button} disabled={!reviewDestination||(reviewDestination==='__other'&&!/^[A-Za-z0-9]{2,12}$/.test(reviewOtherTag.trim()))} onClick={applyReviewBulk}>Apply reassignment</button>
       </section>}
       {selecting&&editingSelection&&selected.size>0 && <RosterBulkEditor players={players} selected={selected} onOpenFields={()=>setFieldsOpen(true)} onApply={updated=>{onUpdatePlayers(updated);showToast?.(`Updated ${updated.length} players`);stopSelection();}}/>}
     </>}
