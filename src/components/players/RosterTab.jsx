@@ -11,7 +11,7 @@ import { RallyLeaderProfileSheet } from './RallyLeaderProfileSheet.jsx';
 import FieldRegistry from './FieldRegistry.jsx';
 import { RosterFilters } from './RosterFilters.jsx';
 import { RosterBulkEditor } from './RosterBulkEditor.jsx';
-import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch, suspectedTransferOut, validPlayerFid, archiveStateTransfer, restoreStateTransfer, moveReviewedPlayerToNoAlliance } from '../../services/rosterViewService.js';
+import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch, suspectedTransferOut, validPlayerFid, archiveStateTransfer, restoreStateTransfer, moveReviewedPlayerToNoAlliance, reassignReviewedPlayer } from '../../services/rosterViewService.js';
 const button={minHeight:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,padding:'10px 12px',fontSize:14,fontWeight:600,cursor:'pointer'};
 
 const PRIMARY_SORTS=[['name','Name'],['power','City power'],['labyrinth','Labyrinth'],['progression','Troop tiers']];
@@ -109,6 +109,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const [locationChecks,setLocationChecks]=useState({});
   const [onlineChecks,setOnlineChecks]=useState({});
   const [locationBusy,setLocationBusy]=useState(false);
+  const [reviewDestination,setReviewDestination]=useState('');
   async function checkLocation(player){
     const fid=String(player.fid||player.playerId||player.id||'').trim();
     if(!validPlayerFid(fid)){setLocationChecks(v=>({...v,[player.id]:{status:'error',message:'Valid player ID required'}}));return;}
@@ -120,6 +121,12 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       const online=base.last_online_at??base.last_online??base.last_login_at??base.last_login??base.lastOnline??null;
       setOnlineChecks(v=>({...v,[player.id]:online}));
       setLocationChecks(v=>({...v,[player.id]:found}));
+      // Only verified, recent in-state observations can change alliance.
+      // External state transfers still require explicit archive confirmation.
+      if(found.state==='3573' && String(player.allianceTag||'').trim()!==found.tag){
+        onSavePlayer(restoreStateTransfer(player,found));
+        showToast?.('API-confirmed alliance: '+(found.tag||'No Alliance'));
+      }
     }catch(e){setLocationChecks(v=>({...v,[player.id]:{status:'error',message:e.message||'Location unavailable'}}));}
   }
   async function checkAllLocations(){
@@ -173,6 +180,15 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const lastFetch=latestRosterFetch(players);
   function toggle(id){setSelected(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);return next;});}
   function stopSelection(){setSelecting(false);setSelected(new Set());setEditingSelection(false);}
+  function applyReviewBulk(){
+    const chosen=players.filter(p=>selected.has(p.id)&&!isTransferred(p));
+    if(!chosen.length)return;
+    const destination=reviewDestination==='__no_alliance'?'':reviewDestination;
+    const reviewedAt=new Date().toISOString();
+    onUpdatePlayers(chosen.map(p=>reassignReviewedPlayer(p,destination,reviewedAt)));
+    showToast?.(chosen.length+' player(s) reassigned; API warnings remain active');
+    stopSelection();
+  }
   function openProfile(player){setViewingPlayer(player);setPlayerLookup({status:'idle'});setProfileOpen(true);}
   function savePlayer(player){onSavePlayer(player);setViewingPlayer(player);}
   async function copyRoster(){
@@ -226,6 +242,15 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       {selecting && <section style={{padding:12,background:C.card,borderRadius:12,marginBottom:12}}>
         <div role="status" style={{fontSize:14,marginBottom:8}}>{selected.size} selected across this roster</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={button} onClick={()=>setSelected(prev=>new Set([...prev,...visible.map(p=>p.id)]))}>Select shown</button><button style={button} onClick={()=>setSelected(new Set())}>Clear selection</button><button style={{...button,color:C.gold}} disabled={!selected.size} onClick={()=>setEditingSelection(!editingSelection)}>Update selected</button>{enable3573Tracking&&<button style={button} disabled={!selected.size} onClick={()=>{const chosen=players.filter(p=>selected.has(p.id)&&!isTransferred(p));if(!chosen.length)return;onUpdatePlayers(chosen.map(p=>({...p,membershipStatus:'transfer_review',membershipFlaggedAt:new Date().toISOString()})));showToast?.(`${chosen.length} player(s) flagged for transfer review`);stopSelection();}}>Flag possible transfer</button>}</div>
+      </section>}
+      {enable3573Tracking&&trackingView==='review'&&selecting&&selected.size>0&&<section aria-label="Bulk alliance reassignment" style={{padding:12,background:C.card,borderRadius:12,marginBottom:12,display:'grid',gap:8}}>
+        <label htmlFor="review-alliance-target" style={{fontSize:12,color:C.icy}}>Assign {selected.size} selected player(s) to</label>
+        <select id="review-alliance-target" value={reviewDestination} onChange={e=>setReviewDestination(e.target.value)} style={{...button,width:'100%'}}>
+          <option value="">Choose alliance</option>
+          {['ARC','HOT','RKG','LUN',...allianceTags].map(tag=><option key={tag} value={tag}>{tag}</option>)}
+          <option value="__no_alliance">No Alliance</option>
+        </select>
+        <button style={button} disabled={!reviewDestination} onClick={applyReviewBulk}>Apply reassignment</button>
       </section>}
       {selecting&&editingSelection&&selected.size>0 && <RosterBulkEditor players={players} selected={selected} onOpenFields={()=>setFieldsOpen(true)} onApply={updated=>{onUpdatePlayers(updated);showToast?.(`Updated ${updated.length} players`);stopSelection();}}/>}
     </>}
