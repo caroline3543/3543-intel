@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { membershipFreshness, suspectedTransferOut } from '../src/services/rosterViewService.js';
+import { membershipFreshness, suspectedTransferOut, reassignReviewedPlayer, applyVerifiedMembership } from '../src/services/rosterViewService.js';
 
 const now = Date.parse('2026-11-19T12:00:00.000Z');
 const player = (capturedAt, extra={}) => ({
@@ -39,4 +39,23 @@ test('excludes archived transfers', () => {
 test('keeps recent provider observations fresh', () => {
   const p = player(new Date(now - 60 * 60 * 1000).toISOString());
   assert.equal(membershipFreshness(p, now), 'fresh');
+});
+
+test('manual bulk reassignment preserves history and stale status', () => {
+  const p=player(new Date(now-48*3600000).toISOString());
+  const updated=reassignReviewedPlayer(p,'ARC',new Date(now).toISOString());
+  assert.equal(updated.allianceTag,'ARC');
+  assert.equal(updated.allianceHistory.at(-1).from,'HOT');
+  assert.equal(updated.allianceHistory.at(-1).to,'ARC');
+  assert.equal(membershipFreshness(updated,now),'stale');
+});
+test('verified membership observation clears stale warning', () => {
+  const p=player(new Date(now-48*3600000).toISOString());
+  const updated=applyVerifiedMembership(p,{status:'verified',state:'3573',tag:'',at:new Date(now-3600000).toISOString()});
+  assert.equal(updated.allianceTag,'');
+  assert.equal(updated.allianceHistory.at(-1).from,'HOT');
+  assert.equal(membershipFreshness(updated,now),'fresh');
+});
+test('unverified membership cannot be applied', () => {
+  assert.throws(()=>applyVerifiedMembership(player(null),{status:'error',state:'3573',tag:'',at:new Date(now).toISOString()}),/verified/);
 });
