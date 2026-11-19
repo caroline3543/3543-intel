@@ -48,15 +48,22 @@ export function latestRosterFetch(players) {
 }
 
 /** Stale player API data is a review signal, never proof of transfer. */
-export const MEMBERSHIP_REVIEW_ROUND_STARTED_AT = '2026-11-18T07:40:00.000Z';
+export const MEMBERSHIP_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A stale provider observation is not evidence of an alliance transfer.
+ * Review acknowledgements and manual alliance edits never make old data fresh.
+ * Missing timestamps are classified separately as unknown, but need review.
+ */
+export function membershipFreshness(player, now=Date.now()) {
+  if (!player || player.membershipStatus === 'transferred_out') return 'excluded';
+  const observedAt = Date.parse(player.providerStats?.capturedAt || player.providerStats?.retrievedAt || '');
+  if (!Number.isFinite(observedAt) || observedAt > now) return 'unknown';
+  return now - observedAt >= MEMBERSHIP_STALE_AFTER_MS ? 'stale' : 'fresh';
+}
+
 export function suspectedTransferOut(player, now=Date.now()) {
-  if(!['RKG','LUN','ARC','HOT'].includes(String(player?.allianceTag||'').toUpperCase()))return false;
-  if(['transferred_out','transfer_review','unverified'].includes(player?.membershipStatus))return false;
-  const refreshed=Date.parse(player?.providerStats?.retrievedAt||'');
-  if(!Number.isFinite(refreshed))return false; // No successful fetch timestamp: unknown, not stale.
-  const reviewed=Date.parse(player?.membershipReviewedAt||'');
-  if(Number.isFinite(reviewed)&&reviewed>=Math.max(refreshed,Date.parse(MEMBERSHIP_REVIEW_ROUND_STARTED_AT)))return false; // Previous review rounds are reopened once; a decision in this round sticks.
-  return now-refreshed>=24*60*60*1000;
+  return ['stale', 'unknown'].includes(membershipFreshness(player, now));
 }
 
 /** Validate the immutable Whiteout player FID before an individual location lookup. */
