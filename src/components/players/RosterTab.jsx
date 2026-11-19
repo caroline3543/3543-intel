@@ -11,7 +11,7 @@ import { RallyLeaderProfileSheet } from './RallyLeaderProfileSheet.jsx';
 import FieldRegistry from './FieldRegistry.jsx';
 import { RosterFilters } from './RosterFilters.jsx';
 import { RosterBulkEditor } from './RosterBulkEditor.jsx';
-import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch, suspectedTransferOut, validPlayerFid, archiveStateTransfer, restoreStateTransfer, moveReviewedPlayerToNoAlliance, reassignReviewedPlayer } from '../../services/rosterViewService.js';
+import { EMPTY_FILTERS, matchesRosterFilters, rosterFilterCount, troopGaps, latestRosterFetch, suspectedTransferOut, validPlayerFid, archiveStateTransfer, restoreStateTransfer, moveReviewedPlayerToNoAlliance, reassignReviewedPlayer, applyVerifiedMembership } from '../../services/rosterViewService.js';
 const button={minHeight:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,padding:'10px 12px',fontSize:14,fontWeight:600,cursor:'pointer'};
 
 const PRIMARY_SORTS=[['name','Name'],['power','City power'],['labyrinth','Labyrinth'],['progression','Troop tiers']];
@@ -123,9 +123,9 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       setLocationChecks(v=>({...v,[player.id]:found}));
       // Only verified, recent in-state observations can change alliance.
       // External state transfers still require explicit archive confirmation.
-      if(found.state==='3573' && String(player.allianceTag||'').trim()!==found.tag){
-        onSavePlayer(restoreStateTransfer(player,found));
-        showToast?.('API-confirmed alliance: '+(found.tag||'No Alliance'));
+      if(found.state==='3573'){
+        onSavePlayer(applyVerifiedMembership(player,found));
+        if(String(player.allianceTag||'').trim()!==found.tag) showToast?.('API-confirmed alliance: '+(found.tag||'No Alliance'));
       }
     }catch(e){setLocationChecks(v=>({...v,[player.id]:{status:'error',message:e.message||'Location unavailable'}}));}
   }
