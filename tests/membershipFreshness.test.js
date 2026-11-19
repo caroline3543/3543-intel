@@ -1,0 +1,42 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { membershipFreshness, suspectedTransferOut } from '../src/services/rosterViewService.js';
+
+const now = Date.parse('2026-11-19T12:00:00.000Z');
+const player = (capturedAt, extra={}) => ({
+  allianceTag: 'HOT',
+  membershipStatus: 'active',
+  providerStats: { capturedAt, retrievedAt: new Date(now).toISOString() },
+  ...extra,
+});
+
+test('flags a 24-hour-old provider observation despite a fresh API retrieval', () => {
+  const p = player(new Date(now - 24 * 60 * 60 * 1000).toISOString());
+  assert.equal(membershipFreshness(p, now), 'stale');
+  assert.equal(suspectedTransferOut(p, now), true);
+});
+
+test('does not suppress stale flags after manual review', () => {
+  const p = player(new Date(now - 48 * 60 * 60 * 1000).toISOString(), {
+    membershipReviewedAt: new Date(now).toISOString(),
+    allianceTag: '',
+  });
+  assert.equal(suspectedTransferOut(p, now), true);
+});
+
+test('flags missing observation timestamp for review', () => {
+  const p = { allianceTag: 'ARC', membershipStatus: 'active', providerStats: {} };
+  assert.equal(membershipFreshness(p, now), 'unknown');
+  assert.equal(suspectedTransferOut(p, now), true);
+});
+
+test('excludes archived transfers', () => {
+  const p = player(null, { membershipStatus: 'transferred_out' });
+  assert.equal(membershipFreshness(p, now), 'excluded');
+  assert.equal(suspectedTransferOut(p, now), false);
+});
+
+test('keeps recent provider observations fresh', () => {
+  const p = player(new Date(now - 60 * 60 * 1000).toISOString());
+  assert.equal(membershipFreshness(p, now), 'fresh');
+});
