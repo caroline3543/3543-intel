@@ -93,3 +93,13 @@ export function moveReviewedPlayerToNoAlliance(player, reviewedAt=new Date().toI
   const previous=String(player.allianceTag||'').trim();
   return {...player,allianceTag:'',lastKnownAlliance:previous||player.lastKnownAlliance||'',membershipStatus:'active',membershipReviewedAt:reviewedAt,allianceHistory:previous?[...(player.allianceHistory||[]),{from:previous,to:'',at:reviewedAt,source:'manual-review'}].slice(-20):player.allianceHistory};
 }
+
+/** Manual alliance classification never updates provider observation freshness. */
+export function reassignReviewedPlayer(player, destination, reviewedAt=new Date().toISOString()) {
+  if (!player || player.membershipStatus === 'transferred_out') throw Error('Cannot reassign an archived transfer.');
+  const to=String(destination ?? '').trim().toUpperCase();
+  if (to && !/^[A-Z0-9]{2,12}$/.test(to)) throw Error('Invalid alliance tag.');
+  const from=String(player.allianceTag||'').trim();
+  if (from===to) return {...player,membershipReviewedAt:reviewedAt};
+  return {...player,allianceTag:to,lastKnownAlliance:from||player.lastKnownAlliance||'',membershipStatus:'active',membershipReviewedAt:reviewedAt,allianceHistory:[...(player.allianceHistory||[]),{from,to,at:reviewedAt,source:'manual-review'}].slice(-20)};
+}
