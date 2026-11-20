@@ -40,6 +40,16 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
       const rows=await query('select membership_3573.cancel_job($1,$2,$3) as ok',[job.id,job.lease_token,reason]);
       if(rows?.[0]?.ok!==true)throw Error('Expired or lost lease');
     },
+    async reserveCredits({credits,providerUsed,now}){
+      if(!Number.isSafeInteger(credits)||credits<1||credits>60||
+         !Number.isSafeInteger(providerUsed)||providerUsed<0||
+         !Number.isFinite(Date.parse(now||'')))return false;
+      const rows=await query(
+        'select membership_3573.reserve_request_credits($1,$2,$3) as allowed',
+        [now,credits,providerUsed]
+      );
+      return rows?.[0]?.allowed===true;
+    },
     async estimateRosterCredits(){
       // Whiteout Stats include=info,roster is one counted request.
       // members_base/members_full are intentionally not used here.
