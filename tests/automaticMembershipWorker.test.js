@@ -5,7 +5,7 @@ const now=Date.parse('2026-11-20T12:00:00Z');
 function harness({enabled=true,usage={used:100,minuteUsed:0},observation={fresh:true,fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3573',tag:'HOT',at:'2026-11-20T11:00:00Z'},roster=null}={}){
  const calls=[];const player={fid:'12345678',username:'Test',stateId:'3573',allianceTag:'ARC',membershipObservedAt:'2026-11-19T00:00:00Z'};
  const job={jobKey:'player:12345678',jobKind:'player_verify',fid:'12345678',attempts:0};
- const store={isEnabled:async()=>enabled,leaseNext:async()=>job,getPlayer:async()=>player,enqueue:async j=>calls.push(['enqueue',j]),commitPlayerObservation:async v=>calls.push(['commit',v]),commitRosterSnapshot:async v=>calls.push(['snapshot',v]),complete:async()=>calls.push(['complete']),retry:async(_,v)=>calls.push(['retry',v])};
+ const store={isEnabled:async()=>enabled,leaseNext:async()=>job,getPlayer:async()=>player,estimateRosterCredits:async()=>1,enqueue:async j=>calls.push(['enqueue',j]),commitPlayerObservation:async v=>calls.push(['commit',v]),commitRosterSnapshot:async v=>calls.push(['snapshot',v]),complete:async()=>calls.push(['complete']),retry:async(_,v)=>calls.push(['retry',v])};
  const api={usage:async()=>usage,verifyPlayer:async()=>observation,roster:async()=>roster};
  return {worker:createMembershipWorker({store,api,clock:()=>now}),calls,job,store,api};
 }
@@ -68,5 +68,22 @@ for(const [name,usage] of [
   const h=harness({usage});
   assert.equal((await h.worker.tick()).status,'usage_unavailable');
   assert.equal(h.calls.length,0);
+ });
+}
+
+test('missing roster cost estimate cannot bypass budget guard',async()=>{
+ const h=harness({roster:{complete:true,fresh:true,observedAt:'2026-11-20T11:00:00Z',members:[]}});
+ h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';
+ delete h.store.estimateRosterCredits;
+ assert.equal((await h.worker.tick()).status,'cost_unverified');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+for(const estimate of [NaN,Infinity,-1,0,1.5,'not-a-number',61]){
+ test('invalid roster credit estimate '+String(estimate)+' fails closed',async()=>{
+  const h=harness({roster:{complete:true,fresh:true,observedAt:'2026-11-20T11:00:00Z',members:[]}});
+  h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';
+  h.store.estimateRosterCredits=async()=>estimate;
+  assert.equal((await h.worker.tick()).status,'cost_unverified');
+  assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
  });
 }
