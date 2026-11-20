@@ -36,3 +36,16 @@ test('seeding never advances an existing scheduled refresh',async()=>{
  assert.match(calls[0].sql,/on conflict\(job_key\) do nothing/i);
  assert.doesNotMatch(calls[0].sql,/due_at\s*=\s*least/i);
 });
+
+test('leased PostgreSQL row is normalized for worker dispatch',async()=>{
+ const adapter=createMembershipQueueAdapter({query:async()=>[{
+  id:7,job_key:'roster:ARC',job_kind:'alliance_roster',alliance_tag:'ARC',
+  lease_token:'lease-token',attempts:2
+ }]});
+ const leased=await adapter.leaseNext({now:'2026-11-20T12:00:00Z'});
+ assert.equal(leased.jobKind,'alliance_roster');
+ assert.equal(leased.jobKey,'roster:ARC');
+ assert.equal(leased.allianceTag,'ARC');
+ assert.equal(leased.lease_token,'lease-token');
+ assert.equal(leased.attempts,2);
+});
