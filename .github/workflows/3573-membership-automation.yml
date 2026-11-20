@@ -61,6 +61,6 @@ jobs:
         with:
           deno-version: v2.x
       - name: Typecheck staged private worker
-        run: deno check supabase/functions/caroline3573-membership-worker/index.ts
+        run: deno check --config supabase/functions/caroline3573-membership-worker/deno.json supabase/functions/caroline3573-membership-worker/index.ts
       - name: Production build check
         run: npm run build
