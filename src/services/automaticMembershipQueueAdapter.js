@@ -37,7 +37,26 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
       const rows=await query('select membership_3573.retry_job($1,$2,$3,$4,$5,$6) as ok',[job.id,job.lease_token,new Date().toISOString(),dueAt,reason,attempts||0]);
       if(rows?.[0]?.ok!==true)throw Error('Expired or lost lease');
     },
-    async commitPlayerObservation(){throw Error('Atomic workspace membership merge not configured')},
+    async getPlayer(fid){
+      const rows=await query("select player from public.caroline_workspaces w cross join lateral jsonb_array_elements(w.data->'players') player where w.id='3573-leaders' and player->>'fid'=$1 limit 1",[String(fid)]);
+      return rows?.[0]?.player||null;
+    },
+    async commitPlayerObservation({job,observation,detectedAt}){
+      if(!job?.lease_token||observation?.status!=='verified'||!observation.at||!observation.source)
+        throw Error('Verified source and active lease required');
+      for(let i=0;i<3;i++){
+        const current=await query("select revision from public.caroline_workspaces where id='3573-leaders'",[]);
+        const revision=current?.[0]?.revision;
+        if(revision==null)throw Error('Workspace unavailable');
+        const rows=await query('select * from membership_3573.commit_verified_location($1,$2,$3,$4,$5,$6,$7)',
+          [String(job.fid),String(observation.state),String(observation.tag??''),observation.at,detectedAt,observation.source,revision]);
+        if(rows?.[0]?.outcome==='revision_conflict')continue;
+        if(rows?.[0]?.outcome==='older_observation')return;
+        if(rows?.[0]?.applied===true)return;
+        throw Error('Membership commit rejected');
+      }
+      throw Error('Concurrent workspace updates; defer job');
+    },
     async commitRosterSnapshot(){throw Error('Atomic roster snapshot transaction not configured')},
   };
 }
