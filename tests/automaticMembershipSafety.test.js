@@ -25,7 +25,7 @@ test('transferred out players are cancelled before API verification',async()=>{
  assert.equal((await h.worker.tick()).status,'not_eligible');
  assert.deepEqual(h.calls,[['cancel','not_eligible']]);
 });
-test('roster credit estimate over minute limit defers the job',async()=>{
+test('oversized member-data cost estimate is rejected rather than executed',async()=>{
  const h=setup({kind:'alliance_roster',credits:100});
  assert.equal((await h.worker.tick()).status,'cost_unverified');
  assert.equal(h.calls[0][0],'retry');
