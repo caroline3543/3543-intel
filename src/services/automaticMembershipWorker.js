@@ -44,6 +44,27 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
       await store.retry(job,{dueAt:new Date(clock()+60000).toISOString(),reason:'budget_or_rate_limit',attempts:job.attempts||0});
       return {status:'rate_limited'};
     }
+    // Eligibility must be checked before consuming a non-refundable reservation.
+    // A cancelled or transferred-out player must not spend free-tier credits.
+    let verifiedPlayer=null;
+    let playerGroup=null;
+    if(job.jobKind==='player_verify'){
+      try{
+        verifiedPlayer=await store.getPlayer(job.fid);
+        if(!verifiedPlayer){
+          await store.cancel(job,'unknown_player');
+          return {status:'not_eligible'};
+        }
+        playerGroup=refreshClass(verifiedPlayer,clock(),await store.getSecondaryTags?.()||[]);
+        if(!playerGroup){
+          await store.cancel(job,'not_eligible');
+          return {status:'not_eligible'};
+        }
+      }catch(error){
+        await store.retry(job,{dueAt:new Date(clock()+60000).toISOString(),reason:'eligibility_check_unavailable',attempts:job.attempts||0});
+        return {status:'eligibility_unavailable'};
+      }
+    }
     // The provider usage snapshot is advisory. Shared reservations are required
     // to prevent simultaneous workers from spending the same remaining credits.
     // Fail closed until the server adapter supplies an atomic reservation.
