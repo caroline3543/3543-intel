@@ -17,8 +17,11 @@ export function planVerifiedMembershipUpdate({workspace,events=[],fid,observatio
   const last=Date.parse(previous.membershipLastSuccessfulAt||previous.membershipObservedAt||'');
   if(Number.isFinite(last)&&Date.parse(observation.at)<last)return {workspace,events,changed:false,reason:'older_observation'};
   const decision=classifyLocation(previous,observation,detectedAt);
+  if(decision.reason==='older_observation')return {workspace,events,changed:false,reason:'older_observation'};
   if(decision.reason==='unverified')throw Error('Invalid state evidence');
-  const updated=String(observation.state)==='3573'    ?applyVerifiedMembership(previous,observation)\n    :archiveStateTransfer(previous,observation,detectedAt);
+  const updated=String(observation.state)==='3573'
+    ?applyVerifiedMembership(previous,observation) 
+    :archiveStateTransfer(previous,observation,detectedAt);
   // Retain every original profile field not explicitly managed by the
   // membership service. Never replace a full player object with API payload.
   const players=workspace.players.slice();
