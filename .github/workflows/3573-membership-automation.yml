@@ -12,7 +12,21 @@ permissions:
 jobs:
   membership:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: membership_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d membership_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,5 +36,19 @@ jobs:
       - run: npm ci
       - name: Membership regression suite
         run: node --test tests/automaticMembership*.test.js
+      - name: Compile staged membership SQL in isolated PostgreSQL
+        env:
+          PGPASSWORD: postgres
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: membership_test
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;"
+          psql -v ON_ERROR_STOP=1 -c "CREATE TABLE public.caroline_workspaces (id text PRIMARY KEY, data jsonb NOT NULL DEFAULT '{}'::jsonb, revision bigint NOT NULL DEFAULT 0, updated_at timestamptz, updated_by text);"
+          psql -v ON_ERROR_STOP=1 -f database/3573_automatic_membership_schema.sql
+          psql -v ON_ERROR_STOP=1 -f database/3573_automatic_membership_worker_functions.sql
+          psql -v ON_ERROR_STOP=1 -f database/3573_membership_roster_snapshot.sql
+          psql -v ON_ERROR_STOP=1 -f database/3573_membership_atomic_commit.sql
       - name: Production build check
         run: npm run build
