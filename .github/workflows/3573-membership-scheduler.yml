@@ -1,0 +1,32 @@
+name: 3573 Membership Scheduler
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
+permissions:
+  contents: read
+jobs:
+  tick:
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      WORKER_URL: ${{ secrets.MEMBERSHIP_3573_WORKER_URL }}
+      CRON_SECRET: ${{ secrets.MEMBERSHIP_3573_CRON_SECRET }}
+      CRON_ENABLED: ${{ secrets.MEMBERSHIP_3573_CRON_ENABLED }}
+    steps:
+      - name: Require explicit production enablement
+        run: |
+          if [ "$CRON_ENABLED" != "true" ]; then
+            echo "3573 membership scheduler is disabled."
+            exit 0
+          fi
+          test -n "$WORKER_URL" && test -n "$CRON_SECRET" || exit 1
+      - name: Run one private membership tick
+        if: env.CRON_ENABLED == 'true'
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -X POST "$WORKER_URL" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"mode":"tick"}'
