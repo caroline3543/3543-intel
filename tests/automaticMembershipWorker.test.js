@@ -56,3 +56,17 @@ test('cached or unconfirmed freshness cannot change membership',async()=>{
  assert.equal((await h.worker.tick()).status,'retry_scheduled');
  assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
 });
+
+for(const [name,usage] of [
+ ['negative daily usage',{used:-1,minuteUsed:0}],
+ ['negative minute usage',{used:100,minuteUsed:-1}],
+ ['fractional daily usage',{used:100.5,minuteUsed:0}],
+ ['fractional minute usage',{used:100,minuteUsed:0.5}],
+ ['impossible minute usage',{used:100,minuteUsed:61}]
+]){
+ test('invalid provider usage '+name+' fails closed before leasing',async()=>{
+  const h=harness({usage});
+  assert.equal((await h.worker.tick()).status,'usage_unavailable');
+  assert.equal(h.calls.length,0);
+ });
+}
