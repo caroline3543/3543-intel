@@ -18,3 +18,20 @@ test('unverified player observation preserves data and retries',async()=>{const 
 test('roster disappearance does not cause transfer',async()=>{const h=harness({roster:{complete:true,fresh:true,observedAt:'2026-11-20T11:00:00Z',members:[]}});h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';assert.equal((await h.worker.tick()).status,'completed');assert.deepEqual(h.calls[0][1].discoveries,[]);assert.equal(h.calls[0][0],'snapshot')});
 test('incomplete roster does not overwrite snapshot',async()=>{const h=harness({roster:{complete:false,fresh:true,members:[]}});h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';assert.equal((await h.worker.tick()).status,'retry_scheduled');assert.equal(h.calls[0][0],'retry')});
 test('seeding creates exact primary roster jobs and due player jobs',async()=>{const h=harness();const n=await h.worker.seed([{fid:'12345678',allianceTag:'ARC',membershipLastSuccessfulAt:'2026-11-20T06:00:00Z'}]);assert.equal(n,1);assert.equal(h.calls.length,5);assert.deepEqual(h.calls.slice(1).map(x=>x[1].allianceTag),['ARC','RKG','HOT','LUN'])});
+
+test('mismatched verified FID cannot update a different player',async()=>{
+ const h=harness({observation:{fid:'99999999',source:'whiteoutstats-player',status:'verified',state:'3599',tag:'ABC',at:'2026-11-20T11:00:00Z'}});
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+test('provider timestamp missing prevents membership changes',async()=>{
+ const h=harness({observation:{fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3599',tag:'ABC'}});
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+test('roster without provider timestamp cannot overwrite a snapshot',async()=>{
+ const h=harness({roster:{complete:true,fresh:true,members:[]}});
+ h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
