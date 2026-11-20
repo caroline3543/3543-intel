@@ -41,13 +41,13 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
         nextIntervalHours=group==='primary'||group==='recentDeparture'?12:group==='secondary'?168:24;
         const observation=await api.verifyPlayer(job.fid);
         // The API adapter must reject cached, incomplete, stale or mismatched responses.
-        if(!observation||observation.status!=='verified')throw Error('Unverified player response');
+        if(!observation||observation.status!=='verified'||String(observation.fid)!==String(job.fid)||!observation.source||!Number.isFinite(Date.parse(observation.at||''))||Date.parse(observation.at)>clock()+300000||clock()-Date.parse(observation.at)>72*60*60*1000)throw Error('Unverified, stale or mismatched player response');
         const decision=classifyLocation(previous,observation,iso());
         await store.commitPlayerObservation({job,previous,observation,decision,detectedAt:iso()});
       } else if(job.jobKind==='alliance_roster') {
         nextIntervalHours=['ARC','RKG','HOT','LUN'].includes(job.allianceTag)?12:168;
         const roster=await api.roster('3573',job.allianceTag);
-        if(!roster?.complete||!roster?.fresh||!Array.isArray(roster.members))throw Error('Incomplete roster response');
+        if(!roster?.complete||!roster?.fresh||!Array.isArray(roster.members)||!Number.isFinite(Date.parse(roster.observedAt||''))||Date.parse(roster.observedAt)>clock()+300000||clock()-Date.parse(roster.observedAt)>72*60*60*1000)throw Error('Incomplete or stale roster response');
         const discoveries=[];
         for(const member of roster.members) {
           const prior=await store.getPlayer(String(member.fid));
