@@ -30,7 +30,7 @@ begin
    or coalesce(length(p_source),0)<3 then
    raise exception 'Invalid or stale verified location evidence';
  end if;
- if not exists (select 1 from membership_3573.refresh_jobs where id=p_job_id and lease_token=p_lease_token and status='leased' and lease_until>=p_detected_at for update) then raise exception 'Missing or expired worker lease'; end if;
+ if not exists (select 1 from membership_3573.refresh_jobs where id=p_job_id and lease_token=p_lease_token and status='leased' and lease_until>=p_detected_at and job_kind='player_verify' and fid=p_fid for update) then raise exception 'Missing or expired worker lease'; end if;
  select w.data,w.revision into v_workspace
  from public.caroline_workspaces w where w.id='3573-leaders' for update;
  if not found then raise exception '3573 workspace missing'; end if;
