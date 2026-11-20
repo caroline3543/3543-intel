@@ -17,7 +17,7 @@ function setup({player={fid:'12345678',allianceTag:'HOT'},kind='player_verify',c
    commitPlayerObservation:async()=>calls.push(['playerCommit']),
    commitRosterSnapshot:async()=>calls.push(['rosterCommit'])
  };
- const api={usage:async()=>usage,verifyPlayer:async()=>({status:'verified',state:'3573',tag:'HOT',at:'2026-11-20T10:00:00Z'}),roster:async()=>({complete:true,fresh:true,members:[]})};
+ const api={usage:async()=>usage,verifyPlayer:async()=>({fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3573',tag:'HOT',at:'2026-11-20T10:00:00Z'}),roster:async()=>({complete:true,fresh:true,observedAt:'2026-11-20T11:00:00Z',members:[]})};
  return {worker:createMembershipWorker({store,api,clock:()=>Date.parse('2026-11-20T12:00:00Z')}),calls};
 }
 test('transferred out players are cancelled before API verification',async()=>{
