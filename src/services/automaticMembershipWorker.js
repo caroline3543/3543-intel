@@ -26,10 +26,18 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
     if(budget<=0)return {status:'budget_exhausted'};
     const job=await store.leaseNext({now:iso(),leaseSeconds:600});
     if(!job)return {status:'idle'};
-    const credits=job.jobKind==='alliance_roster'?Math.max(1,Number(await store.estimateRosterCredits?.(job.allianceTag)||1)):estimatedCredits({kind:'player'});
+    let credits;
+    try {
+      const estimate=job.jobKind==='alliance_roster'
+        ? await store.estimateRosterCredits?.(job.allianceTag)
+        : estimatedCredits({kind:'player'});
+      credits=estimate===undefined ? NaN : Number(estimate);
+    } catch {
+      credits=NaN;
+    }
     let nextIntervalHours=24;
-    if(credits>60){
-      await store.retry(job,{dueAt:new Date(clock()+3600000).toISOString(),reason:'roster_cost_exceeds_minute_limit',attempts:job.attempts||0});
+    if(!Number.isSafeInteger(credits)||credits<1||credits>60){
+      await store.retry(job,{dueAt:new Date(clock()+3600000).toISOString(),reason:'unverified_or_excessive_request_cost',attempts:job.attempts||0});
       return {status:'cost_unverified'};
     }
     if(credits>budget||usage.minuteUsed+credits>60){
