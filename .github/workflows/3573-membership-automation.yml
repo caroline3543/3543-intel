@@ -1,0 +1,23 @@
+name: 3573 Membership Automation Tests
+on:
+  push:
+    branches:
+      - work/3573-automatic-membership-transfer-tracking
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  membership:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Membership regression suite
+        run: node --test tests/automaticMembership*.test.js
+      - name: Production build check
+        run: npm run build
