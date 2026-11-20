@@ -63,6 +63,13 @@ begin
      'allianceTag',p_tag,'membershipStatus','active',
      'transferDestinationState',null,'transferDestinationAlliance',null,
      'transferredOutAt',null);
+   -- Track recent departures from the four main alliances for 72-hour
+   -- follow-up checks. Returning to a main alliance clears the marker.
+   if p_tag in ('ARC','RKG','HOT','LUN') then
+     v_new=v_new||jsonb_build_object('leftPrimaryAt',null);
+   elsif v_old_tag in ('ARC','RKG','HOT','LUN') and v_old_tag<>p_tag then
+     v_new=v_new||jsonb_build_object('leftPrimaryAt',p_detected_at);
+   end if;
    if v_old_tag<>p_tag then
      v_history=coalesce(v_player->'allianceHistory','[]'::jsonb);
      v_new=jsonb_set(v_new,'{allianceHistory}',
