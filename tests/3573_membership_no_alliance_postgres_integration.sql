@@ -20,7 +20,8 @@ begin
  end if;
  select data->'players'->0 into p from public.caroline_workspaces where id='3573-leaders';
  if p->>'allianceTag' <> '' or p->>'membershipStatus' <> 'active'
-   or p->>'manualNotes' <> 'Keep this note' then
+   or p->>'manualNotes' <> 'Keep this note'
+   or (p->>'leftPrimaryAt')::timestamptz is null then
    raise exception 'No Alliance state incorrect or manual data overwritten';
  end if;
  if (select count(*) from membership_3573.transfer_events) <> 0 then
