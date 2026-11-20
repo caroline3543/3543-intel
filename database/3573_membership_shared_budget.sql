@@ -18,7 +18,6 @@ declare
  v_daily integer;
  v_minute_credits integer;
  v_last_provider integer;
- v_last_reported_at timestamptz;
 begin
  if p_now is null or p_credits is null or p_credits<1 or p_credits>60
     or p_provider_used is null or p_provider_used<0 then return false; end if;
@@ -36,10 +35,10 @@ begin
  select credits into v_minute_credits from membership_3573.minute_reservations where minute_start=v_minute for update;
  -- Conservatively account for provider usage already reported and locally
  -- reserved credits. Never allow more than 4,000 planned worker credits/day.
- -- The provider usage total already includes successful prior reservations. Counting
- -- every reservation again would double-charge the same credits and halt early.
- -- Use the higher of observed provider usage and outstanding local reservations.
- if greatest(p_provider_used,v_last_provider,v_daily)+p_credits>4000
+ -- Deliberately conservative: provider totals may lag, and other site calls
+ -- can spend credits between snapshots. This may count some usage twice,
+ -- but must not undercount the free-tier account allowance.
+ if greatest(p_provider_used,v_last_provider)+v_daily+p_credits>4000
     or v_minute_credits+p_credits>60 then return false; end if;
  update membership_3573.refresh_usage
  set estimated_credits=estimated_credits+p_credits,updated_at=p_now where usage_day=v_day;
