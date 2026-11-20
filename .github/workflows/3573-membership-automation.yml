@@ -52,5 +52,6 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/3573_membership_atomic_commit.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_postgres_integration.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_roster_postgres_integration.sql
+          psql -v ON_ERROR_STOP=1 -f tests/3573_membership_no_alliance_postgres_integration.sql
       - name: Production build check
         run: npm run build
