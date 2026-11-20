@@ -48,3 +48,13 @@ begin
 end $$;
 revoke all on function membership_3573.reserve_request_credits(timestamptz,integer,integer) from public,anon,authenticated;
 grant execute on function membership_3573.reserve_request_credits(timestamptz,integer,integer) to service_role;
+
+-- Public-schema RPC bridge for trusted Supabase Edge Functions only.
+-- Both the existing proxy and the private worker reserve from the same ledger.
+create or replace function public.caroline_3573_reserve_proxy_credit()
+returns boolean language sql security invoker set search_path=''
+as $$
+ select membership_3573.reserve_request_credits(now(),1,0)
+$$;
+revoke all on function public.caroline_3573_reserve_proxy_credit() from public,anon,authenticated;
+grant execute on function public.caroline_3573_reserve_proxy_credit() to service_role;
