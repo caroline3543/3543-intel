@@ -15,6 +15,6 @@ export function verifiedPlayerLocation(response, expectedFid, now=Date.now()) {
   const observedAt=base.cached_at??response?.data?.cached_at??response?.data?.meta?.cached_at??null;
   if(!observedAt)throw Error('API did not provide a verifiable observation timestamp');
   const observedMs=typeof observedAt==='number'?observedAt<1e12?observedAt*1000:observedAt:Date.parse(observedAt);
-  if(!Number.isFinite(observedMs)||observedMs>now||now-observedMs>=24*60*60*1000)throw Error('Provider membership observation is stale or invalid');
+  if(!Number.isFinite(observedMs)||observedMs>now||now-observedMs>72*60*60*1000)throw Error('Provider membership observation is stale or invalid');
   return {status:'verified',state,tag,at:new Date(observedMs).toISOString()};
 }
