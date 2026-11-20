@@ -10,7 +10,7 @@ export function transferNavigation(events=[],now=Date.now()){
  const inbound=confirmed.filter(e=>String(e.toState)===STATE);
  const outbound=confirmed.filter(e=>String(e.fromState)===STATE);
  const recent=list=>list.some(e=>{
-   const at=validTime(e.lastVerifiedAt||e.verifiedAt||e.firstDetectedAt);
+   const at=validTime(e.firstDetectedAt);
    return at!==null&&at<=now&&now-at<72*HOUR;
  });
  return {
