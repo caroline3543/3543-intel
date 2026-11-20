@@ -66,8 +66,8 @@ begin
    if v_old_tag<>p_tag then
      v_history=coalesce(v_player->'allianceHistory','[]'::jsonb);
      v_new=jsonb_set(v_new,'{allianceHistory}',
-       (select coalesce(jsonb_agg(item),'[]'::jsonb) from
-        (select item from jsonb_array_elements(v_history||
+       (select coalesce(jsonb_agg(item order by ord),'[]'::jsonb) from
+        (select item,ord from jsonb_array_elements(v_history||
          jsonb_build_array(jsonb_build_object('from',v_old_tag,'to',p_tag,'at',p_observed_at,'source','whiteoutstats'))) with ordinality t(item,ord)
          order by ord desc limit 20) recent));
      v_new=v_new||jsonb_build_object('lastKnownAlliance',v_old_tag);
