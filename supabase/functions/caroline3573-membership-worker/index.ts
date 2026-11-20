@@ -118,8 +118,15 @@ Deno.serve(async(req)=>{
   const workspace=await query("select data from public.caroline_workspaces where id=$1",["3573-leaders"]);
   if(!workspace[0]||!Array.isArray(workspace[0].data?.players))
    return json({error:"Workspace player data unavailable"},503);
+  // Secondary alliances must be derived from current workspace membership;
+  // omitting them silently disables the promised weekly refresh cadence.
+  const secondaryTags=[...new Set(workspace[0].data.players
+   .filter((player:any)=>player?.membershipStatus!=="transferred_out")
+   .map((player:any)=>String(player?.allianceTag||""))
+   .filter((tag:string)=>/^[A-Za-z0-9_]{1,16}$/.test(tag)&&!["ARC","RKG","HOT","LUN"].includes(tag))
+  )].sort();
   const worker=createMembershipWorker({store,api});
-  const seeded=await worker.seed(workspace[0].data.players);
+  const seeded=await worker.seed(workspace[0].data.players,secondaryTags);
   const results=[];
   for(let i=0;i<12;i++){
    const result=await worker.tick();
