@@ -54,6 +54,29 @@ create table if not exists membership_3573.roster_snapshots (
   is_complete boolean not null default false,
   updated_at timestamptz not null default now()
 );
+create table if not exists membership_3573.roster_discoveries (
+ fid text primary key,
+ first_seen_at timestamptz not null,
+ last_seen_at timestamptz not null,
+ alliance_tag text not null,
+ previous_state text,
+ status text not null default 'unverified' check(status in ('unverified','verified')),
+ check (previous_state is null or previous_state ~ '^[1-9][0-9]*
+alter table membership_3573.transfer_events enable row level security;
+alter table membership_3573.refresh_usage enable row level security;
+alter table membership_3573.roster_snapshots enable row level security;
+revoke all on all tables in schema membership_3573 from public,anon,authenticated;
+-- Service-role worker must use a private server-side credential. Never expose it to browsers.
+
+-- The private schema is accessible to trusted service-role workers only.
+grant usage on schema membership_3573 to service_role;
+grant select,insert,update,delete on all tables in schema membership_3573 to service_role;
+grant usage,select on all sequences in schema membership_3573 to service_role;
+alter default privileges in schema membership_3573 grant select,insert,update,delete on tables to service_role;
+alter default privileges in schema membership_3573 grant usage,select on sequences to service_role;
+)
+);
+alter table membership_3573.roster_discoveries enable row level security;
 alter table membership_3573.refresh_jobs enable row level security;
 alter table membership_3573.transfer_events enable row level security;
 alter table membership_3573.refresh_usage enable row level security;
