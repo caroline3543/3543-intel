@@ -163,7 +163,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const currentPlayer=players.find(p=>p.id===viewingPlayer?.id)||viewingPlayer;
   const matchesSearch=p=>!search||[p.username,p.alias,p.fid,...(p.pastUsernames||[])].some(v=>String(v||'').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   const isTransferred=p=>p.membershipStatus==='transferred_out';
-  const isReview=p=>!isTransferred(p)&&(p.membershipStatus==='unverified'||p.membershipStatus==='transfer_review'||(enable3573Tracking&&suspectedTransferOut(p,membershipNow)));
+  const isReview=p=>!isTransferred(p)&&(p.membershipStatus==='transfer_review'||(enable3573Tracking&&suspectedTransferOut(p,membershipNow)));
   const visible=players.filter(p=>!enable3573Tracking?matchesRosterFilters(p,search,filters)&&(filters.alliance?p.membershipStatus!=='unverified':true):trackingView==='transferred'?isTransferred(p)&&matchesSearch(p):trackingView==='review'?isReview(p)&&matchesSearch(p):!isTransferred(p)&&matchesRosterFilters(p,search,filters)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
   const key=JSON.stringify([search,filters,sort,sortDirection,grouped]);
   const displayed=visible.slice(0,visibleCount);
