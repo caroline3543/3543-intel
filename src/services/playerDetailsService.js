@@ -38,6 +38,7 @@ export function applyPlayerDetails(player,response,state){
   if(String(state)==='3573'){
     try{verifiedLocation=verifiedPlayerLocation(response,player.fid);}catch{/* Incomplete, failed or stale membership evidence cannot change allocation. */}
   }
+  if(String(state)==='3573')details.membershipEvidenceRejected=!verifiedLocation;
   const evidence=String(state)==='3573'?(verifiedLocation?{tag:verifiedLocation.tag,at:verifiedLocation.at,noAlliance:!verifiedLocation.tag}:prior.at?prior:null):(explicitAlliance?{tag:tag.trim(),at,noAlliance:!tag.trim()}:prior.at?prior:null);
   updated={...updated,providerDetails:details,providerStats:{...updated.providerStats,allianceObservation:evidence}};
   if(explicitAlliance&&!tag.trim()&&(String(state)!=='3573'||verifiedLocation)){
