@@ -21,7 +21,7 @@ begin
   )
   update membership_3573.refresh_jobs j
      set status='leased', lease_until=p_now+make_interval(secs=>p_lease_seconds),
-         lease_token=extensions.gen_random_uuid(), updated_at=p_now
+         lease_token=pg_catalog.gen_random_uuid(), updated_at=p_now
     from candidate c where j.id=c.id
     returning j.* into v_job;
   return v_job;
