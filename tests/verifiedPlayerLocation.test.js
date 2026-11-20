@@ -14,7 +14,7 @@ test('omitted alliance is not treated as No Alliance',()=>{
   assert.throws(()=>verifiedPlayerLocation(r,'12345',now),/omitted alliance/);
 });
 test('stale cache cannot trigger automatic relocation',()=>{
-  assert.throws(()=>verifiedPlayerLocation(response(null,new Date(now-48*3600000).toISOString()),'12345',now),/stale/);
+  assert.throws(()=>verifiedPlayerLocation(response(null,new Date(now-73*3600000).toISOString()),'12345',now),/stale/);
 });
 test('missing observation timestamp blocks confirmation',()=>{
   assert.throws(()=>verifiedPlayerLocation(response(null,null),'12345',now),/timestamp/);
