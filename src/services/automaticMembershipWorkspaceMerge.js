@@ -14,7 +14,10 @@ export function planVerifiedMembershipUpdate({workspace,events=[],fid,observatio
   if(index<0)throw Error('Player not found by stable FID');
   const previous=workspace.players[index];
   if(String(previous.fid)!==String(fid))throw Error('FID mismatch');
+  if(String(observation.fid)!==String(fid)||!observation.source)throw Error('Provider identity and source required');
   const last=Date.parse(previous.membershipLastSuccessfulAt||previous.membershipObservedAt||'');
+  const manual=Date.parse(previous.manualMembershipAt||'');
+  if(Number.isFinite(manual)&&Date.parse(observation.at)<=manual)throw Error('Provider observation predates manual membership edit');
   if(Number.isFinite(last)&&Date.parse(observation.at)<last)return {workspace,events,changed:false,reason:'older_observation'};
   const decision=classifyLocation(previous,observation,detectedAt);
   if(decision.reason==='older_observation')return {workspace,events,changed:false,reason:'older_observation'};
