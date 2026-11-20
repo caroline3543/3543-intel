@@ -96,6 +96,18 @@ Deno.serve(async req => {
     return respond({ error: "Lookup protection unavailable. Try later." }, 503, origin);
   }
 
+  // A second, shared budget guard covers all calls made through this proxy,
+  // not just the membership worker. Existing 300/day site limits remain.
+  try {
+    const {data: reserved,error: reserveError}=await limiter.rpc("caroline_3573_reserve_proxy_credit");
+    if(reserveError||reserved!==true){
+      if(reserveError)console.error(JSON.stringify({event:"shared_credit_reservation_unavailable",detail:reserveError.code||"database_error"}));
+      return respond({error:"Shared free-tier API budget unavailable. Try later."},reserveError?503:429,origin);
+    }
+  }catch{
+    return respond({error:"Shared free-tier API budget unavailable. Try later."},503,origin);
+  }
+
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 95000);
