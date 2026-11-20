@@ -75,10 +75,10 @@ begin
  else
    v_new=v_new||jsonb_build_object(
      'membershipStatus','transferred_out',
-     'lastKnownAlliance',v_old_tag,
+     'lastKnownAlliance',case when v_old_state='3573' then v_old_tag else coalesce(v_player->>'lastKnownAlliance',v_old_tag) end,
      'transferDestinationState',p_state,
      'transferDestinationAlliance',p_tag,
-     'transferredOutAt',coalesce(v_player->'transferredOutAt',to_jsonb(p_detected_at)));
+     'transferredOutAt',case when v_old_state='3573' then to_jsonb(p_detected_at) else coalesce(v_player->'transferredOutAt',to_jsonb(p_detected_at)) end);
  end if;
  update public.caroline_workspaces
  set data=jsonb_set(data,array['players',v_index::text],v_new),
