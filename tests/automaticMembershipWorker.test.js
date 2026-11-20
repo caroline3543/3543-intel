@@ -98,3 +98,25 @@ test('denied shared reservation fails closed before provider lookup',async()=>{
  assert.equal((await h.worker.tick()).status,'budget_unavailable');
  assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
 });
+
+test('ineligible transferred-out player is cancelled without reserving API credits',async()=>{
+ const h=harness();
+ let reservations=0,providerCalls=0;
+ h.store.getPlayer=async()=>({fid:'12345678',membershipStatus:'transferred_out',allianceTag:'HOT'});
+ h.store.reserveCredits=async()=>{reservations++;return true;};
+ h.store.cancel=async()=>h.calls.push(['cancel']);
+ h.api.verifyPlayer=async()=>{providerCalls++;throw Error('must not call provider');};
+ assert.equal((await h.worker.tick()).status,'not_eligible');
+ assert.equal(reservations,0);
+ assert.equal(providerCalls,0);
+ assert.deepEqual(h.calls.map(x=>x[0]),['cancel']);
+});
+test('unknown player is cancelled without reserving API credits',async()=>{
+ const h=harness();let reservations=0;
+ h.store.getPlayer=async()=>null;
+ h.store.reserveCredits=async()=>{reservations++;return true;};
+ h.store.cancel=async()=>h.calls.push(['cancel']);
+ assert.equal((await h.worker.tick()).status,'not_eligible');
+ assert.equal(reservations,0);
+ assert.deepEqual(h.calls.map(x=>x[0]),['cancel']);
+});
