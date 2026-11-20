@@ -13,9 +13,16 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
       const rows=await query(`
         insert into membership_3573.refresh_jobs(job_key,job_kind,fid,alliance_tag,priority,due_at)
         values($1,$2,$3,$4,$5,$6)
-        -- Seeding must not pull an existing scheduled refresh forward.
-        -- Otherwise every seed run makes all primary rosters immediately due.
-        on conflict(job_key) do nothing
+        -- Preserve pending and leased due dates. Cancelled jobs may be
+        -- reactivated by later seeding after a cooldown, so temporary API
+        -- failures cannot permanently remove a player from automation.
+        on conflict(job_key) do update
+        set status='pending',due_at=excluded.due_at,priority=excluded.priority,
+            fid=excluded.fid,alliance_tag=excluded.alliance_tag,
+            attempts=0,last_error=null,lease_token=null,lease_until=null,
+            updated_at=now()
+        where membership_3573.refresh_jobs.status='cancelled'
+          and membership_3573.refresh_jobs.updated_at < now()-interval '1 hour'
         returning id`,
         [job.jobKey,job.jobKind,job.fid||null,job.allianceTag||null,job.priority||100,job.dueAt]);
       return rows?.[0]||null;
