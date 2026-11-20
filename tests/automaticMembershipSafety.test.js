@@ -27,7 +27,7 @@ test('transferred out players are cancelled before API verification',async()=>{
 });
 test('roster credit estimate over minute limit defers the job',async()=>{
  const h=setup({kind:'alliance_roster',credits:100});
- assert.equal((await h.worker.tick()).status,'rate_limited');
+ assert.equal((await h.worker.tick()).status,'cost_unverified');
  assert.equal(h.calls[0][0],'retry');
  assert.equal(h.calls[0][1].attempts,0);
 });
