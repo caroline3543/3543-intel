@@ -26,7 +26,7 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
     if(budget<=0)return {status:'budget_exhausted'};
     const job=await store.leaseNext({now:iso(),leaseSeconds:600});
     if(!job)return {status:'idle'};
-    const credits=job.jobKind==='alliance_roster'?Math.max(1,Number(await store.estimateRosterCredits?.(job.allianceTag)||100)):estimatedCredits({kind:'player'});
+    const credits=job.jobKind==='alliance_roster'?Math.max(1,Number(await store.estimateRosterCredits?.(job.allianceTag)||1)):estimatedCredits({kind:'player'});
     let nextIntervalHours=24;
     if(credits>60){
       await store.retry(job,{dueAt:new Date(clock()+3600000).toISOString(),reason:'roster_cost_exceeds_minute_limit',attempts:job.attempts||0});
