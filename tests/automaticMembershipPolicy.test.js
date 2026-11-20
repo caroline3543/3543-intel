@@ -18,7 +18,8 @@ test('refresh categories and exclusion',()=>{
  assert.equal(nextRefreshAt({...player,membershipLastSuccessfulAt:'2026-11-20T06:00:00Z'},now),now+6*60*60*1000);
 });
 test('budget is conservative for member and batch requests',()=>{
- assert.equal(estimatedCredits({kind:'alliance_members_full',memberCount:100}),100);\n assert.equal(estimatedCredits({kind:'alliance_roster'}),1);
+ assert.equal(estimatedCredits({kind:'alliance_members_full',memberCount:100}),100);
+ assert.equal(estimatedCredits({kind:'alliance_roster'}),1);
  assert.equal(estimatedCredits({kind:'players_batch',ids:Array(50).fill('1')}),50);
  assert.equal(availableBudget({used:4000,reserved:1000}),0);
  assert.equal(canSchedule({used:3900,reserved:1000,credits:100,minuteUsed:0}),false);
