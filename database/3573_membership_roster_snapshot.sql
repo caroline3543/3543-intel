@@ -43,7 +43,20 @@ begin
      fetched_at=excluded.fetched_at,is_complete=true,updated_at=excluded.updated_at
  where membership_3573.roster_snapshots.provider_observed_at is null
     or membership_3573.roster_snapshots.provider_observed_at<=excluded.provider_observed_at;
- -- New roster discoveries are handled by a separate verification queue.
+ -- Preserve first sightings of unknown players without fabricating a
+ -- previous state or an interstate transfer. Only player verification can
+ -- establish a confirmed location.
+ insert into membership_3573.roster_discoveries(fid,first_seen_at,last_seen_at,alliance_tag,previous_state,status)
+ select distinct m->>'fid',p_detected_at,p_detected_at,p_alliance_tag,null,'unverified'
+ from jsonb_array_elements(p_members) m
+ where not exists (
+   select 1 from public.caroline_workspaces w
+   cross join lateral jsonb_array_elements(w.data->'players') p
+   where w.id='3573-leaders' and p->>'fid'=m->>'fid'
+ )
+ on conflict(fid) do update
+ set last_seen_at=excluded.last_seen_at,alliance_tag=excluded.alliance_tag
+ where membership_3573.roster_discoveries.status='unverified';
  -- A roster alone is not evidence of prior state or transfer direction.
  return v_count;
 end $$;
