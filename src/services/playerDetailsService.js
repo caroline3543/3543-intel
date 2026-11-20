@@ -46,7 +46,7 @@ export function applyPlayerDetails(player,response,state){
   }
   if(String(state)==='3573'){
     if(verifiedLocation){
-      try{updated=applyVerifiedMembership(updated,verifiedLocation);}
+      try{const confirmed=applyVerifiedMembership(player,verifiedLocation);for(const key of ['allianceTag','allianceHistory','lastKnownAlliance','membershipStatus','membershipObservedAt','membershipLastSuccessfulAt','membershipCheckedAt','membershipReviewedAt','manualMembershipAt','transferredOutAt','transferDestinationState','transferDestinationAlliance']){if(Object.prototype.hasOwnProperty.call(confirmed,key))updated[key]=structuredClone(confirmed[key]);else delete updated[key];}}
       catch{verifiedLocation=null;}
     }
     if(!verifiedLocation){
