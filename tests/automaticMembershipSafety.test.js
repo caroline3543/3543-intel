@@ -7,6 +7,7 @@ function setup({player={fid:'12345678',allianceTag:'HOT'},kind='player_verify',c
  const job={id:1,lease_token:'token',jobKind:kind,fid:'12345678',allianceTag:'HOT',attempts:0};
  const store={
    isEnabled:async()=>true,
+   reserveCredits:async()=>true,
    leaseNext:async()=>job,
    estimateRosterCredits:async()=>credits,
    getPlayer:async()=>player,
