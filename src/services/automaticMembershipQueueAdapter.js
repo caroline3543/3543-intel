@@ -42,9 +42,10 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
       const rows=await query('select membership_3573.cancel_job($1,$2,$3) as ok',[job.id,job.lease_token,reason]);
       if(rows?.[0]?.ok!==true)throw Error('Expired or lost lease');
     },
-    async estimateRosterCredits(tag){
-      const rows=await query('select jsonb_array_length(member_ids) as n from membership_3573.roster_snapshots where alliance_tag=$1',[tag]);
-      return Math.max(100,Number(rows?.[0]?.n||0));
+    async estimateRosterCredits(){
+      // Whiteout Stats include=info,roster is one counted request.
+      // members_base/members_full are intentionally not used here.
+      return 1;
     },
     async getPlayer(fid){
       const rows=await query("select player from public.caroline_workspaces w cross join lateral jsonb_array_elements(w.data->'players') player where w.id='3573-leaders' and player->>'fid'=$1 limit 1",[String(fid)]);
