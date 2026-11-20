@@ -83,9 +83,9 @@ begin
      revision=revision+1,updated_at=p_detected_at,updated_by='membership-automation'
  where id='3573-leaders';
  if v_old_state<>p_state then
-   -- This event key intentionally identifies a transition; after a return,
-   -- the next departure must be distinguished by a separate episode ID.
-   v_event_key='state:'||p_fid||':'||v_old_state||':'||p_state;
+   -- State changes are committed only once per transition. Timestamp suffix
+   -- distinguishes a later departure after the player returns to 3573.
+   v_event_key='state:'||p_fid||':'||v_old_state||':'||p_state||':'||extract(epoch from p_observed_at)::bigint;
    insert into membership_3573.transfer_events
     (event_key,fid,username,direction,from_state,to_state,
      from_alliance,to_alliance,first_detected_at,last_verified_at,
