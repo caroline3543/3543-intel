@@ -66,6 +66,16 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
       }
       throw Error('Concurrent workspace updates; defer job');
     },
-    async commitRosterSnapshot(){throw Error('Atomic roster snapshot transaction not configured')},
+    async commitRosterSnapshot({job,roster,detectedAt}){
+      if(!job?.lease_token||job.jobKind!=='alliance_roster'||!roster?.complete||!roster?.fresh||!Array.isArray(roster.members))
+        throw Error('Complete fresh roster and active lease required');
+      if(!Number.isFinite(Date.parse(roster.observedAt||'')))throw Error('Provider observation timestamp required');
+      const rows=await query(
+        'select membership_3573.commit_roster_snapshot($1,$2,$3,$4::jsonb,$5,$6) as count',
+        [job.id,job.lease_token,job.allianceTag,JSON.stringify(roster.members),roster.observedAt,detectedAt]
+      );
+      if(!Number.isInteger(Number(rows?.[0]?.count)))throw Error('Roster snapshot commit rejected');
+      return Number(rows[0].count);
+    },
   };
 }
