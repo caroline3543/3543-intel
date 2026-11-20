@@ -52,14 +52,14 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
       return rows?.[0]?.player||null;
     },
     async commitPlayerObservation({job,observation,detectedAt}){
-      if(!job?.lease_token||observation?.status!=='verified'||!observation.at||!observation.source)
+      if(!job?.lease_token||observation?.status!=='verified'||observation.fresh!==true||String(observation.fid)!==String(job.fid)||!/^[1-9][0-9]*$/.test(String(observation.state??''))||typeof observation.tag!=='string'||!/^[A-Za-z0-9_]{0,20}$/.test(observation.tag)||!Number.isFinite(Date.parse(observation.at||''))||!observation.source)
         throw Error('Verified source and active lease required');
       for(let i=0;i<3;i++){
         const current=await query("select revision from public.caroline_workspaces where id='3573-leaders'",[]);
         const revision=current?.[0]?.revision;
         if(revision==null)throw Error('Workspace unavailable');
         const rows=await query('select * from membership_3573.commit_verified_location($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-          [String(job.fid),String(observation.state),String(observation.tag??''),observation.at,detectedAt,observation.source,revision,job.id,job.lease_token]);
+          [String(job.fid),String(observation.state),observation.tag,observation.at,detectedAt,observation.source,revision,job.id,job.lease_token]);
         if(rows?.[0]?.outcome==='revision_conflict')continue;
         if(rows?.[0]?.outcome==='older_observation')return;
         if(rows?.[0]?.applied===true)return;
