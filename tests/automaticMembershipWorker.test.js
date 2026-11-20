@@ -87,3 +87,14 @@ for(const estimate of [NaN,Infinity,-1,0,1.5,'not-a-number',61]){
   assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
  });
 }
+
+test('missing shared reservation mechanism fails closed before provider lookup',async()=>{
+ const h=harness();delete h.store.reserveCredits;
+ assert.equal((await h.worker.tick()).status,'budget_unavailable');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+test('denied shared reservation fails closed before provider lookup',async()=>{
+ const h=harness();h.store.reserveCredits=async()=>false;
+ assert.equal((await h.worker.tick()).status,'budget_unavailable');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
