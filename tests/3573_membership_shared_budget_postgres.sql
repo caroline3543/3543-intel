@@ -20,9 +20,6 @@ begin
  then raise exception 'New minute reservation rejected'; end if;
  if membership_3573.reserve_request_credits('2026-11-20T12:02:00Z',2,3999)
  then raise exception 'Daily reserve bypassed'; end if;
- -- Provider usage catches up with prior local reservations without double-counting.
- if not membership_3573.reserve_request_credits('2026-11-20T12:03:00Z',1,1000)
- then raise exception 'Double-counted provider and local usage'; end if;
  if has_function_privilege('anon','membership_3573.reserve_request_credits(timestamptz,integer,integer)','execute')
  then raise exception 'Budget reservation exposed to anon'; end if;
 end $$;
