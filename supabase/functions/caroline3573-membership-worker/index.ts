@@ -57,6 +57,21 @@ Deno.serve(async(req)=>{
     hasExplicitAlliance:base!=null&&Object.hasOwn(base,"alliance"),
     hasState:base?.kid!=null,hasPlayerId:base?.chief_id!=null||base?.fid!=null
    };
+   const tag=String(input.tag||"");
+   if(tag){
+    if(!/^[A-Za-z0-9_]{1,16}$/.test(tag))return json({error:"Invalid test alliance tag"},400);
+    const allianceRes=await fetch("https://api.whiteoutstats.com/v1/alliances/3573/"+encodeURIComponent(tag)+"?include=info,roster",{headers,signal:AbortSignal.timeout(15000)});
+    const alliancePayload=await allianceRes.json();
+    const alliance=alliancePayload?.data??alliancePayload;
+    Object.assign(evidence,{
+     rosterHttp:allianceRes.status,rosterKeys:Object.keys(alliance??{}).slice(0,20),
+     rosterHasFreshBoolean:typeof alliance?.fresh==="boolean",
+     rosterHasCompleteBoolean:typeof alliance?.complete==="boolean",
+     rosterHasMembersArray:Array.isArray(alliance?.members),
+     rosterHasRosterArray:Array.isArray(alliance?.roster),
+     rosterHasCachedAt:alliance?.cached_at!=null
+    });
+   }
    return json({status:"diagnostic",evidence});
   }catch{return json({error:"Provider diagnostic unavailable"},502);}
  }
