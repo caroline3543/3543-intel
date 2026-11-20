@@ -41,6 +41,19 @@ begin
  return v_count=1;
 end $$;
 
+create or replace function membership_3573.cancel_job(p_id bigint,p_token uuid,p_reason text)
+returns boolean language plpgsql security invoker set search_path=''
+as $
+declare v_count integer;
+begin
+ update membership_3573.refresh_jobs
+ set status='cancelled',last_error=left(p_reason,200),
+     lease_until=null,lease_token=null,updated_at=now()
+ where id=p_id and status='leased' and lease_token=p_token;
+ get diagnostics v_count=row_count;
+ return v_count=1;
+end $;
+
 create or replace function membership_3573.retry_job(p_id bigint,p_token uuid,p_now timestamptz,p_next_due_at timestamptz,p_error text,p_attempts integer)
 returns boolean language plpgsql security invoker set search_path = ''
 as $$
@@ -57,10 +70,12 @@ end $$;
 
 revoke all on function membership_3573.lease_next_job(timestamptz,integer) from public,anon,authenticated;
 revoke all on function membership_3573.finish_job(bigint,uuid,timestamptz,timestamptz) from public,anon,authenticated;
+revoke all on function membership_3573.cancel_job(bigint,uuid,text) from public,anon,authenticated;
 revoke all on function membership_3573.retry_job(bigint,uuid,timestamptz,timestamptz,text,integer) from public,anon,authenticated;
 grant usage on schema membership_3573 to service_role;
 grant select,insert,update on all tables in schema membership_3573 to service_role;
 grant usage,select on all sequences in schema membership_3573 to service_role;
 grant execute on function membership_3573.lease_next_job(timestamptz,integer) to service_role;
 grant execute on function membership_3573.finish_job(bigint,uuid,timestamptz,timestamptz) to service_role;
+grant execute on function membership_3573.cancel_job(bigint,uuid,text) to service_role;
 grant execute on function membership_3573.retry_job(bigint,uuid,timestamptz,timestamptz,text,integer) to service_role;
