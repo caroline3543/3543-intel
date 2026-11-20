@@ -27,6 +27,7 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
     const job=await store.leaseNext({now:iso(),leaseSeconds:600});
     if(!job)return {status:'idle'};
     const credits=job.jobKind==='alliance_roster'?1:estimatedCredits({kind:'player'});
+    let nextIntervalHours=24;
     if(credits>budget||usage.minuteUsed+credits>60){
       await store.retry(job,{dueAt:new Date(clock()+60000).toISOString(),reason:'budget_or_rate_limit'});
       return {status:'rate_limited'};
@@ -34,6 +35,8 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
     try{
       if(job.jobKind==='player_verify') {
         const previous=await store.getPlayer(job.fid);
+        const group=refreshClass(previous,clock(),await store.getSecondaryTags?.()||[]);
+        nextIntervalHours=group==='primary'||group==='recentDeparture'?12:group==='secondary'?168:24;
         if(!previous)throw Error('Unknown player');
         const observation=await api.verifyPlayer(job.fid);
         // The API adapter must reject cached, incomplete, stale or mismatched responses.
@@ -41,6 +44,7 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
         const decision=classifyLocation(previous,observation,iso());
         await store.commitPlayerObservation({job,previous,observation,decision,detectedAt:iso()});
       } else if(job.jobKind==='alliance_roster') {
+        nextIntervalHours=['ARC','RKG','HOT','LUN'].includes(job.allianceTag)?12:168;
         const roster=await api.roster('3573',job.allianceTag);
         if(!roster?.complete||!roster?.fresh||!Array.isArray(roster.members))throw Error('Incomplete roster response');
         const discoveries=[];
@@ -52,7 +56,7 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
         // Atomic snapshot + discoveries: disappearance never proves transfer.
         await store.commitRosterSnapshot({job,roster,discoveries,detectedAt:iso()});
       } else throw Error('Unsupported job kind');
-      await store.complete(job,{completedAt:iso(),nextDueAt:new Date(clock()+(job.jobKind==='alliance_roster'?12:24)*60*60*1000).toISOString()});
+      await store.complete(job,{completedAt:iso(),nextDueAt:new Date(clock()+nextIntervalHours*60*60*1000).toISOString()});
       return {status:'completed',jobKind:job.jobKind};
     }catch(error){
       const attempts=(job.attempts||0)+1;
