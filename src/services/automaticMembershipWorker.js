@@ -45,7 +45,7 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
         nextIntervalHours=group==='primary'||group==='recentDeparture'?12:group==='secondary'?168:24;
         const observation=await api.verifyPlayer(job.fid);
         // The API adapter must reject cached, incomplete, stale or mismatched responses.
-        if(!observation||observation.status!=='verified'||String(observation.fid)!==String(job.fid)||!observation.source||!Number.isFinite(Date.parse(observation.at||''))||Date.parse(observation.at)>clock()+300000||clock()-Date.parse(observation.at)>72*60*60*1000)throw Error('Unverified, stale or mismatched player response');
+        if(!observation||observation.status!=='verified'||observation.fresh!==true||String(observation.fid)!==String(job.fid)||!observation.source||!/^[1-9][0-9]*$/.test(String(observation.state??''))||typeof observation.tag!=='string'||!/^[A-Za-z0-9_]{0,20}$/.test(observation.tag)||!Number.isFinite(Date.parse(observation.at||''))||Date.parse(observation.at)>clock()+300000||clock()-Date.parse(observation.at)>72*60*60*1000)throw Error('Unverified, stale or mismatched player response');
         const decision=classifyLocation(previous,observation,iso());
         await store.commitPlayerObservation({job,previous,observation,decision,detectedAt:iso()});
       } else if(job.jobKind==='alliance_roster') {
