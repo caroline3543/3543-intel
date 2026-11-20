@@ -28,3 +28,11 @@ test('private queue adapter accepts explicit No Alliance and commits verified ob
  assert.equal(calls.length,2);
  assert.equal(calls[1].params[2],'');
 });
+
+test('seeding never advances an existing scheduled refresh',async()=>{
+ const calls=[];
+ const adapter=createMembershipQueueAdapter({query:async(sql,params)=>{calls.push({sql,params});return []}});
+ await adapter.enqueue({jobKey:'roster:ARC',jobKind:'alliance_roster',allianceTag:'ARC',priority:5,dueAt:'2026-11-21T00:00:00Z'});
+ assert.match(calls[0].sql,/on conflict\(job_key\) do nothing/i);
+ assert.doesNotMatch(calls[0].sql,/due_at\s*=\s*least/i);
+});
