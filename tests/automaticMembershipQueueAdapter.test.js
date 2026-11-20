@@ -49,3 +49,19 @@ test('leased PostgreSQL row is normalized for worker dispatch',async()=>{
  assert.equal(leased.lease_token,'lease-token');
  assert.equal(leased.attempts,2);
 });
+
+test('shared budget adapter reserves credits using private SQL RPC',async()=>{
+ const calls=[];
+ const adapter=createMembershipQueueAdapter({query:async(sql,params)=>{
+  calls.push({sql,params});return [{allowed:true}];
+ }});
+ assert.equal(await adapter.reserveCredits({credits:1,providerUsed:200,now:'2026-11-20T12:00:00Z'}),true);
+ assert.match(calls[0].sql,/membership_3573\.reserve_request_credits/);
+ assert.deepEqual(calls[0].params,['2026-11-20T12:00:00Z',1,200]);
+});
+test('invalid shared budget reservation does not query database',async()=>{
+ let called=false;
+ const adapter=createMembershipQueueAdapter({query:async()=>{called=true;return [];}});
+ assert.equal(await adapter.reserveCredits({credits:0,providerUsed:200,now:'2026-11-20T12:00:00Z'}),false);
+ assert.equal(called,false);
+});
