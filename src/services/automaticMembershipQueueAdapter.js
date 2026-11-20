@@ -62,6 +62,15 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
       // members_base/members_full are intentionally not used here.
       return 1;
     },
+    async getSecondaryTags(){
+      const rows=await query("select data->'players' as players from public.caroline_workspaces where id='3573-leaders'",[]);
+      if(!Array.isArray(rows?.[0]?.players))throw Error('Workspace secondary alliances unavailable');
+      return [...new Set(rows[0].players
+        .filter(player=>player?.membershipStatus!=='transferred_out')
+        .map(player=>String(player?.allianceTag||''))
+        .filter(tag=>/^[A-Za-z0-9_]{1,16}$/.test(tag)&&!['ARC','RKG','HOT','LUN'].includes(tag))
+      )].sort();
+    },
     async getPlayer(fid){
       const rows=await query("select player from public.caroline_workspaces w cross join lateral jsonb_array_elements(w.data->'players') player where w.id='3573-leaders' and player->>'fid'=$1 limit 1",[String(fid)]);
       return rows?.[0]?.player||null;
