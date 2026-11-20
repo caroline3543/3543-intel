@@ -28,3 +28,10 @@ test('transfer filter uses immutable player IDs',()=>{
  assert.deepEqual(filterTransferPlayers(players,events,'out').map(p=>p.username),['A']);
  assert.deepEqual(filterTransferPlayers(players,events,'in').map(p=>p.username),['B']);
 });
+
+test('routine re-verification does not extend the 72-hour promotion',()=>{
+ const old={...events[0],firstDetectedAt:'2026-11-16T11:00:00Z',lastVerifiedAt:'2026-11-20T11:00:00Z'};
+ const view=transferNavigation([old],now);
+ assert.equal(view.promoted,false);
+ assert.equal(view.transferredOut.length,1);
+});
