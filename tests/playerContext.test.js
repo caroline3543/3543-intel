@@ -35,9 +35,9 @@ test('relative activity uses the recorded timestamp, handles future times and ke
  assert.equal(recordedActivity(t,t+90000000).relative,'1d 1h ago');assert.equal(recordedActivity(t,t-3600000).relative,'1h 0m in the future');assert.equal(recordedActivity(null),null);
 });
 
-test('rolling 24-hour membership review covers all alliances and survives manual acknowledgement',()=>{
+test('rolling 72-hour membership review covers all alliances and survives manual acknowledgement',()=>{
  const now=Date.parse('2026-11-17T12:00:00Z');
- const p={allianceTag:'RKG',membershipStatus:'active',providerStats:{capturedAt:'2026-11-16T12:00:00Z'}};
+ const p={allianceTag:'RKG',membershipStatus:'active',providerStats:{capturedAt:'2026-11-14T11:00:00Z'}};
  assert.equal(suspectedTransferOut(p,now),true);
  assert.equal(suspectedTransferOut({...p,allianceTag:'FARM'},now),true);
  assert.equal(suspectedTransferOut({...p,providerStats:{capturedAt:'2026-11-17T11:00:00Z'}},now),false);
