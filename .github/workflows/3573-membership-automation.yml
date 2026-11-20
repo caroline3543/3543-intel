@@ -44,7 +44,7 @@ jobs:
           PGUSER: postgres
           PGDATABASE: membership_test
         run: |
-          psql -v ON_ERROR_STOP=1 -c "CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;"
+          psql -v ON_ERROR_STOP=1 -c "CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;"
           psql -v ON_ERROR_STOP=1 -c "CREATE TABLE public.caroline_workspaces (id text PRIMARY KEY, data jsonb NOT NULL DEFAULT '{}'::jsonb, revision bigint NOT NULL DEFAULT 0, updated_at timestamptz, updated_by text);"
           psql -v ON_ERROR_STOP=1 -f database/3573_automatic_membership_schema.sql
           psql -v ON_ERROR_STOP=1 -f database/3573_automatic_membership_worker_functions.sql
