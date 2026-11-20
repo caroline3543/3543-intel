@@ -37,7 +37,7 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
         const previous=await store.getPlayer(job.fid);
         if(!previous)throw Error('Unknown player');
         const group=refreshClass(previous,clock(),await store.getSecondaryTags?.()||[]);
-        if(!group){await store.cancel?.(job,'not_eligible');return {status:'not_eligible'};}
+        if(!group){await store.cancel(job,'not_eligible');return {status:'not_eligible'};}
         nextIntervalHours=group==='primary'||group==='recentDeparture'?12:group==='secondary'?168:24;
         const observation=await api.verifyPlayer(job.fid);
         // The API adapter must reject cached, incomplete, stale or mismatched responses.
