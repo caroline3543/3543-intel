@@ -165,3 +165,23 @@ test('No alliance is a distinct roster filter and a verified same-state allocati
  assert.equal(updated.allianceHistory.at(-1).from,'LUN');
  assert.equal(updated.allianceHistory.at(-1).to,'');
 });
+
+test('incomplete player details cannot erase confirmed 3573 alliance',()=>{
+ const p={id:'stable',fid:'596099868',allianceTag:'HOT',allianceRank:'R3',membershipStatus:'active',membershipObservedAt:'2026-11-17T00:00:00Z',allianceHistory:[]};
+ const r={retrieved_at:'2026-11-20T00:00:00Z',data:{chief_id:p.fid,player:{fid:p.fid,kid:3573,alliance:null}}};
+ const next=applyPlayerDetails(p,r,'3573');
+ assert.equal(next.allianceTag,'HOT');
+ assert.equal(next.allianceRank,'R3');
+ assert.equal(next.membershipObservedAt,p.membershipObservedAt);
+ assert.deepEqual(next.allianceHistory,[]);
+});
+test('verified explicit No Alliance in player details retains previous alliance history',()=>{
+ const p={id:'stable',fid:'596099868',allianceTag:'HOT',membershipStatus:'active',membershipObservedAt:'2026-11-17T00:00:00Z',allianceHistory:[]};
+ const at=new Date(Date.now()-3600000).toISOString();
+ const r={retrieved_at:new Date().toISOString(),data:{chief_id:p.fid,player:{fid:p.fid,kid:3573,alliance:null,cached_at:at}}};
+ const next=applyPlayerDetails(p,r,'3573');
+ assert.equal(next.allianceTag,'');
+ assert.equal(next.lastKnownAlliance,'HOT');
+ assert.equal(next.allianceHistory.at(-1).from,'HOT');
+ assert.equal(next.membershipLastSuccessfulAt,at);
+});
