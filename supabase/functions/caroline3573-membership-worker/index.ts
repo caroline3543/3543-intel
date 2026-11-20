@@ -105,8 +105,13 @@ Deno.serve(async(req)=>{
    return json({error:"Workspace player data unavailable"},503);
   const worker=createMembershipWorker({store,api});
   const seeded=await worker.seed(workspace[0].data.players);
-  const result=await worker.tick();
-  return json({seeded,status:result.status,jobKind:result.jobKind||null});
+  const results=[];
+  for(let i=0;i<12;i++){
+   const result=await worker.tick();
+   results.push({status:result.status,jobKind:result.jobKind||null});
+   if(result.status!=="completed"&&result.status!=="retry_scheduled"&&result.status!=="not_eligible")break;
+  }
+  return json({seeded,processed:results.length,results});
  }catch(error){
   console.error(JSON.stringify({event:"membership_worker_error",type:error instanceof Error?error.name:"unknown"}));
   return json({error:"Membership worker unavailable; no unverified changes applied"},503);
