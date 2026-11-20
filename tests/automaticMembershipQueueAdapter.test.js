@@ -67,3 +67,19 @@ test('invalid shared budget reservation does not query database',async()=>{
  assert.equal(await adapter.reserveCredits({credits:0,providerUsed:200,now:'2026-11-20T12:00:00Z'}),false);
  assert.equal(called,false);
 });
+
+test('secondary alliances are derived from workspace players, excluding primary and departed',async()=>{
+ const adapter=createMembershipQueueAdapter({query:async()=>[{players:[
+  {fid:'12345',allianceTag:'ARC'},
+  {fid:'12346',allianceTag:'FAM'},
+  {fid:'12347',allianceTag:'BDE'},
+  {fid:'12348',allianceTag:'FAM'},
+  {fid:'12349',allianceTag:'OLD',membershipStatus:'transferred_out'},
+  {fid:'12350',allianceTag:''}
+ ]}]});
+ assert.deepEqual(await adapter.getSecondaryTags(),['BDE','FAM']);
+});
+test('missing workspace roster fails closed for secondary eligibility',async()=>{
+ const adapter=createMembershipQueueAdapter({query:async()=>[]});
+ await assert.rejects(adapter.getSecondaryTags(),/unavailable/);
+});
