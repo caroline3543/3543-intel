@@ -35,9 +35,9 @@ Deno.serve(async(req)=>{
  try{input=await req.json();}catch{return json({error:"Invalid JSON"},400);}
  if(input?.mode==="probe"){
   const apiKey=Deno.env.get("WHITEOUTSTATS_API_KEY")||"";
-  if(!/^wos_[\\x21-\\x7e]+$/.test(apiKey))return json({error:"Provider key unavailable"},503);
+  if(!/^wos_[\x21-\x7e]+$/.test(apiKey))return json({error:"Provider key unavailable"},503);
   const fid=String(input.fid||"");
-  if(!/^[1-9]\\d{3,14}$/.test(fid))return json({error:"A valid test FID is required"},400);
+  if(!/^[1-9]\d{3,14}$/.test(fid))return json({error:"A valid test FID is required"},400);
   try{
    const headers={Authorization:"Bearer "+apiKey,Accept:"application/json"};
    const [usageRes,playerRes]=await Promise.all([
