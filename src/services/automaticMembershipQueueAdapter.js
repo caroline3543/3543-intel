@@ -14,11 +14,9 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
       const rows=await query(`
         insert into membership_3573.refresh_jobs(job_key,job_kind,fid,alliance_tag,priority,due_at)
         values($1,$2,$3,$4,$5,$6)
-        on conflict(job_key) do update set
-          priority=excluded.priority,
-          due_at=least(membership_3573.refresh_jobs.due_at,excluded.due_at),
-          updated_at=now()
-        where membership_3573.refresh_jobs.status='pending'
+        -- Seeding must not pull an existing scheduled refresh forward.
+        -- Otherwise every seed run makes all primary rosters immediately due.
+        on conflict(job_key) do nothing
         returning id`,
         [job.jobKey,job.jobKind,job.fid||null,job.allianceTag||null,job.priority||100,job.dueAt]);
       return rows?.[0]||null;
