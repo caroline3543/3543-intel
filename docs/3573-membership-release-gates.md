@@ -1,16 +1,16 @@
 # State 3573 automatic membership: production release gates
 
-**Status: NOT READY FOR PRODUCTION.** Development branch only. Do not apply the staged SQL, deploy the Edge Functions, set enablement secrets, or merge to production without explicit user approval.
+**Status: NOT READY FOR PRODUCTION. Free-tier release validation only.** Development branch only. Do not apply the staged SQL, deploy the Edge Functions, set enablement secrets, or merge to production without explicit user approval.
 
 ## Safety gates
 
-1. **Real Whiteout Stats free-tier response validation:** Run the authenticated worker `mode=probe` with a known State 3573 player FID and alliance tag in an isolated preview environment. Confirm the exact `/usage`, `/players/:fid?include=base`, and `/alliances/3573/:tag?include=info,roster` response shapes. The probe reports metadata, not player identities. Update parsers and tests to match observed provider fields. **Never infer freshness from HTTP success or proxy retrieval time.**
+1. **Real Whiteout Stats free-tier response validation:** Run a read-only provider diagnostic using an already-authorized server-side provider credential, without deploying to production or creating a paid Supabase branch. If no such credential is available to CI or a permitted diagnostic runner, record this as an explicit external dependency and request only the minimum access needed. Confirm the exact `/usage`, `/players/:fid?include=base`, and `/alliances/3573/:tag?include=info,roster` response shapes. The probe reports metadata, not player identities. Update parsers and tests to match observed provider fields. **Never infer freshness from HTTP success or proxy retrieval time.**
 2. **Shared request accounting:** Confirm the existing `consume_whiteoutstats_lookup` 300/day limiter remains compatible with the new `caroline_3573_reserve_proxy_credit` reservation. Confirm provider account usage and the staged worker budget include other keys on the same account. Fail closed on unverified usage. Verify concurrent proxy/worker requests in isolated PostgreSQL.
 3. **Private worker:** Verify `DATABASE_URL` connects using a trusted server-only role and the private `membership_3573` schema. Verify the Edge Function can bundle all shared JS modules, accepts only the cron secret, and defaults to disabled. No secrets in the browser or repository.
 4. **Scheduler:** Confirm the 15-minute GitHub scheduler is gated by `MEMBERSHIP_3573_CRON_ENABLED=true`, and the Edge Function separately requires `MEMBERSHIP_3573_ENABLED=true`. Test repeated and overlapping ticks; verify job leases and daily/minute quotas.
 5. **Membership correctness:** Confirm explicit No Alliance, alliance changes, and verified cross-state transfers update the existing workspace with manual fields preserved. Test cached/missing/failed API responses, roster disappearance, unknown previous state, stale observations, and concurrent manual edits. No inferred transfers.
 6. **Transfer UI:** Verify `/api/transfers` requires a leader session and the new service-role-only transfer-feed RPC is installed. Test 72-hour promotion, monthly history, returning players, and zero events.
-7. **End-to-end:** All GitHub workflows green on the final integration commit. Run an isolated database integration, preview UI smoke test, and real provider diagnostic. Confirm actual free-tier quota usage. Review deployment diff and rollback/disable plan.
+7. **End-to-end:** All GitHub workflows green on the final integration commit. Run an isolated PostgreSQL integration and preview UI smoke test in GitHub Actions, then run the read-only real provider diagnostic through an authorized server-side path. Confirm actual free-tier quota usage. Review deployment diff and rollback/disable plan.
 
 ## Controlled deployment sequence (requires separate user approval)
 
@@ -23,4 +23,4 @@
 
 ## Known limitation
 
-No safe preview Supabase branch was identified during the read-only audit. Creating one may incur additional compute charges and requires user agreement. Until an isolated preview or approved read-only diagnostic exists, **real provider freshness and the end-to-end live integration remain unverified**.
+The user has a **Supabase Free** subscription. Do not create a preview branch, additional paid project, or upgrade. GitHub Actions' isolated PostgreSQL is the test database. Real provider freshness and account usage must still be verified using a credentialed, read-only diagnostic; simulated fixtures alone cannot pass this gate. If no safe diagnostic path is available, stop and request access rather than deploying unverified writes.
