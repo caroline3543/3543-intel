@@ -35,3 +35,14 @@ test('routine re-verification does not extend the 72-hour promotion',()=>{
  assert.equal(view.promoted,false);
  assert.equal(view.transferredOut.length,1);
 });
+
+test('database snake_case rows render correctly without guessing transfer origins',()=>{
+ const rows=[
+  {fid:'12345678',confidence:'confirmed',from_state:'3573',to_state:'3600',first_detected_at:'2026-11-19T12:00:00Z'},
+  {fid:'23456789',confidence:'confirmed',from_state:'3600',to_state:'3573',first_detected_at:'2026-11-19T12:00:00Z'},
+  {fid:'34567890',confidence:'confirmed',from_state:null,to_state:'3573',first_detected_at:'2026-11-19T12:00:00Z'}
+ ];
+ const view=transferNavigation(rows,now);
+ assert.deepEqual(view.filters.map(f=>f.count),[1,1]);
+ assert.deepEqual(filterTransferPlayers([{fid:'23456789'}],rows,'in').map(p=>p.fid),['23456789']);
+});
