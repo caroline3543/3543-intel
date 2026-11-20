@@ -175,7 +175,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const changeSort=id=>{setMoreSorts(false);if(id===sort)setSortDirection(d=>d==='asc'?'desc':'asc');else{setSort(id);setSortDirection(id==='name'||id==='labyrinth'?'asc':'desc');}};
   const extraSelected=EXTRA_SORTS.some(([id])=>id===sort);
   const filterCount=rosterFilterCount(filters);
-  const mainAllianceTags=['ARC','HOT','RKG','LUN'];
+  const mainAllianceTags=['ARC','RKG','HOT','LUN'];
   const allianceTags=[...new Set(players.filter(p=>!isTransferred(p)).map(p=>p.allianceTag).filter(Boolean))].filter(tag=>!mainAllianceTags.includes(tag)).sort();
   const reviewCount=players.filter(p=>isReview(p)).length;
   const onlineLabel=p=>{const value=onlineChecks[p.id]??p.providerStats?.lastOnline??p.providerStats?.last_online_at??p.providerStats?.last_online; if(value===null||value===undefined||value==='')return 'Not provided by API';const n=Number(value);const d=typeof value==='number'||(/^\d{10,13}$/.test(String(value)))?new Date(n<1e12?n*1000:n):new Date(value);return Number.isFinite(d.getTime())?d.toLocaleString():'Not provided by API';};
