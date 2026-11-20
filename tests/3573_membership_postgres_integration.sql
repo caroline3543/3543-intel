@@ -46,7 +46,7 @@ end $$;
 -- Verify a later confirmed return to 3573 is a distinct inbound event.
 insert into membership_3573.refresh_jobs(job_key,job_kind,fid,priority,due_at)
 values ('player:return:12345678','player_verify','12345678',10,now()-interval '1 minute');
-do $
+do $$
 declare
  j membership_3573.refresh_jobs;
  result record;
@@ -73,5 +73,5 @@ begin
  if membership_3573.finish_job(j.id,j.lease_token,now(),now()+interval '12 hours') is distinct from true then
    raise exception 'Return job completion failed';
  end if;
-end $;
+end $$;
 rollback;
