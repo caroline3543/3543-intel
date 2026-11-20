@@ -21,7 +21,7 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
   async function tick() {
     if(await store.isEnabled()!==true)return {status:'disabled'};
     const usage=await api.usage();
-    if(!usage||!Number.isFinite(usage.used)||!Number.isFinite(usage.minuteUsed))return {status:'usage_unavailable'};
+    if(!usage||!Number.isSafeInteger(usage.used)||usage.used<0||!Number.isSafeInteger(usage.minuteUsed)||usage.minuteUsed<0||usage.minuteUsed>60)return {status:'usage_unavailable'};
     const budget=availableBudget({used:usage.used,reserved:reserve});
     if(budget<=0)return {status:'budget_exhausted'};
     const job=await store.leaseNext({now:iso(),leaseSeconds:600});
