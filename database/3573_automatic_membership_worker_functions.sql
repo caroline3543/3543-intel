@@ -43,7 +43,7 @@ end $$;
 
 create or replace function membership_3573.cancel_job(p_id bigint,p_token uuid,p_reason text)
 returns boolean language plpgsql security invoker set search_path=''
-as $
+as $$
 declare v_count integer;
 begin
  update membership_3573.refresh_jobs
@@ -52,7 +52,7 @@ begin
  where id=p_id and status='leased' and lease_token=p_token;
  get diagnostics v_count=row_count;
  return v_count=1;
-end $;
+end $$;
 
 create or replace function membership_3573.retry_job(p_id bigint,p_token uuid,p_now timestamptz,p_next_due_at timestamptz,p_error text,p_attempts integer)
 returns boolean language plpgsql security invoker set search_path = ''
