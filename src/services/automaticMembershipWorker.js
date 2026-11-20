@@ -52,7 +52,7 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
         // Atomic snapshot + discoveries: disappearance never proves transfer.
         await store.commitRosterSnapshot({job,roster,discoveries,detectedAt:iso()});
       } else throw Error('Unsupported job kind');
-      await store.complete(job,{completedAt:iso()});
+      await store.complete(job,{completedAt:iso(),nextDueAt:new Date(clock()+(job.jobKind==='alliance_roster'?12:24)*60*60*1000).toISOString()});
       return {status:'completed',jobKind:job.jobKind};
     }catch(error){
       const attempts=(job.attempts||0)+1;
