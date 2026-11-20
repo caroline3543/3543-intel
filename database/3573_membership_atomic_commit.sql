@@ -4,7 +4,7 @@
 -- Must be invoked by a trusted backend with service-role access only.
 create or replace function membership_3573.commit_verified_location(
  p_fid text, p_state text, p_tag text, p_observed_at timestamptz,
- p_detected_at timestamptz, p_source text, p_expected_revision bigint
+ p_detected_at timestamptz, p_source text, p_expected_revision bigint, p_job_id bigint, p_lease_token uuid
 ) returns table(applied boolean, new_revision bigint, outcome text)
 language plpgsql security invoker set search_path=''
 as $$
@@ -30,6 +30,7 @@ begin
    or coalesce(length(p_source),0)<3 then
    raise exception 'Invalid or stale verified location evidence';
  end if;
+ if not exists (select 1 from membership_3573.refresh_jobs where id=p_job_id and lease_token=p_lease_token and status='leased' and lease_until>=p_detected_at for update) then raise exception 'Missing or expired worker lease'; end if;
  select w.data,w.revision into v_workspace
  from public.caroline_workspaces w where w.id='3573-leaders' for update;
  if not found then raise exception '3573 workspace missing'; end if;
@@ -101,5 +102,5 @@ begin
         when v_old_tag<>p_tag then 'alliance_change'
         else 'verified_unchanged' end::text;
 end $$;
-revoke all on function membership_3573.commit_verified_location(text,text,text,timestamptz,timestamptz,text,bigint) from public,anon,authenticated;
-grant execute on function membership_3573.commit_verified_location(text,text,text,timestamptz,timestamptz,text,bigint) to service_role;
+revoke all on function membership_3573.commit_verified_location(text,text,text,timestamptz,timestamptz,text,bigint,bigint,uuid) from public,anon,authenticated;
+grant execute on function membership_3573.commit_verified_location(text,text,text,timestamptz,timestamptz,text,bigint,bigint,uuid) to service_role;
