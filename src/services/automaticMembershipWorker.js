@@ -28,6 +28,10 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
     if(!job)return {status:'idle'};
     const credits=job.jobKind==='alliance_roster'?Math.max(1,Number(await store.estimateRosterCredits?.(job.allianceTag)||100)):estimatedCredits({kind:'player'});
     let nextIntervalHours=24;
+    if(credits>60){
+      await store.retry(job,{dueAt:new Date(clock()+3600000).toISOString(),reason:'roster_cost_exceeds_minute_limit',attempts:job.attempts||0});
+      return {status:'cost_unverified'};
+    }
     if(credits>budget||usage.minuteUsed+credits>60){
       await store.retry(job,{dueAt:new Date(clock()+60000).toISOString(),reason:'budget_or_rate_limit',attempts:job.attempts||0});
       return {status:'rate_limited'};
