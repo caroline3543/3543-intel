@@ -22,3 +22,16 @@ test('missing observation timestamp blocks confirmation',()=>{
 test('player ID mismatch blocks confirmation',()=>{
   assert.throws(()=>verifiedPlayerLocation(response(null),'99999',now),/ID mismatch/);
 });
+
+test('verified location retains explicit freshness evidence for worker',()=>{
+ const observation=verifiedPlayerLocation(response({abbr:'HOT'}),'12345',now);
+ assert.equal(observation.fresh,true);
+ assert.equal(observation.status,'verified');
+});
+test('unconfirmed freshness is rejected rather than synthesized',()=>{
+ const r=response({abbr:'HOT'});delete r.data.fresh;
+ assert.throws(()=>verifiedPlayerLocation(r,'12345',now),/fresh/);
+});
+test('invalid provider alliance tag is rejected',()=>{
+ assert.throws(()=>verifiedPlayerLocation(response({abbr:'HOT wrong'}),'12345',now),/invalid characters/);
+});
