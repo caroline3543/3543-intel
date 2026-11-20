@@ -120,3 +120,24 @@ test('unknown player is cancelled without reserving API credits',async()=>{
  assert.equal(reservations,0);
  assert.deepEqual(h.calls.map(x=>x[0]),['cancel']);
 });
+
+test('secondary alliance players receive weekly refresh jobs and roster coverage',async()=>{
+ const h=harness();
+ const n=await h.worker.seed([
+  {fid:'12345678',allianceTag:'FAM',membershipLastSuccessfulAt:'2026-11-19T12:00:00Z'},
+  {fid:'23456789',allianceTag:'HOT',membershipLastSuccessfulAt:'2026-11-19T12:00:00Z'}
+ ],['FAM']);
+ assert.equal(n,2);
+ const playerJobs=h.calls.filter(x=>x[1].jobKind==='player_verify').map(x=>x[1]);
+ assert.equal(playerJobs[0].priority,80);
+ assert.equal(playerJobs[0].dueAt,'2026-11-26T12:00:00.000Z');
+ assert.equal(playerJobs[1].priority,20);
+ assert.equal(h.calls.filter(x=>x[1].jobKind==='alliance_roster').length,5);
+ assert.ok(h.calls.some(x=>x[1].jobKey==='roster:FAM'));
+});
+test('transferred-out players are excluded from all routine refresh queues',async()=>{
+ const h=harness();
+ const n=await h.worker.seed([{fid:'12345678',allianceTag:'HOT',membershipStatus:'transferred_out'}],[]);
+ assert.equal(n,0);
+ assert.equal(h.calls.filter(x=>x[1].jobKind==='player_verify').length,0);
+});
