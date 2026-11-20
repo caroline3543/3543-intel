@@ -2,8 +2,7 @@
  * SQL transport adapter for the private membership_3573 schema.
  * transport.query(sql,params) must execute with a server-side service credential.
  * Never instantiate in a browser or with anon credentials.
- * Profile and event writes intentionally remain unimplemented until a
- * transaction-safe workspace merge is available.
+ * Membership writes use the staged transaction-safe database functions.
  */
 export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
   if(typeof query!=='function')throw Error('Private SQL query transport required');
@@ -23,7 +22,8 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
     },
     async leaseNext({now,leaseSeconds=600}){
       const rows=await query('select * from membership_3573.lease_next_job($1,$2)',[now,leaseSeconds]);
-      return rows?.[0]?.id?rows[0]:null;
+      const row=rows?.[0];
+      return row?.id?{...row,jobKind:row.job_kind,jobKey:row.job_key,allianceTag:row.alliance_tag,lease_token:row.lease_token}:null;
     },
     async complete(job,{completedAt,nextDueAt}){
       if(!job?.lease_token||!nextDueAt)throw Error('Lease token and next due date required');
