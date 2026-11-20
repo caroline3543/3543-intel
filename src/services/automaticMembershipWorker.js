@@ -44,6 +44,19 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
       await store.retry(job,{dueAt:new Date(clock()+60000).toISOString(),reason:'budget_or_rate_limit',attempts:job.attempts||0});
       return {status:'rate_limited'};
     }
+    // The provider usage snapshot is advisory. Shared reservations are required
+    // to prevent simultaneous workers from spending the same remaining credits.
+    // Fail closed until the server adapter supplies an atomic reservation.
+    let reserved=false;
+    try {
+      reserved=await store.reserveCredits?.({credits,providerUsed:usage.used,now:iso()})===true;
+    } catch {
+      reserved=false;
+    }
+    if(!reserved){
+      await store.retry(job,{dueAt:new Date(clock()+60000).toISOString(),reason:'shared_budget_unavailable',attempts:job.attempts||0});
+      return {status:'budget_unavailable'};
+    }
     try{
       if(job.jobKind==='player_verify') {
         const previous=await store.getPlayer(job.fid);
