@@ -1,0 +1,38 @@
+name: 3573 Provider Read-only Diagnostic
+on:
+  workflow_dispatch:
+    inputs:
+      fid:
+        description: "Known State 3573 player FID (never printed)"
+        required: true
+        type: string
+      tag:
+        description: "State 3573 alliance tag"
+        required: true
+        default: HOT
+        type: string
+permissions:
+  contents: read
+jobs:
+  provider:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check provider credential presence without printing it
+        env:
+          WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY }}
+        run: |
+          if [ -z "$WOS_DIAGNOSTIC_KEY" ]; then
+            echo "Blocked: configure repository secret WOS_DIAGNOSTIC_KEY. No requests made."
+            exit 1
+          fi
+      - name: Read-only provider response validation
+        env:
+          WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY }}
+          WOS_TEST_FID: ${{ inputs.fid }}
+          WOS_TEST_TAG: ${{ inputs.tag }}
+        run: node scripts/3573-provider-diagnostic.mjs
