@@ -21,6 +21,10 @@ begin
  if ids <> '["12345678","23456789"]'::jsonb then
    raise exception 'Roster snapshot members mismatch';
  end if;
+ if (select count(*) from membership_3573.roster_discoveries
+     where status='unverified' and previous_state is null)<>2 then
+   raise exception 'Unknown roster players must remain unverified discoveries';
+ end if;
  begin
   perform membership_3573.commit_roster_snapshot(
    j.id,j.lease_token,'ARC','[{"fid":"12345678"},{"fid":"12345678"}]'::jsonb,
