@@ -1,4 +1,4 @@
-import {applyVerifiedMembership} from './rosterViewService.js';
+import {applyVerifiedMembership,archiveStateTransfer} from './rosterViewService.js';
 import {classifyLocation,upsertTransferEvent} from './automaticMembershipPolicy.js';
 
 /**
@@ -18,7 +18,7 @@ export function planVerifiedMembershipUpdate({workspace,events=[],fid,observatio
   if(Number.isFinite(last)&&Date.parse(observation.at)<last)return {workspace,events,changed:false,reason:'older_observation'};
   const decision=classifyLocation(previous,observation,detectedAt);
   if(decision.reason==='unverified')throw Error('Invalid state evidence');
-  const updated=applyVerifiedMembership(previous,observation);
+  const updated=String(observation.state)==='3573'    ?applyVerifiedMembership(previous,observation)\n    :archiveStateTransfer(previous,observation,detectedAt);
   // Retain every original profile field not explicitly managed by the
   // membership service. Never replace a full player object with API payload.
   const players=workspace.players.slice();
