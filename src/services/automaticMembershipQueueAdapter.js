@@ -48,8 +48,8 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
         const current=await query("select revision from public.caroline_workspaces where id='3573-leaders'",[]);
         const revision=current?.[0]?.revision;
         if(revision==null)throw Error('Workspace unavailable');
-        const rows=await query('select * from membership_3573.commit_verified_location($1,$2,$3,$4,$5,$6,$7)',
-          [String(job.fid),String(observation.state),String(observation.tag??''),observation.at,detectedAt,observation.source,revision]);
+        const rows=await query('select * from membership_3573.commit_verified_location($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+          [String(job.fid),String(observation.state),String(observation.tag??''),observation.at,detectedAt,observation.source,revision,job.id,job.lease_token]);
         if(rows?.[0]?.outcome==='revision_conflict')continue;
         if(rows?.[0]?.outcome==='older_observation')return;
         if(rows?.[0]?.applied===true)return;
