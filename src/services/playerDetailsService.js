@@ -1,4 +1,6 @@
 import {allianceEvidence} from './allianceEvidenceService.js';
+import {verifiedPlayerLocation} from './verifiedPlayerLocation.js';
+import {applyVerifiedMembership} from './rosterViewService.js';
 import {normalizeStateId} from './stateWorkspaceService.js';
 import {mergeAllianceProfiles,allianceRows} from './allianceImportService.js';
 import {rankingProfileUpdates} from './stateRankingsService.js';
@@ -32,11 +34,27 @@ export function applyPlayerDetails(player,response,state){
   if(!updated)throw new Error('Unable to match this player. Nothing was changed.');
   const explicitAlliance=base.alliance===null||typeof base.alliance?.abbr==='string';
   const prior=allianceEvidence(player);
-  const evidence=explicitAlliance?{tag:tag.trim(),at,noAlliance:!tag.trim()}:prior.at?prior:null;
+  let verifiedLocation=null;
+  if(String(state)==='3573'){
+    try{verifiedLocation=verifiedPlayerLocation(response,player.fid);}catch{/* Incomplete, failed or stale membership evidence cannot change allocation. */}
+  }
+  if(String(state)==='3573')details.membershipEvidenceRejected=!verifiedLocation;
+  const evidence=String(state)==='3573'?(verifiedLocation?{tag:verifiedLocation.tag,at:verifiedLocation.at,noAlliance:!verifiedLocation.tag}:prior.at?prior:null):(explicitAlliance?{tag:tag.trim(),at,noAlliance:!tag.trim()}:prior.at?prior:null);
   updated={...updated,providerDetails:details,providerStats:{...updated.providerStats,allianceObservation:evidence}};
-  if(explicitAlliance&&!tag.trim()){
+  if(explicitAlliance&&!tag.trim()&&(String(state)!=='3573'||verifiedLocation)){
     updated.allianceTag='';updated.allianceRank=null;updated.providerStats.allianceTag='';
     if(player.allianceTag)updated.allianceHistory=[...(player.allianceHistory||[]),{from:player.allianceTag,to:'',at}];
+  }
+  if(String(state)==='3573'){
+    if(verifiedLocation){
+      try{const confirmed=applyVerifiedMembership(player,verifiedLocation);for(const key of ['allianceTag','allianceHistory','lastKnownAlliance','membershipStatus','membershipObservedAt','membershipLastSuccessfulAt','membershipCheckedAt','membershipReviewedAt','manualMembershipAt','transferredOutAt','transferDestinationState','transferDestinationAlliance']){if(Object.prototype.hasOwnProperty.call(confirmed,key))updated[key]=structuredClone(confirmed[key]);else delete updated[key];}}
+      catch{verifiedLocation=null;}
+    }
+    if(!verifiedLocation){
+      const protectedFields=['allianceTag','allianceRank','allianceHistory','lastKnownAlliance','membershipStatus','membershipObservedAt','membershipLastSuccessfulAt','membershipCheckedAt','membershipReviewedAt','manualMembershipAt','transferredOutAt','transferDestinationState','transferDestinationAlliance'];
+      for(const key of protectedFields)if(Object.prototype.hasOwnProperty.call(player,key))updated[key]=structuredClone(player[key]);else delete updated[key];
+      updated.providerStats={...updated.providerStats,allianceTag:player.providerStats?.allianceTag,allianceObservation:prior.at?prior:null};
+    }
   }
   for(const [board,scoreKey,rankKey] of [['personal_power','power','power_rank'],['kills','kills','kills_rank'],['furnace','furnace_level','furnace_rank'],['state_transfer','state_transfer_score','state_transfer_rank'],['labyrinth','labyrinth','labyrinth_rank']]){
     const rank=ranks?.[rankKey],score=ranks?.[scoreKey];

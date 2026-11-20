@@ -37,6 +37,15 @@ test('missing or malformed direct alliance data never restamps a manual or old a
   const prior=applyPlayerDetails({id:'one',fid:'12345',allianceTag:'HOT',providerStats:{allianceTag:'ARC',retrievedAt:day}},response(base),'3573');
   assert.equal(allianceCheck(prior,team).tag,'ARC');assert.equal(allianceCheck(prior,team).at,day);
  }
- const none=applyPlayerDetails({id:'one',fid:'12345',allianceTag:'ARC'},response({alliance:null}),'3573');
+ const observedAt=new Date(Date.now()-3600000).toISOString();
+ const none=applyPlayerDetails({id:'one',fid:'12345',allianceTag:'ARC'}, {retrieved_at:new Date().toISOString(),data:{player:{kid:3573,chief_id:'12345',alliance:null,cached_at:observedAt}}},'3573');
  assert.equal(none.allianceTag,'');assert.equal(none.providerStats.allianceTag,'');assert.equal(allianceCheck(none,team).status,'move');assert.match(allianceCheck(none,team).label,/No alliance/);
+});
+
+test('unverified explicit empty alliance cannot leak into TAL membership evidence',()=>{
+ const p={id:'one',fid:'12345',allianceTag:'HOT',providerStats:{allianceTag:'HOT',retrievedAt:'2026-11-07T00:00:00Z'}};
+ const r={retrieved_at:new Date().toISOString(),data:{player:{kid:3573,chief_id:'12345',alliance:null}}};
+ const updated=applyPlayerDetails(p,r,'3573');
+ assert.equal(updated.allianceTag,'HOT');
+ assert.equal(allianceCheck(updated,team).tag,'HOT');
 });
