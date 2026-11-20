@@ -84,8 +84,8 @@ begin
  set data=jsonb_set(data,array['players',v_index::text],v_new),
      revision=revision+1,updated_at=p_detected_at,updated_by='membership-automation'
  where id='3573-leaders';
- if v_old_state<>p_state then
-   -- State changes are committed only once per transition. Timestamp suffix
+ if v_old_state<>p_state and (v_old_state='3573' or p_state='3573') then
+   -- Only crossings of State 3573 are counted as transfers. Timestamp suffix
    -- distinguishes a later departure after the player returns to 3573.
    v_event_key='state:'||p_fid||':'||v_old_state||':'||p_state||':'||extract(epoch from p_observed_at)::bigint;
    insert into membership_3573.transfer_events
