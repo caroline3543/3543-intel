@@ -26,18 +26,19 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
     if(budget<=0)return {status:'budget_exhausted'};
     const job=await store.leaseNext({now:iso(),leaseSeconds:600});
     if(!job)return {status:'idle'};
-    const credits=job.jobKind==='alliance_roster'?1:estimatedCredits({kind:'player'});
+    const credits=job.jobKind==='alliance_roster'?Math.max(1,Number(await store.estimateRosterCredits?.(job.allianceTag)||100)):estimatedCredits({kind:'player'});
     let nextIntervalHours=24;
     if(credits>budget||usage.minuteUsed+credits>60){
-      await store.retry(job,{dueAt:new Date(clock()+60000).toISOString(),reason:'budget_or_rate_limit'});
+      await store.retry(job,{dueAt:new Date(clock()+60000).toISOString(),reason:'budget_or_rate_limit',attempts:job.attempts||0});
       return {status:'rate_limited'};
     }
     try{
       if(job.jobKind==='player_verify') {
         const previous=await store.getPlayer(job.fid);
-        const group=refreshClass(previous,clock(),await store.getSecondaryTags?.()||[]);
-        nextIntervalHours=group==='primary'||group==='recentDeparture'?12:group==='secondary'?168:24;
         if(!previous)throw Error('Unknown player');
+        const group=refreshClass(previous,clock(),await store.getSecondaryTags?.()||[]);
+        if(!group){await store.cancel?.(job,'not_eligible');return {status:'not_eligible'};}
+        nextIntervalHours=group==='primary'||group==='recentDeparture'?12:group==='secondary'?168:24;
         const observation=await api.verifyPlayer(job.fid);
         // The API adapter must reject cached, incomplete, stale or mismatched responses.
         if(!observation||observation.status!=='verified')throw Error('Unverified player response');
