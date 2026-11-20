@@ -5,7 +5,7 @@ const now=Date.parse('2026-11-20T12:00:00Z');
 const payload={fresh:true,cached_at:'2026-11-20T11:00:00Z',player:{chief_id:'12345678',kid:3573,alliance:{abbr:'HOT'}}};
 test('fresh verified provider payload yields immutable ID and source',()=>{
  assert.deepEqual(verifiedPlayerLocation({data:payload},'12345678',now),{
-  status:'verified',fid:'12345678',state:'3573',tag:'HOT',at:'2026-11-20T11:00:00.000Z',source:'whiteoutstats-player'
+  status:'verified',fresh:true,fid:'12345678',state:'3573',tag:'HOT',at:'2026-11-20T11:00:00.000Z',source:'whiteoutstats-player'
  });
 });
 test('explicit null alliance is No Alliance',()=>{
