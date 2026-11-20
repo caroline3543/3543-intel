@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createMembershipWorker} from '../src/services/automaticMembershipWorker.js';
 const now=Date.parse('2026-11-20T12:00:00Z');
-function harness({enabled=true,usage={used:100,minuteUsed:0},observation={fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3573',tag:'HOT',at:'2026-11-20T11:00:00Z'},roster=null}={}){
+function harness({enabled=true,usage={used:100,minuteUsed:0},observation={fresh:true,fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3573',tag:'HOT',at:'2026-11-20T11:00:00Z'},roster=null}={}){
  const calls=[];const player={fid:'12345678',username:'Test',stateId:'3573',allianceTag:'ARC',membershipObservedAt:'2026-11-19T00:00:00Z'};
  const job={jobKey:'player:12345678',jobKind:'player_verify',fid:'12345678',attempts:0};
  const store={isEnabled:async()=>enabled,leaseNext:async()=>job,getPlayer:async()=>player,enqueue:async j=>calls.push(['enqueue',j]),commitPlayerObservation:async v=>calls.push(['commit',v]),commitRosterSnapshot:async v=>calls.push(['snapshot',v]),complete:async()=>calls.push(['complete']),retry:async(_,v)=>calls.push(['retry',v])};
@@ -32,6 +32,27 @@ test('provider timestamp missing prevents membership changes',async()=>{
 test('roster without provider timestamp cannot overwrite a snapshot',async()=>{
  const h=harness({roster:{complete:true,fresh:true,members:[]}});
  h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+
+test('missing state cannot modify a player',async()=>{
+ const h=harness({observation:{fresh:true,fid:'12345678',source:'whiteoutstats-player',status:'verified',tag:'',at:'2026-11-20T11:00:00Z'}});
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+test('missing alliance field cannot be inferred as No Alliance',async()=>{
+ const h=harness({observation:{fresh:true,fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3573',at:'2026-11-20T11:00:00Z'}});
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+test('explicit empty alliance is valid verified No Alliance evidence',async()=>{
+ const h=harness({observation:{fresh:true,fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3573',tag:'',at:'2026-11-20T11:00:00Z'}});
+ assert.equal((await h.worker.tick()).status,'completed');
+ assert.equal(h.calls[0][1].decision.kind,'alliance_change');
+});
+test('cached or unconfirmed freshness cannot change membership',async()=>{
+ const h=harness({observation:{fresh:false,fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3599',tag:'ABC',at:'2026-11-20T11:00:00Z'}});
  assert.equal((await h.worker.tick()).status,'retry_scheduled');
  assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
 });
