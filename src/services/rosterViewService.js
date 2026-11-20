@@ -48,7 +48,7 @@ export function latestRosterFetch(players) {
 }
 
 /** Stale player API data is a review signal, never proof of transfer. */
-export const MEMBERSHIP_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+export const MEMBERSHIP_STALE_AFTER_MS = 72 * 60 * 60 * 1000;
 
 /**
  * A stale provider observation is not evidence of an alliance transfer.
@@ -57,9 +57,9 @@ export const MEMBERSHIP_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
  */
 export function membershipFreshness(player, now=Date.now()) {
   if (!player || player.membershipStatus === 'transferred_out') return 'excluded';
-  const observedAt = Date.parse(player.membershipObservedAt || player.providerStats?.capturedAt || '');
+  const observedAt = Date.parse(player.membershipLastSuccessfulAt || player.membershipObservedAt || player.providerStats?.capturedAt || '');
   if (!Number.isFinite(observedAt) || observedAt > now) return 'unknown';
-  return now - observedAt >= MEMBERSHIP_STALE_AFTER_MS ? 'stale' : 'fresh';
+  return now - observedAt > MEMBERSHIP_STALE_AFTER_MS ? 'stale' : 'fresh';
 }
 
 export function suspectedTransferOut(player, now=Date.now()) {
@@ -112,5 +112,5 @@ export function applyVerifiedMembership(player, location) {
   const manual=Date.parse(player.manualMembershipAt||'');
   if ((Number.isFinite(previous) && observed < previous) || (Number.isFinite(manual) && observed <= manual)) throw Error('Membership observation predates a newer observation or manual reassignment.');
   const next=restoreStateTransfer(player,location);
-  return {...next,membershipObservedAt:location.at,membershipCheckedAt:location.at};
+  return {...next,membershipObservedAt:location.at,membershipLastSuccessfulAt:location.at,membershipCheckedAt:location.at};
 }
