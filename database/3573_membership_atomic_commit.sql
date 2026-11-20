@@ -61,7 +61,8 @@ begin
  if p_state='3573' then
    v_new=v_new||jsonb_build_object(
      'allianceTag',p_tag,'membershipStatus','active',
-     'transferDestinationState',null,'transferDestinationAlliance',null);
+     'transferDestinationState',null,'transferDestinationAlliance',null,
+     'transferredOutAt',null);
    if v_old_tag<>p_tag then
      v_history=coalesce(v_player->'allianceHistory','[]'::jsonb);
      v_new=jsonb_set(v_new,'{allianceHistory}',
