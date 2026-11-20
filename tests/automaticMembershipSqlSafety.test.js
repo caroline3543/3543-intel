@@ -15,5 +15,5 @@ test('lease UUID generation uses a built-in PostgreSQL function',()=>{
 
 test('transfer ledger only records state changes crossing 3573',()=>{
  const commit=readFileSync(new URL('../database/3573_membership_atomic_commit.sql',import.meta.url),'utf8');
- assert.match(commit,/if v_old_state<>p_state and \\(v_old_state='3573' or p_state='3573'\\) then/);
+ assert.match(commit,/if v_old_state<>p_state and \(v_old_state='3573' or p_state='3573'\) then/);
 });
