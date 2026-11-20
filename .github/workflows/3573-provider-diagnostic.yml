@@ -24,15 +24,15 @@ jobs:
           node-version: '22'
       - name: Check provider credential presence without printing it
         env:
-          WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY }}
+          WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY || secrets.WHITEOUTSTATS_API_KEY }}
         run: |
           if [ -z "$WOS_DIAGNOSTIC_KEY" ]; then
-            echo "Blocked: configure repository secret WOS_DIAGNOSTIC_KEY. No requests made."
+            echo "Blocked: neither WOS_DIAGNOSTIC_KEY nor WHITEOUTSTATS_API_KEY is available to this workflow. No requests made."
             exit 1
           fi
       - name: Read-only provider response validation
         env:
-          WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY }}
+          WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY || secrets.WHITEOUTSTATS_API_KEY }}
           WOS_TEST_FID: ${{ inputs.fid }}
           WOS_TEST_TAG: ${{ inputs.tag }}
         run: node scripts/3573-provider-diagnostic.mjs
