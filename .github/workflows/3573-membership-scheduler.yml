@@ -1,0 +1,33 @@
+name: 3573 Membership Scheduler
+on:
+  schedule:
+    - cron: '2-57/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        required: true
+        default: readiness
+        options: [readiness, tick]
+permissions: {}
+concurrency:
+  group: membership-3573-production
+  cancel-in-progress: false
+jobs:
+  worker:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.MEMBERSHIP_3573_CRON_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CRON_SECRET: ${{ secrets.MEMBERSHIP_3573_CRON_SECRET }}
+      REQUEST_MODE: ${{ inputs.mode || 'tick' }}
+    steps:
+      - name: Call the authenticated State 3573 worker
+        shell: bash
+        run: |
+          test -n "$CRON_SECRET"
+          case "$REQUEST_MODE" in readiness|tick) ;; *) exit 1 ;; esac
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -X POST 'https://nrksysaynoklqzhyhnmd.supabase.co/functions/v1/caroline3573-membership-worker' \
+            -H "Authorization: Bearer $CRON_SECRET" -H 'Content-Type: application/json' \
+            --data "$(jq -nc --arg mode "$REQUEST_MODE" '{mode:$mode}')"
