@@ -11,6 +11,15 @@ Deno.serve(async req=>{
   const input=await req.json();
   if(input.workspaceId!=='3573-leaders'||input.role!=='leader')return reply({error:'Leader workspace access required'},403);
   const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false,autoRefreshToken:false}});
+  if(input.action==='transfers'){
+   // Read-only, service-role RPC. The site server authenticates the leader session.
+   const beforeId=input.beforeId??null;
+   if(beforeId!==null&&!/^[1-9]\d{0,18}$/.test(String(beforeId)))return reply({error:'Invalid transfer cursor'},400);
+   const {data,error}=await db.rpc('caroline_3573_transfer_feed',{p_limit:500,p_before_id:beforeId});
+   if(error)throw error;
+   const events=data||[];
+   return reply({events,nextCursor:events.length===500?String(events.at(-1).id):null});
+  }
   if(input.action==='read'){
    const {data,error}=await db.from('caroline_workspaces').select('data,revision,updated_at').eq('id','3573-leaders').single();
    if(error)throw error;if(input.since===data.revision&&data.data!=null)return reply({unchanged:true,revision:data.revision,updatedAt:data.updated_at});return reply({data:data.data,revision:data.revision,updatedAt:data.updated_at,role:'leader'});

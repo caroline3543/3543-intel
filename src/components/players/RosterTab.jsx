@@ -1,3 +1,5 @@
+import { monthlyTransferHistory } from '../../services/automaticMembershipPolicy.js';
+import { transferNavigation,filterTransferPlayers,normalizeTransferEvents } from '../../services/automaticMembershipTransferView.js';
 import { mightpulseRequest } from '../../services/mightpulseService.js';
 import { verifiedPlayerLocation } from '../../services/verifiedPlayerLocation.js';
 import {PlayerSearch} from './PlayerSearch.jsx';
@@ -69,7 +71,7 @@ function compareRosterPlayers(a,b,field,direction,events) {
   return (av-bv)*order || fallback();
 }
 
-export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,roles,onSaveCustomRoles,onSavePlayer,onUpdatePlayers,onDeletePlayer,onGoToIntel,showToast,onLoadAlliance,legionPlan,onRefreshLegion,legionRefresh,teamworkPreferences,onSaveTeamworkPreferences,enable3573Tracking=false}) {
+export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,roles,onSaveCustomRoles,onSavePlayer,onUpdatePlayers,onDeletePlayer,onGoToIntel,showToast,onLoadAlliance,legionPlan,onRefreshLegion,legionRefresh,teamworkPreferences,onSaveTeamworkPreferences,enable3573Tracking=false,transferEvents=[]}) {
   const [search,setSearch]=useState('');
   const [filters,setFilters]=useState({...EMPTY_FILTERS});
   const [filtersOpen,setFiltersOpen]=useState(false);
@@ -164,8 +166,11 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const matchesSearch=p=>!search||[p.username,p.alias,p.fid,...(p.pastUsernames||[])].some(v=>String(v||'').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   const isTransferred=p=>p.membershipStatus==='transferred_out';
   const isReview=p=>!isTransferred(p)&&(p.membershipStatus==='transfer_review'||(enable3573Tracking&&suspectedTransferOut(p,membershipNow)));
-  const visible=players.filter(p=>!enable3573Tracking?matchesRosterFilters(p,search,filters)&&(filters.alliance?p.membershipStatus!=='unverified':true):trackingView==='transferred'?isTransferred(p)&&matchesSearch(p):trackingView==='review'?isReview(p)&&matchesSearch(p):!isTransferred(p)&&matchesRosterFilters(p,search,filters)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
-  const key=JSON.stringify([search,filters,sort,sortDirection,grouped]);
+  const transferView=transferNavigation(transferEvents,membershipNow);
+  const transferMonths=monthlyTransferHistory(normalizeTransferEvents(transferEvents));
+  const transferredInIds=new Set(filterTransferPlayers(players,transferEvents,'in').map(p=>String(p.fid)));
+  const visible=players.filter(p=>!enable3573Tracking?matchesRosterFilters(p,search,filters)&&(filters.alliance?p.membershipStatus!=='unverified':true):trackingView==='transferred_in'?transferredInIds.has(String(p.fid))&&!isTransferred(p)&&matchesSearch(p):trackingView==='transferred'?isTransferred(p)&&matchesSearch(p):trackingView==='review'?isReview(p)&&matchesSearch(p):!isTransferred(p)&&matchesRosterFilters(p,search,filters)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
+  const key=JSON.stringify([search,filters,sort,sortDirection,grouped,trackingView]);
   const displayed=visible.slice(0,visibleCount);
   useEffect(()=>{setVisibleCount(20);},[key]);
   useEffect(()=>{if(!loadRef.current||visibleCount>=visible.length||typeof IntersectionObserver==='undefined')return;
@@ -175,7 +180,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const changeSort=id=>{setMoreSorts(false);if(id===sort)setSortDirection(d=>d==='asc'?'desc':'asc');else{setSort(id);setSortDirection(id==='name'||id==='labyrinth'?'asc':'desc');}};
   const extraSelected=EXTRA_SORTS.some(([id])=>id===sort);
   const filterCount=rosterFilterCount(filters);
-  const mainAllianceTags=['ARC','HOT','RKG','LUN'];
+  const mainAllianceTags=['ARC','RKG','HOT','LUN'];
   const allianceTags=[...new Set(players.filter(p=>!isTransferred(p)).map(p=>p.allianceTag).filter(Boolean))].filter(tag=>!mainAllianceTags.includes(tag)).sort();
   const reviewCount=players.filter(p=>isReview(p)).length;
   const onlineLabel=p=>{const value=onlineChecks[p.id]??p.providerStats?.lastOnline??p.providerStats?.last_online_at??p.providerStats?.last_online; if(value===null||value===undefined||value==='')return 'Not provided by API';const n=Number(value);const d=typeof value==='number'||(/^\d{10,13}$/.test(String(value)))?new Date(n<1e12?n*1000:n):new Date(value);return Number.isFinite(d.getTime())?d.toLocaleString():'Not provided by API';};
@@ -215,16 +220,36 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
         <span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Alliance</span>
         {[['','All'],...mainAllianceTags.map(tag=>[tag,tag]),['__no_alliance','No alliance'],['__more','More']].map(([tag,label])=><button key={tag||'all'} aria-pressed={tag==='__more'?allianceMoreOpen:filters.alliance===tag} onClick={()=>{if(tag==='__more'){setAllianceMoreOpen(v=>!v);return;}setFilters({...filters,alliance:tag});setAllianceMoreOpen(false);}} style={{background:(tag==='__more'?allianceMoreOpen:filters.alliance===tag)?'#45351F':'#182A3F',color:(tag==='__more'?allianceMoreOpen:filters.alliance===tag)?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',fontSize:12,minHeight:35,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{mainAllianceTags.includes(tag)?` · ${players.filter(p=>p.allianceTag===tag&&!isTransferred(p)&&!isReview(p)).length}`:''}{tag==='__more'?' ⌄':''}</button>)}
       </div>}
+      {enable3573Tracking&&trackingView==='current'&&transferView.promoted&&<div role="group" aria-label="Recent transfers" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:7}}>
+        {transferView.filters.filter(f=>f.promoted).map(f=><button key={f.key} type="button" style={{...button,whiteSpace:'nowrap',flexShrink:0}} onClick={()=>{setTrackingView(f.key==='transferred_in'?'transferred_in':'transferred');setVisibleCount(20);setAllianceMoreOpen(false);}}>{f.label} · {f.count}</button>)}
+      </div>}
+      {enable3573Tracking&&trackingView==='current'&&<details style={{marginBottom:9,padding:'8px 10px',background:C.card,borderRadius:12}}>
+        <summary style={{cursor:'pointer',color:C.gold}}>Transfer history</summary>
+        {transferMonths.length===0&&<p style={{fontSize:12,color:C.icy}}>No confirmed transfers to show.</p>}
+        {transferMonths.map(month=><details key={month.month} style={{padding:'8px 0',borderBottom:'1px solid '+C.border}}>
+          <summary style={{cursor:'pointer',fontSize:13}}>
+            {new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(month.month+'-01T00:00:00Z'))}
+            {' · '}{month.in} in · {month.out} out · {month.net>0?'+':''}{month.net} net
+          </summary>
+          <ul style={{paddingLeft:20,fontSize:12,color:C.icy}}>
+            {month.events.map(event=><li key={event.event_key||event.id} style={{padding:'4px 0'}}>
+              <strong>{event.username||event.fid}</strong>
+              {' · '}{event.fromState}{event.fromAlliance?' ['+event.fromAlliance+']':''}
+              {' → '}{event.toState}{event.toAlliance?' ['+event.toAlliance+']':''}
+            </li>)}
+          </ul>
+        </details>)}
+      </details>}
       {!enable3573Tracking&&<div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,marginBottom:6,alignItems:'center'}}>{[['','All'],...[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].sort().map(tag=>[tag,tag]),['__no_alliance','No alliance'],['__review','Needs review']].map(([tag,label])=><button key={tag||'all'} onClick={()=>setFilters({...filters,alliance:tag})} style={{...button,fontSize:12,whiteSpace:'nowrap',flexShrink:0}}>{label}</button>)}</div>}
       {enable3573Tracking&&trackingView==='current'&&allianceMoreOpen&&<div role="group" aria-label="Other alliances" style={{display:'flex',gap:6,flexWrap:'wrap',background:C.card,borderRadius:12,padding:10,marginBottom:9}}>
         {allianceTags.map(tag=><button key={tag} style={{...button,fontSize:12,background:filters.alliance===tag?C.gold:C.section,color:filters.alliance===tag?C.bg:C.icy}} onClick={()=>{setFilters({...filters,alliance:tag});setAllianceMoreOpen(false);}}>{tag} · {players.filter(p=>p.allianceTag===tag&&!isTransferred(p)&&!isReview(p)).length}</button>)}
         {!allianceTags.length&&<span style={{fontSize:12,color:C.icy}}>No other alliances recorded</span>}
-        <div style={{width:'100%',borderTop:'1px solid '+C.border,marginTop:4,paddingTop:8}}><button type="button" style={{...button,width:'100%',textAlign:'left',color:C.icy}} onClick={()=>{setTrackingView('transferred');setAllianceMoreOpen(false);setFilters({...filters,alliance:''});setVisibleCount(20);}}>Transferred out · {players.filter(isTransferred).length}</button></div>
+        <div style={{width:'100%',borderTop:'1px solid '+C.border,marginTop:4,paddingTop:8}}>{transferView.transferredIn.length>0&&<button type="button" style={{...button,width:'100%',textAlign:'left',color:C.icy,marginBottom:6}} onClick={()=>{setTrackingView('transferred_in');setAllianceMoreOpen(false);setVisibleCount(20);}}>Transferred in · {transferView.transferredIn.length}</button>}<button type="button" style={{...button,width:'100%',textAlign:'left',color:C.icy}} onClick={()=>{setTrackingView('transferred');setAllianceMoreOpen(false);setFilters({...filters,alliance:''});setVisibleCount(20);}}>Transferred out · {players.filter(isTransferred).length}</button></div>
       </div>}
       {enable3573Tracking&&trackingView==='current'&&reviewCount>0&&<button type="button" onClick={()=>{setTrackingView('review');setVisibleCount(20);setOptionsOpen(false);}} style={{border:0,background:'transparent',color:'#E8B766',padding:'8px 0',minHeight:38,textAlign:'left',fontSize:12,cursor:'pointer'}}>{reviewCount} account{reviewCount===1?'':'s'} need membership review ›</button>}
       {enable3573Tracking&&trackingView!=='current'&&<button type="button" style={{...button,marginBottom:10}} onClick={()=>{setTrackingView('current');setVisibleCount(20);}}>‹ Back to Members</button>}
       {trackingView==='review'&&<button type="button" style={{...button,width:'100%',marginBottom:12}} disabled={locationBusy} onClick={checkAllLocations}>{locationBusy?'Checking locations…':'Find current location for all'}</button>}
-      {trackingView!=='current'&&<h3 style={{fontSize:17,margin:'0 0 10px'}}>{trackingView==='review'?'Membership to review':'Transferred out'}</h3>}
+      {trackingView!=='current'&&<h3 style={{fontSize:17,margin:'0 0 10px'}}>{trackingView==='review'?'Membership to review':trackingView==='transferred_in'?'Transferred in':'Transferred out'}</h3>}
       {trackingView==='review'&&<p style={{fontSize:12,color:C.icy,margin:'0 0 12px'}}>Players without a valid API membership refresh for over 72 hours need review. Their last confirmed alliance is preserved.</p>}
       <div role="group" aria-label="Sort roster" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,scrollbarWidth:'none',alignItems:'center'}}><span style={{fontSize:11,color:C.icy,minWidth:48,flexShrink:0}}>Sort</span>
         {PRIMARY_SORTS.map(([id,label])=><button key={id} aria-pressed={sort===id} onClick={()=>changeSort(id)} style={{background:sort===id?'#45351F':'#182A3F',color:sort===id?'#F2C47A':C.icy,border:'1px solid transparent',borderRadius:22,padding:'7px 11px',minHeight:35,fontSize:12,whiteSpace:'nowrap',flexShrink:0,cursor:'pointer'}}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
@@ -234,7 +259,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
         {EXTRA_SORTS.map(([id,label])=><button key={id} style={{...button,background:sort===id?C.gold:C.section,color:sort===id?C.bg:C.icy,fontSize:12}} onClick={()=>changeSort(id)}>{label}{sort===id?(sortDirection==='asc'?' ↑':' ↓'):''}</button>)}
       </div>}
       {optionsOpen&&<div style={{display:'grid',gap:9,padding:12,background:'#15273A',borderRadius:12,marginBottom:10}}>
-        <div style={{fontSize:14,fontWeight:700}}>Roster options</div>{enable3573Tracking&&<><button style={button} onClick={()=>{setTrackingView("current");setOptionsOpen(false);}}>Current roster</button><button style={button} onClick={()=>{setTrackingView("review");setOptionsOpen(false);}}>Membership review ({reviewCount})</button><button style={button} onClick={()=>{setTrackingView("transferred");setOptionsOpen(false);}}>Transferred out ({players.filter(isTransferred).length})</button></>}<div style={{display:'flex',gap:7}}><button style={{...button,flex:1}} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button><button style={{...button,flex:1}} onClick={()=>selecting?stopSelection():setSelecting(true)}>{selecting?'Done selecting':'Select players'}</button></div>
+        <div style={{fontSize:14,fontWeight:700}}>Roster options</div>{enable3573Tracking&&<><button style={button} onClick={()=>{setTrackingView("current");setOptionsOpen(false);}}>Current roster</button><button style={button} onClick={()=>{setTrackingView("review");setOptionsOpen(false);}}>Membership review ({reviewCount})</button>{transferView.transferredIn.length>0&&<button style={button} onClick={()=>{setTrackingView("transferred_in");setOptionsOpen(false);}}>Transferred in ({transferView.transferredIn.length})</button>}<button style={button} onClick={()=>{setTrackingView("transferred");setOptionsOpen(false);}}>Transferred out ({players.filter(isTransferred).length})</button></>}<div style={{display:'flex',gap:7}}><button style={{...button,flex:1}} onClick={()=>setFiltersOpen(true)}>Filters{filterCount?` (${filterCount})`:''}</button><button style={{...button,flex:1}} onClick={()=>selecting?stopSelection():setSelecting(true)}>{selecting?'Done selecting':'Select players'}</button></div>
         <label style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:13,color:C.icy}}>Show player IDs <input type="checkbox" checked={showIds} onChange={e=>setShowIds(e.target.checked)} style={{width:20,height:20,accentColor:C.gold}}/></label>
         <button style={button} onClick={()=>{setGrouped(!grouped);setOptionsOpen(false);}}>{grouped?'Show one list':'Group by role'}</button>
         <button style={button} onClick={()=>{setFieldsOpen(true);setOptionsOpen(false);}}>Update player details</button>

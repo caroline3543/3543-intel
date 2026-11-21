@@ -72,6 +72,36 @@ export function SiteApp(){
 }
 function Members({onLogout,error,preferences,onPreferencesChange}){
   const [tab,setTab]=useState('members');
+  const [transferEvents,setTransferEvents]=useState([]);
+  useEffect(()=>{
+    let active=true;
+    let refreshing=false;
+    async function refreshTransfers(){
+      if(refreshing)return;
+      refreshing=true;
+      try{
+        const events=[];
+        let cursor=null;
+        do {
+          const path=cursor===null?'/api/transfers':'/api/transfers?before='+encodeURIComponent(cursor);
+          const response=await fetch(path,{credentials:'same-origin',cache:'no-store'});
+          if(!response.ok||!active)return;
+          const result=await response.json();
+          const next=result.nextCursor??null;
+          if(!Array.isArray(result.events)||(next!==null&&
+            (typeof next!=='string'||!/^[1-9]\d{0,18}$/.test(next)||(cursor!==null&&BigInt(next)>=BigInt(cursor)))))return;
+          events.push(...result.events);
+          cursor=next;
+        } while(cursor!==null);
+        if(active)setTransferEvents(events);
+      }catch{/* Preserve last successful transfer feed when offline. */}
+      finally{refreshing=false;}
+    }
+    refreshTransfers();
+    const timer=setInterval(()=>{if(document.visibilityState!=='hidden')refreshTransfers();},60_000);
+    return ()=>{active=false;clearInterval(timer);};
+  },[]);
+
   const [workspaceOpen,setWorkspaceOpen]=useState(false);
   const lastAttention=useRef(null);
   const [initialPlayerId,setInitialPlayerId]=useState(null);
@@ -398,7 +428,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {sync.mode!=='join'&&!sync.conflicts?.length&&<div>
     {tab==='members'&&!DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag))&&<AllianceSetup players={players} onLoad={importRoster}/>}
     {returnToFoundry&&tab==='members'&&<div style={{position:'sticky',top:0,zIndex:10,padding:'10px 16px',background:'#142438',borderBottom:'1px solid #40546a'}}><button type="button" style={button} onClick={backToFoundry}>← Back to Foundry</button></div>}
-    {tab==='members'&&players.length>0&&<RosterTab enable3573Tracking teamworkPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamworkPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('TAL teamwork preferences saved.');}} initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} legionPlan={data.talPlan||newPlan()} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
+    {tab==='members'&&players.length>0&&<RosterTab enable3573Tracking transferEvents={transferEvents} teamworkPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamworkPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('TAL teamwork preferences saved.');}} initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} legionPlan={data.talPlan||newPlan()} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
     {tab==='events'&&<section aria-label="Events" style={{padding:'12px 16px',display:'grid',gap:8}}>{[['foundry','Foundry','Team planning and assignments',true],['tal','Tundra Arms League','Under development',true],['castle','Castle Battle','Coming soon',false],['canyon','Canyon Clash','Coming soon',false]].map(([id,label,description,available])=><button key={id} type="button" disabled={!available} aria-disabled={!available} onClick={()=>available&&navigate(id)} style={{...button,textAlign:'left',padding:'13px 14px',minHeight:64,display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,opacity:available?1:.56,cursor:available?'pointer':'not-allowed',background:available?'#203449':'#172739',borderColor:available?'#40546a':'#293b4d'}}><span style={{display:'grid',gap:3}}><strong style={{fontSize:15,fontWeight:700}}>{label}</strong><span style={{fontSize:12,color:C.icy}}>{description}</span></span><span aria-hidden="true" style={{fontSize:available?20:14,color:C.icy}}>{available?'›':'Locked'}</span></button>)}</section>}
     {['foundry','castle','canyon','tal'].includes(tab)&&<button type="button" onClick={()=>navigate('events')} style={{...button,margin:'12px 16px'}}>‹ Back to Events</button>}
     {tab==='svs'&&<SvsComparison players={players} lastLabSummary={data.settings?.compareLabTop100||null} onLabSummary={summary=>setData(prev=>({...prev,settings:{...prev.settings,compareLabTop100:summary}}))}/>}

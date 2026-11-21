@@ -1,0 +1,100 @@
+name: 3573 Membership Automation Tests
+on:
+  push:
+    branches:
+      - work/3573-automatic-membership-transfer-tracking
+  pull_request:
+    branches:
+      - release/3573-production
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  membership:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: membership_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d membership_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Membership regression suite
+        run: node --test tests/automaticMembership*.test.js
+      - name: Compile staged membership SQL in isolated PostgreSQL
+        env:
+          PGPASSWORD: postgres
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: membership_test
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;"
+          psql -v ON_ERROR_STOP=1 -c "CREATE TABLE public.caroline_workspaces (id text PRIMARY KEY, data jsonb NOT NULL DEFAULT '{}'::jsonb, revision bigint NOT NULL DEFAULT 0, updated_at timestamptz, updated_by text);"
+          psql -v ON_ERROR_STOP=1 -f database/3573_automatic_membership_schema.sql
+          psql -v ON_ERROR_STOP=1 -f database/3573_automatic_membership_worker_functions.sql
+          psql -v ON_ERROR_STOP=1 -f database/3573_membership_roster_snapshot.sql
+          psql -v ON_ERROR_STOP=1 -f database/3573_membership_atomic_commit.sql
+          psql -v ON_ERROR_STOP=1 -f database/3573_membership_transfer_feed.sql
+          psql -v ON_ERROR_STOP=1 -f database/3573_membership_shared_budget.sql
+          psql -v ON_ERROR_STOP=1 -f tests/3573_membership_postgres_integration.sql
+          psql -v ON_ERROR_STOP=1 -f tests/3573_membership_roster_postgres_integration.sql
+          psql -v ON_ERROR_STOP=1 -f tests/3573_membership_no_alliance_postgres_integration.sql
+          psql -v ON_ERROR_STOP=1 -f tests/3573_membership_transfer_feed_postgres.sql
+          psql -v ON_ERROR_STOP=1 -f tests/3573_membership_shared_budget_postgres.sql
+      - name: Verify competing database sessions honor the same quota
+        env:
+          PGPASSWORD: postgres
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: membership_test
+        run: |
+          first=$(mktemp)
+          second=$(mktemp)
+          trap 'rm -f "$first" "$second"' EXIT
+          psql -Aqt -v ON_ERROR_STOP=1 -c "select membership_3573.reserve_request_credits('2026-11-20T14:00:00Z',1,100,59)" > "$first" &
+          first_pid=$!
+          psql -Aqt -v ON_ERROR_STOP=1 -c "select membership_3573.reserve_request_credits('2026-11-20T14:00:00Z',1,100,59)" > "$second" &
+          second_pid=$!
+          wait "$first_pid"
+          wait "$second_pid"
+          test "$(printf '%s\n' "$(cat "$first")" "$(cat "$second")" | sort | tr -d '\n')" = 'ft'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Typecheck staged private worker
+        run: deno check --config supabase/functions/caroline3573-membership-worker/deno.json supabase/functions/caroline3573-membership-worker/index.ts
+      - name: Production build check
+        run: npm run build
+  provider-diagnostic:
+    if: vars.WOS_DIAGNOSTIC_IN_CI == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/work/3573-automatic-membership-transfer-tracking'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate real provider response
+        env:
+          WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY || secrets.WHITEOUTSTATS_API_KEY }}
+          WOS_TEST_TAG: HOT
+        run: node scripts/3573-provider-diagnostic.mjs
