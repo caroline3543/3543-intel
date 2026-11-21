@@ -116,7 +116,7 @@ Deno.serve(async(req)=>{
    const ready=Object.values(checks??{}).length===4&&Object.values(checks).every(value=>value===true);
    return json({status:ready?"ready":"incomplete",writesEnabled,checks},ready?200:503);
   }
-  const deadline=Date.now()+80000;
+  const deadline=Date.now()+50000;
   const workspace=await query("select data from public.caroline_workspaces where id=$1",["3573-leaders"]);
   if(!workspace[0]||!Array.isArray(workspace[0].data?.players))
    return json({error:"Workspace player data unavailable"},503);
@@ -130,7 +130,7 @@ Deno.serve(async(req)=>{
   const worker=createMembershipWorker({store,api});
   const seeded=await worker.seed(workspace[0].data.players,secondaryTags);
   const results=[];
-  for(let i=0;i<12&&Date.now()<deadline;i++){
+  for(let i=0;i<6&&Date.now()<deadline;i++){
    const result=await worker.tick();
    results.push({status:result.status,jobKind:result.jobKind||null});
    if(result.status!=="completed"&&result.status!=="retry_scheduled"&&result.status!=="not_eligible")break;
