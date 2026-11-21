@@ -25,7 +25,7 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
       const rows=await query(`
         insert into membership_3573.refresh_jobs(job_key,job_kind,fid,alliance_tag,priority,due_at)
         select job_key,job_kind,fid,alliance_tag,priority,due_at
-        from jsonb_to_recordset($1::jsonb)
+        from jsonb_to_recordset(($1::text)::jsonb)
           as new_job(job_key text,job_kind text,fid text,alliance_tag text,priority integer,due_at timestamptz)
         -- Preserve pending and leased due dates. Cancelled jobs may be
         -- reactivated by later seeding after a cooldown, so temporary API
@@ -111,7 +111,7 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
         throw Error('Complete fresh roster and active lease required');
       if(!Number.isFinite(Date.parse(roster.observedAt||'')))throw Error('Provider observation timestamp required');
       const rows=await query(
-        'select membership_3573.commit_roster_snapshot($1,$2,$3,$4::jsonb,$5,$6) as count',
+        'select membership_3573.commit_roster_snapshot($1,$2,$3,($4::text)::jsonb,$5,$6) as count',
         [job.id,job.lease_token,job.allianceTag,JSON.stringify(roster.members),roster.observedAt,detectedAt]
       );
       if(!Number.isInteger(Number(rows?.[0]?.count)))throw Error('Roster snapshot commit rejected');
