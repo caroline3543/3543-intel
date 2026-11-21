@@ -4,7 +4,7 @@
 import postgres from "npm:postgres@3.4.7";
 import {createMembershipWorker} from "../../../src/services/automaticMembershipWorker.js";
 import {createMembershipQueueAdapter} from "../../../src/services/automaticMembershipQueueAdapter.js";
-import {verifiedPlayerLocation} from "../../../src/services/verifiedPlayerLocation.js";
+import {providerObservationTime,verifiedPlayerLocation,verifiedProviderUsage} from "../../../src/services/verifiedPlayerLocation.js";
 
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{
  status,headers:{"content-type":"application/json","cache-control":"no-store"}
@@ -17,14 +17,6 @@ async function authenticated(req:Request){
  const [a,b]=await Promise.all([digest(secret),digest(received)]);
  let mismatch=0;for(let i=0;i<a.length;i++)mismatch|=a[i]^b[i];
  return mismatch===0;
-}
-function validUsage(payload:any){
- const body=payload?.data??payload;
- // Provider response format must be verified before the worker is enabled.
- const used=body?.used,minuteUsed=body?.minute_used;
- if(!Number.isSafeInteger(used)||used<0||!Number.isSafeInteger(minuteUsed)||minuteUsed<0||minuteUsed>60)
-  throw Error("Unverified provider usage response");
- return {used,minuteUsed};
 }
 Deno.serve(async(req)=>{
  if(req.method!=="POST")return json({error:"Method not allowed"},405);
@@ -98,7 +90,7 @@ Deno.serve(async(req)=>{
   }finally{clearTimeout(timer);}
  };
  const api={
-  usage:async()=>validUsage(await upstream("/usage")),
+  usage:async()=>verifiedProviderUsage(await upstream("/usage")),
   verifyPlayer:async(fid:string)=>{
    if(!/^[1-9]\d{3,14}$/.test(fid))throw Error("Invalid FID");
    const response=await upstream("/players/"+fid+"?include=base");
@@ -111,7 +103,7 @@ Deno.serve(async(req)=>{
    // Never infer completeness or freshness from a successful HTTP status.
    if(data?.fresh!==true||data?.complete!==true||!Array.isArray(data?.members)||
       !data?.cached_at)throw Error("Provider roster freshness or completeness unverified");
-   return {complete:true,fresh:true,observedAt:data.cached_at,members:data.members};
+   return {complete:true,fresh:true,observedAt:providerObservationTime(data.cached_at),members:data.members};
   }
  };
  try{

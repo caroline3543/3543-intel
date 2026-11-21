@@ -24,3 +24,23 @@
 ## Known limitation
 
 The user has a **Supabase Free** subscription. Do not create a preview branch, additional paid project, or upgrade. GitHub Actions' isolated PostgreSQL is the test database. Real provider freshness and account usage must still be verified using a credentialed, read-only diagnostic; simulated fixtures alone cannot pass this gate. If no safe diagnostic path is available, stop and request access rather than deploying unverified writes.
+
+## Provider and scheduler verification
+
+The documented free-tier usage endpoint returns nested account-wide counters
+in `minute` and `daily`. The worker validates both limits and checks that used
+plus remaining equals the limit. The player adapter requires explicit freshness,
+identity, alliance membership and an observation no older than one hour. The
+roster adapter still requires explicit positive completeness evidence. Capture
+authenticated examples before marking either adapter verified.
+
+GitHub only triggers scheduled workflows from the default branch (`main`).
+Merging to `release/3573-production` alone leaves the scheduler inactive.
+Install the scheduler workflow on `main` separately after verifying its
+target and keeping the scheduler and worker flags disabled. The provider diagnostic runs on changes to its inputs on the development branch.
+Manual dispatch additionally requires the workflow on the default branch.
+
+Roster sightings of known transferred-out players can enqueue a one-off
+player verification. Only a verified location in 3573 can record the return.
+Players with unknown origins remain discoveries until independent evidence
+supplies a previous state.

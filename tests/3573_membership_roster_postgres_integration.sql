@@ -1,5 +1,10 @@
 -- Isolated CI-only roster transaction tests. Never runs on production.
 begin;
+insert into public.caroline_workspaces (id,data)
+values ('3573-leaders',jsonb_build_object('players',jsonb_build_array(
+ jsonb_build_object('fid','34567890','membershipStatus','transferred_out',
+  'transferDestinationState','3574','membershipObservedAt',now()-interval '1 day')
+)));
 insert into membership_3573.refresh_jobs(job_key,job_kind,alliance_tag,priority,due_at)
 values ('roster:ARC','alliance_roster','ARC',5,now()-interval '1 minute');
 do $$
@@ -14,11 +19,11 @@ begin
  end if;
  select membership_3573.commit_roster_snapshot(
   j.id,j.lease_token,'ARC',
-  '[{"fid":"12345678"},{"fid":"23456789"}]'::jsonb,
+  '[{"fid":"12345678"},{"fid":"23456789"},{"fid":"34567890"}]'::jsonb,
   now()-interval '2 minutes',now()) into n;
- if n<>2 then raise exception 'Expected two roster members'; end if;
+ if n<>3 then raise exception 'Expected three roster members'; end if;
  select member_ids into ids from membership_3573.roster_snapshots where alliance_tag='ARC';
- if ids <> '["12345678","23456789"]'::jsonb then
+ if ids <> '["12345678","23456789","34567890"]'::jsonb then
    raise exception 'Roster snapshot members mismatch';
  end if;
  if (select count(*) from membership_3573.roster_discoveries
@@ -48,6 +53,10 @@ begin
  exception when others then
   if sqlerrm='Mismatched alliance lease unexpectedly accepted' then raise; end if;
  end;
+ if (select count(*) from membership_3573.refresh_jobs
+     where job_key='return:34567890' and status='pending')<>1 then
+   raise exception 'Known departure on the roster must get a one-off verification job';
+ end if;
  if (select count(*) from membership_3573.transfer_events)<>0 then
    raise exception 'Roster snapshot incorrectly created transfer event';
  end if;

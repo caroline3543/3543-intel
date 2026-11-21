@@ -46,17 +46,19 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
     }
     // Eligibility must be checked before consuming a non-refundable reservation.
     // A cancelled or transferred-out player must not spend free-tier credits.
-    let verifiedPlayer=null;
-    let playerGroup=null;
+    const returnCheck=job.jobKind==='player_verify'&&job.jobKey===`return:${job.fid}`;
+    async function eligible(player) {
+      if(returnCheck)return player?.membershipStatus==='transferred_out'?'return':null;
+      return refreshClass(player,clock(),await store.getSecondaryTags?.()||[]);
+    }
     if(job.jobKind==='player_verify'){
       try{
-        verifiedPlayer=await store.getPlayer(job.fid);
+        const verifiedPlayer=await store.getPlayer(job.fid);
         if(!verifiedPlayer){
           await store.cancel(job,'unknown_player');
           return {status:'not_eligible'};
         }
-        playerGroup=refreshClass(verifiedPlayer,clock(),await store.getSecondaryTags?.()||[]);
-        if(!playerGroup){
+        if(!await eligible(verifiedPlayer)){
           await store.cancel(job,'not_eligible');
           return {status:'not_eligible'};
         }
@@ -82,12 +84,16 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
       if(job.jobKind==='player_verify') {
         const previous=await store.getPlayer(job.fid);
         if(!previous)throw Error('Unknown player');
-        const group=refreshClass(previous,clock(),await store.getSecondaryTags?.()||[]);
+        const group=await eligible(previous);
         if(!group){await store.cancel(job,'not_eligible');return {status:'not_eligible'};}
         nextIntervalHours=group==='primary'||group==='recentDeparture'?12:group==='secondary'?168:24;
         const observation=await api.verifyPlayer(job.fid);
         // The API adapter must reject cached, incomplete, stale or mismatched responses.
         if(!observation||observation.status!=='verified'||observation.fresh!==true||String(observation.fid)!==String(job.fid)||!observation.source||!/^[1-9][0-9]*$/.test(String(observation.state??''))||typeof observation.tag!=='string'||!/^[A-Za-z0-9_]{0,20}$/.test(observation.tag)||!Number.isFinite(Date.parse(observation.at||''))||Date.parse(observation.at)>clock()+300000||clock()-Date.parse(observation.at)>72*60*60*1000)throw Error('Unverified, stale or mismatched player response');
+        if(returnCheck&&String(observation.state)!=='3573'){
+          await store.cancel(job,'return_not_confirmed');
+          return {status:'not_eligible'};
+        }
         const decision=classifyLocation(previous,observation,iso());
         await store.commitPlayerObservation({job,previous,observation,decision,detectedAt:iso()});
       } else if(job.jobKind==='alliance_roster') {
@@ -103,6 +109,10 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
         // Atomic snapshot + discoveries: disappearance never proves transfer.
         await store.commitRosterSnapshot({job,roster,discoveries,detectedAt:iso()});
       } else throw Error('Unsupported job kind');
+      if(returnCheck){
+        await store.cancel(job,'return_check_complete');
+        return {status:'completed',jobKind:job.jobKind};
+      }
       await store.complete(job,{completedAt:iso(),nextDueAt:new Date(clock()+nextIntervalHours*60*60*1000).toISOString()});
       return {status:'completed',jobKind:job.jobKind};
     }catch(error){

@@ -57,6 +57,24 @@ begin
  on conflict(fid) do update
  set last_seen_at=excluded.last_seen_at,alliance_tag=excluded.alliance_tag
  where membership_3573.roster_discoveries.status='unverified';
+ -- A recently observed roster entry can trigger one independent return check.
+ -- Confirmed departures are excluded from the ordinary player refresh queue.
+ insert into membership_3573.refresh_jobs
+   (job_key,job_kind,fid,priority,due_at)
+ select 'return:'||(m->>'fid'),'player_verify',m->>'fid',10,p_detected_at
+ from jsonb_array_elements(p_members) m
+ join public.caroline_workspaces w on w.id='3573-leaders'
+ cross join lateral jsonb_array_elements(w.data->'players') p
+ where p->>'fid'=m->>'fid'
+   and p->>'membershipStatus'='transferred_out'
+   and coalesce(p->>'transferDestinationState','') ~ '^[1-9][0-9]*$'
+   and p->>'transferDestinationState'<>'3573'
+   and p_observed_at > nullif(p->>'membershipObservedAt','')::timestamptz
+ on conflict(job_key) do update
+ set status='pending',due_at=excluded.due_at,attempts=0,last_error=null,
+     lease_token=null,lease_until=null,updated_at=p_detected_at
+ where membership_3573.refresh_jobs.status='cancelled'
+   and membership_3573.refresh_jobs.updated_at<p_observed_at;
  -- A roster alone is not evidence of prior state or transfer direction.
  return v_count;
 end $$;

@@ -1,5 +1,11 @@
 name: 3573 Provider Read-only Diagnostic
 on:
+  push:
+    branches: [work/3573-automatic-membership-transfer-tracking]
+    paths:
+      - .github/workflows/3573-provider-diagnostic.yml
+      - scripts/3573-provider-diagnostic.mjs
+      - src/services/verifiedPlayerLocation.js
   workflow_dispatch:
     inputs:
       fid:
@@ -34,5 +40,5 @@ jobs:
         env:
           WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY || secrets.WHITEOUTSTATS_API_KEY }}
           WOS_TEST_FID: ${{ inputs.fid }}
-          WOS_TEST_TAG: ${{ inputs.tag }}
+          WOS_TEST_TAG: ${{ inputs.tag || 'HOT' }}
         run: node scripts/3573-provider-diagnostic.mjs
