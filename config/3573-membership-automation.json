@@ -1,0 +1,41 @@
+{
+  "stateId": "3573",
+  "enabled": false,
+  "primaryAlliances": [
+    "ARC",
+    "RKG",
+    "HOT",
+    "LUN"
+  ],
+  "secondaryAlliances": [],
+  "refreshHours": {
+    "primary": 12,
+    "noAlliance": 24,
+    "secondary": 168,
+    "recentPrimaryDeparture": 12
+  },
+  "recentPrimaryDepartureHours": 72,
+  "transfers": {
+    "navigationPromotionHours": 72,
+    "requireVerifiedPlayerState": true,
+    "unknownOriginIsTransfer": false
+  },
+  "provider": {
+    "name": "whiteoutstats",
+    "dailyMaxCredits": 5000,
+    "dailyReservedCredits": 1000,
+    "minuteMaxCredits": 60,
+    "allianceInclude": "roster",
+    "batchMaxIds": 50,
+    "requireFreshCompleteResponses": true
+  },
+  "worker": {
+    "concurrency": 1,
+    "leaseMinutes": 10,
+    "maxAttempts": 5,
+    "baseRetrySeconds": 60,
+    "maxRetrySeconds": 3600,
+    "staggerMinutes": 15,
+    "usageCheckMinutes": 60
+  }
+}

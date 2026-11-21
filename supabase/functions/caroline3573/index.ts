@@ -1,3 +1,4 @@
+import {verifiedProviderUsage} from "../../../src/services/verifiedPlayerLocation.js";
 import { playerDetailsPath } from "./playerDetails.js";
 import { rankingsPath } from "./rankings.js";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -94,6 +95,28 @@ Deno.serve(async req => {
     if (!allowed) return respond({ error: "Lookup limit reached. Try again later." }, 429, origin);
   } catch {
     return respond({ error: "Lookup protection unavailable. Try later." }, 503, origin);
+  }
+
+  // A second, shared budget guard covers all calls made through this proxy,
+  // not just the membership worker. Existing 300/day site limits remain.
+  try {
+    const usageResponse = await fetch(API_ROOT + "/usage", {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+      redirect: "error",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!usageResponse.ok) throw Error("Provider usage unavailable");
+    const usage = verifiedProviderUsage(await usageResponse.json());
+    const {data: reserved,error: reserveError}=await limiter.rpc("caroline_3573_reserve_proxy_credit", {
+      p_provider_used: usage.used,
+      p_provider_minute_used: usage.minuteUsed,
+    });
+    if(reserveError||reserved!==true){
+      if(reserveError)console.error(JSON.stringify({event:"shared_credit_reservation_unavailable",detail:reserveError.code||"database_error"}));
+      return respond({error:"Shared free-tier API budget unavailable. Try later."},reserveError?503:429,origin);
+    }
+  }catch{
+    return respond({error:"Shared free-tier API budget unavailable. Try later."},503,origin);
   }
 
   try {

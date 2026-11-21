@@ -1,0 +1,143 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createMembershipWorker} from '../src/services/automaticMembershipWorker.js';
+const now=Date.parse('2026-11-20T12:00:00Z');
+function harness({enabled=true,usage={used:100,minuteUsed:0},observation={fresh:true,fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3573',tag:'HOT',at:'2026-11-20T11:00:00Z'},roster=null}={}){
+ const calls=[];const player={fid:'12345678',username:'Test',stateId:'3573',allianceTag:'ARC',membershipObservedAt:'2026-11-19T00:00:00Z'};
+ const job={jobKey:'player:12345678',jobKind:'player_verify',fid:'12345678',attempts:0};
+ const store={isEnabled:async()=>enabled,leaseNext:async()=>job,getPlayer:async()=>player,reserveCredits:async()=>true,estimateRosterCredits:async()=>1,enqueue:async j=>calls.push(['enqueue',j]),commitPlayerObservation:async v=>calls.push(['commit',v]),commitRosterSnapshot:async v=>calls.push(['snapshot',v]),complete:async()=>calls.push(['complete']),retry:async(_,v)=>calls.push(['retry',v])};
+ const api={usage:async()=>usage,verifyPlayer:async()=>observation,roster:async()=>roster};
+ return {worker:createMembershipWorker({store,api,clock:()=>now}),calls,job,store,api};
+}
+test('worker disabled by default has no side effects',async()=>{const h=harness({enabled:false});assert.equal((await h.worker.tick()).status,'disabled');assert.equal(h.calls.length,0)});
+test('unavailable usage fails closed',async()=>{const h=harness({usage:null});assert.equal((await h.worker.tick()).status,'usage_unavailable');assert.equal(h.calls.length,0)});
+test('daily reserve prevents refresh',async()=>{const h=harness({usage:{used:4500,minuteUsed:0}});assert.equal((await h.worker.tick()).status,'budget_exhausted');assert.equal(h.calls.length,0)});
+test('minute limit reschedules without fetching',async()=>{const h=harness({usage:{used:100,minuteUsed:60}});assert.equal((await h.worker.tick()).status,'rate_limited');assert.equal(h.calls[0][0],'retry')});
+test('verified player observation commits, then completes',async()=>{const h=harness();assert.equal((await h.worker.tick()).status,'completed');assert.equal(h.calls[0][1].decision.kind,'alliance_change');assert.deepEqual(h.calls.map(x=>x[0]),['commit','complete'])});
+test('unverified player observation preserves data and retries',async()=>{const h=harness({observation:{status:'cached'}});assert.equal((await h.worker.tick()).status,'retry_scheduled');assert.deepEqual(h.calls.map(x=>x[0]),['retry'])});
+test('roster disappearance does not cause transfer',async()=>{const h=harness({roster:{complete:true,fresh:true,observedAt:'2026-11-20T11:00:00Z',members:[]}});h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';assert.equal((await h.worker.tick()).status,'completed');assert.deepEqual(h.calls[0][1].discoveries,[]);assert.equal(h.calls[0][0],'snapshot')});
+test('incomplete roster does not overwrite snapshot',async()=>{const h=harness({roster:{complete:false,fresh:true,members:[]}});h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';assert.equal((await h.worker.tick()).status,'retry_scheduled');assert.equal(h.calls[0][0],'retry')});
+test('seeding creates exact primary roster jobs and due player jobs',async()=>{const h=harness();const n=await h.worker.seed([{fid:'12345678',allianceTag:'ARC',membershipLastSuccessfulAt:'2026-11-20T06:00:00Z'}]);assert.equal(n,1);assert.equal(h.calls.length,5);assert.deepEqual(h.calls.slice(1).map(x=>x[1].allianceTag),['ARC','RKG','HOT','LUN'])});
+
+test('mismatched verified FID cannot update a different player',async()=>{
+ const h=harness({observation:{fid:'99999999',source:'whiteoutstats-player',status:'verified',state:'3599',tag:'ABC',at:'2026-11-20T11:00:00Z'}});
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+test('provider timestamp missing prevents membership changes',async()=>{
+ const h=harness({observation:{fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3599',tag:'ABC'}});
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+test('roster without provider timestamp cannot overwrite a snapshot',async()=>{
+ const h=harness({roster:{complete:true,fresh:true,members:[]}});
+ h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+
+test('missing state cannot modify a player',async()=>{
+ const h=harness({observation:{fresh:true,fid:'12345678',source:'whiteoutstats-player',status:'verified',tag:'',at:'2026-11-20T11:00:00Z'}});
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+test('missing alliance field cannot be inferred as No Alliance',async()=>{
+ const h=harness({observation:{fresh:true,fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3573',at:'2026-11-20T11:00:00Z'}});
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+test('explicit empty alliance is valid verified No Alliance evidence',async()=>{
+ const h=harness({observation:{fresh:true,fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3573',tag:'',at:'2026-11-20T11:00:00Z'}});
+ assert.equal((await h.worker.tick()).status,'completed');
+ assert.equal(h.calls[0][1].decision.kind,'alliance_change');
+});
+test('cached or unconfirmed freshness cannot change membership',async()=>{
+ const h=harness({observation:{fresh:false,fid:'12345678',source:'whiteoutstats-player',status:'verified',state:'3599',tag:'ABC',at:'2026-11-20T11:00:00Z'}});
+ assert.equal((await h.worker.tick()).status,'retry_scheduled');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+
+for(const [name,usage] of [
+ ['negative daily usage',{used:-1,minuteUsed:0}],
+ ['negative minute usage',{used:100,minuteUsed:-1}],
+ ['fractional daily usage',{used:100.5,minuteUsed:0}],
+ ['fractional minute usage',{used:100,minuteUsed:0.5}],
+ ['impossible minute usage',{used:100,minuteUsed:61}]
+]){
+ test('invalid provider usage '+name+' fails closed before leasing',async()=>{
+  const h=harness({usage});
+  assert.equal((await h.worker.tick()).status,'usage_unavailable');
+  assert.equal(h.calls.length,0);
+ });
+}
+
+test('missing roster cost estimate cannot bypass budget guard',async()=>{
+ const h=harness({roster:{complete:true,fresh:true,observedAt:'2026-11-20T11:00:00Z',members:[]}});
+ h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';
+ delete h.store.estimateRosterCredits;
+ assert.equal((await h.worker.tick()).status,'cost_unverified');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+for(const estimate of [NaN,Infinity,-1,0,1.5,'not-a-number',61]){
+ test('invalid roster credit estimate '+String(estimate)+' fails closed',async()=>{
+  const h=harness({roster:{complete:true,fresh:true,observedAt:'2026-11-20T11:00:00Z',members:[]}});
+  h.job.jobKind='alliance_roster';h.job.allianceTag='ARC';
+  h.store.estimateRosterCredits=async()=>estimate;
+  assert.equal((await h.worker.tick()).status,'cost_unverified');
+  assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+ });
+}
+
+test('missing shared reservation mechanism fails closed before provider lookup',async()=>{
+ const h=harness();delete h.store.reserveCredits;
+ assert.equal((await h.worker.tick()).status,'budget_unavailable');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+test('denied shared reservation fails closed before provider lookup',async()=>{
+ const h=harness();h.store.reserveCredits=async()=>false;
+ assert.equal((await h.worker.tick()).status,'budget_unavailable');
+ assert.deepEqual(h.calls.map(x=>x[0]),['retry']);
+});
+
+test('ineligible transferred-out player is cancelled without reserving API credits',async()=>{
+ const h=harness();
+ let reservations=0,providerCalls=0;
+ h.store.getPlayer=async()=>({fid:'12345678',membershipStatus:'transferred_out',allianceTag:'HOT'});
+ h.store.reserveCredits=async()=>{reservations++;return true;};
+ h.store.cancel=async()=>h.calls.push(['cancel']);
+ h.api.verifyPlayer=async()=>{providerCalls++;throw Error('must not call provider');};
+ assert.equal((await h.worker.tick()).status,'not_eligible');
+ assert.equal(reservations,0);
+ assert.equal(providerCalls,0);
+ assert.deepEqual(h.calls.map(x=>x[0]),['cancel']);
+});
+test('unknown player is cancelled without reserving API credits',async()=>{
+ const h=harness();let reservations=0;
+ h.store.getPlayer=async()=>null;
+ h.store.reserveCredits=async()=>{reservations++;return true;};
+ h.store.cancel=async()=>h.calls.push(['cancel']);
+ assert.equal((await h.worker.tick()).status,'not_eligible');
+ assert.equal(reservations,0);
+ assert.deepEqual(h.calls.map(x=>x[0]),['cancel']);
+});
+
+test('secondary alliance players receive weekly refresh jobs and roster coverage',async()=>{
+ const h=harness();
+ const n=await h.worker.seed([
+  {fid:'12345678',allianceTag:'FAM',membershipLastSuccessfulAt:'2026-11-19T12:00:00Z'},
+  {fid:'23456789',allianceTag:'HOT',membershipLastSuccessfulAt:'2026-11-19T12:00:00Z'}
+ ],['FAM']);
+ assert.equal(n,2);
+ const playerJobs=h.calls.filter(x=>x[1].jobKind==='player_verify').map(x=>x[1]);
+ assert.equal(playerJobs[0].priority,80);
+ assert.equal(playerJobs[0].dueAt,'2026-11-26T12:00:00.000Z');
+ assert.equal(playerJobs[1].priority,20);
+ assert.equal(h.calls.filter(x=>x[1].jobKind==='alliance_roster').length,5);
+ assert.ok(h.calls.some(x=>x[1].jobKey==='roster:FAM'));
+});
+test('transferred-out players are excluded from all routine refresh queues',async()=>{
+ const h=harness();
+ const n=await h.worker.seed([{fid:'12345678',allianceTag:'HOT',membershipStatus:'transferred_out'}],[]);
+ assert.equal(n,0);
+ assert.equal(h.calls.filter(x=>x[1].jobKind==='player_verify').length,0);
+});
