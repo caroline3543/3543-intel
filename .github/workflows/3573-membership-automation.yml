@@ -65,7 +65,7 @@ jobs:
       - name: Production build check
         run: npm run build
   provider-diagnostic:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/work/3573-automatic-membership-transfer-tracking'
+    if: vars.WOS_DIAGNOSTIC_IN_CI == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/work/3573-automatic-membership-transfer-tracking'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

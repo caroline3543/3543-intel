@@ -48,3 +48,32 @@ export function verifiedPlayerLocation(response, expectedFid, now=Date.now()) {
   const at=providerObservationTime(observedAt,now);
   return {status:'verified',fresh:true,fid,state,tag,at,source:'whiteoutstats-player'};
 }
+
+export function verifiedAllianceRoster(response, state, tag, now = Date.now()) {
+  const payload = response?.data ?? response;
+  const alliance = payload?.alliance;
+  if (payload?.ok !== true || payload.fresh !== true || payload.complete === false ||
+      String(payload.kid) !== String(state) || payload.tag !== tag ||
+      String(alliance?.kid) !== String(state) || alliance?.abbr !== tag ||
+      (payload.aid != null && alliance.aid != null && String(payload.aid) !== String(alliance.aid))) {
+    throw Error('Provider roster identity or freshness unverified');
+  }
+
+  const members = payload.members;
+  if (!Array.isArray(members) || alliance.count !== members.length ||
+      ('member_count' in payload && payload.member_count !== members.length)) {
+    throw Error('Provider roster completeness unverified');
+  }
+  const ids = new Set();
+  const normalized = members.map(member => {
+    const fid = String(member?.chief_id ?? member?.fid ?? '');
+    if (!/^[1-9]\d{3,14}$/.test(fid) || ids.has(fid) ||
+        (member.fid != null && String(member.fid) !== fid) ||
+        (member.kid != null && String(member.kid) !== String(state))) {
+      throw Error('Provider roster member identity unverified');
+    }
+    ids.add(fid);
+    return {...member, fid};
+  });
+  return {complete:true, fresh:true, observedAt:providerObservationTime(payload.cached_at, now), members:normalized};
+}

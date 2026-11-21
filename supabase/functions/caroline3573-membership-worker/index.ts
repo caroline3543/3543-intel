@@ -4,7 +4,7 @@
 import postgres from "npm:postgres@3.4.7";
 import {createMembershipWorker} from "../../../src/services/automaticMembershipWorker.js";
 import {createMembershipQueueAdapter} from "../../../src/services/automaticMembershipQueueAdapter.js";
-import {providerObservationTime,verifiedPlayerLocation,verifiedProviderUsage} from "../../../src/services/verifiedPlayerLocation.js";
+import {verifiedAllianceRoster,verifiedPlayerLocation,verifiedProviderUsage} from "../../../src/services/verifiedPlayerLocation.js";
 
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{
  status,headers:{"content-type":"application/json","cache-control":"no-store"}
@@ -58,7 +58,7 @@ Deno.serve(async(req)=>{
     Object.assign(evidence,{
      rosterHttp:allianceRes.status,rosterKeys:Object.keys(alliance??{}).slice(0,20),
      rosterHasFreshBoolean:typeof alliance?.fresh==="boolean",
-     rosterHasCompleteBoolean:typeof alliance?.complete==="boolean",
+     rosterCount:alliance?.member_count??null,
      rosterHasMembersArray:Array.isArray(alliance?.members),
      rosterHasRosterArray:Array.isArray(alliance?.roster),
      rosterHasCachedAt:alliance?.cached_at!=null
@@ -99,11 +99,7 @@ Deno.serve(async(req)=>{
   roster:async(state:string,tag:string)=>{
    if(state!=="3573"||!/^[A-Za-z0-9_]{1,16}$/.test(tag))throw Error("Invalid roster request");
    const response=await upstream("/alliances/3573/"+encodeURIComponent(tag)+"?include=info,roster");
-   const data=response?.data??response;
-   // Never infer completeness or freshness from a successful HTTP status.
-   if(data?.fresh!==true||data?.complete!==true||!Array.isArray(data?.members)||
-      !data?.cached_at)throw Error("Provider roster freshness or completeness unverified");
-   return {complete:true,fresh:true,observedAt:providerObservationTime(data.cached_at),members:data.members};
+   return verifiedAllianceRoster(response,state,tag);
   }
  };
  try{

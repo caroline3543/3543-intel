@@ -1,4 +1,4 @@
-import {providerObservationTime,verifiedPlayerLocation,verifiedProviderUsage} from '../src/services/verifiedPlayerLocation.js';
+import {verifiedAllianceRoster,verifiedPlayerLocation,verifiedProviderUsage} from '../src/services/verifiedPlayerLocation.js';
 // Read-only Whiteout Stats response-shape diagnostic. No player data or secrets printed.
 // Run: WOS_DIAGNOSTIC_KEY=... WOS_TEST_FID=... WOS_TEST_TAG=HOT node scripts/3573-provider-diagnostic.mjs
 const key=process.env.WOS_DIAGNOSTIC_KEY||'';
@@ -33,8 +33,8 @@ const accepts = (check) => {
 const evidence={
  usage:{http:usage.http,keys:keys(u),accepted:accepts(()=>verifiedProviderUsage(u))},
  player:{http:player.http,accepted:accepts(()=>verifiedPlayerLocation(p,fid)),keys:keys(p),playerKeys:keys(base),freshBoolean:typeof p?.fresh==='boolean',freshTrue:p?.fresh===true,hasExplicitAlliance:base!=null&&Object.hasOwn(base,'alliance'),hasState:base?.kid!=null,hasPlayerId:base?.chief_id!=null||base?.fid!=null,hasTimestamp:at!=null,timestampParseable:at!=null&&Number.isFinite(timestampMs(at))},
- roster:{http:roster.http,timestampFresh:accepts(()=>providerObservationTime(r?.cached_at)),keys:keys(r),freshTrue:r?.fresh===true,completeTrue:r?.complete===true,membersArray:Array.isArray(r?.members),rosterArray:Array.isArray(r?.roster),hasTimestamp:r?.cached_at!=null}
+ roster:{http:roster.http,accepted:accepts(()=>verifiedAllianceRoster(r,'3573',tag)),keys:keys(r),memberCount:members.length}
 };
 console.log(JSON.stringify(evidence,null,2));
 if([usage,player,roster].some(x=>x.http!==200))process.exitCode=2;
-else if(!evidence.usage.accepted||!evidence.player.accepted||!evidence.roster.freshTrue||!evidence.roster.completeTrue||!evidence.roster.membersArray||!evidence.roster.timestampFresh)process.exitCode=3;
+else if(!evidence.usage.accepted||!evidence.player.accepted||!evidence.roster.accepted)process.exitCode=3;

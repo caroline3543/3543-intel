@@ -31,13 +31,26 @@ The documented free-tier usage endpoint returns nested account-wide counters
 in `minute` and `daily`. The worker validates both limits and checks that used
 plus remaining equals the limit. The player adapter requires explicit freshness,
 identity, alliance membership and an observation no older than one hour. The
-roster adapter still requires explicit positive completeness evidence. Capture
-authenticated examples before marking either adapter verified.
+roster adapter validates the roster and alliance identity, freshness timestamp,
+alliance member count, roster count when supplied, and unique member FIDs.
+
+On 21 November 2026, a temporary authenticated diagnostic on Supabase
+`nrksysaynoklqzhyhnmd` reused the deployed app's existing provider secret.
+All three Whiteout Stats endpoints returned HTTP 200. The usage response
+confirmed the free-tier account counters (0 used in the minute and 136
+used in the day at the time of inspection). HOT returned 100 unique member
+IDs and an alliance-reported count of 100. Its roster was one second old.
+The player response matched the requested FID and reported State 3573 with
+an explicit HOT alliance and a current timestamp. The roster had no
+`complete` flag. The diagnostic accepted no anonymous requests and was
+closed immediately after the check.
 
 GitHub only triggers scheduled workflows from the default branch (`main`).
 Merging to `release/3573-production` alone leaves the scheduler inactive.
 Install the scheduler workflow on `main` separately after verifying its
-target and keeping the scheduler and worker flags disabled. The provider diagnostic runs on changes to its inputs on the development branch.
+target and keeping the scheduler and worker flags disabled. The development-branch GitHub diagnostic is optional when hosted
+provider validation runs on Supabase. It runs on push only when
+`WOS_DIAGNOSTIC_IN_CI` is true and needs an authorized GitHub Actions secret.
 Manual dispatch additionally requires the workflow on the default branch.
 
 Roster sightings of known transferred-out players can enqueue a one-off
