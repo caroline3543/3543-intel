@@ -6,16 +6,19 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
   const iso=()=>new Date(clock()).toISOString();
   async function seed(players,secondaryTags=[]) {
     let created=0;
+    const jobs=[];
     for(const player of players) {
       const cls=refreshClass(player,clock(),secondaryTags);
       if(!cls||!player?.fid)continue;
       const dueAt=new Date(nextRefreshAt(player,clock(),secondaryTags)).toISOString();
-      await store.enqueue({jobKey:`player:${player.fid}`,jobKind:'player_verify',fid:String(player.fid),priority:cls==='recentDeparture'?10:cls==='primary'?20:cls==='noAlliance'?40:80,dueAt});
+      jobs.push({jobKey:`player:${player.fid}`,jobKind:'player_verify',fid:String(player.fid),priority:cls==='recentDeparture'?10:cls==='primary'?20:cls==='noAlliance'?40:80,dueAt});
       created++;
     }
     for(const tag of ['ARC','RKG','HOT','LUN',...secondaryTags]) {
-      await store.enqueue({jobKey:`roster:${tag}`,jobKind:'alliance_roster',allianceTag:tag,priority:['ARC','RKG','HOT','LUN'].includes(tag)?5:70,dueAt:iso()});
+      jobs.push({jobKey:`roster:${tag}`,jobKind:'alliance_roster',allianceTag:tag,priority:['ARC','RKG','HOT','LUN'].includes(tag)?5:70,dueAt:iso()});
     }
+    if(store.enqueueMany)await store.enqueueMany(jobs);
+    else for(const job of jobs)await store.enqueue(job);
     return created;
   }
   async function tick() {
