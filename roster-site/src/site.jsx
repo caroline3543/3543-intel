@@ -75,13 +75,27 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const [transferEvents,setTransferEvents]=useState([]);
   useEffect(()=>{
     let active=true;
+    let refreshing=false;
     async function refreshTransfers(){
+      if(refreshing)return;
+      refreshing=true;
       try{
-        const response=await fetch('/api/transfers',{credentials:'same-origin',cache:'no-store'});
-        if(!response.ok)return;
-        const result=await response.json();
-        if(active&&Array.isArray(result.events))setTransferEvents(result.events);
+        const events=[];
+        let cursor=null;
+        do {
+          const path=cursor===null?'/api/transfers':'/api/transfers?before='+encodeURIComponent(cursor);
+          const response=await fetch(path,{credentials:'same-origin',cache:'no-store'});
+          if(!response.ok||!active)return;
+          const result=await response.json();
+          const next=result.nextCursor??null;
+          if(!Array.isArray(result.events)||(next!==null&&
+            (typeof next!=='string'||!/^[1-9]\d{0,18}$/.test(next)||(cursor!==null&&BigInt(next)>=BigInt(cursor)))))return;
+          events.push(...result.events);
+          cursor=next;
+        } while(cursor!==null);
+        if(active)setTransferEvents(events);
       }catch{/* Preserve last successful transfer feed when offline. */}
+      finally{refreshing=false;}
     }
     refreshTransfers();
     const timer=setInterval(()=>{if(document.visibilityState!=='hidden')refreshTransfers();},60_000);

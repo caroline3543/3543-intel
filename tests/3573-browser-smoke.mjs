@@ -38,6 +38,14 @@ try{
    const request=route.request(),url=new URL(request.url());
    if(request.method()!=='GET'&&url.pathname!=='/api/lookup')writes.push({stage,path:url.pathname,method:request.method(),body:request.postData()?.slice(0,1200)});
    if(url.pathname==='/api/session')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authenticated:true,role:'leader'})});
+   if(url.pathname==='/api/transfers'){
+    const first_detected_at=new Date().toISOString();
+    const events=[
+     {id:1,fid:fixture.players[0].fid,username:'Caroline',confidence:'confirmed',from_state:'3574',to_state:'3573',to_alliance:'HOT',first_detected_at},
+     {id:2,fid:'681766699',username:'Departed player',confidence:'confirmed',from_state:'3573',to_state:'3574',from_alliance:'ARC',first_detected_at}
+    ];
+    return route.fulfill({status:200,json:{events}});
+   }
    if(url.pathname==='/api/workspace')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:fixture,revision:1,updatedAt:'2026-11-01T00:00:00Z',role:'leader'})});
    if(url.pathname==='/api/lookup'&&request.method()==='POST'){
     const body=JSON.parse(request.postData()||'{}');
@@ -55,6 +63,11 @@ try{
   const expectedTabs=['Members','Events','Compare','Changes'];
   const mainNav=page.getByRole('navigation',{name:'Main navigation'});
   assert.deepEqual(await mainNav.getByRole('button').allTextContents(),expectedTabs,'Main navigation must show the four primary tabs');
+  await page.getByRole('group',{name:'Recent transfers'}).getByRole('button',{name:'Transferred In · 1'}).waitFor();
+  await page.getByText('Transfer history',{exact:true}).click();
+  await page.getByText(/1 in · 1 out · 0 net/).click();
+  await page.getByText('Departed player',{exact:true}).waitFor();
+  await page.getByText('Transfer history',{exact:true}).click();
   stage='events';
   await mainNav.getByRole('button',{name:'Events',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:/Castle Battle/}).isDisabled(),true,'Unavailable Castle Battle must not be clickable');

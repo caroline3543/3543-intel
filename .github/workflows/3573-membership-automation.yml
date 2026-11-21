@@ -64,3 +64,19 @@ jobs:
         run: deno check --config supabase/functions/caroline3573-membership-worker/deno.json supabase/functions/caroline3573-membership-worker/index.ts
       - name: Production build check
         run: npm run build
+  provider-diagnostic:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/work/3573-automatic-membership-transfer-tracking'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate real provider response
+        env:
+          WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY || secrets.WHITEOUTSTATS_API_KEY }}
+          WOS_TEST_TAG: HOT
+        run: node scripts/3573-provider-diagnostic.mjs

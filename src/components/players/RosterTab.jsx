@@ -1,4 +1,5 @@
-import { transferNavigation,filterTransferPlayers } from '../../services/automaticMembershipTransferView.js';
+import { monthlyTransferHistory } from '../../services/automaticMembershipPolicy.js';
+import { transferNavigation,filterTransferPlayers,normalizeTransferEvents } from '../../services/automaticMembershipTransferView.js';
 import { mightpulseRequest } from '../../services/mightpulseService.js';
 import { verifiedPlayerLocation } from '../../services/verifiedPlayerLocation.js';
 import {PlayerSearch} from './PlayerSearch.jsx';
@@ -166,6 +167,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   const isTransferred=p=>p.membershipStatus==='transferred_out';
   const isReview=p=>!isTransferred(p)&&(p.membershipStatus==='transfer_review'||(enable3573Tracking&&suspectedTransferOut(p,membershipNow)));
   const transferView=transferNavigation(transferEvents,membershipNow);
+  const transferMonths=monthlyTransferHistory(normalizeTransferEvents(transferEvents));
   const transferredInIds=new Set(filterTransferPlayers(players,transferEvents,'in').map(p=>String(p.fid)));
   const visible=players.filter(p=>!enable3573Tracking?matchesRosterFilters(p,search,filters)&&(filters.alliance?p.membershipStatus!=='unverified':true):trackingView==='transferred_in'?transferredInIds.has(String(p.fid))&&!isTransferred(p)&&matchesSearch(p):trackingView==='transferred'?isTransferred(p)&&matchesSearch(p):trackingView==='review'?isReview(p)&&matchesSearch(p):!isTransferred(p)&&matchesRosterFilters(p,search,filters)).sort((a,b)=>compareRosterPlayers(a,b,sort,sortDirection,events));
   const key=JSON.stringify([search,filters,sort,sortDirection,grouped,trackingView]);
@@ -221,6 +223,23 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
       {enable3573Tracking&&trackingView==='current'&&transferView.promoted&&<div role="group" aria-label="Recent transfers" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:7}}>
         {transferView.filters.filter(f=>f.promoted).map(f=><button key={f.key} type="button" style={{...button,whiteSpace:'nowrap',flexShrink:0}} onClick={()=>{setTrackingView(f.key==='transferred_in'?'transferred_in':'transferred');setVisibleCount(20);setAllianceMoreOpen(false);}}>{f.label} · {f.count}</button>)}
       </div>}
+      {enable3573Tracking&&trackingView==='current'&&<details style={{marginBottom:9,padding:'8px 10px',background:C.card,borderRadius:12}}>
+        <summary style={{cursor:'pointer',color:C.gold}}>Transfer history</summary>
+        {transferMonths.length===0&&<p style={{fontSize:12,color:C.icy}}>No confirmed transfers to show.</p>}
+        {transferMonths.map(month=><details key={month.month} style={{padding:'8px 0',borderBottom:'1px solid '+C.border}}>
+          <summary style={{cursor:'pointer',fontSize:13}}>
+            {new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(month.month+'-01T00:00:00Z'))}
+            {' · '}{month.in} in · {month.out} out · {month.net>0?'+':''}{month.net} net
+          </summary>
+          <ul style={{paddingLeft:20,fontSize:12,color:C.icy}}>
+            {month.events.map(event=><li key={event.event_key||event.id} style={{padding:'4px 0'}}>
+              <strong>{event.username||event.fid}</strong>
+              {' · '}{event.fromState}{event.fromAlliance?' ['+event.fromAlliance+']':''}
+              {' → '}{event.toState}{event.toAlliance?' ['+event.toAlliance+']':''}
+            </li>)}
+          </ul>
+        </details>)}
+      </details>}
       {!enable3573Tracking&&<div role="group" aria-label="Filter by alliance" style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,marginBottom:6,alignItems:'center'}}>{[['','All'],...[...new Set(players.map(p=>p.allianceTag).filter(Boolean))].sort().map(tag=>[tag,tag]),['__no_alliance','No alliance'],['__review','Needs review']].map(([tag,label])=><button key={tag||'all'} onClick={()=>setFilters({...filters,alliance:tag})} style={{...button,fontSize:12,whiteSpace:'nowrap',flexShrink:0}}>{label}</button>)}</div>}
       {enable3573Tracking&&trackingView==='current'&&allianceMoreOpen&&<div role="group" aria-label="Other alliances" style={{display:'flex',gap:6,flexWrap:'wrap',background:C.card,borderRadius:12,padding:10,marginBottom:9}}>
         {allianceTags.map(tag=><button key={tag} style={{...button,fontSize:12,background:filters.alliance===tag?C.gold:C.section,color:filters.alliance===tag?C.bg:C.icy}} onClick={()=>{setFilters({...filters,alliance:tag});setAllianceMoreOpen(false);}}>{tag} · {players.filter(p=>p.allianceTag===tag&&!isTransferred(p)&&!isReview(p)).length}</button>)}

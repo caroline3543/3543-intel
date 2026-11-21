@@ -177,7 +177,7 @@ test('incomplete player details cannot erase confirmed 3573 alliance',()=>{
 });
 test('verified explicit No Alliance in player details retains previous alliance history',()=>{
  const p={id:'stable',fid:'596099868',allianceTag:'HOT',membershipStatus:'active',membershipObservedAt:'2026-11-17T00:00:00Z',allianceHistory:[]};
- const at=new Date(Date.now()-3600000).toISOString();
+ const at=new Date(Date.now()-1800000).toISOString();
  const r={retrieved_at:new Date().toISOString(),data:{fresh:true,chief_id:p.fid,player:{fid:p.fid,kid:3573,alliance:null,cached_at:at}}};
  const next=applyPlayerDetails(p,r,'3573');
  assert.equal(next.allianceTag,'');

@@ -84,11 +84,14 @@ export function transferFilterState(events,now=Date.now()) {
 export function monthlyTransferHistory(events) {
   const groups=new Map();
   for(const event of events){
-    if(event.confidence!=='confirmed'||!timestamp(event.firstDetectedAt))continue;
+    if(event.confidence!=='confirmed'||!timestamp(event.firstDetectedAt)||!validState(event.fromState)||!validState(event.toState))continue;
+    const incoming=String(event.toState)==='3573'&&String(event.fromState)!=='3573';
+    const outgoing=String(event.fromState)==='3573'&&String(event.toState)!=='3573';
+    if(!incoming&&!outgoing)continue;
     const month=event.firstDetectedAt.slice(0,7);
     const group=groups.get(month)||{month,in:0,out:0,net:0,events:[]};
-    if(event.toState==='3573'&&event.fromState!=='3573')group.in++;
-    if(event.fromState==='3573'&&event.toState!=='3573')group.out++;
+    if(incoming)group.in++;
+    if(outgoing)group.out++;
     group.net=group.in-group.out;group.events.push(event);groups.set(month,group);
   }
   return [...groups.values()].sort((a,b)=>b.month.localeCompare(a.month));

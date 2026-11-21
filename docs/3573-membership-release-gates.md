@@ -44,3 +44,18 @@ Roster sightings of known transferred-out players can enqueue a one-off
 player verification. Only a verified location in 3573 can record the return.
 Players with unknown origins remain discoveries until independent evidence
 supplies a previous state.
+
+## Rollback preparation
+
+Before SQL or Edge changes, export the `3573-leaders` workspace row and the
+existing database definitions to restricted backup storage. Record the
+workspace revision and verify the export restores into an isolated PostgreSQL
+instance. Record the deployed Edge Function versions and archive their source
+before replacing them. Confirm the Vercel production deployment is available
+for rollback.
+
+If an enabled release fails, disable the GitHub scheduler and the Edge worker
+first, drain in-flight jobs, and restore the previous Vercel deployment and
+Edge Function versions. Preserve the ledger and workspace. Compare the saved
+workspace revision with its current state and reconcile automation edits
+individually so that restoring a snapshot cannot erase later leader edits.
