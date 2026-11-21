@@ -83,3 +83,14 @@ test('missing workspace roster fails closed for secondary eligibility',async()=>
  const adapter=createMembershipQueueAdapter({query:async()=>[]});
  await assert.rejects(adapter.getSecondaryTags(),/unavailable/);
 });
+
+test('the worker can enqueue a roster in one statement and deduplicates repeated job keys',async()=>{
+ const calls=[];
+ const adapter=createMembershipQueueAdapter({query:async(sql,params)=>{calls.push({sql,params});return []}});
+ const player={jobKey:'player:12345',jobKind:'player_verify',fid:'12345',dueAt:'2026-11-21T00:00:00Z'};
+ const roster={jobKey:'roster:HOT',jobKind:'alliance_roster',allianceTag:'HOT',dueAt:player.dueAt};
+ await adapter.enqueueMany([player,roster,player]);
+ assert.equal(calls.length,1);
+ assert.match(calls[0].sql,/jsonb_to_recordset/);
+ assert.deepEqual(JSON.parse(calls[0].params[0]).map(job=>job.job_key),[player.jobKey,roster.jobKey]);
+});

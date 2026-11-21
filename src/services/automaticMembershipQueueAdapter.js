@@ -9,10 +9,24 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
   return {
     isEnabled:enabled,
     async enqueue(job){
-      if(!job?.jobKey||!job?.jobKind||!job?.dueAt)throw Error('Invalid job');
+      const rows=await this.enqueueMany([job]);
+      return rows[0]||null;
+    },
+    async enqueueMany(jobs){
+      const unique=new Map();
+      for(const job of jobs){
+        if(!job?.jobKey||!job?.jobKind||!job?.dueAt)throw Error('Invalid job');
+        unique.set(job.jobKey,{
+          job_key:job.jobKey,job_kind:job.jobKind,fid:job.fid||null,
+          alliance_tag:job.allianceTag||null,priority:job.priority||100,due_at:job.dueAt
+        });
+      }
+      if(!unique.size)return [];
       const rows=await query(`
         insert into membership_3573.refresh_jobs(job_key,job_kind,fid,alliance_tag,priority,due_at)
-        values($1,$2,$3,$4,$5,$6)
+        select job_key,job_kind,fid,alliance_tag,priority,due_at
+        from jsonb_to_recordset($1::jsonb)
+          as new_job(job_key text,job_kind text,fid text,alliance_tag text,priority integer,due_at timestamptz)
         -- Preserve pending and leased due dates. Cancelled jobs may be
         -- reactivated by later seeding after a cooldown, so temporary API
         -- failures cannot permanently remove a player from automation.
@@ -24,8 +38,8 @@ export function createMembershipQueueAdapter({query,enabled=async()=>false}) {
         where membership_3573.refresh_jobs.status='cancelled'
           and membership_3573.refresh_jobs.updated_at < now()-interval '1 hour'
         returning id`,
-        [job.jobKey,job.jobKind,job.fid||null,job.allianceTag||null,job.priority||100,job.dueAt]);
-      return rows?.[0]||null;
+        [JSON.stringify([...unique.values()])]);
+      return rows||[];
     },
     async leaseNext({now,leaseSeconds=600}){
       const rows=await query('select * from membership_3573.lease_next_job($1,$2)',[now,leaseSeconds]);
