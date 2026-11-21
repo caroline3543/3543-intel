@@ -57,6 +57,24 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_no_alliance_postgres_integration.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_transfer_feed_postgres.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_shared_budget_postgres.sql
+      - name: Verify competing database sessions honor the same quota
+        env:
+          PGPASSWORD: postgres
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: membership_test
+        run: |
+          first=$(mktemp)
+          second=$(mktemp)
+          trap 'rm -f "$first" "$second"' EXIT
+          psql -Aqt -v ON_ERROR_STOP=1 -c "select membership_3573.reserve_request_credits('2026-11-20T14:00:00Z',1,100,59)" > "$first" &
+          first_pid=$!
+          psql -Aqt -v ON_ERROR_STOP=1 -c "select membership_3573.reserve_request_credits('2026-11-20T14:00:00Z',1,100,59)" > "$second" &
+          second_pid=$!
+          wait "$first_pid"
+          wait "$second_pid"
+          test "$(printf '%s\n' "$(cat "$first")" "$(cat "$second")" | sort | tr -d '\n')" = 'ft'
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x

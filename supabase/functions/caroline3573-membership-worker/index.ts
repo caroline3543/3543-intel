@@ -67,7 +67,9 @@ Deno.serve(async(req)=>{
    return json({status:"diagnostic",evidence});
   }catch{return json({error:"Provider diagnostic unavailable"},502);}
  }
- if(Deno.env.get("MEMBERSHIP_3573_ENABLED")!=="true")return json({status:"disabled"});
+ if(input?.mode!=="tick"&&input?.mode!=="readiness")return json({error:"Unsupported worker mode"},400);
+ const writesEnabled=Deno.env.get("MEMBERSHIP_3573_ENABLED")==="true";
+ if(input.mode==="tick"&&!writesEnabled)return json({status:"disabled"});
  const connection=Deno.env.get("DATABASE_URL")||"";
  const apiKey=Deno.env.get("WHITEOUTSTATS_API_KEY")||"";
  if(!connection||!/^wos_[\x21-\x7e]+$/.test(apiKey))
@@ -93,16 +95,28 @@ Deno.serve(async(req)=>{
   usage:async()=>verifiedProviderUsage(await upstream("/usage")),
   verifyPlayer:async(fid:string)=>{
    if(!/^[1-9]\d{3,14}$/.test(fid))throw Error("Invalid FID");
-   const response=await upstream("/players/"+fid+"?include=base");
+   const response=await upstream("/players/"+fid+"?include=base&wait=10");
    return verifiedPlayerLocation(response,fid);
   },
   roster:async(state:string,tag:string)=>{
    if(state!=="3573"||!/^[A-Za-z0-9_]{1,16}$/.test(tag))throw Error("Invalid roster request");
-   const response=await upstream("/alliances/3573/"+encodeURIComponent(tag)+"?include=info,roster");
+   const response=await upstream("/alliances/3573/"+encodeURIComponent(tag)+"?include=info,roster&wait=10");
    return verifiedAllianceRoster(response,state,tag);
   }
  };
  try{
+  if(input.mode==="readiness"){
+   const [checks]=await query(`
+    select
+     exists(select 1 from public.caroline_workspaces where id=$1 and jsonb_typeof(data->'players')='array') as workspace_ok,
+     to_regclass('membership_3573.refresh_jobs') is not null as queue_ok,
+     to_regprocedure('public.caroline_3573_transfer_feed(integer,bigint)') is not null as transfer_feed_ok,
+     to_regprocedure('membership_3573.reserve_request_credits(timestamptz,integer,integer,integer)') is not null as budget_ok
+   `,["3573-leaders"]);
+   const ready=Object.values(checks??{}).length===4&&Object.values(checks).every(value=>value===true);
+   return json({status:ready?"ready":"incomplete",writesEnabled,checks},ready?200:503);
+  }
+  const deadline=Date.now()+80000;
   const workspace=await query("select data from public.caroline_workspaces where id=$1",["3573-leaders"]);
   if(!workspace[0]||!Array.isArray(workspace[0].data?.players))
    return json({error:"Workspace player data unavailable"},503);
@@ -116,7 +130,7 @@ Deno.serve(async(req)=>{
   const worker=createMembershipWorker({store,api});
   const seeded=await worker.seed(workspace[0].data.players,secondaryTags);
   const results=[];
-  for(let i=0;i<12;i++){
+  for(let i=0;i<12&&Date.now()<deadline;i++){
    const result=await worker.tick();
    results.push({status:result.status,jobKind:result.jobKind||null});
    if(result.status!=="completed"&&result.status!=="retry_scheduled"&&result.status!=="not_eligible")break;

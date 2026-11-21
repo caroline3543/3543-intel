@@ -72,7 +72,7 @@ export function createMembershipWorker({store,api,clock=()=>Date.now(),reserve=1
     // Fail closed until the server adapter supplies an atomic reservation.
     let reserved=false;
     try {
-      reserved=await store.reserveCredits?.({credits,providerUsed:usage.used,now:iso()})===true;
+      reserved=await store.reserveCredits?.({credits,providerUsed:usage.used,providerMinuteUsed:usage.minuteUsed,now:iso()})===true;
     } catch {
       reserved=false;
     }

@@ -4,29 +4,33 @@ do $$
 declare
  i integer;
 begin
- if not membership_3573.reserve_request_credits('2026-11-20T12:00:00Z',1,100)
+ if not membership_3573.reserve_request_credits('2026-11-20T12:00:00Z',1,100,0)
  then raise exception 'First reservation rejected'; end if;
- if membership_3573.reserve_request_credits('2026-11-20T12:00:00Z',61,100)
+ if membership_3573.reserve_request_credits('2026-11-20T12:00:00Z',61,100,0)
  then raise exception 'Oversized reservation accepted'; end if;
- if membership_3573.reserve_request_credits('2026-11-20T12:00:00Z',1,-1)
+ if membership_3573.reserve_request_credits('2026-11-20T12:00:00Z',1,-1,0)
  then raise exception 'Invalid provider usage accepted'; end if;
  for i in 1..59 loop
-  if not membership_3573.reserve_request_credits('2026-11-20T12:00:00Z',1,100)
+  if not membership_3573.reserve_request_credits('2026-11-20T12:00:00Z',1,100,0)
   then raise exception 'Reservation % rejected unexpectedly',i; end if;
  end loop;
- if membership_3573.reserve_request_credits('2026-11-20T12:00:00Z',1,100)
+ if membership_3573.reserve_request_credits('2026-11-20T12:00:00Z',1,100,0)
  then raise exception 'Minute limit bypassed'; end if;
- if not membership_3573.reserve_request_credits('2026-11-20T12:01:00Z',1,100)
+ if not membership_3573.reserve_request_credits('2026-11-20T12:01:00Z',1,100,0)
  then raise exception 'New minute reservation rejected'; end if;
- if not public.caroline_3573_reserve_proxy_credit() then
+ if not public.caroline_3573_reserve_proxy_credit(0,0) then
   raise exception 'Proxy cannot reserve shared API credit'; end if;
- if membership_3573.reserve_request_credits('2026-11-20T12:02:00Z',2,3999)
+ if membership_3573.reserve_request_credits('2026-11-20T12:02:00Z',2,3999,0)
  then raise exception 'Daily reserve bypassed'; end if;
- if has_function_privilege('anon','public.caroline_3573_reserve_proxy_credit()','execute')
+ if not membership_3573.reserve_request_credits('2026-11-21T13:00:00Z',1,100,59) then
+  raise exception 'Final available provider credit rejected'; end if;
+ if membership_3573.reserve_request_credits('2026-11-21T13:00:00Z',1,100,0) then
+  raise exception 'Older provider minute counters bypassed shared quota'; end if;
+ if has_function_privilege('anon','public.caroline_3573_reserve_proxy_credit(integer,integer)','execute')
  then raise exception 'Proxy reservation callable by anonymous role'; end if;
- if not has_function_privilege('service_role','public.caroline_3573_reserve_proxy_credit()','execute')
+ if not has_function_privilege('service_role','public.caroline_3573_reserve_proxy_credit(integer,integer)','execute')
  then raise exception 'Service role cannot reserve proxy credits'; end if;
- if has_function_privilege('anon','membership_3573.reserve_request_credits(timestamptz,integer,integer)','execute')
+ if has_function_privilege('anon','membership_3573.reserve_request_credits(timestamptz,integer,integer,integer)','execute')
  then raise exception 'Budget reservation exposed to anon'; end if;
 end $$;
 rollback;

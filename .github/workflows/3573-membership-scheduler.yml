@@ -2,12 +2,15 @@ name: 3573 Membership Scheduler
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '2-57/5 * * * *'
 permissions:
   contents: read
+concurrency:
+  group: membership-3573-production
+  cancel-in-progress: false
 jobs:
   tick:
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
