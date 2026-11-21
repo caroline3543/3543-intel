@@ -20,9 +20,10 @@ const [usage,player,roster]=await Promise.all([
 const keys=o=>o&&typeof o==='object'&&!Array.isArray(o)?Object.keys(o).slice(0,30):[];
 const p=player.body,base=p?.player, r=roster.body,u=usage.body;
 const at=base?.cached_at??p?.cached_at??p?.meta?.cached_at??null;
+const timestampMs=value=>typeof value==='number'?(value<1e12?value*1000:value):typeof value==='string'&&/^\d{10,13}$/.test(value)?(Number(value)<1e12?Number(value)*1000:Number(value)):Date.parse(value);
 const evidence={
  usage:{http:usage.http,keys:keys(u),usedInteger:Number.isSafeInteger(u?.used),minuteUsedInteger:Number.isSafeInteger(u?.minute_used)},
- player:{http:player.http,keys:keys(p),playerKeys:keys(base),freshBoolean:typeof p?.fresh==='boolean',freshTrue:p?.fresh===true,hasExplicitAlliance:base!=null&&Object.hasOwn(base,'alliance'),hasState:base?.kid!=null,hasPlayerId:base?.chief_id!=null||base?.fid!=null,hasTimestamp:at!=null,timestampParseable:at!=null&&Number.isFinite(Date.parse(at))},
+ player:{http:player.http,keys:keys(p),playerKeys:keys(base),freshBoolean:typeof p?.fresh==='boolean',freshTrue:p?.fresh===true,hasExplicitAlliance:base!=null&&Object.hasOwn(base,'alliance'),hasState:base?.kid!=null,hasPlayerId:base?.chief_id!=null||base?.fid!=null,hasTimestamp:at!=null,timestampParseable:at!=null&&Number.isFinite(timestampMs(at))},
  roster:{http:roster.http,keys:keys(r),freshBoolean:typeof r?.fresh==='boolean',completeBoolean:typeof r?.complete==='boolean',membersArray:Array.isArray(r?.members),rosterArray:Array.isArray(r?.roster),hasTimestamp:r?.cached_at!=null}
 };
 console.log(JSON.stringify(evidence,null,2));
