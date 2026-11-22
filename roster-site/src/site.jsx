@@ -184,9 +184,29 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const syncLabel=syncProblem?'Sync not working':sync.dirty||sync.syncing?'Syncing':'Synced';
   const syncColor=syncProblem?'#F07575':sync.dirty||sync.syncing?'#E6BF7B':'#72CBA9';
   const membershipAge=relativeRefreshAge(membership.refresh?.completedAt);
-  const membershipLabel=membership.running?'Refresh in progress':membership.refresh?.completedAt?'Refresh completed '+membershipAge.toLowerCase():'Membership refresh';
-  const refreshAction=<button style={button} onClick={membership.start} disabled={membership.busy||membership.running||!!legionRefresh||nameRefresh.status==='running'||!sync.joined||sync.dirty||sync.mode==='join'||!!sync.conflicts?.length}>Refresh all alliances</button>;
+  const membershipLabel=membership.running?'Verifying moves':membership.refresh?.completedAt?'Moves checked '+membershipAge.toLowerCase():'Alliance refresh';
   const [importing,setImporting]=useState(false),[deleting,setDeleting]=useState(null),[message,setMessage]=useState('');
+  const [rosterRefreshing,setRosterRefreshing]=useState(false);
+  const rosterRefreshLock=useRef(false);
+  async function refreshPriorityRosters(){
+    if(rosterRefreshLock.current)return;
+    rosterRefreshLock.current=true;
+    setRosterRefreshing(true);
+    setMessage('');
+    try{
+      const response=await fetch('/api/priority-roster-refresh',{method:'POST',credentials:'same-origin',signal:AbortSignal.timeout(35000)});
+      const result=await response.json();
+      if(!response.ok)throw Error(result.error||'Could not refresh the alliance lists.');
+      const verification=result.missing===0?'No missing players to verify.':
+        result.queued===result.missing?`${result.queued} queued for verification.`:
+        `${result.missing} missing · ${result.queued} newly queued for verification.`;
+      setMessage(`${result.succeeded.length} of 5 alliance lists refreshed · ${result.found} players found. ${verification}`+
+        (result.unavailable.length?` Unavailable: ${result.unavailable.join(', ')}.`:''));
+      await retry();
+    }catch(error){setMessage(error.message||'Could not refresh the alliance lists.');}
+    finally{rosterRefreshLock.current=false;setRosterRefreshing(false);}
+  }
+  const refreshAction=<button style={button} onClick={refreshPriorityRosters} disabled={rosterRefreshing||!!legionRefresh||nameRefresh.status==='running'||!sync.joined||sync.dirty||sync.mode==='join'||!!sync.conflicts?.length}>{rosterRefreshing?'Loading alliance lists…':'Refresh priority alliances'}</button>;
   const latest=useRef(data);latest.current=data;
   const pendingTalSync=useRef({active:false,sawDirty:false});
   useEffect(()=>{

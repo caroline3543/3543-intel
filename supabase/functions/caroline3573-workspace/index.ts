@@ -19,6 +19,19 @@ Deno.serve(async req=>{
    if(error)throw error;
    return reply({refresh:data});
   }
+  if(input.action==='priority-roster-refresh'){
+   if(!Number.isSafeInteger(input.revision)||input.revision<0||
+      !Array.isArray(input.missing)||input.missing.some((fid:unknown)=>typeof fid!=='string'||!/^[1-9]\d{3,14}$/.test(fid))){
+    return reply({error:'Invalid priority refresh request'},400);
+   }
+   const missing=Deno.env.get('MEMBERSHIP_3573_ENABLED')==='true'?input.missing:[];
+   const {data,error}=await db.rpc('caroline_3573_commit_priority_refresh',{
+    p_revision:input.revision,p_workspace:validateWorkspace(input.data),p_missing:missing,
+    p_actor:typeof input.actor==='string'?input.actor:'priority-roster-refresh'
+   });
+   if(error)throw error;
+   return reply(data,data.conflict?409:200);
+  }
   if(input.action==='transfers'){
    // Read-only, service-role RPC. The site server authenticates the leader session.
    const beforeId=input.beforeId??null;

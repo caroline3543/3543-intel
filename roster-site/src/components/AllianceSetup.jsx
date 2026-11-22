@@ -31,9 +31,9 @@ export function AllianceSetup({players,onLoad}){
   const hasDefaults=DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag));
   return <section aria-label="Your alliances" style={{margin:'16px 20px 4px',padding:16,borderRadius:14,background:C.section}}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}><h2 style={{fontSize:18,margin:0}}>Your alliances</h2><button style={button} aria-expanded={expanded} disabled={busy} onClick={()=>setExpanded(!expanded)}>{expanded?"Hide":"Manage"}</button></div>
-    {!expanded&&<p style={{fontSize:14,color:C.icy,marginBottom:0}}>HOT · ARC · RKG · LUN</p>}
+    {!expanded&&<p style={{fontSize:14,color:C.icy,marginBottom:0}}>{DEFAULT_ALLIANCES.join(' · ')}</p>}
     {expanded&&<>
-    <p style={{fontSize:14,color:C.icy,lineHeight:1.5,margin:'0 0 14px'}}>Load HOT, ARC, RKG and LUN from State 3573.</p>
+    <p style={{fontSize:14,color:C.icy,lineHeight:1.5,margin:'0 0 14px'}}>Load {DEFAULT_ALLIANCES.join(', ')} from State 3573.</p>
     <button style={{...button,width:'100%',background:C.gold,color:C.bg,marginBottom:10}} disabled={busy} onClick={()=>load(DEFAULT_ALLIANCES)}>{busy?'Loading…':hasDefaults?'Refresh priority alliances':'Load priority alliances'}</button>
     {DEFAULT_ALLIANCES.map(tag=>{
       const count=players.filter(p=>p.allianceTag===tag).length;
