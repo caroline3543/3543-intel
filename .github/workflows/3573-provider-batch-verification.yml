@@ -1,0 +1,26 @@
+name: State 3573 live provider batch verification
+on:
+  push:
+    branches: [work/3573-provider-batch-verification]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify live response shape and freshness (read-only)
+        env:
+          WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY || secrets.WHITEOUTSTATS_API_KEY }}
+        run: |
+          if [ -z "$WOS_DIAGNOSTIC_KEY" ]; then
+            echo 'Credential unavailable to this workflow. No provider requests made.'
+            exit 1
+          fi
+          node scripts/3573-provider-diagnostic.mjs
