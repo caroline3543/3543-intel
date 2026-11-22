@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
 const steps=[
-  {title:'Load your alliances',body:'Tap Load all four to add HOT, ARC, RKG and LUN. Or load one alliance at a time.'},
+  {title:'Load your alliances',body:'Tap Load priority alliances to add ARC, HOT, RKG, WAR and LUN. You can also load one alliance at a time.'},
   {title:'Find a player',body:'Use alliance or TAL legion chips in Members. Search a name or player ID, including past names.'},
   {title:'Make an update',body:'Open a player. Tap a troop tier or the Identity pencil to edit. Use Name changes below to see recent renames. Tap the download icon for an Excel copy.'},
 ];

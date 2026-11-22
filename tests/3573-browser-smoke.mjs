@@ -105,7 +105,7 @@ try{
   stage='alliance-compare';
   await page.getByRole('button',{name:'Alliances',exact:true}).click();
   await page.getByRole('textbox',{name:'Opponent state'}).fill('3573');
-  await page.getByRole('textbox',{name:'Opponent alliance'}).fill('ARC');
+  await page.getByLabel('Opponent alliance').fill('ARC');
   await page.getByRole('button',{name:'Load rosters'}).click();
   await page.getByRole('heading',{name:'Furnace strength'}).waitFor({timeout:10000});
   assert.equal(await page.getByRole('button',{name:'FC8',exact:true}).count(),1,'FC8 must remain a threshold');

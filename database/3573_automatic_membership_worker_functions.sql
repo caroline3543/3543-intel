@@ -14,8 +14,9 @@ begin
   if p_lease_seconds < 30 or p_lease_seconds > 3600 then raise exception 'Invalid lease duration'; end if;
   with candidate as (
     select id from membership_3573.refresh_jobs
-    where (status='pending' and due_at <= p_now)
-       or (status='leased' and lease_until < p_now)
+    where job_key not like 'manual:%'
+      and ((status='pending' and due_at <= p_now)
+        or (status='leased' and lease_until < p_now))
     order by priority asc, due_at asc, id asc
     for update skip locked limit 1
   )

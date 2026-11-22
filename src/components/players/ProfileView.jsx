@@ -1,3 +1,4 @@
+import {verifiedMembershipTime} from '../../services/rosterViewService.js';
 import {ProfileTeamwork} from './ProfileTeamwork.jsx';
 import { ProfileTalCapacity } from './ProfileTalCapacity.jsx';
 import {ProfileSheetImport} from './ProfileSheetImport.jsx';
@@ -31,7 +32,7 @@ function relativeProfileAge(raw){
  const months=Math.floor(days/30);if(days<365)return 'Updated '+Math.max(1,months)+' month'+(months===1?'':'s')+' ago';
  const years=Math.floor(days/365);return 'Updated '+years+' year'+(years===1?'':'s')+' ago';
 }
-export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,players=[],teamworkPreferences={},onSaveTeamworkPreferences,playerLookup,onCheckPlayerName,onApplyCheckedName}) {
+export function ProfileView({showMembershipFreshness=false,player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,players=[],teamworkPreferences={},onSaveTeamworkPreferences,playerLookup,onCheckPlayerName,onApplyCheckedName}) {
   const panel=useRef(null);
   const close=useRef(onClose);close.current=onClose;
   useEffect(()=>{
@@ -62,13 +63,14 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
     <section ref={panel} role="dialog" aria-modal="true" aria-label={`Player profile: ${name}`} onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:480,height:'min(94dvh, 94vh)',minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch',touchAction:'pan-y',boxSizing:'border-box',padding:'0 16px max(110px, env(safe-area-inset-bottom))',overscrollBehavior:'contain'}}>
       <header style={{position:'sticky',top:0,zIndex:1,background:C.card,padding:'16px 0 12px',display:'flex',gap:12,alignItems:'center',borderBottom:`1px solid ${C.border}`,marginBottom:16}}>
         <PlayerAvatar player={player} size={48} color={roleColor(player.roles?.[0],roles)} bordered/>
-        <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel].filter(Boolean).join(' · ')}</div><CopyPlayerId fid={player.fid}/><div title={player.profileLastUpdated?new Date(player.profileLastUpdated).toLocaleString():undefined} style={{fontSize:12,color:C.icy,marginTop:5}}>{relativeProfileAge(player.profileLastUpdated)} · Profile edited</div>{player.providerStats?.retrievedAt&&<div title={new Date(player.providerStats.retrievedAt).toLocaleString()} style={{fontSize:12,color:C.icy}}>API data · {relativeProfileAge(player.providerStats.retrievedAt).replace(/^Updated /,'')}</div>}</div>
+        <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:showMembershipFreshness&&verifiedMembershipTime(player)?'No Alliance':null,player.furnaceLevel].filter(Boolean).join(' · ')}</div><CopyPlayerId fid={player.fid}/><div title={player.profileLastUpdated?new Date(player.profileLastUpdated).toLocaleString():undefined} style={{fontSize:12,color:C.icy,marginTop:5}}>{relativeProfileAge(player.profileLastUpdated)} · Profile edited</div>{player.providerStats?.retrievedAt&&<div title={new Date(player.providerStats.retrievedAt).toLocaleString()} style={{fontSize:12,color:C.icy}}>API data · {relativeProfileAge(player.providerStats.retrievedAt).replace(/^Updated /,'')}</div>}</div>
         <button style={profileButton} aria-label="Close profile" onClick={onClose}>✕</button>
       </header>
       <ProfileTroops key={`troops:${player.id}`} player={player} onSave={onSave}/>
       <ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/>
       <ProfileJoiners key={`heroes:${player.id}`} player={player} onSave={onSave}/>
       <ProfileTeamwork key={`tal-teamwork:${player.id}`} player={player} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} onSavePlayer={onSave}/>
+      {showMembershipFreshness&&<div style={{fontSize:12,color:C.icy,margin:'6px 0 12px'}}>Membership verified · {verifiedMembershipTime(player)?<time dateTime={verifiedMembershipTime(player)}>{new Date(verifiedMembershipTime(player)).toLocaleString()}</time>:'No verified timestamp'}</div>}
       <ProfileSection title="Check username with API">
         <p style={{fontSize:13,color:C.icy,margin:'0 0 10px'}}>Look up this Player ID directly. This checks the provider separately from the alliance roster and won't change saved data without confirmation.</p>
         <button type="button" style={profileButton} disabled={!player.fid||playerLookup?.status==='loading'} onClick={()=>onCheckPlayerName?.(player)}>{playerLookup?.status==='loading'?'Checking…':'Refresh player name'}</button>

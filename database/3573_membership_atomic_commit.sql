@@ -1,4 +1,21 @@
--- STAGED ONLY. Not applied to the live database.
+-- Apply the verified membership writer before the manual refresh migration.
+create or replace function membership_3573.read_membership_timestamp(p_value text)
+returns timestamptz language plpgsql stable security invoker set search_path=''
+as $$
+begin
+ if p_value ~ '^[0-9]{10}(\.[0-9]+)?$' then
+   return to_timestamp(p_value::double precision);
+ elsif p_value ~ '^[0-9]{13}(\.[0-9]+)?$' then
+   return to_timestamp(p_value::double precision / 1000);
+ elsif p_value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' then
+   return p_value::timestamptz;
+ end if;
+ return null;
+exception when data_exception then return null;
+end $$;
+revoke all on function membership_3573.read_membership_timestamp(text) from public,anon,authenticated;
+grant execute on function membership_3573.read_membership_timestamp(text) to service_role;
+
 -- One transaction updates the existing JSONB player in-place and inserts
 -- a confirmed interstate event. Manual fields and other players remain intact.
 -- Must be invoked by a trusted backend with service-role access only.
@@ -17,6 +34,7 @@ declare
  v_old_state text;
  v_old_tag text;
  v_old_observed timestamptz;
+ v_last_success timestamptz;
  v_manual timestamptz;
  v_history jsonb;
  v_event_key text;
@@ -41,13 +59,25 @@ begin
  v_players=v_workspace.data->'players';
  select (ordinality-1)::integer, value into v_index,v_player
  from jsonb_array_elements(v_players) with ordinality
- where value->>'fid'=p_fid;
- if not found then raise exception 'Unknown player FID'; end if;
- v_old_observed=nullif(coalesce(v_player->>'membershipLastSuccessfulAt',v_player->>'membershipObservedAt',''),'')::timestamptz;
- v_manual=nullif(coalesce(v_player->>'manualMembershipAt',''),'')::timestamptz;
+ where btrim(value->>'fid')=p_fid;
+ if (select count(*) from jsonb_array_elements(v_players) player where btrim(player->>'fid')=p_fid)>1 then
+   return query select false,v_workspace.revision,'duplicate_fid'::text;
+   return;
+ end if;
+ if v_index is null then
+   return query select false,v_workspace.revision,'unknown_player'::text;
+   return;
+ end if;
+ v_last_success=membership_3573.read_membership_timestamp(v_player->>'membershipLastSuccessfulAt');
+ v_old_observed=coalesce(v_last_success,membership_3573.read_membership_timestamp(v_player->>'membershipObservedAt'));
+ v_manual=membership_3573.read_membership_timestamp(v_player->>'manualMembershipAt');
  if (v_old_observed is not null and p_observed_at < v_old_observed)
     or (v_manual is not null and p_observed_at<=v_manual) then
    return query select false,v_workspace.revision,'older_observation'::text;
+   return;
+ end if;
+ if v_last_success=p_observed_at then
+   return query select false,v_workspace.revision,'already_verified'::text;
    return;
  end if;
  v_old_tag=coalesce(v_player->>'allianceTag','');
@@ -57,7 +87,8 @@ begin
  v_new=v_player||jsonb_build_object(
    'membershipObservedAt',p_observed_at,
    'membershipLastSuccessfulAt',p_observed_at,
-   'membershipCheckedAt',p_observed_at);
+   'membershipCheckedAt',p_observed_at,
+   'membershipPersistedAt',p_detected_at);
  if p_state='3573' then
    v_new=v_new||jsonb_build_object(
      'allianceTag',p_tag,'membershipStatus','active',
@@ -71,7 +102,7 @@ begin
      v_new=v_new||jsonb_build_object('leftPrimaryAt',p_detected_at);
    end if;
    if v_old_tag<>p_tag then
-     v_history=coalesce(v_player->'allianceHistory','[]'::jsonb);
+     v_history=case when jsonb_typeof(v_player->'allianceHistory')='array' then v_player->'allianceHistory' else '[]'::jsonb end;
      v_new=jsonb_set(v_new,'{allianceHistory}',
        (select coalesce(jsonb_agg(item order by ord),'[]'::jsonb) from
         (select item,ord from jsonb_array_elements(v_history||
@@ -101,7 +132,7 @@ begin
      provider_observed_at,source,confidence)
    values(v_event_key,p_fid,v_player->>'username',
       case when p_state='3573' then 'in' else 'out' end,
-      v_old_state,p_state,v_old_tag,p_tag,p_detected_at,p_detected_at,
+      v_old_state,p_state,case when v_old_state<>'3573' then coalesce(v_player->>'transferDestinationAlliance',v_old_tag) else v_old_tag end,p_tag,p_detected_at,p_detected_at,
       p_observed_at,p_source,'confirmed')
    on conflict(event_key) do update set last_verified_at=excluded.last_verified_at;
  end if;

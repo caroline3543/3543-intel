@@ -1,7 +1,7 @@
 const MAX_PROVIDER_AGE_MS = 60 * 60 * 1000;
 
 export function providerObservationTime(value, now = Date.now()) {
-  const unix = typeof value === 'number' || (typeof value === 'string' && /^\d{10,13}$/.test(value));
+  const unix = typeof value === 'number' || (typeof value === 'string' && /^(?:\d{10}|\d{13})(?:\.\d+)?$/.test(value));
   const number = unix ? Number(value) : NaN;
   const milliseconds = unix
     ? (number < 1e12 ? number * 1000 : number)

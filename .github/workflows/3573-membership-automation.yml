@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - work/3573-automatic-membership-transfer-tracking
+      - work/3573-refresh-reconciliation
   pull_request:
     branches:
       - release/3573-production
@@ -11,7 +12,7 @@ permissions:
   contents: read
 jobs:
   membership:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       postgres:
@@ -52,11 +53,13 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/3573_membership_atomic_commit.sql
           psql -v ON_ERROR_STOP=1 -f database/3573_membership_transfer_feed.sql
           psql -v ON_ERROR_STOP=1 -f database/3573_membership_shared_budget.sql
+          psql -v ON_ERROR_STOP=1 -f database/3573_membership_manual_refresh.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_postgres_integration.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_roster_postgres_integration.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_no_alliance_postgres_integration.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_transfer_feed_postgres.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_shared_budget_postgres.sql
+          psql -v ON_ERROR_STOP=1 -f tests/3573_membership_manual_refresh_postgres.sql
       - name: Verify competing database sessions honor the same quota
         env:
           PGPASSWORD: postgres
@@ -81,10 +84,22 @@ jobs:
       - name: Typecheck staged private worker
         run: deno check --config supabase/functions/caroline3573-membership-worker/deno.json supabase/functions/caroline3573-membership-worker/index.ts
       - name: Production build check
-        run: npm run build
+        run: npm run build && npm run build --prefix roster-site
+      - name: Install isolated browser test dependencies
+        run: npm install --no-save --package-lock=false playwright@1.56.1 postgres@3.4.7
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify provider to database to the roster screen
+        env:
+          MEMBERSHIP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/membership_test
+        run: node tests/3573-membership-refresh-e2e.mjs
   provider-diagnostic:
-    if: vars.WOS_DIAGNOSTIC_IN_CI == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/work/3573-automatic-membership-transfer-tracking'
-    runs-on: ubuntu-latest
+    if: >-
+      (vars.WOS_DIAGNOSTIC_IN_CI == 'true' && github.event_name == 'push') ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.head_ref == 'work/3573-refresh-reconciliation')
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -97,4 +112,23 @@ jobs:
         env:
           WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY || secrets.WHITEOUTSTATS_API_KEY }}
           WOS_TEST_TAG: HOT
-        run: node scripts/3573-provider-diagnostic.mjs
+        run: |
+          if [[ -z "$WOS_DIAGNOSTIC_KEY" ]]; then
+            echo 'Whiteout Stats key unavailable to this runner. No provider calls made.' | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          node scripts/3573-provider-diagnostic.mjs
+
+  cron-rehearsal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Rehearse Supabase Cron through the worker on an isolated runner
+        run: bash tests/3573-cron-rehearsal.sh
+      - name: Show database startup logs on failure
+        if: failure()
+        run: docker logs membership-fixture-db

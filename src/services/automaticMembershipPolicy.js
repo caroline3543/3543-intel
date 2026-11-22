@@ -15,7 +15,12 @@ export const MINUTE_LIMIT = 60;
 export const TRANSFER_PROMOTION_MS = 72*60*60*1000;
 const validState = v => /^\d+$/.test(String(v ?? '')) && Number(v)>0;
 const validFid = v => /^[1-9]\d{3,14}$/.test(String(v ?? ''));
-const timestamp = v => {const t=Date.parse(v ?? '');return Number.isFinite(t)?t:null;};
+const timestamp = value => {
+  const text=String(value ?? '');
+  const time=/^\d{10}(\.\d+)?$/.test(text)?Number(text)*1000:
+    /^\d{13}(\.\d+)?$/.test(text)?Number(text):Date.parse(text);
+  return Number.isFinite(time)?time:null;
+};
 export function refreshClass(player, now=Date.now(), secondaryTags=[]) {
   if (player?.membershipStatus==='transferred_out') return null;
   const tag=String(player?.allianceTag ?? '');

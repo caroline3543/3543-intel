@@ -6,11 +6,19 @@ Deno.serve(async req=>{
  const token=req.headers.get('x-caroline-site-key')||'';
  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token));
  const hash=Array.from(new Uint8Array(digest)).map(v=>v.toString(16).padStart(2,'0')).join('');
- if(token.length<32||hash!=='6a1e9094f4daa0772a0651b0ae239fa1db314a3c9b631c498c10394f63712ade')return reply({error:'Site access required'},401);
+ const expectedHash=Deno.env.get('CAROLINE3573_SITE_KEY_HASH')||'6a1e9094f4daa0772a0651b0ae239fa1db314a3c9b631c498c10394f63712ade';
+ if(token.length<32||hash!==expectedHash)return reply({error:'Site access required'},401);
  try{
   const input=await req.json();
   if(input.workspaceId!=='3573-leaders'||input.role!=='leader')return reply({error:'Leader workspace access required'},403);
   const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false,autoRefreshToken:false}});
+  if(input.action==='membership-refresh'){
+   if(typeof input.start!=='boolean')return reply({error:'Invalid refresh request'},400);
+   if(input.start&&Deno.env.get('MEMBERSHIP_3573_ENABLED')!=='true')return reply({error:'Membership refresh is disabled'},503);
+   const {data,error}=await db.rpc('caroline_3573_manual_refresh',{p_start:input.start});
+   if(error)throw error;
+   return reply({refresh:data});
+  }
   if(input.action==='transfers'){
    // Read-only, service-role RPC. The site server authenticates the leader session.
    const beforeId=input.beforeId??null;

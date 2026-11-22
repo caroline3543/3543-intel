@@ -1,3 +1,4 @@
+import {state3573AllianceTags} from '../../../src/services/state3573Alliances.js';
 import {useState} from 'react';
 import {mightpulseRequest} from '../../../src/services/mightpulseService.js';
 import {normalizeRankings,rankingScore} from '../../../src/services/stateRankingsService.js';
@@ -83,8 +84,10 @@ export function SvsComparison({players=[],lastLabSummary=null,onLabSummary}){
   {aboutData&&<div style={{...panel,fontSize:12,color:'#A8BFD5',lineHeight:1.5,marginBottom:12}}>Lab rankings show the published top 100, not every player. Alliance statistics use available roster records and exclude missing values. The chart shows Pre-FC through FC8. Lab results are saved after a successful lookup; refreshing does not modify Members or TAL.</div>}
   <div style={{background:'#15273A',borderRadius:14,padding:4,display:'grid',gridTemplateColumns:'1fr 1fr',gap:5,marginBottom:12}}>{[['state','States'],['alliance','Alliances']].map(([id,label])=><button key={id} aria-pressed={mode===id} onClick={()=>{setMode(id);setErrors([])}} style={{...btn,border:0,background:mode===id?'#416181':'transparent'}}>{label}</button>)}</div>
   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9}}>
-   {[0,1].map(i=><div key={i} style={{minWidth:0}}><label style={{color:i?'#EBC18A':'#89C4FF',fontSize:11,fontWeight:700}}>{i?'OPPONENT':'YOUR SIDE'}</label><input style={{...field,marginTop:7}} aria-label={i?'Opponent state':'Your state'} inputMode="numeric" placeholder="State ID" value={i?theirState:ourState} onChange={e=>i?setTheirState(e.target.value):setOurState(e.target.value)}/>{mode==='alliance'&&<input style={{...field,marginTop:7}} aria-label={i?'Opponent alliance':'Your alliance'} placeholder="Alliance tag" value={i?theirTag:ourTag} onChange={e=>i?setTheirTag(e.target.value):setOurTag(e.target.value)}/>}</div>)}
+   {[0,1].map(i=><div key={i} style={{minWidth:0}}><label style={{color:i?'#EBC18A':'#89C4FF',fontSize:11,fontWeight:700}}>{i?'OPPONENT':'YOUR SIDE'}</label><input style={{...field,marginTop:7}} aria-label={i?'Opponent state':'Your state'} inputMode="numeric" placeholder="State ID" value={i?theirState:ourState} onChange={e=>i?setTheirState(e.target.value):setOurState(e.target.value)}/>{mode==='alliance'&&<input style={{...field,marginTop:7}} aria-label={i?'Opponent alliance':'Your alliance'} placeholder="Alliance tag" list={(i?theirState:ourState)==='3573'?'state-3573-alliance-tags':undefined} value={i?theirTag:ourTag} onChange={e=>i?setTheirTag(e.target.value):setOurTag(e.target.value)}/>}</div>)}
   </div>
+
+  {mode==='alliance'&&<datalist id="state-3573-alliance-tags">{state3573AllianceTags(players).map(tag=><option key={tag} value={tag}/>)}</datalist>}
 
   {mode==='state'&&ourState==='3573'&&<AllianceStandings players={players} lastLabSummary={lastLabSummary} onLabSummary={onLabSummary}/>}
   {mode==='state'&&<div style={{...panel,marginTop:13}}>

@@ -1,3 +1,4 @@
+import {gameApiConfig} from '../server/gameApi.js';
 import {accessContext,respond} from '../server/access.js';
 import {WORKSPACE_ID} from '../shared/workspace.js';
 
@@ -9,8 +10,9 @@ export default async function handler(req,res){
  if(access.role!=='leader'||access.workspaceId!==WORKSPACE_ID)return respond(res,403,{error:'Leader access required.'});
  const beforeId=req.query?.before??null;
  if(beforeId!==null&&(typeof beforeId!=='string'||!/^[1-9]\d{0,18}$/.test(beforeId)))return respond(res,400,{error:'Invalid transfer cursor.'});
- const base=process.env.GAME_API_URL,key=process.env.GAME_API_PUBLIC_KEY,token=process.env.GAME_SITE_TOKEN;
- if(!base||!key||!token)return respond(res,503,{error:'Transfer history is not configured.'});
+ const config=gameApiConfig();
+ if(!config)return respond(res,503,{error:'Transfer history is not configured.'});
+ const {base,key,token}=config;
  try{
   const response=await fetch(`${base.replace(/\/$/,'')}/functions/v1/caroline3573-workspace`,{
    method:'POST',

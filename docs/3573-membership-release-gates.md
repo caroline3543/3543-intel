@@ -72,3 +72,46 @@ first, drain in-flight jobs, and restore the previous Vercel deployment and
 Edge Function versions. Preserve the ledger and workspace. Compare the saved
 workspace revision with its current state and reconcile automation edits
 individually so that restoring a snapshot cannot erase later leader edits.
+
+## All-alliance refresh release
+
+This release adds `3573_membership_manual_refresh.sql` after the verified
+membership writer and queue functions. Deploy the updated workspace and worker
+Edge Functions together with these SQL changes before promoting the Vercel
+preview. A preview must supply a branch-scoped `STATE_3573_PREVIEW_API_ORIGIN`
+matching its isolated `GAME_API_URL`. The app blocks the known production
+Supabase origin on preview deployments. Use a separate site token and configure
+its SHA-256 hash as `CAROLINE3573_SITE_KEY_HASH` on the isolated workspace Edge
+Function. Use synthetic roster records and a mocked provider on any write test.
+
+The scheduled workflow on `main` was nominally every five minutes. The 22
+November UTC runs occurred at 03:17 and 11:42. A five-minute schedule with no
+delivery guarantee is insufficient for the manual queue. Use the opt-in
+`3573_membership_scheduler.sql` with Supabase Cron on the release target. Set
+`membership_3573_worker_origin` and `membership_3573_cron_secret` in that
+project's Vault using the secure dashboard. The cron secret must match the
+existing worker secret. Confirm private readiness, observe two consecutive
+successful scheduled invocations and inspect both the cron run history and the
+Edge HTTP response. Then turn off the GitHub production schedule variable on
+`main`. Retain its authenticated manual dispatch for recovery. No cron,
+migration, environment, or function change on production is authorized by a
+preview or PR.
+
+Each five-minute tick can use one manual batch of at most 20 FIDs. Every FID
+is charged in the shared budget, plus existing scheduled and proxy usage.
+For 649 eligible FIDs, 33 ticks take about 165 minutes at full capacity.
+Provider pending, timeouts, and quota exhaustion can extend this estimate.
+The latest job exposes its last worker check-in, provider calls, distinct
+valid records, durable writes, membership changes, unchanged locations and
+terminal failures. Unknown provider outcomes after a process interruption
+are counted separately. The run and its item/request receipts are retained
+30 days and pruned when starting a later run. The 15-minute post-completion
+cooldown returns the same result on a duplicate click.
+
+Before production approval, verify the credentialed batch response shape
+and freshness, rehearse the new cron flow in isolation and confirm the
+existing production-deployed Edge endpoints still point to the expected
+workspace. The budget migration is shared with the lookup proxy. Never
+substitute a second key to bypass the account limit. Roll back by stopping
+the Supabase cron job, disabling the worker, and restoring the previous
+Vercel/Edge versions while preserving both workspace and ledgers.

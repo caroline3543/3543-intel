@@ -1,40 +1,62 @@
-import {verifiedAllianceRoster,verifiedPlayerLocation,verifiedProviderUsage} from '../src/services/verifiedPlayerLocation.js';
-// Read-only Whiteout Stats response-shape diagnostic. No player data or secrets printed.
-// Run: WOS_DIAGNOSTIC_KEY=... WOS_TEST_FID=... WOS_TEST_TAG=HOT node scripts/3573-provider-diagnostic.mjs
+import {parseManualPlayerBatch} from '../src/services/manualMembershipRefresh.js';
+import {verifiedProviderUsage} from '../src/services/verifiedPlayerLocation.js';
+
+// Read-only diagnostic. Logs only counts and safe status labels.
 const key=process.env.WOS_DIAGNOSTIC_KEY||'';
 const requestedFid=process.env.WOS_TEST_FID||'';
 const tag=process.env.WOS_TEST_TAG||'HOT';
-if(!/^wos_[\x21-\x7e]+$/.test(key))throw Error('Missing valid WOS_DIAGNOSTIC_KEY');
-if(requestedFid&&!/^[1-9]\d{3,14}$/.test(requestedFid))throw Error('Missing valid WOS_TEST_FID');
-if(!/^[A-Za-z0-9_]{1,16}$/.test(tag))throw Error('Invalid WOS_TEST_TAG');
-const root='https://api.whiteoutstats.com/v1';
-async function check(path){
- const response=await fetch(root+path,{headers:{Authorization:'Bearer '+key,Accept:'application/json'},signal:AbortSignal.timeout(15000)});
- const data=await response.json().catch(()=>null);
- return {http:response.status,body:data?.data??data};
-}
-const [usage,roster]=await Promise.all([
- check('/usage'),
- check('/alliances/3573/'+encodeURIComponent(tag)+'?include=info,roster')
-]);
 const validFid=value=>/^[1-9]\d{3,14}$/.test(value);
+if(!/^wos_[\x21-\x7e]+$/.test(key))throw Error('Missing valid WOS_DIAGNOSTIC_KEY');
+if(requestedFid&&!validFid(requestedFid))throw Error('Missing valid WOS_TEST_FID');
+if(!/^[A-Za-z0-9_]{1,16}$/.test(tag))throw Error('Invalid WOS_TEST_TAG');
+
+const root='https://api.whiteoutstats.com/v1';
+async function check(path, timeout=15000) {
+  const response=await fetch(root+path,{
+    headers:{Authorization:'Bearer '+key,Accept:'application/json'},signal:AbortSignal.timeout(timeout)
+  });
+  const payload=await response.json().catch(()=>null);
+  return {http:response.status,body:payload?.data??payload,retryAfter:response.headers.get('Retry-After')};
+}
+
+const usage=await check('/usage');
+const counters=verifiedProviderUsage(usage.body);
+if(usage.http!==200 || counters.used>4996 || counters.minuteUsed>56) {
+  throw Error('Provider budget too low for this diagnostic. No player or roster requests sent.');
+}
+const roster=await check('/alliances/3573/'+encodeURIComponent(tag)+'?include=info,roster');
 const members=Array.isArray(roster.body?.members)?roster.body.members:[];
-const fid=requestedFid||members
- .map(member=>String(member?.chief_id??member?.fid??''))
- .find(validFid);
-const player=fid?await check('/players/'+fid+'?include=base'):{http:null,body:null};
-const keys=o=>o&&typeof o==='object'&&!Array.isArray(o)?Object.keys(o).slice(0,30):[];
-const p=player.body,base=p?.player, r=roster.body,u=usage.body;
-const at=base?.cached_at??p?.cached_at??p?.meta?.cached_at??null;
-const timestampMs=value=>typeof value==='number'?(value<1e12?value*1000:value):typeof value==='string'&&/^\d{10,13}$/.test(value)?(Number(value)<1e12?Number(value)*1000:Number(value)):Date.parse(value);
-const accepts = (check) => {
- try { check(); return true; } catch { return false; }
-};
-const evidence={
- usage:{http:usage.http,keys:keys(u),accepted:accepts(()=>verifiedProviderUsage(u))},
- player:{http:player.http,accepted:accepts(()=>verifiedPlayerLocation(p,fid)),keys:keys(p),playerKeys:keys(base),freshBoolean:typeof p?.fresh==='boolean',freshTrue:p?.fresh===true,hasExplicitAlliance:base!=null&&Object.hasOwn(base,'alliance'),hasState:base?.kid!=null,hasPlayerId:base?.chief_id!=null||base?.fid!=null,hasTimestamp:at!=null,timestampParseable:at!=null&&Number.isFinite(timestampMs(at))},
- roster:{http:roster.http,accepted:accepts(()=>verifiedAllianceRoster(r,'3573',tag)),keys:keys(r),memberCount:members.length}
-};
-console.log(JSON.stringify(evidence,null,2));
-if([usage,player,roster].some(x=>x.http!==200))process.exitCode=2;
-else if(!evidence.usage.accepted||!evidence.player.accepted||!evidence.roster.accepted)process.exitCode=3;
+const ids=[...new Set([requestedFid,...members.map(member=>String(member?.chief_id??member?.fid??''))].filter(validFid))].slice(0,2);
+if(roster.http!==200||ids.length!==2)throw Error('Provider roster did not supply a two-player sample');
+
+async function inspectBatch(fids, wait) {
+  const params=new URLSearchParams({ids:fids.join(','),include:'base',wait:String(wait),max_age:'3600'});
+  const response=await check('/players?'+params, (wait+10)*1000);
+  const results=parseManualPlayerBatch(response.body,fids);
+  const statuses=Object.create(null);
+  for(const {outcome} of results.values())statuses[outcome]=(statuses[outcome]??0)+1;
+  const freshFlags=(Array.isArray(response.body?.players)?response.body.players:[]).reduce((counts,row)=>{
+    const label=row?.fresh===true?'fresh':row?.fresh===false?'stale':'missing';
+    counts[label]++;
+    return counts;
+  },{fresh:0,stale:0,missing:0});
+  return {response,results,evidence:{http:response.http,requested:fids.length,statuses,freshFlags}};
+}
+
+const first=await inspectBatch(ids,5);
+let followup=null;
+const waiting=[...first.results].find(([, result])=>['provider_pending','freshness_unverified'].includes(result.outcome));
+if(first.response.http===200&&waiting) {
+  // A single follow-up keeps even the fully charged case at four credits:
+  // one alliance roster, two initial player IDs and one retry.
+  const seconds=Number(waiting[1].retryAfter??first.response.body?.retry_after??first.response.retryAfter??5);
+  if(Number.isFinite(seconds)&&seconds>=0&&seconds<=45) {
+    await new Promise(resolve=>setTimeout(resolve,seconds*1000));
+    followup=await inspectBatch([waiting[0]],30);
+  }
+}
+const verified=new Set([...first.results,...(followup?.results??[])].filter(([,result])=>result.outcome==='verified').map(([fid])=>fid));
+console.log(JSON.stringify({usageHttp:usage.http,rosterHttp:roster.http,first:first.evidence,
+  followup:followup?.evidence??null,verifiedUniqueMemberships:verified.size},null,2));
+if(first.response.http!==200||(followup&&followup.response.http!==200))process.exitCode=2;
+else if(!verified.size)process.exitCode=3;

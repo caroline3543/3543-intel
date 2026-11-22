@@ -47,6 +47,34 @@ export function latestRosterFetch(players) {
   return dates.sort((a,b)=>Date.parse(b)-Date.parse(a))[0] || null;
 }
 
+export function membershipTimestamp(value) {
+  const text = String(value ?? '');
+  if (/^\d{10}(\.\d+)?$/.test(text)) return Number(text) * 1000;
+  if (/^\d{13}(\.\d+)?$/.test(text)) return Number(text);
+  return Date.parse(text);
+}
+
+export function verifiedMembershipTime(player, now = Date.now()) {
+  const at = membershipTimestamp(player?.membershipLastSuccessfulAt);
+  return Number.isFinite(at) && at <= now ? new Date(at).toISOString() : null;
+}
+
+export function membershipExceptions(players) {
+  const counts = new Map();
+  for (const player of players) {
+    const fid = String(player.fid ?? '').trim();
+    if (validPlayerFid(fid)) counts.set(fid, (counts.get(fid) ?? 0) + 1);
+  }
+  return new Map(players.flatMap(player => {
+    if (player.membershipStatus === 'transferred_out') return [];
+    const fid = String(player.fid ?? '').trim();
+    const reason = !validPlayerFid(fid) ? 'Add a valid player ID' :
+      counts.get(fid) > 1 ? 'Resolve duplicate player ID' :
+      player.membershipStatus === 'transfer_review' ? 'Flagged by an organiser' : null;
+    return reason ? [[player.id, reason]] : [];
+  }));
+}
+
 /** Stale player API data is a review signal, never proof of transfer. */
 export const MEMBERSHIP_STALE_AFTER_MS = 72 * 60 * 60 * 1000;
 
