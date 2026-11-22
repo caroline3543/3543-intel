@@ -94,8 +94,12 @@ jobs:
           MEMBERSHIP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/membership_test
         run: node tests/3573-membership-refresh-e2e.mjs
   provider-diagnostic:
-    if: vars.WOS_DIAGNOSTIC_IN_CI == 'true' && github.event_name == 'push' && (github.ref == 'refs/heads/work/3573-automatic-membership-transfer-tracking' || github.ref == 'refs/heads/work/3573-refresh-reconciliation')
-    runs-on: ubuntu-latest
+    if: >-
+      (vars.WOS_DIAGNOSTIC_IN_CI == 'true' && github.event_name == 'push') ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.head_ref == 'work/3573-refresh-reconciliation')
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -108,4 +112,23 @@ jobs:
         env:
           WOS_DIAGNOSTIC_KEY: ${{ secrets.WOS_DIAGNOSTIC_KEY || secrets.WHITEOUTSTATS_API_KEY }}
           WOS_TEST_TAG: HOT
-        run: node scripts/3573-provider-diagnostic.mjs
+        run: |
+          if [[ -z "$WOS_DIAGNOSTIC_KEY" ]]; then
+            echo 'Whiteout Stats key unavailable to this runner. No provider calls made.' | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          node scripts/3573-provider-diagnostic.mjs
+
+  cron-rehearsal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Rehearse Supabase Cron through the worker on an isolated runner
+        run: bash tests/3573-cron-rehearsal.sh
+      - name: Show database startup logs on failure
+        if: failure()
+        run: docker logs membership-fixture-db

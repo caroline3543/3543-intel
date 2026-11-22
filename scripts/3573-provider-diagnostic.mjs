@@ -14,10 +14,12 @@ async function check(path){
  const data=await response.json().catch(()=>null);
  return {http:response.status,body:data?.data??data};
 }
-const [usage,roster]=await Promise.all([
- check('/usage'),
- check('/alliances/3573/'+encodeURIComponent(tag)+'?include=info,roster')
-]);
+const usage=await check('/usage');
+const counters=verifiedProviderUsage(usage.body);
+if(usage.http!==200 || counters.used>4996 || counters.minuteUsed>56) {
+  throw Error('Provider budget too low for this diagnostic. No player or roster requests sent.');
+}
+const roster=await check('/alliances/3573/'+encodeURIComponent(tag)+'?include=info,roster');
 const validFid=value=>/^[1-9]\d{3,14}$/.test(value);
 const members=Array.isArray(roster.body?.members)?roster.body.members:[];
 const fid=requestedFid||members
