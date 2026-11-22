@@ -5,7 +5,7 @@ export function MembershipRefreshStatus({refresh, error, revision, stale}) {
     {error && <div role="alert" style={{color:C.red}}>{error}</div>}
     <div role="status">
       {refresh ? <>
-        <strong>{refresh.completedAt ? 'Membership refresh complete' : refresh.waiting ? 'Refresh in progress · some checks waiting' : refresh.finished ? 'Membership refresh in progress' : 'Membership refresh queued'}</strong>
+        <strong>{refresh.completedAt ? 'Move & transfer verification complete' : refresh.waiting ? 'Verifying moves · some checks waiting' : refresh.finished ? 'Verifying moves & transfers' : 'Move & transfer verification queued'}</strong>
         <div>{refresh.finished} of {refresh.queued} players checked</div>
         <div>{refresh.updated} changed · {refresh.unchanged} unchanged</div>
         <div>{refresh.missing} missing membership · {refresh.failed} failed</div>
@@ -16,7 +16,7 @@ export function MembershipRefreshStatus({refresh, error, revision, stale}) {
         {!refresh.completedAt && Date.now()-Date.parse(refresh.lastWorkerAt||refresh.startedAt)>15*60*1000 &&
           <div style={{color:'#F0B25C'}}>The refresh worker has not checked in recently.</div>}
         {refresh.persisted > 0 && revision < refresh.workspaceRevision && <div>Waiting for roster sync…</div>}
-      </> : !error && <div>No completed membership refresh recorded</div>}
+      </> : !error && <div>No moves queued for verification</div>}
       <div>{stale} active players without a verified refresh in the past 72 hours</div>
     </div>
     {refresh && <details style={{marginTop:5}}>

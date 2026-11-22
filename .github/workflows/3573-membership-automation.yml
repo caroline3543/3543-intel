@@ -54,12 +54,14 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/3573_membership_transfer_feed.sql
           psql -v ON_ERROR_STOP=1 -f database/3573_membership_shared_budget.sql
           psql -v ON_ERROR_STOP=1 -f database/3573_membership_manual_refresh.sql
+          psql -v ON_ERROR_STOP=1 -f database/3573_priority_roster_refresh.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_postgres_integration.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_roster_postgres_integration.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_no_alliance_postgres_integration.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_transfer_feed_postgres.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_shared_budget_postgres.sql
           psql -v ON_ERROR_STOP=1 -f tests/3573_membership_manual_refresh_postgres.sql
+          psql -v ON_ERROR_STOP=1 -f tests/3573_priority_roster_refresh_postgres.sql
       - name: Verify competing database sessions honor the same quota
         env:
           PGPASSWORD: postgres

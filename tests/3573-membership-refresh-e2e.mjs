@@ -91,6 +91,10 @@ try{
         const workspace=await readWorkspace();
         return route.fulfill({status:200,json:{...workspace,role:'leader'}});
       }
+      if(url.pathname==='/api/priority-roster-refresh'){
+        assert.equal(request.method(),'POST');
+        return route.fulfill({status:200,json:{succeeded:['ARC','HOT','RKG','WAR','LUN'],unavailable:[],found:465,missing:0,queued:0}});
+      }
       if(url.pathname==='/api/membership-refresh'){
         const response={
           code:500,setHeader(){},status(code){this.code=code;return this;},
@@ -113,9 +117,8 @@ try{
     await page.getByLabel('More workspace actions').click();
     if(width===390){
       await page.getByText('569 active players without a verified refresh in the past 72 hours').waitFor();
-      await page.getByRole('button',{name:'Refresh all alliances'}).click();
-      await page.getByText('0 of 649 players checked').waitFor();
-      assert.equal(await page.getByRole('button',{name:'Refresh all alliances'}).isDisabled(),true);
+      await page.getByRole('button',{name:'Refresh priority alliances',exact:true}).first().click();
+      await page.getByText(/5 of 5 alliance lists refreshed/).waitFor();
       const [a,b]=await Promise.all([refreshStatus(true),refreshStatus(true)]);
       assert.equal(a.id,b.id,'Simultaneous organisers must see one persisted job');
       // Drain the persisted queue while the browser is closed. Backoff is
@@ -144,7 +147,7 @@ try{
       console.log('Refresh evidence', JSON.stringify(summary));
       continue;
     }
-    await page.getByText('Membership refresh complete',{exact:true}).waitFor();
+    await page.getByText('Move & transfer verification complete',{exact:true}).waitFor();
     await page.getByText('2 active players without a verified refresh in the past 72 hours').waitFor();
     await page.getByText('2 changed · 645 unchanged').waitFor();
     await page.getByText('1 missing membership · 1 failed').waitFor();
