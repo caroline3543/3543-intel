@@ -1,8 +1,9 @@
+import {PRIORITY_ALLIANCES} from '../../../src/services/state3573Alliances.js';
 import {useRef,useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
 import {fetchMightpulseAlliance} from '../../../src/services/mightpulseService.js';
 import {allianceRows} from '../../../src/services/allianceImportService.js';
-export const DEFAULT_ALLIANCES=['HOT','ARC','RKG','LUN'];
+export const DEFAULT_ALLIANCES=PRIORITY_ALLIANCES;
 const button={minHeight:44,minWidth:76,padding:'10px 14px',fontSize:14,fontWeight:600,borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.icy,cursor:'pointer'};
 export function AllianceSetup({players,onLoad}){
   const [status,setStatus]=useState({}),[busy,setBusy]=useState(false);
@@ -33,7 +34,7 @@ export function AllianceSetup({players,onLoad}){
     {!expanded&&<p style={{fontSize:14,color:C.icy,marginBottom:0}}>HOT · ARC · RKG · LUN</p>}
     {expanded&&<>
     <p style={{fontSize:14,color:C.icy,lineHeight:1.5,margin:'0 0 14px'}}>Load HOT, ARC, RKG and LUN from State 3573.</p>
-    <button style={{...button,width:'100%',background:C.gold,color:C.bg,marginBottom:10}} disabled={busy} onClick={()=>load(DEFAULT_ALLIANCES)}>{busy?'Loading…':hasDefaults?'Refresh all four':'Load all four'}</button>
+    <button style={{...button,width:'100%',background:C.gold,color:C.bg,marginBottom:10}} disabled={busy} onClick={()=>load(DEFAULT_ALLIANCES)}>{busy?'Loading…':hasDefaults?'Refresh priority alliances':'Load priority alliances'}</button>
     {DEFAULT_ALLIANCES.map(tag=>{
       const count=players.filter(p=>p.allianceTag===tag).length;
       const item=status[tag];

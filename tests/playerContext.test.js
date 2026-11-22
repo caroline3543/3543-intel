@@ -73,7 +73,7 @@ test('transfer location button uses the shared FID validator and the visible ros
  const {readFileSync}=await import('node:fs');
  const source=readFileSync(new URL('../src/components/players/RosterTab.jsx',import.meta.url),'utf8');
  const start=source.indexOf('async function checkLocation(player)');
- const end=source.indexOf('async function checkAllLocations()',start);
+ const end=source.indexOf('function applyLocation(',start);
  assert.ok(start>=0&&end>start,'location lookup handler must exist');
  const handler=source.slice(start,end);
  assert.match(handler,/player\.fid\|\|player\.playerId\|\|player\.id/);

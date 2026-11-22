@@ -1,3 +1,4 @@
+import {gameApiConfig} from '../server/gameApi.js';
 import {gzipSync,gunzipSync} from 'node:zlib';
 import {accessContext,sameOrigin,respond} from '../server/access.js';
 import {validateWorkspace,WORKSPACE_ID} from '../shared/workspace.js';
@@ -19,8 +20,9 @@ export default async function handler(req,res){
    body.action='commit';body.revision=input.revision;body.data=validateWorkspace(data);
   }catch(e){return respond(res,400,{error:e.message||'Invalid workspace data.'});}
  }
- const base=process.env.GAME_API_URL,key=process.env.GAME_API_PUBLIC_KEY,token=process.env.GAME_SITE_TOKEN;
- if(!base||!key||!token)return respond(res,503,{error:'Shared storage is not configured.'});
+ const config=gameApiConfig();
+ if(!config)return respond(res,503,{error:'Shared storage is not configured.'});
+ const {base,key,token}=config;
  try{
   const response=await fetch(`${base.replace(/\/$/,'')}/functions/v1/caroline3573-workspace`,{method:'POST',headers:{'Content-Type':'application/json',apikey:key,Authorization:`Bearer ${key}`,'x-caroline-site-key':token},body:JSON.stringify(body),signal:AbortSignal.timeout(25000)});
   const result=await response.json();return compressed(res,response.status,result);

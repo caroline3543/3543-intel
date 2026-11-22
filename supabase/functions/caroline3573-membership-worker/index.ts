@@ -3,6 +3,7 @@
 // and explicit MEMBERSHIP_3573_ENABLED=true after production approval.
 import postgres from "npm:postgres@3.4.7";
 import {createMembershipWorker} from "../../../src/services/automaticMembershipWorker.js";
+import {createManualMembershipStore,processManualMembershipBatch} from "../../../src/services/manualMembershipRefresh.js";
 import {createMembershipQueueAdapter} from "../../../src/services/automaticMembershipQueueAdapter.js";
 import {verifiedAllianceRoster,verifiedPlayerLocation,verifiedProviderUsage} from "../../../src/services/verifiedPlayerLocation.js";
 
@@ -93,6 +94,16 @@ Deno.serve(async(req)=>{
  };
  const api={
   usage:async()=>verifiedProviderUsage(await upstream("/usage")),
+  verifyBatch:async(fids:string[])=>{
+   if(fids.length<1||fids.length>20||fids.some(fid=>!/^[1-9]\d{3,14}$/.test(fid)))throw Error("Invalid batch");
+   const url=new URL("https://api.whiteoutstats.com/v1/players");
+   url.search=new URLSearchParams({ids:fids.join(","),include:"base",wait:"5",max_age:"3600"}).toString();
+   const response=await fetch(url,{
+    headers:{Authorization:"Bearer "+apiKey,Accept:"application/json"},signal:AbortSignal.timeout(15000)
+   });
+   const body=response.ok?await response.json().catch(()=>null):null;
+   return {status:response.status,retryAfter:response.headers.get("Retry-After"),body};
+  },
   verifyPlayer:async(fid:string)=>{
    if(!/^[1-9]\d{3,14}$/.test(fid))throw Error("Invalid FID");
    const response=await upstream("/players/"+fid+"?include=base&wait=10");
@@ -111,12 +122,18 @@ Deno.serve(async(req)=>{
      exists(select 1 from public.caroline_workspaces where id=$1 and jsonb_typeof(data->'players')='array') as workspace_ok,
      to_regclass('membership_3573.refresh_jobs') is not null as queue_ok,
      to_regprocedure('public.caroline_3573_transfer_feed(integer,bigint)') is not null as transfer_feed_ok,
-     to_regprocedure('membership_3573.reserve_request_credits(timestamptz,integer,integer,integer)') is not null as budget_ok
+     to_regprocedure('membership_3573.reserve_request_credits(timestamptz,integer,integer,integer)') is not null as budget_ok,
+     to_regprocedure('public.caroline_3573_manual_refresh(boolean)') is not null as manual_refresh_ok
    `,["3573-leaders"]);
-   const ready=Object.values(checks??{}).length===4&&Object.values(checks).every(value=>value===true);
+   const ready=Object.values(checks??{}).length===5&&Object.values(checks).every(value=>value===true);
    return json({status:ready?"ready":"incomplete",writesEnabled,checks},ready?200:503);
   }
   const deadline=Date.now()+50000;
+  const manual=await processManualMembershipBatch({store:createManualMembershipStore(query,store),api})
+   .catch(() => {
+    console.error(JSON.stringify({event:"manual_membership_batch_interrupted"}));
+    return "interrupted";
+   });
   const workspace=await query("select data from public.caroline_workspaces where id=$1",["3573-leaders"]);
   if(!workspace[0]||!Array.isArray(workspace[0].data?.players))
    return json({error:"Workspace player data unavailable"},503);
@@ -135,7 +152,7 @@ Deno.serve(async(req)=>{
    results.push({status:result.status,jobKind:result.jobKind||null});
    if(result.status!=="completed"&&result.status!=="retry_scheduled"&&result.status!=="not_eligible")break;
   }
-  return json({seeded,processed:results.length,results});
+  return json({seeded,manual,processed:results.length,results});
  }catch(error){
   console.error(JSON.stringify({event:"membership_worker_error",type:error instanceof Error?error.name:"unknown"}));
   return json({error:"Membership worker unavailable; no unverified changes applied"},503);

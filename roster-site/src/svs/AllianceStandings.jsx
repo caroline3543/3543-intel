@@ -3,7 +3,11 @@ import {mightpulseRequest} from '../../../src/services/mightpulseService.js';
 import {normalizeRankings} from '../../../src/services/stateRankingsService.js';
 import {providerFurnaceLevel} from '../../../src/services/providerProfileService.js';
 
-const TAGS=['ARC','HOT','RKG','LUN'];
+import {PRIORITY_ALLIANCES as TAGS,state3573AllianceTags} from '../../../src/services/state3573Alliances.js';
+
+const NO_ALLIANCE='No Alliance';
+const OTHER_ALLIANCES='Other alliances';
+const memberTag=p=>String(p.allianceTag||'').trim()||NO_ALLIANCE;
 const LAB_CACHE_KEY='3573:compare:labyrinth-top-100:v1';
 const MAX_LAB_CACHE_AGE_MS=30*24*60*60*1000;
 function readLabCache(){try{const value=JSON.parse(localStorage.getItem(LAB_CACHE_KEY)||'null');return value?.stateId==='3573'&&value.board==='labyrinth'&&Array.isArray(value.rows)&&value.rows.length<=100&&Number.isFinite(Date.parse(value.retrievedAt))&&Date.parse(value.retrievedAt)<=Date.now()+60000&&Date.now()-Date.parse(value.retrievedAt)<MAX_LAB_CACHE_AGE_MS?value:null;}catch{return null;}}
@@ -19,10 +23,11 @@ export function furnaceProgress(value){
 }
 export function allianceStandings(players,rankings){
  const unique=new Set();
- const groups=Object.fromEntries(TAGS.map(tag=>[tag,{tag,players:0,powerTotal:0,powerCount:0,fcTotal:0,fcCount:0,lab:null}]));
+ const tags=[...state3573AllianceTags(players),NO_ALLIANCE];
+ const groups=Object.fromEntries(tags.map(tag=>[tag,{tag,players:0,powerTotal:0,powerCount:0,fcTotal:0,fcCount:0,lab:null}]));
  for(const p of players||[]){
   if(p.membershipStatus==='transferred_out'||String(p.stateId||'3573')!=='3573')continue;
-  const tag=String(p.allianceTag||'').trim().toUpperCase();
+  const tag=memberTag(p);
   if(!groups[tag])continue;
   const id=String(p.fid||p.id||'').trim();
   if(!id||unique.has(id))continue;
@@ -34,13 +39,18 @@ export function allianceStandings(players,rankings){
   if(fc!==null){g.fcTotal+=fc;g.fcCount++;}
  }
  const lab=labGroups(rankings);
- return TAGS.map(tag=>{const g=groups[tag];return {...g,avgPower:g.powerCount?g.powerTotal/g.powerCount:null,avgFC:g.fcCount?g.fcTotal/g.fcCount:null,lab:lab?.counts[tag]??(lab?0:null)};});
+ return tags.map(tag=>{const g=groups[tag];return {...g,avgPower:g.powerCount?g.powerTotal/g.powerCount:null,avgFC:g.fcCount?g.fcTotal/g.fcCount:null,lab:tag===NO_ALLIANCE?lab?.noAlliance??null:lab?.counts[tag]??lab?.other[tag]??(lab?0:null)};});
 }
 export function labGroups(rankings){
  if(!rankings)return null;
- if(rankings.stateId==='3573'&&rankings.board==='labyrinth'&&rankings.counts&&rankings.rows===undefined)return rankings;
+ if(rankings.stateId==='3573'&&rankings.board==='labyrinth'&&rankings.counts&&rankings.rows===undefined){
+  const other={...rankings.other};
+  const counts=Object.fromEntries(TAGS.map(tag=>[tag,rankings.counts[tag]??other[tag]??0]));
+  for(const tag of TAGS)delete other[tag];
+  return {...rankings,counts,other};
+ }
  const counts=Object.fromEntries(TAGS.map(tag=>[tag,0]));
- const other={},seen=new Set();
+ const other=Object.create(null),seen=new Set();
  let noAlliance=0,unknown=0,total=0;
  for(const r of rankings.rows||[]){
   if(!Number.isInteger(r.rank)||r.rank<1||r.rank>100)continue;
@@ -48,9 +58,9 @@ export function labGroups(rankings){
   const key=id||'rank:'+r.rank;
   if(seen.has(key))continue;
   seen.add(key);total++;
-  const tag=String(r.allianceTag??'').trim().toUpperCase();
+  const tag=String(r.allianceTag??'').trim();
   if(TAGS.includes(tag))counts[tag]++;
-  else if(tag==='NO ALLIANCE'||tag==='NONE'||tag==='N/A'||tag==='-')noAlliance++;
+  else if(['NO ALLIANCE','NONE','N/A','-'].includes(tag.toUpperCase()))noAlliance++;
   else if(tag)other[tag]=(other[tag]||0)+1;
   else unknown++;
  }
@@ -62,7 +72,7 @@ export function AllianceStandings({players=[],lastLabSummary=null,onLabSummary})
  const [snapshot,setSnapshot]=useState(readLabCache),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [distributionMetric,setDistributionMetric]=useState('count');
  const [selectedFurnace,setSelectedFurnace]=useState(null);
- const [sort,setSort]=useState('avgPower'),[ascending,setAscending]=useState(false),[showOther,setShowOther]=useState(false);
+ const [sort,setSort]=useState(null),[ascending,setAscending]=useState(false),[showOther,setShowOther]=useState(false);
  const load=async()=>{if(busy)return;setBusy(true);setError('');
   try{const result=await mightpulseRequest('rankings',{state:3573,board:'labyrinth',limit:100});
    const next=normalizeRankings(result,'3573','labyrinth');
@@ -76,14 +86,14 @@ export function AllianceStandings({players=[],lastLabSummary=null,onLabSummary})
  const effectiveLab=snapshot&&(!savedSummary||Date.parse(snapshot.retrievedAt)>=Date.parse(savedSummary.retrievedAt))?snapshot:savedSummary;
  const rows=allianceStandings(players,effectiveLab);
  const lab=labGroups(effectiveLab);
- const ordered=[...rows].sort((a,b)=>{if(sort==='tag')return ascending?a.tag.localeCompare(b.tag):b.tag.localeCompare(a.tag);
-  const av=a[sort],bv=b[sort];if(av==null)return 1;if(bv==null)return -1;return ascending?av-bv:bv-av;});
+ const ordered=sort?[...rows].sort((a,b)=>{if(sort==='tag')return ascending?a.tag.localeCompare(b.tag):b.tag.localeCompare(a.tag);
+  const av=a[sort],bv=b[sort];if(av==null)return Number(bv!=null);if(bv==null)return -1;return ascending?av-bv:bv-av;}):rows;
  const header=(key,label)=><button type="button" onClick={()=>{if(sort===key)setAscending(!ascending);else{setSort(key);setAscending(false);}}}
   style={{background:'transparent',border:0,color:'#C7D7E8',fontSize:11,fontWeight:700,padding:'12px 3px',cursor:'pointer',minHeight:44,textAlign:key==='tag'?'left':'right',width:'100%'}}>
   {label}{sort===key?(ascending?' ↑':' ↓'):''}</button>;
  return <section aria-label="3573 alliance standings" style={{background:'#15273A',border:'1px solid #344F69',borderRadius:15,padding:12,marginTop:13}}>
   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}>
-   <div><h3 style={{margin:0,fontSize:17}}>Alliance standings</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:4}}>Top four · App roster</div></div>
+   <div><h3 style={{margin:0,fontSize:17}}>Alliance standings</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:4}}>App roster</div></div>
    <button type="button" onClick={load} disabled={busy} style={{border:'1px solid #344F69',background:'#1E3448',color:'#F1F7FD',borderRadius:9,minHeight:44,padding:'8px 10px',fontSize:12,fontWeight:650}}>{busy?'Refreshing…':'Refresh Lab'}</button>
   </div>
   <div style={{fontSize:11,color:'#A8BFD5',marginBottom:7}}>Lab Top 100 · {effectiveLab?'Last lookup '+new Date(effectiveLab.retrievedAt).toLocaleString():'No saved lookup yet'}</div>
@@ -110,17 +120,21 @@ export function AllianceStandings({players=[],lastLabSummary=null,onLabSummary})
 
   <div style={{marginTop:18,borderTop:'1px solid #344F69',paddingTop:15}}>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-    <div><h3 style={{fontSize:16,margin:0}}>Furnace distribution</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:3}}>App roster · four alliances</div></div>
+    <div><h3 style={{fontSize:16,margin:0}}>Furnace distribution</h3><div style={{fontSize:12,color:'#A8BFD5',marginTop:3}}>App roster</div></div>
     <div role="group" aria-label="Furnace chart units" style={{display:'flex',background:'#102238',borderRadius:9,padding:3}}>
      {[['count','Players'],['percent','%']].map(([id,label])=><button key={id} type="button" aria-pressed={distributionMetric===id} onClick={()=>setDistributionMetric(id)} style={{border:0,borderRadius:7,minHeight:36,padding:'6px 12px',background:distributionMetric===id?'#365675':'transparent',color:'#F2F7FD',fontSize:12,fontWeight:700}}>{label}</button>)}
     </div>
    </div>
    {(()=>{
-    const tags=['ARC','HOT','RKG','LUN'],colors=['#8EA5C4','#3A9CC2','#43A59B','#E0AC65'],tiers=['Pre-FC','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8'];
+    const tags=[...TAGS,...(rows.length>TAGS.length+1?[OTHER_ALLIANCES]:[]),NO_ALLIANCE];
+    const colors={'ARC':'#8EA5C4','HOT':'#3A9CC2','RKG':'#43A59B','WAR':'#C494D9','LUN':'#E0AC65',[OTHER_ALLIANCES]:'#B8C9D9',[NO_ALLIANCE]:'#8494A4'};
+    const tiers=['Pre-FC','FC1','FC2','FC3','FC4','FC5','FC6','FC7','FC8'];
     const unique=new Set(),groups=Object.fromEntries(tags.map(t=>[t,{known:0,unknown:0,counts:Object.fromEntries(tiers.map(tier=>[tier,0]))}]));
     for(const p of players||[]){
      if(p.membershipStatus==='transferred_out'||String(p.stateId||'3573')!=='3573')continue;
-     const tag=String(p.allianceTag||'').trim().toUpperCase(),id=String(p.fid||p.id||'').trim();
+     const playerTag=memberTag(p);
+     const tag=TAGS.includes(playerTag)||playerTag===NO_ALLIANCE?playerTag:OTHER_ALLIANCES;
+     const id=String(p.fid||p.id||'').trim();
      if(!groups[tag]||!id||unique.has(id))continue;unique.add(id);
      const label=providerFurnaceLevel(p.furnaceLevel??p.providerStats?.furnaceLabel??p.providerStats?.furnaceLevel);
      const tier=label&&/^F\d+$/.test(label)?'Pre-FC':label;
@@ -131,12 +145,12 @@ export function AllianceStandings({players=[],lastLabSummary=null,onLabSummary})
     const maximum=Math.max(1,...vals);
     const active=selectedFurnace&&tiers.includes(selectedFurnace)?selectedFurnace:null;
     return <div style={{marginTop:12}}>
-     <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:10}}>{tags.map((tag,i)=><span key={tag} style={{fontSize:11,color:'#D3E0EC'}}><span style={{color:colors[i]}}>●</span> {tag}</span>)}</div>
+     <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:10}}>{tags.map(tag=><span key={tag} style={{fontSize:11,color:'#D3E0EC'}}><span style={{color:colors[tag]}}>●</span> {tag}</span>)}</div>
      <div style={{overflowX:'auto',paddingBottom:5}}>
       <div style={{minWidth:340}}>
        <div style={{height:178,display:'flex',alignItems:'stretch',gap:7,borderBottom:'1px solid #54708B',background:'repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),#29445D 25%)'}}>
         {tiers.map(tier=><button key={tier} type="button" aria-label={'Show '+tier+' furnace counts'} aria-pressed={active===tier} onClick={()=>setSelectedFurnace(active===tier?null:tier)} style={{display:'flex',flex:1,alignItems:'flex-end',gap:2,justifyContent:'center',border:0,background:active===tier?'#203C56':'transparent',padding:'0 2px',cursor:'pointer',minWidth:0}}>
-         {tags.map((tag,i)=>{const value=distributionMetric==='count'?groups[tag].counts[tier]:groups[tag].known?groups[tag].counts[tier]/groups[tag].known*100:0;return <span key={tag} title={tag+' '+tier+': '+(distributionMetric==='count'?value:value.toFixed(1)+'%')} style={{height:(value/maximum*100)+'%',width:'23%',minHeight:value>0?2:0,background:colors[i],borderRadius:'3px 3px 0 0'}}/>})}
+         {tags.map(tag=>{const value=distributionMetric==='count'?groups[tag].counts[tier]:groups[tag].known?groups[tag].counts[tier]/groups[tag].known*100:0;return <span key={tag} title={tag+' '+tier+': '+(distributionMetric==='count'?value:value.toFixed(1)+'%')} style={{height:(value/maximum*100)+'%',flex:1,minHeight:value>0?2:0,background:colors[tag],borderRadius:'3px 3px 0 0'}}/>})}
         </button>)}
        </div>
        <div style={{display:'flex',gap:7,marginTop:7}}>{tiers.map(tier=><div key={tier} style={{flex:1,textAlign:'center',fontSize:11,color:active===tier?'#F2F7FD':'#B9CADB',fontWeight:active===tier?800:500}}>{tier}</div>)}</div>
@@ -144,7 +158,7 @@ export function AllianceStandings({players=[],lastLabSummary=null,onLabSummary})
      </div>
      {active&&<div role="status" style={{background:'#102238',padding:10,borderRadius:10,marginTop:9}}>
       <strong style={{fontSize:13}}>{active}</strong>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:8,marginTop:7}}>{tags.map((tag,i)=><div key={tag}><span style={{color:colors[i],fontSize:11}}>{tag}</span><div style={{fontSize:17,fontWeight:750}}>{distributionMetric==='count'?groups[tag].counts[active]:groups[tag].known?(groups[tag].counts[active]/groups[tag].known*100).toFixed(1)+'%':'—'}</div></div>)}</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(67px,1fr))',gap:8,marginTop:7}}>{tags.map(tag=><div key={tag}><span style={{color:colors[tag],fontSize:11}}>{tag}</span><div style={{fontSize:17,fontWeight:750}}>{distributionMetric==='count'?groups[tag].counts[active]:groups[tag].known?(groups[tag].counts[active]/groups[tag].known*100).toFixed(1)+'%':'—'}</div></div>)}</div>
      </div>}
      <div style={{fontSize:11,color:'#A8BFD5',marginTop:9}}>Valid levels: {tags.map(tag=>tag+' '+groups[tag].known).join(' · ')} · Unknown/out of range: {tags.reduce((n,tag)=>n+groups[tag].unknown,0)}.</div>
     </div>;

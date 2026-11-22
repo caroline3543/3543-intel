@@ -1,3 +1,6 @@
+import {useMembershipRefresh} from './useMembershipRefresh.js';
+import {MembershipRefreshStatus} from './components/MembershipRefreshStatus.jsx';
+import {MEMBERSHIP_STALE_AFTER_MS,verifiedMembershipTime} from '../../src/services/rosterViewService.js';
 import {applyTalBulk} from './tal/bulkActions.js';
 import {applyTalSheetSnapshot} from './tal/sheetSync.js';
 import {BattlePlanner} from './battle/BattlePlanner.jsx';
@@ -5,9 +8,7 @@ import {FoundryTab} from './foundry/FoundryTab.jsx';
 import {SvsComparison} from './svs/SvsComparison.jsx';
 import {applyBattleAction} from './battle/model.js';
 import {withAutomaticRoles} from './tal/autoRoles.js';
-import {fetchMightpulseAlliance,fetchMightpulsePlayer} from '../../src/services/mightpulseService.js';
-import {allianceRows} from '../../src/services/allianceImportService.js';
-import {assessAllianceRoster} from '../../src/services/allianceRosterValidation.js';
+import {fetchMightpulsePlayer} from '../../src/services/mightpulseService.js';
 import {WorkspaceOptions,WorkspaceAttention} from './components/WorkspaceOptions.jsx';
 import {plannedMemberIds} from '../../src/services/talRosterService.js';
 import {useSharedWorkspace} from './useSharedWorkspace.js';
@@ -121,8 +122,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const {data,setData:setSharedData,sync,publish,join,retry,resolve}=useSharedWorkspace(localInitial.current);
   function setData(value){setSharedData(prev=>{const next=withAutomaticRoles(typeof value==='function'?value(prev):value);latest.current=next;return next;});}
   useEffect(()=>{if(sync.ready&&sync.joined&&!sync.conflicts?.length){const normalized=withAutomaticRoles(data);if(normalized!==data)setSharedData(normalized);}},[data,sync.ready,sync.joined,sync.conflicts?.length]);
-  const [apiProgress,setApiProgress]=useState('');
-  const [apiResult,setApiResult]=useState(null);
+  const membership=useMembershipRefresh(sync.ready&&sync.joined);
   const [nameRefresh,setNameRefresh]=useState({status:'idle',done:0,total:0,changes:[],failed:0,error:''});
   const nameRefreshStop=useRef(false);
   async function refreshUsernames(){
@@ -183,7 +183,9 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const syncProblem=Boolean(sync.issue||sync.conflicts?.length||syncLate);
   const syncLabel=syncProblem?'Sync not working':sync.dirty||sync.syncing?'Syncing':'Synced';
   const syncColor=syncProblem?'#F07575':sync.dirty||sync.syncing?'#E6BF7B':'#72CBA9';
-  const apiRefreshAge=relativeRefreshAge(data.settings?.lastApiRefresh?.at,Date.now());
+  const membershipAge=relativeRefreshAge(membership.refresh?.completedAt);
+  const membershipLabel=membership.running?'Refresh in progress':membership.refresh?.completedAt?'Refresh completed '+membershipAge.toLowerCase():'Membership refresh';
+  const refreshAction=<button style={button} onClick={membership.start} disabled={membership.busy||membership.running||!!legionRefresh||nameRefresh.status==='running'||!sync.joined||sync.dirty||sync.mode==='join'||!!sync.conflicts?.length}>Refresh all alliances</button>;
   const [importing,setImporting]=useState(false),[deleting,setDeleting]=useState(null),[message,setMessage]=useState('');
   const latest=useRef(data);latest.current=data;
   const pendingTalSync=useRef({active:false,sawDirty:false});
@@ -240,6 +242,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   useEffect(()=>{if(requiredAction&&requiredAction!==lastAttention.current)setWorkspaceOpen(true);else if(!requiredAction&&lastAttention.current)setWorkspaceOpen(false);lastAttention.current=requiredAction;},[requiredAction]);
   const players=data.players||[];
   const activePlayers=players.filter(p=>p.membershipStatus!=='transferred_out');
+  const staleMemberships=activePlayers.filter(player=>!(Date.parse(verifiedMembershipTime(player))>=Date.now()-MEMBERSHIP_STALE_AFTER_MS)).length;
   useEffect(()=>{saveToStorage(data);},[data]);
   useEffect(()=>{const fail=()=>setMessage('Unable to save. Export a backup before closing this page.');window.addEventListener('app:storage-full',fail);return()=>window.removeEventListener('app:storage-full',fail);},[]);
   function save(player){const next=withGameLanguage({...player,profileLastUpdated:new Date().toISOString()});setData(prev=>({...prev,players:prev.players.map(p=>p.id===next.id?next:p)}));setMessage('Player updated');}
@@ -249,64 +252,6 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     setData(prev=>({...prev,players:reconcileTag?reconcileAllianceMembership(mergeAllianceProfiles(prev.players,rows,'3573').players,rows,reconcileTag,new Date().toISOString(),assessment):mergeAllianceProfiles(prev.players,rows,'3573').players,settings:{...prev.settings,lastApiRefresh:{at:new Date().toISOString(),scope:'Alliance roster',count:rows.length}}}));return {updated:result.updated.length,added:result.added.length};
   }
   async function syncNow(){setMessage('Syncing shared workspace…');const result=await retry();setMessage(result?.issue?result.issue:result?.conflicts?.length?'Edits need review.':result?.dirty||result?.syncing?'Changes are still syncing.':'Synced. All shared changes are up to date.');}
-  async function refreshAll(onlyTags=null){
-    if(refreshing.current)return;
-    refreshing.current=true;stopRefresh.current=false;
-    const targets=Array.isArray(onlyTags)?onlyTags:DEFAULT_ALLIANCES;
-    const priorMembers=(latest.current.players||[]).filter(p=>targets.includes(String(p.allianceTag||'').toUpperCase())&&/^\d+$/.test(String(p.fid||''))&&p.membershipStatus!=='transferred_out');
-    const observedFids=new Set();const completeTags=new Set();
-    const failures=[],successes=[];let checked=0,updated=0,added=0;
-    setApiResult(null);
-    try{
-      for(const tag of targets){
-        if(stopRefresh.current)break;
-        setApiProgress('Refreshing '+tag+' · '+(checked+1)+'/'+targets.length);
-        try{
-          const response=await fetchMightpulseAlliance(3573,tag);
-          const rows=allianceRows(response,'3573',tag);
-          if(!rows.length)throw Error('No roster returned');
-          // Absence is only evidence of departure when the provider explicitly confirms a complete roster.
-          // A successful HTTP response or 100 returned members alone is not proof of completeness.
-          const assessment=assessAllianceRoster(response,{stateId:'3573',allianceTag:tag});
-          if(assessment.problems.some(problem=>problem!=='completeness_unverified'))throw Error('Alliance roster validation failed: '+assessment.problems.join(', '));
-          const complete=assessment.authoritative;
-          if(complete)completeTags.add(tag);
-          for(const row of rows)observedFids.add(row.fid);
-          const result=importRoster(rows,{reconcileTag:complete?tag:null,assessment});
-          successes.push(tag);updated+=result.updated;added+=result.added;
-        }catch(e){
-          failures.push({tag,reason:e.message||'API request failed'});
-          if([401,403,429].includes(e.status)||[401,403,429].includes(e.providerStatus))break;
-        }
-        checked++;
-      }
-      // Resolve missing FIDs only after all requested alliance rosters have been checked.
-      // Never infer a departure from a partial roster or an unsuccessful lookup.
-      const missing=priorMembers.filter(p=>completeTags.has(String(p.allianceTag).toUpperCase())&&!observedFids.has(String(p.fid)));
-      let relocated=0,unresolved=0;
-      for(const p of missing){
-        if(stopRefresh.current)break;
-        setApiProgress(`Checking former members · ${relocated+unresolved+1}/${missing.length}`);
-        try{
-          const response=await fetchMightpulsePlayer(p.fid);
-          const updated=applyPlayerDetails(p,response,'3573');
-          setData(prev=>({...prev,players:prev.players.map(old=>String(old.fid)===String(p.fid)?updated:old)}));
-          relocated++;
-        }catch(e){
-          unresolved++;
-          if([401,403,429].includes(e.status)||[401,403,429].includes(e.providerStatus))break;
-        }
-      }
-      const status=failures.length||successes.length<targets.length?(successes.length?'partial':'failed'):'success';
-      const result={status,successes,failures,updated,added,checked,requested:targets.length,relocated,unresolved,at:new Date().toISOString()};
-      setApiResult(result);
-      if(successes.length){
-        setData(prev=>({...prev,settings:{...prev.settings,lastApiRefresh:{at:result.at,scope:successes.join(', '),count:updated+added,failed:failures.length,partial:status!=='success'}}}));
-        setMessage(status==='success'?'API refresh complete · '+updated+' updated · '+added+' added':'API refresh partially completed · '+failures.length+' failed');
-        await retry();
-      }else setMessage('API refresh failed. Existing player records were preserved.');
-    }finally{refreshing.current=false;setApiProgress('');}
-  }
   async function refreshLab(){
     if(labBusy.current)return;labBusy.current=true;setRefreshingLab(true);
     try{
@@ -361,13 +306,13 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
         <div style={{display:'flex',alignItems:'center',gap:7}}>
           <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:syncProblem?'#F07575':C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
             <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:syncColor}}/>
-            <span style={{display:'grid',textAlign:'left',gap:2}}><span>{syncLabel}</span><span style={{fontSize:10,color:C.icy,whiteSpace:'nowrap'}}>API: {apiRefreshAge}</span></span>
+            <span style={{display:'grid',textAlign:'left',gap:2}}><span>{syncLabel}</span><span style={{fontSize:10,color:C.icy,whiteSpace:'nowrap'}}>{membershipLabel}</span></span>
           </button>
           <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
               <strong style={{fontSize:13,marginBottom:2}}>Workspace actions</strong>
-              <button style={button} onClick={()=>refreshAll()} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button>
-              <button style={button} onClick={refreshUsernames} disabled={!!apiProgress||!!legionRefresh||nameRefresh.status==='running'||sync.mode==='join'||!!sync.conflicts?.length}>{nameRefresh.status==='running'?'Checking usernames…':'Refresh usernames'}</button>
+              {refreshAction}
+              <button style={button} onClick={refreshUsernames} disabled={membership.running||!!legionRefresh||nameRefresh.status==='running'||sync.mode==='join'||!!sync.conflicts?.length}>{nameRefresh.status==='running'?'Checking usernames…':'Refresh usernames'}</button>
               {nameRefresh.status!=='idle'&&<div role="status" style={{padding:10,borderRadius:10,background:C.section,fontSize:12,lineHeight:1.6}}>
                 <strong>{nameRefresh.status==='running'?'Checking usernames':nameRefresh.status==='applied'?'Names saved':'Username review'}</strong>
                 <div>{nameRefresh.done} of {nameRefresh.total} checked · {nameRefresh.changes.length} differences · {nameRefresh.failed} failed</div>{nameRefresh.error&&<div role="alert" style={{color:'#F0B25C'}}>{nameRefresh.error}</div>}
@@ -381,8 +326,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
               <button style={button} disabled={exporting} onClick={backup}>{exporting?'Exporting…':'Export roster as Excel'}</button>
               <button style={button} disabled={sync.syncing||sync.mode==='join'||!!sync.conflicts?.length} onClick={syncNow}>{sync.syncing?'Syncing…':sync.issue?'Retry sync':sync.dirty?'Sync changes':'Check sync'}</button>
               <button style={button} onClick={()=>setWorkspaceOpen(true)}>Workspace settings</button>
-              {apiResult&&<div role="status" style={{padding:10,borderRadius:10,background:'#1A2C40',fontSize:12,lineHeight:1.6}}><strong style={{color:apiResult.status==='success'?'#72CBA9':'#F0B25C'}}>{apiResult.status==='success'?'Refresh complete':apiResult.status==='partial'?'Refresh partially completed':'Refresh failed'}</strong><div>{apiResult.updated} profiles updated · {apiResult.added} added</div><div>{apiResult.successes.length} of {apiResult.requested} alliances refreshed</div>{apiResult.failures.map(f=><div key={f.tag} style={{color:'#F0B25C'}}>{f.tag}: {f.reason}</div>)}{apiResult.failures.length>0&&<button style={{...button,width:'100%',marginTop:8}} disabled={!!apiProgress} onClick={()=>refreshAll(apiResult.failures.map(f=>f.tag))}>Retry failed alliances</button>}</div>}
-              {data.settings?.lastApiRefresh&&<span style={{fontSize:11,color:C.icy,lineHeight:1.4}}>API updated {new Date(data.settings.lastApiRefresh.at).toISOString().slice(0,16).replace('T',' ')} UTC</span>}
+              <MembershipRefreshStatus refresh={membership.refresh} error={membership.error} revision={sync.revision} stale={staleMemberships}/>
             </div>
           </details>
         </div>
@@ -394,13 +338,14 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
         <div style={{display:'flex',alignItems:'center',gap:7}}>
           <button aria-label="Workspace sync status and details" title="Workspace sync details" onClick={()=>setWorkspaceOpen(true)} style={{background:'transparent',border:0,color:syncProblem?'#F07575':C.icy,minHeight:44,padding:'5px 2px',fontSize:12,display:'flex',alignItems:'center',gap:5}}>
             <span aria-hidden="true" style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:syncColor}}/>
-            <span style={{display:'grid',textAlign:'left',gap:2}}><span>{syncLabel}</span><span style={{fontSize:10,color:C.icy,whiteSpace:'nowrap'}}>API: {apiRefreshAge}</span></span>
+            <span style={{display:'grid',textAlign:'left',gap:2}}><span>{syncLabel}</span><span style={{fontSize:10,color:C.icy,whiteSpace:'nowrap'}}>{membershipLabel}</span></span>
           </button>
           <details style={{position:'relative'}}><summary aria-label="More workspace actions" style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',minHeight:44,minWidth:44,borderRadius:10,background:C.section,color:C.icy,fontSize:22}}>⋯</summary>
             <div style={{position:'absolute',right:0,top:48,zIndex:85,width:235,display:'grid',gap:7,padding:12,background:'#14263A',border:'1px solid '+C.border,borderRadius:13,boxShadow:'0 12px 32px #0009'}}>
               <strong style={{fontSize:13,marginBottom:2}}>Workspace actions</strong>
-              <button style={button} onClick={refreshAll} disabled={!!apiProgress||!!legionRefresh||sync.mode==='join'||!!sync.conflicts?.length}>{apiProgress?'Refreshing API…':'Refresh API'}</button>
-              <button style={button} onClick={refreshUsernames} disabled={!!apiProgress||!!legionRefresh||nameRefresh.status==='running'||sync.mode==='join'||!!sync.conflicts?.length}>{nameRefresh.status==='running'?'Checking usernames…':'Refresh usernames'}</button>
+              {refreshAction}
+              <MembershipRefreshStatus refresh={membership.refresh} error={membership.error} revision={sync.revision} stale={staleMemberships}/>
+              <button style={button} onClick={refreshUsernames} disabled={membership.running||!!legionRefresh||nameRefresh.status==='running'||sync.mode==='join'||!!sync.conflicts?.length}>{nameRefresh.status==='running'?'Checking usernames…':'Refresh usernames'}</button>
               {nameRefresh.status!=='idle'&&<div role="status" style={{padding:10,borderRadius:10,background:C.section,fontSize:12,lineHeight:1.6}}>
                 <strong>{nameRefresh.status==='running'?'Checking usernames':nameRefresh.status==='applied'?'Names saved':'Username review'}</strong>
                 <div>{nameRefresh.done} of {nameRefresh.total} checked · {nameRefresh.changes.length} differences · {nameRefresh.failed} failed</div>
@@ -423,7 +368,6 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     <WorkspaceAttention sync={sync} onReview={()=>setWorkspaceOpen(true)}/>
     {message&&<div role="status" style={{margin:'12px 20px 0',padding:10,color:C.icy,background:C.section,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>{message}<button style={button} onClick={()=>setMessage('')} aria-label="Dismiss message">✕</button></div>}
     <BottomNav tab={tab} onChange={navigate}/>
-    {apiProgress&&<div role="status" style={{padding:'12px 20px',fontSize:14,color:C.icy}}>{apiProgress}<button style={button} onClick={()=>{stopRefresh.current=true;}}>Stop after this alliance</button></div>}
     {legionRefresh&&<div role="status" style={{padding:'12px 20px',color:C.icy}}>Refreshing players: {legionRefresh.done} of {legionRefresh.total}<button style={{...button,marginLeft:8}} onClick={()=>{stopRefresh.current=true;}}>Stop after this player</button></div>}
     {sync.mode!=='join'&&!sync.conflicts?.length&&<div>
     {tab==='members'&&!DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag))&&<AllianceSetup players={players} onLoad={importRoster}/>}

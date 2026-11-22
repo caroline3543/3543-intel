@@ -1,3 +1,4 @@
+import {verifiedMembershipTime} from '../../services/rosterViewService.js';
 import { C } from '../../utils/constants.js';
 import { FC_OPTIONS } from '../../utils/constants.js';
 import { PlayerAvatar } from './PlayerAvatar.jsx';
@@ -54,7 +55,7 @@ export function comparePriority(a, b) {
 
 const compact=value=>Number(value).toLocaleString('en-US',{notation:'compact',maximumFractionDigits:1});
 const control={minHeight:44,minWidth:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,padding:10,fontSize:14,cursor:'pointer'};
-export function PlayerCard({player,onClick,onDelete,missingCount,onToggleRallyLead,onOpenFields,bulkMode,isSelected,detail,sortDetail,sortField,showId=false}) {
+export function PlayerCard({showMembershipFreshness=false,player,onClick,onDelete,missingCount,onToggleRallyLead,onOpenFields,bulkMode,isSelected,detail,sortDetail,sortField,showId=false}) {
   const [menu,setMenu]=useState(false);
   const name=player.username||player.alias||'Unknown';
   const leader=player.roles?.includes('Rally Lead');
@@ -66,7 +67,7 @@ export function PlayerCard({player,onClick,onDelete,missingCount,onToggleRallyLe
         {bulkMode?<span aria-hidden="true" style={{fontSize:22,color:isSelected?C.gold:C.icy}}>{isSelected?'☑':'☐'}</span>:<PlayerAvatar player={player} size={40}/>}
         <span style={{flex:1,minWidth:0}}>
           <span style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}><span style={{fontSize:15,fontWeight:650,minWidth:0,overflowWrap:'anywhere',lineHeight:1.3}}>{name}</span>{player.furnaceLevel&&<span style={{fontSize:13,color:C.gold,flexShrink:0}}>{player.furnaceLevel}</span>}</span>
-          <span style={{display:'block',fontSize:12,color:C.icy,marginTop:3}}>{player.allianceTag?`[${player.allianceTag}]`:'Alliance unknown'}{' · '}{sortDetail && sortField!=='furnace' ? `${sortDetail.label} ${sortDetail.value}` : power!=null ? `City power ${compact(power)}` : 'City power not recorded'}</span>
+          <span style={{display:'block',fontSize:12,color:C.icy,marginTop:3}}>{player.allianceTag?`[${player.allianceTag}]`:showMembershipFreshness&&verifiedMembershipTime(player)?'No Alliance':'Alliance unknown'}{' · '}{sortDetail && sortField!=='furnace' ? `${sortDetail.label} ${sortDetail.value}` : power!=null ? `City power ${compact(power)}` : 'City power not recorded'}</span>
           {showId&&<span style={{display:'block',fontSize:12,color:C.icy,marginTop:3}}>ID {player.fid||player.id}</span>}
         </span>
       </button>
