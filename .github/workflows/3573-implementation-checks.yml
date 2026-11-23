@@ -11,6 +11,7 @@ on:
       - work/3573-production-backlog-reconciliation
       - release/3573-membership-integration
       - work/3573-compare-live-data-redesign
+      - work/3573-player-profile-redesign
 
 permissions:
   contents: read
