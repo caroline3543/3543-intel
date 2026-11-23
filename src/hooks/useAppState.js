@@ -78,12 +78,19 @@ export function useAppState() {
       };
     });
     showToast(isCloudConfigured() ? 'Player updated on this device. Cloud save pending.' : 'Player updated on this device. Cloud sync unavailable.');
-    if (isCloudConfigured()) {
-      pushPlayer(stamped, allianceTag()).then(ok => {
-        if (!ok) showToast('Cloud save failed. Your local change remains; retry syncing before switching devices.', 'error');
-        else showToast('Player saved to cloud ✓');
+    if (!isCloudConfigured()) return Promise.resolve({persisted:false,local:true,reason:'Cloud sync unavailable'});
+    return Promise.resolve().then(() => pushPlayer(stamped, allianceTag()))
+      .then(ok => {
+        if (!ok) {
+          showToast('Cloud save failed. Your local change remains; retry syncing before switching devices.', 'error');
+          return {persisted:false,local:true,reason:'Cloud save failed'};
+        }
+        showToast('Player saved to cloud ✓');
+        return {persisted:true,local:true};
+      }).catch(error => {
+        showToast('Cloud save failed. Your local change remains; retry syncing before switching devices.', 'error');
+        return {persisted:false,local:true,reason:error?.message||'Cloud save failed'};
       });
-    }
   }, [showToast]);
 
   const addPlayers = useCallback((newPlayers) => {
