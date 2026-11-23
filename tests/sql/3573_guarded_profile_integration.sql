@@ -69,7 +69,7 @@ begin
  if v_status <> 'not_saved' then raise exception 'RLS denied edit succeeded';end if;
 end $$;
 -- The function must reject every state other than 3573, even with an otherwise valid row.
-do $
+do $$
 declare v_rejected boolean := false;
 begin
  begin
@@ -80,9 +80,9 @@ begin
  exception when sqlstate '22023' then v_rejected := true;
  end;
  if not v_rejected then raise exception 'Other-state update was not rejected';end if;
-end $;
+end $$;
 reset role;
-do $
+do $$
 begin
  if (select data->>'notes' from public.players where state_id='3543' and id='456') <> 'original'
  then raise exception 'Other state modified';end if;
