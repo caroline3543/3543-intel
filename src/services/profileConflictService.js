@@ -51,7 +51,7 @@ export async function beginGuardedProfileEdit({playerId,stateId,client}){
   return {ready:false,reason:'Invalid server player record'};
  return {ready:true,updatedAt:snapshot.updatedAt,player:snapshot.player};
 }
-export async function commitGuardedProfileEdit({snapshot,changes,stateId,client}){
+export async function commitGuardedProfileEdit({snapshot,changes,stateId,client,expectedFields}){
  if(!snapshot?.ready||!snapshot?.updatedAt||!snapshot?.player?.id)
   return {persisted:false,reason:'Reload the server profile before saving'};
  if(!changes||typeof changes!=='object'||Array.isArray(changes))
@@ -60,6 +60,14 @@ export async function commitGuardedProfileEdit({snapshot,changes,stateId,client}
  const allowed=['notes','joinerHeroes','teamworkTraitStates','communicationLanguage'];
  if(Object.keys(changes).some(key=>!allowed.includes(key)))
   return {persisted:false,reason:'Unsupported profile field'};
+ // Refuse to apply a draft based on stale UI fields even if the snapshot was refreshed.
+ // The caller must supply the values shown when editing began.
+ if(!expectedFields||typeof expectedFields!=='object'||Array.isArray(expectedFields))
+  return {persisted:false,reason:'Original field values are required before saving'};
+ for(const key of Object.keys(changes)){
+  if(!Object.hasOwn(expectedFields,key)||JSON.stringify(expectedFields[key]??null)!==JSON.stringify(snapshot.player[key]??null))
+   return {persisted:false,conflict:true,reason:'This field changed since you opened the editor. Reload before retrying.'};
+ }
  const player={...snapshot.player,...changes,profileLastUpdated:new Date().toISOString()};
  return saveProfileIfUnchanged({player,expectedUpdatedAt:snapshot.updatedAt,stateId,client});
 }
