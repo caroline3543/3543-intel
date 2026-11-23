@@ -33,7 +33,7 @@ function relativeProfileAge(raw){
  const months=Math.floor(days/30);if(days<365)return 'Updated '+Math.max(1,months)+' month'+(months===1?'':'s')+' ago';
  const years=Math.floor(days/365);return 'Updated '+years+' year'+(years===1?'':'s')+' ago';
 }
-export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,players=[],teamworkPreferences={},onSaveTeamworkPreferences,playerLookup,onCheckPlayerName,onApplyCheckedName}) {
+export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,onApplyConfirmedProfileSave,players=[],teamworkPreferences={},onSaveTeamworkPreferences,playerLookup,onCheckPlayerName,onApplyCheckedName}) {
   const panel=useRef(null);
   const [headerCompact, setHeaderCompact] = useState(false);
   const close=useRef(onClose);close.current=onClose;
