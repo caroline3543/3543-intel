@@ -14,10 +14,23 @@ export function ProfileRoles({player,roles,onSave}) {
 }
 export function ProfileNotes({player,onSave}) {
   const [draft,setDraft]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [saveError,setSaveError]=useState('');
+  async function saveNotes(event){
+    event.preventDefault();if(saving)return;
+    setSaving(true);setSaveError('');
+    try{
+      const result=await onSave({...player,notes:draft,profileLastUpdated:new Date().toISOString()});
+      if(!result?.persisted){setSaveError(result?.reason||'Cloud persistence was not confirmed. The change may exist on this device only.');return;}
+      setDraft(null);
+    }catch(error){setSaveError(error?.message||'Unable to confirm cloud save');}
+    finally{setSaving(false);}
+  }
   return <ProfileSection title="Officer notes" action={draft===null?<button style={profileButton} onClick={()=>setDraft(player.notes||'')}>Edit</button>:null}>
-    {draft===null?<p style={{fontSize:14,color:C.icy,lineHeight:1.6,whiteSpace:'pre-wrap',margin:0}}>{player.notes||'No notes yet.'}</p>:<form onSubmit={event=>{event.preventDefault();onSave({...player,notes:draft,profileLastUpdated:new Date().toISOString()});setDraft(null);}}>
+    {draft===null?<p style={{fontSize:14,color:C.icy,lineHeight:1.6,whiteSpace:'pre-wrap',margin:0}}>{player.notes||'No notes yet.'}</p>:<form onSubmit={saveNotes}>
       <textarea autoFocus aria-label="Officer notes" value={draft} onChange={event=>setDraft(event.target.value)} style={{...profileButton,width:'100%',minHeight:100,boxSizing:'border-box',fontSize:16,fontFamily:'inherit',resize:'vertical',color:C.white,cursor:'text'}}/>
-      <div style={{display:'flex',gap:8,marginTop:10}}><button type="button" style={{...profileButton,flex:1}} onClick={()=>setDraft(null)}>Cancel</button><button style={{...profileButton,flex:1,background:C.gold,color:C.bg}} type="submit">Save notes</button></div>
+      {saveError&&<p role="alert" style={{fontSize:13,color:C.red}}>{saveError}</p>}
+      <div style={{display:'flex',gap:8,marginTop:10}}><button type="button" style={{...profileButton,flex:1}} disabled={saving} onClick={()=>setDraft(null)}>Cancel</button><button style={{...profileButton,flex:1,background:C.gold,color:C.bg}} type="submit" disabled={saving}>{saving?'Saving…':'Save notes'}</button></div>
     </form>}
   </ProfileSection>;
 }
