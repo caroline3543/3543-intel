@@ -9,7 +9,7 @@ import { fmtDateShort } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
 import { PlayerAvatar } from './PlayerAvatar.jsx';
 import { ProfileSection, ProfileDetails, profileButton } from './ProfileParts.jsx';
-import { ProfileTroops } from './ProfileTroops.jsx';
+import { ProfileStrengthSummary } from './ProfileStrengthSummary.jsx';
 import { ProfileMovementSummary } from './ProfileMovementSummary.jsx';
 import { ProfileIdentity } from './ProfileIdentity.jsx';
 import { ProfileRoles, ProfileNotes } from './ProfilePlanning.jsx';
@@ -67,7 +67,7 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
         <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:headerCompact?16:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{!headerCompact&&player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}{!headerCompact&&<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel].filter(Boolean).join(' · ')}</div>}{!headerCompact&&<CopyPlayerId fid={player.fid}/>}{!headerCompact&&<div title={player.profileLastUpdated?new Date(player.profileLastUpdated).toLocaleString():undefined} style={{fontSize:12,color:C.icy,marginTop:5}}>{relativeProfileAge(player.profileLastUpdated)} · Profile edited</div>}{!headerCompact&&player.providerStats?.retrievedAt&&<div title={new Date(player.providerStats.retrievedAt).toLocaleString()} style={{fontSize:12,color:C.icy}}>API data · {relativeProfileAge(player.providerStats.retrievedAt).replace(/^Updated /,'')}</div>}</div>
         <button style={profileButton} aria-label="Close profile" onClick={onClose}>✕</button>
       </header>
-      <ProfileTroops key={`troops:${player.id}`} player={player} onSave={onSave}/>
+      <ProfileStrengthSummary key={`strength:${player.id}`} player={player} onSave={onSave}/>
       <ProfileMovementSummary player={player}/>
       <ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/>
       <ProfileJoiners key={`heroes:${player.id}`} player={player} onSave={onSave}/>
@@ -86,41 +86,8 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
       </ProfileSection>
       {player.blacklisted&&<p style={{fontSize:14,color:C.red}}>Excluded from battle plans{player.blacklistReason?`: ${player.blacklistReason}`:''}</p>}
       <ProfileSection title="Alliance rank"><p style={{fontSize:14,color:C.icy,margin:'0 0 12px'}}>Tap a rank to set it. Tap again to clear.</p><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{ALLIANCE_RANKS.map(rank=><button key={rank} style={{...profileButton,color:player.allianceRank===rank?C.gold:C.icy,borderColor:player.allianceRank===rank?C.gold:C.border}} aria-pressed={player.allianceRank===rank} onClick={()=>setAllianceRank(rank)}>{rank}</button>)}</div></ProfileSection>
-      {player.lastFoundryTroopPower!=null&&<ProfileSection title="Last known Foundry troop power"><div style={{fontSize:20,fontWeight:700,color:C.icy}}>{Number(player.lastFoundryTroopPower).toLocaleString()}</div><div style={{fontSize:12,color:C.muted||'#9bb0c4',marginTop:4}}>Recorded {player.lastFoundryTroopPowerAt?new Date(player.lastFoundryTroopPowerAt).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}):'date unknown'}</div></ProfileSection>}
       <ProfileTalCapacity key={`tal-capacity:${player.id}`} player={player} onSave={onSave}/>
       <ProfileRoles key={`roles:${player.id}`} player={player} roles={roles} onSave={onSave}/>
-        {(player.leaderProfile?.teams || []).length > 0 && (
-          <ProfileSection title="Rally setup">
-            {player.leaderProfile.marchTime != null && (
-              <div style={{ fontSize:13, color:C.gold, fontWeight:700, marginBottom:10 }}>
-                🏃 March time: {Math.floor(player.leaderProfile.marchTime / 60)}:{String(player.leaderProfile.marchTime % 60).padStart(2,'0')}
-              </div>
-            )}
-            {player.leaderProfile.teams.map(team => {
-              const heroes = (team.leadHeroes || []).filter(Boolean);
-              if (!heroes.length) return null;
-              return (
-                <div key={team.id} style={{ marginBottom:10 }}>
-                  <div style={{ fontSize:13, color:C.icy, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>{team.type === 'offense' ? '⚔️ Offense' : '🛡️ Defense'}{team.ratio ? ` · ${team.ratio}` : ''}</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                    {heroes.map(h => {
-                      const skill = team.heroSkillLevels?.[h];
-                      const widgets = team.widgets?.[h];
-                      return (
-                        <span key={h} style={{ padding:'6px 12px', borderRadius:16, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:13 }}>
-                          {h}{skill != null ? ` · Skill ${skill}` : ''}{widgets != null ? ` · Widget ${widgets}` : ''}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </ProfileSection>
-        )}
-
-
-      <button onClick={onOpenLeaderProfile} style={{...profileButton,width:'100%',color:C.gold,marginBottom:12}}>Edit rally setup</button>
       <ProfileSheetImport player={player}/>
       <ProfileNotes key={`notes:${player.id}`} player={player} onSave={onSave}/>
       <ProfileDetails title="Game stats"><ProviderStatsSection player={player}/></ProfileDetails>
