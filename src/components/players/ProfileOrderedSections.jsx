@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import {supabase} from '../../services/supabaseClient.js';
 import {loadProfileSectionOrder,saveProfileSectionOrder} from '../../services/profilePreferencesService.js';
 import {C} from '../../utils/constants.js';
-import {PROFILE_SECTION_IDS,normalizeProfileSectionOrder,moveProfileSection} from '../../services/profileSectionOrder.js';
+import {normalizeProfileSectionOrder,moveProfileSection} from '../../services/profileSectionOrder.js';
 import {ProfileStrengthSummary} from './ProfileStrengthSummary.jsx';
 import {ProfileMovementSummary} from './ProfileMovementSummary.jsx';
 import {ProfileJoiners} from './ProfileJoiners.jsx';
@@ -12,7 +12,6 @@ import {ProfileDetails,ProfileSection,profileButton} from './ProfileParts.jsx';
 import {PlayerHistorySection} from './PlayerHistorySection.jsx';
 import {PlayerRankingsSection} from './PlayerRankingsSection.jsx';
 import {PlayerEquipmentSection} from './PlayerEquipmentSection.jsx';
-import {TroopPowerChart} from './TroopPowerChart.jsx';
 
 const labels={
  'event-power':'Event power','troop-tiers':'Troop tiers','quick-statistics':'Quick statistics',
@@ -23,9 +22,7 @@ const labels={
 };
 const display = value => value==null||value===''||!Number.isFinite(Number(value))?'Not recorded':new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}).format(Number(value));
 
-/** Session-only ordering until authenticated per-organiser preferences are available.
- * Do not persist this to shared browser storage: multiple organisers may use one device.
- */
+/** Account-specific layout is saved only after an authenticated RLS-protected write. */
 export function ProfileOrderedSections({player,onSave,players,preferences,onSavePreferences,events,history}) {
  const [order,setOrder]=useState(()=>normalizeProfileSectionOrder());
  const [arranging,setArranging]=useState(false);
@@ -39,7 +36,7 @@ export function ProfileOrderedSections({player,onSave,players,preferences,onSave
    catch(error){if(active){setLayoutStatus('error');setLayoutError(error.message||'Unable to load saved layout');}}
   }
   load();
-  const subscription=supabase?.auth.onAuthStateChange(()=>{if(active)load();}).data.subscription;
+  const subscription=supabase?.auth.onAuthStateChange(()=>{if(active)queueMicrotask(load);}).data.subscription;
   return ()=>{active=false;subscription?.unsubscribe();};
  },[]);
  async function commitOrder(next){
