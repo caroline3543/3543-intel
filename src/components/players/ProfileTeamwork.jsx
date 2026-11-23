@@ -8,12 +8,12 @@ const pairKey=(a,b)=>[String(a),String(b)].sort().join(':');
 export function ProfileTeamwork({player,players=[],preferences={},onSavePreferences,onSavePlayer}){
  const [partner,setPartner]=useState('');
  const [partnerQuery,setPartnerQuery]=useState('');
- const values=preferences.players?.[String(player.id)]||{};
+ const values=player.teamworkTraitStates||{};
  const pairs=(preferences.pairs||[]).filter(([a,b])=>String(a)===String(player.id)||String(b)===String(player.id));
  const options=players.filter(p=>p.id!==player.id).filter(p=>{const q=partnerQuery.trim().toLocaleLowerCase();return q&&[p.username,p.alias,p.fid,...(p.pastUsernames||[])].some(v=>String(v||'').toLocaleLowerCase().includes(q));}).sort((a,b)=>(a.username||a.alias||'').localeCompare(b.username||b.alias||'')).slice(0,8);
  const name=id=>players.find(p=>String(p.id)===String(id))?.username||String(id);
  function save(next){onSavePreferences?.(normaliseRallyPreferences(next));}
- function trait(key,checked){save({...preferences,players:{...preferences.players,[String(player.id)]:{...values,[key]:checked}}});}
+ function trait(key,checked){onSavePlayer?.({...player,teamworkTraitStates:{...values,[key]:checked},profileLastUpdated:new Date().toISOString()});}
  function addPair(){if(!partner||String(partner)===String(player.id))return;
    const a=String(player.id),b=String(partner);
    if(!(preferences.pairs||[]).some(([x,y])=>pairKey(x,y)===pairKey(a,b)))save({...preferences,pairs:[...(preferences.pairs||[]),[a,b]]});
@@ -21,7 +21,7 @@ export function ProfileTeamwork({player,players=[],preferences={},onSavePreferen
  }
  function removePair(a,b){save({...preferences,pairs:(preferences.pairs||[]).filter(([x,y])=>pairKey(x,y)!==pairKey(a,b))});}
  return <ProfileSection title="Teamwork">
-   <p style={{fontSize:13,color:C.icy,lineHeight:1.5}}>Officer-recorded preferences for working together. Not an automatic assessment of the player.</p>
+   <p style={{fontSize:13,color:C.icy,lineHeight:1.5}}>Officer-recorded assessments. Unknown means not assessed. Battle-planning preferences are managed separately.</p>
    <label style={{fontSize:13,color:C.icy,display:'block',margin:'10px 0 14px'}}>Voice communication language
      <select aria-label="Preferred voice communication language" value={player.communicationLanguage||''}
        onChange={e=>onSavePlayer?.({...player,communicationLanguage:e.target.value,profileLastUpdated:new Date().toISOString()})}
