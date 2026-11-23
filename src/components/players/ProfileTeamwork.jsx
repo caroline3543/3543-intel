@@ -31,9 +31,9 @@ export function ProfileTeamwork({player,players=[],preferences={},onSavePreferen
      </select>
      <span style={{display:'block',fontSize:12,marginTop:5}}>Spreadsheet language: {player.sheetLanguage||'Not recorded'} · Game UI language: {player.gameLanguage||'Not recorded'}. Neither confirms spoken fluency.</span>
    </label>
-   {traits.map(([key,title])=><label key={key} style={{display:'flex',gap:10,alignItems:'center',minHeight:44,fontSize:14,color:C.white}}>
-     <input type="checkbox" checked={values[key]===true} onChange={e=>trait(key,e.target.checked)}/>{title}
-   </label>)}
+   {traits.map(([key,title])=><div key={key} style={{display:'flex',gap:10,alignItems:'center',justifyContent:'space-between',minHeight:48,fontSize:14,color:C.white,flexWrap:'wrap'}}>
+     <span>{title}</span><div role="group" aria-label={title} style={{display:'flex',gap:4}}>{[[null,'Unknown'],[true,'Yes'],[false,'No']].map(([value,label])=><button type="button" key={label} aria-pressed={(values[key]??null)===value} onClick={()=>trait(key,value)} style={{...profileButton,minWidth:54,background:(values[key]??null)===value?C.section:C.card,borderColor:(values[key]??null)===value?C.gold:C.border}}>{label}</button>)}</div>
+   </div>)}
    <p style={{fontSize:13,color:C.icy,margin:'12px 0 6px'}}>Works well with</p>
    {pairs.map(([a,b])=><div key={pairKey(a,b)} style={{display:'flex',gap:8,justifyContent:'space-between',alignItems:'center',minHeight:40}}>
      <span style={{fontSize:13,color:C.white}}>{name(String(a)===String(player.id)?b:a)}</span>
