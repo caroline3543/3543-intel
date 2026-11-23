@@ -30,7 +30,7 @@ test('reads database updated_at rather than JSON edit timestamp',async()=>{
  const client={from(table){
   assert.equal(table,'players');
   return {select(columns){
-   assert.equal(columns,'updated_at,data');
+   assert.equal(columns,'updated_at,data,alliance_tag');
    return {eq(field,value){
     queries.push([field,value]);
     return {eq(field2,value2){
@@ -124,4 +124,20 @@ test('two editors: first save succeeds, second fails atomically without overwrit
  assert.equal(row.data.notes,'first editor');
  assert.equal(row.data.cityPower,100);
  assert.equal(writes,1);
+});
+
+test('guarded edit uses database alliance tag even when player JSON lacks it',async()=>{
+ let submitted;
+ const client={
+  from:()=>({select:()=>({eq:()=>({eq:()=>({maybeSingle:async()=>({
+   data:{updated_at:'2026-11-23T10:00:00Z',alliance_tag:'HOT',data:{id:'123',notes:'before',cityPower:100}},error:null
+  })})})})}),
+  rpc:async(_name,params)=>{submitted=params;return {data:[{status:'saved',server_updated_at:'2026-11-23T10:01:00Z'}],error:null}}
+ };
+ const snapshot=await beginGuardedProfileEdit({playerId:'123',stateId:'3573',client});
+ assert.equal(snapshot.allianceTag,'HOT');
+ const result=await commitGuardedProfileEdit({snapshot,changes:{notes:'after'},expectedFields:{notes:'before'},stateId:'3573',client});
+ assert.equal(result.persisted,true);
+ assert.equal(submitted.p_alliance_tag,'HOT');
+ assert.equal(submitted.p_data.allianceTag,undefined);
 });
