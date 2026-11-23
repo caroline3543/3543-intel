@@ -16,23 +16,24 @@ export function ProfileNotes({player,onSave,onGuardedSaveNotes}) {
   const [draft,setDraft]=useState(null);
   const [saving,setSaving]=useState(false);
   const [saveError,setSaveError]=useState('');
+  const [saveConflict,setSaveConflict]=useState(false);
   const [originalNotes,setOriginalNotes]=useState(null);
   async function saveNotes(event){
     event.preventDefault();if(saving)return;
-    setSaving(true);setSaveError('');
+    setSaving(true);setSaveError('');setSaveConflict(false);
     try{
       const result=onGuardedSaveNotes
         ? await onGuardedSaveNotes(player,draft,originalNotes)
         : await onSave({...player,notes:draft,profileLastUpdated:new Date().toISOString()});
-      if(!result?.persisted){setSaveError(result?.reason||'Cloud persistence was not confirmed. The change may exist on this device only.');return;}
-      setDraft(null);setOriginalNotes(null);
+      if(!result?.persisted){setSaveConflict(Boolean(result?.conflict));setSaveError(result?.reason||(onGuardedSaveNotes?'Cloud save was not confirmed. Your draft has been preserved.':'Cloud persistence was not confirmed. The change may exist on this device only.'));return;}
+      setDraft(null);setOriginalNotes(null);setSaveConflict(false);
     }catch(error){setSaveError(error?.message||'Unable to confirm cloud save');}
     finally{setSaving(false);}
   }
   return <ProfileSection title="Officer notes" action={draft===null?<button style={profileButton} onClick={()=>{setOriginalNotes(player.notes??null);setDraft(player.notes||'');}}>Edit</button>:null}>
     {draft===null?<p style={{fontSize:14,color:C.icy,lineHeight:1.6,whiteSpace:'pre-wrap',margin:0}}>{player.notes||'No notes yet.'}</p>:<form onSubmit={saveNotes}>
       <textarea autoFocus aria-label="Officer notes" value={draft} onChange={event=>setDraft(event.target.value)} style={{...profileButton,width:'100%',minHeight:100,boxSizing:'border-box',fontSize:16,fontFamily:'inherit',resize:'vertical',color:C.white,cursor:'text'}}/>
-      {saveError&&<p role="alert" style={{fontSize:13,color:C.red}}>{saveError}</p>}
+      {saveError&&<p role="alert" style={{fontSize:13,color:C.red}}>{saveError}{saveConflict?' Your draft is still here. Copy it before reloading the profile.':''}</p>}
       <div style={{display:'flex',gap:8,marginTop:10}}><button type="button" style={{...profileButton,flex:1}} disabled={saving} onClick={()=>{setDraft(null);setOriginalNotes(null);}}>Cancel</button><button style={{...profileButton,flex:1,background:C.gold,color:C.bg}} type="submit" disabled={saving}>{saving?'Saving…':'Save notes'}</button></div>
     </form>}
   </ProfileSection>;
