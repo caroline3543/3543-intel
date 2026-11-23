@@ -34,3 +34,9 @@ jobs:
         env:
           PGPASSWORD: integration-only
         run: psql -h 127.0.0.1 -U postgres -d profile_integration -v ON_ERROR_STOP=1 -f tests/sql/3573_guarded_profile_integration.sql
+      - name: Verify approved organiser read, save, revocation and state isolation
+        env:
+          PGPASSWORD: integration-only
+        run: |
+          psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE approved_profile_integration;'
+          psql -h 127.0.0.1 -U postgres -d approved_profile_integration -v ON_ERROR_STOP=1 -f tests/sql/3573_approved_organisers_integration.sql
