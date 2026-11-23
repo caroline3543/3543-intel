@@ -5,7 +5,7 @@ import {normalizeStateId} from './stateWorkspaceService.js';
  * No fallback to upsert: an unavailable RPC must fail closed.
  * The server function is SECURITY INVOKER and respects players RLS.
  */
-export async function saveProfileIfUnchanged({player,expectedUpdatedAt,stateId,client}){
+export async function saveProfileIfUnchanged({player,expectedUpdatedAt,stateId,client,expectedAllianceTag}){
  if(!client) return {persisted:false,reason:'Cloud sync unavailable'};
  if(!player?.id || !expectedUpdatedAt || !Number.isFinite(Date.parse(expectedUpdatedAt))){
   return {persisted:false,reason:'Reload this profile to obtain its server version before editing'};
@@ -14,7 +14,7 @@ export async function saveProfileIfUnchanged({player,expectedUpdatedAt,stateId,c
   p_state_id:normalizeStateId(stateId),
   p_id:String(player.id),
   p_expected_updated_at:expectedUpdatedAt,
-  p_alliance_tag:player.allianceTag||'',
+  p_alliance_tag:expectedAllianceTag===undefined?(player.allianceTag||''):expectedAllianceTag,
   p_data:player
  });
  if(error)return {persisted:false,reason:'Guarded save unavailable or denied',error:error.message};
@@ -31,12 +31,12 @@ export async function saveProfileIfUnchanged({player,expectedUpdatedAt,stateId,c
 export async function loadPlayerVersion({playerId,stateId,client}){
  if(!client)return {ready:false,reason:'Cloud sync unavailable'};
  if(playerId==null||String(playerId).trim()==='')return {ready:false,reason:'Missing player ID'};
- const {data,error}=await client.from('players').select('updated_at,data')
+ const {data,error}=await client.from('players').select('updated_at,data,alliance_tag')
    .eq('state_id',normalizeStateId(stateId)).eq('id',String(playerId)).maybeSingle();
  if(error)return {ready:false,reason:'Unable to verify player version',error:error.message};
  if(!data?.updated_at)return {ready:false,reason:'Player is unavailable or you lack permission'};
  if(!Number.isFinite(Date.parse(data.updated_at)))return {ready:false,reason:'Invalid server version'};
- return {ready:true,updatedAt:data.updated_at,player:data.data};
+ return {ready:true,updatedAt:data.updated_at,player:data.data,allianceTag:data.alliance_tag??''};
 }
 
 /**
@@ -49,7 +49,7 @@ export async function beginGuardedProfileEdit({playerId,stateId,client}){
  if(!snapshot.ready)return snapshot;
  if(!snapshot.player||typeof snapshot.player!=='object'||Array.isArray(snapshot.player))
   return {ready:false,reason:'Invalid server player record'};
- return {ready:true,updatedAt:snapshot.updatedAt,player:snapshot.player};
+ return {ready:true,updatedAt:snapshot.updatedAt,player:snapshot.player,allianceTag:snapshot.allianceTag};
 }
 export async function commitGuardedProfileEdit({snapshot,changes,stateId,client,expectedFields}){
  if(!snapshot?.ready||!snapshot?.updatedAt||!snapshot?.player?.id)
@@ -70,6 +70,6 @@ export async function commitGuardedProfileEdit({snapshot,changes,stateId,client,
    return {persisted:false,conflict:true,reason:'This field changed since you opened the editor. Reload before retrying.'};
  }
  const player={...snapshot.player,...changes,profileLastUpdated:new Date().toISOString()};
- const result=await saveProfileIfUnchanged({player,expectedUpdatedAt:snapshot.updatedAt,stateId,client});
+ const result=await saveProfileIfUnchanged({player,expectedUpdatedAt:snapshot.updatedAt,stateId,client,expectedAllianceTag:snapshot.allianceTag});
  return result.persisted?{...result,player}:result;
 }
