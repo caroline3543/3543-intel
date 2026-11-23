@@ -1,4 +1,6 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
+import {supabase} from '../../services/supabaseClient.js';
+import {loadProfileSectionOrder,saveProfileSectionOrder} from '../../services/profilePreferencesService.js';
 import {C} from '../../utils/constants.js';
 import {PROFILE_SECTION_IDS,normalizeProfileSectionOrder,moveProfileSection} from '../../services/profileSectionOrder.js';
 import {ProfileStrengthSummary} from './ProfileStrengthSummary.jsx';
@@ -27,7 +29,27 @@ const display = value => value==null||value===''||!Number.isFinite(Number(value)
 export function ProfileOrderedSections({player,onSave,players,preferences,onSavePreferences,events,history}) {
  const [order,setOrder]=useState(()=>normalizeProfileSectionOrder());
  const [arranging,setArranging]=useState(false);
- const [expandedMore,setExpandedMore]=useState(false);
+ const [layoutStatus,setLayoutStatus]=useState('loading');
+ const [layoutError,setLayoutError]=useState('');
+ const [layoutBusy,setLayoutBusy]=useState(false);
+ useEffect(()=>{
+  let active=true;
+  async function load(){
+   try{const result=await loadProfileSectionOrder();if(!active)return;setOrder(result.order);setLayoutStatus(result.status);setLayoutError('');}
+   catch(error){if(active){setLayoutStatus('error');setLayoutError(error.message||'Unable to load saved layout');}}
+  }
+  load();
+  const subscription=supabase?.auth.onAuthStateChange(()=>{if(active)load();}).data.subscription;
+  return ()=>{active=false;subscription?.unsubscribe();};
+ },[]);
+ async function commitOrder(next){
+  if(layoutStatus!=='ready'){setLayoutError('Sign in through Settings to save your personal section order.');return;}
+  setLayoutBusy(true);setLayoutError('');
+  try{const saved=await saveProfileSectionOrder(next);setOrder(saved);setLayoutStatus('ready');}
+  catch(error){setLayoutError(error.message||'Unable to save layout. Order unchanged.');}
+  finally{setLayoutBusy(false);}
+ }
+
  const names=[...new Set((player.pastUsernames||[]).filter(Boolean))].slice(-3).reverse();
  function render(id){
   switch(id){
@@ -52,13 +74,14 @@ export function ProfileOrderedSections({player,onSave,players,preferences,onSave
  }
  return <div>
   <button type="button" onClick={()=>setArranging(x=>!x)} aria-expanded={arranging} style={{...profileButton,width:'100%',marginBottom:12}}>{arranging?'Done arranging':'Arrange profile sections'}</button>
+  {layoutError&&<p role="alert" style={{color:C.red,fontSize:13}}>{layoutError}</p>}
   {arranging&&<div aria-label="Profile section order" style={{marginBottom:16}}>
-   <p style={{fontSize:12,color:C.icy}}>Order changes apply to this open profile only. Account sync is not yet enabled.</p>
-   <button type="button" style={profileButton} onClick={()=>setOrder(normalizeProfileSectionOrder())}>Reset order</button>
+   <p style={{fontSize:12,color:C.icy}}>{layoutStatus==='ready'?'Changes save to your signed-in account.':layoutStatus==='loading'?'Loading personal layout…':'Sign in through Settings to sync your personal layout.'}</p>
+   <button type="button" style={profileButton} disabled={layoutBusy||layoutStatus!=='ready'} onClick={()=>commitOrder(normalizeProfileSectionOrder())}>Reset order</button>
    {order.map((id,index)=><div key={id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderBottom:`1px solid ${C.border}`}}>
     <span style={{flex:1,minWidth:0,fontSize:14}}>{labels[id]}</span>
-    <button type="button" aria-label={`Move ${labels[id]} up`} disabled={index===0} style={profileButton} onClick={()=>setOrder(prev=>moveProfileSection(prev,id,-1))}>↑</button>
-    <button type="button" aria-label={`Move ${labels[id]} down`} disabled={index===order.length-1} style={profileButton} onClick={()=>setOrder(prev=>moveProfileSection(prev,id,1))}>↓</button>
+    <button type="button" aria-label={`Move ${labels[id]} up`} disabled={layoutBusy||layoutStatus!=='ready'||index===0} style={profileButton} onClick={()=>commitOrder(moveProfileSection(order,id,-1))}>↑</button>
+    <button type="button" aria-label={`Move ${labels[id]} down`} disabled={layoutBusy||layoutStatus!=='ready'||index===order.length-1} style={profileButton} onClick={()=>commitOrder(moveProfileSection(order,id,1))}>↓</button>
    </div>)}
   </div>}
   {order.map(id=><div key={id} data-profile-section={id}>{render(id)}</div>)}
