@@ -1,6 +1,7 @@
 -- REVIEW ONLY. Do not apply without an approved deployment and RLS verification.
 -- Atomic compare-and-swap for existing player rows. Uses caller's RLS permissions.
 -- Expected timestamp MUST come from the server, not a client-generated edit time.
+-- The database itself enforces the profile field allowlist; client checks alone are insufficient.
 create or replace function public.update_player_if_unchanged(
   p_state_id text,
   p_id text,
@@ -25,6 +26,10 @@ begin
      set data=p_data, alliance_tag=p_alliance_tag, updated_at=clock_timestamp()
    where state_id=p_state_id and id=p_id
      and updated_at=p_expected_updated_at
+     and alliance_tag is not distinct from p_alliance_tag
+     and (data - array['notes','joinerHeroes','teamworkTraitStates','communicationLanguage','profileLastUpdated']::text[])
+       = (p_data - array['notes','joinerHeroes','teamworkTraitStates','communicationLanguage','profileLastUpdated']::text[])
+     and p_data->>'id'=p_id
   returning updated_at into v_updated_at;
 
   if found then
