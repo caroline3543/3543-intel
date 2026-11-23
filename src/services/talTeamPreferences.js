@@ -6,8 +6,8 @@ export function normaliseRallyPreferences(raw = {}) {
   const players = {};
   for (const [id, value] of Object.entries(raw.players || {})) {
     if (!value || typeof value !== 'object') continue;
-    players[String(id)] = Object.fromEntries(TRAITS.map(t => [t, value[t] === true ? true : value[t] === false ? false : null]));
-    players[String(id)].priority = value.priority === true ? true : value.priority === false ? false : null;
+    players[String(id)] = Object.fromEntries(TRAITS.map(t => [t, value[t] === true]));
+    players[String(id)].priority = value.priority === true;
   }
   const seen = new Set();
   const pairs = (Array.isArray(raw.pairs) ? raw.pairs : []).filter(pair => {
