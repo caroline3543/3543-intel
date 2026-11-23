@@ -62,9 +62,24 @@ test('guarded edit preserves unrelated server fields and uses CAS',async()=>{
  let submitted;
  const client={rpc:async(name,args)=>{submitted=args;return {data:[{status:'saved',server_updated_at:'2026-11-23T10:01:00Z'}]}}};
  const snapshot={ready:true,updatedAt:'2026-11-23T10:00:00Z',player:{id:'123',notes:'before',cityPower:100,allianceTag:'HOT'}};
- const result=await commitGuardedProfileEdit({snapshot,changes:{notes:'after'},stateId:'3573',client});
+ const result=await commitGuardedProfileEdit({snapshot,changes:{notes:'after'},expectedFields:{notes:'before'},stateId:'3573',client});
  assert.equal(result.persisted,true);
  assert.equal(submitted.p_data.cityPower,100);
  assert.equal(submitted.p_data.notes,'after');
  assert.equal(submitted.p_expected_updated_at,snapshot.updatedAt);
+});
+
+test('rejects stale editor draft without invoking database write',async()=>{
+ let called=false;
+ const client={rpc:async()=>{called=true;return {data:[]}}};
+ const snapshot={ready:true,updatedAt:'2026-11-23T10:00:00Z',player:{id:'123',notes:'newer officer note'}};
+ const result=await commitGuardedProfileEdit({snapshot,changes:{notes:'older draft'},expectedFields:{notes:'original note'},stateId:'3573',client});
+ assert.equal(result.persisted,false);
+ assert.equal(result.conflict,true);
+ assert.equal(called,false);
+});
+test('refuses guarded edits without original field values',async()=>{
+ const snapshot={ready:true,updatedAt:'2026-11-23T10:00:00Z',player:{id:'123',notes:'original'}};
+ const result=await commitGuardedProfileEdit({snapshot,changes:{notes:'changed'},stateId:'3573',client:{}});
+ assert.equal(result.persisted,false);
 });
