@@ -5,6 +5,10 @@
 -- The function owner must be a trusted administrative role.
 -- No direct organiser UPDATE policy on public.players is created.
 
+-- Apply definitions and EXECUTE restrictions atomically to avoid a temporary
+-- PUBLIC execution window during migration.
+begin;
+
 create or replace function public.read_3573_profile_for_edit(p_id text)
 returns table(updated_at timestamptz, alliance_tag text, data jsonb)
 language plpgsql security definer set search_path = ''
@@ -73,5 +77,7 @@ revoke all on function public.read_3573_profile_for_edit(text) from public,anon;
 revoke all on function public.update_3573_profile_fields(text,timestamptz,text,jsonb) from public,anon;
 grant execute on function public.read_3573_profile_for_edit(text) to authenticated;
 grant execute on function public.update_3573_profile_fields(text,timestamptz,text,jsonb) to authenticated;
+
+commit;
 
 -- Do not enable until the isolated authenticated integration tests pass.
