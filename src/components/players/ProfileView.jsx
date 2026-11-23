@@ -127,9 +127,7 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
       <ProfileDetails title="Heroes & equipment"><PlayerEquipmentSection player={player} onSave={onSave}/></ProfileDetails>
       <ProfileDetails title="Rankings"><PlayerRankingsSection player={player}/></ProfileDetails>
       <ProfileDetails title="History & attendance"><PlayerHistorySection player={player}/>
-        <ProfileSection title="Last 4 alliance movements">
-          {(player.allianceHistory||[]).filter(m=>m.from!==m.to).slice(-4).reverse().length===0?<div style={{fontSize:13,color:C.icy}}>No alliance movements recorded yet.</div>:(player.allianceHistory||[]).filter(m=>m.from!==m.to).slice(-4).reverse().map((m,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'9px 0',borderBottom:'1px solid '+C.border,fontSize:13}}><span>{m.from||'No alliance'} → {m.to||'No alliance'}</span><span style={{color:C.icy,whiteSpace:'nowrap'}}>{m.at?new Date(m.at).toLocaleDateString(): 'Date unknown'}</span></div>)}
-        </ProfileSection>
+
         {metrics&&(
           <ProfileSection title="Event attendance">
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
