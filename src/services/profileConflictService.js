@@ -38,3 +38,28 @@ export async function loadPlayerVersion({playerId,stateId,client}){
  if(!Number.isFinite(Date.parse(data.updated_at)))return {ready:false,reason:'Invalid server version'};
  return {ready:true,updatedAt:data.updated_at,player:data.data};
 }
+
+/**
+ * Explicit two-stage guarded edit. No local mutation or unguarded upsert.
+ * A server snapshot is returned to the editor so it can avoid overwriting
+ * unrelated fields that changed before editing began.
+ */
+export async function beginGuardedProfileEdit({playerId,stateId,client}){
+ const snapshot=await loadPlayerVersion({playerId,stateId,client});
+ if(!snapshot.ready)return snapshot;
+ if(!snapshot.player||typeof snapshot.player!=='object'||Array.isArray(snapshot.player))
+  return {ready:false,reason:'Invalid server player record'};
+ return {ready:true,updatedAt:snapshot.updatedAt,player:snapshot.player};
+}
+export async function commitGuardedProfileEdit({snapshot,changes,stateId,client}){
+ if(!snapshot?.ready||!snapshot?.updatedAt||!snapshot?.player?.id)
+  return {persisted:false,reason:'Reload the server profile before saving'};
+ if(!changes||typeof changes!=='object'||Array.isArray(changes))
+  return {persisted:false,reason:'Invalid changes'};
+ // Only whitelisted profile fields may be patched through this API.
+ const allowed=['notes','joinerHeroes','teamworkTraitStates','communicationLanguage'];
+ if(Object.keys(changes).some(key=>!allowed.includes(key)))
+  return {persisted:false,reason:'Unsupported profile field'};
+ const player={...snapshot.player,...changes,profileLastUpdated:new Date().toISOString()};
+ return saveProfileIfUnchanged({player,expectedUpdatedAt:snapshot.updatedAt,stateId,client});
+}
