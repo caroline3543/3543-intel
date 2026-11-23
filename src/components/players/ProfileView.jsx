@@ -2,7 +2,7 @@ import {ProfileTeamwork} from './ProfileTeamwork.jsx';
 import { ProfileTalCapacity } from './ProfileTalCapacity.jsx';
 import {ProfileSheetImport} from './ProfileSheetImport.jsx';
 import {CopyPlayerId} from './CopyPlayerId.jsx';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { C, ALLIANCE_RANKS, TROOP_POWER_EVENTS } from '../../utils/constants.js';
 import { roleColor } from '../../utils/roles.js';
 import { fmtDateShort } from '../../utils/dates.js';
@@ -10,6 +10,7 @@ import { calcMetrics } from '../../data/metrics.js';
 import { PlayerAvatar } from './PlayerAvatar.jsx';
 import { ProfileSection, ProfileDetails, profileButton } from './ProfileParts.jsx';
 import { ProfileTroops } from './ProfileTroops.jsx';
+import { ProfileMovementSummary } from './ProfileMovementSummary.jsx';
 import { ProfileIdentity } from './ProfileIdentity.jsx';
 import { ProfileRoles, ProfileNotes } from './ProfilePlanning.jsx';
 import { ProfileJoiners } from './ProfileJoiners.jsx';
@@ -33,6 +34,7 @@ function relativeProfileAge(raw){
 }
 export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,players=[],teamworkPreferences={},onSaveTeamworkPreferences,playerLookup,onCheckPlayerName,onApplyCheckedName}) {
   const panel=useRef(null);
+  const [headerCompact, setHeaderCompact] = useState(false);
   const close=useRef(onClose);close.current=onClose;
   useEffect(()=>{
     if(!open)return;
@@ -59,13 +61,14 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
   const troopPowerHistory=events.filter(ev=>TROOP_POWER_EVENTS.includes(ev.type)).flatMap(ev=>(ev.snapshots||[]).filter(s=>s.playerId===player.id&&s.troopPower!=null).map(s=>({date:ev.date,value:s.troopPower}))).sort((a,b)=>new Date(a.date)-new Date(b.date)).map(p=>({label:fmtDateShort(p.date),value:p.value}));
   function setAllianceRank(rank){onSave({...player,allianceRank:player.allianceRank===rank?null:rank,profileLastUpdated:new Date().toISOString()});}
   return <div onClick={onClose} style={{position:'fixed',inset:0,background:C.bg+'dd',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-    <section ref={panel} role="dialog" aria-modal="true" aria-label={`Player profile: ${name}`} onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:480,height:'min(94dvh, 94vh)',minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch',touchAction:'pan-y',boxSizing:'border-box',padding:'0 16px max(110px, env(safe-area-inset-bottom))',overscrollBehavior:'contain'}}>
-      <header style={{position:'sticky',top:0,zIndex:1,background:C.card,padding:'16px 0 12px',display:'flex',gap:12,alignItems:'center',borderBottom:`1px solid ${C.border}`,marginBottom:16}}>
-        <PlayerAvatar player={player} size={48} color={roleColor(player.roles?.[0],roles)} bordered/>
-        <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel].filter(Boolean).join(' · ')}</div><CopyPlayerId fid={player.fid}/><div title={player.profileLastUpdated?new Date(player.profileLastUpdated).toLocaleString():undefined} style={{fontSize:12,color:C.icy,marginTop:5}}>{relativeProfileAge(player.profileLastUpdated)} · Profile edited</div>{player.providerStats?.retrievedAt&&<div title={new Date(player.providerStats.retrievedAt).toLocaleString()} style={{fontSize:12,color:C.icy}}>API data · {relativeProfileAge(player.providerStats.retrievedAt).replace(/^Updated /,'')}</div>}</div>
+    <section ref={panel} onScroll={e=>setHeaderCompact(e.currentTarget.scrollTop>56)} role="dialog" aria-modal="true" aria-label={`Player profile: ${name}`} onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:480,height:'min(94dvh, 94vh)',minHeight:0,overflowY:'scroll',WebkitOverflowScrolling:'touch',touchAction:'pan-y',boxSizing:'border-box',padding:'0 16px max(110px, env(safe-area-inset-bottom))',overscrollBehavior:'contain'}}>
+      <header style={{position:'sticky',top:0,zIndex:1,background:C.card,padding:headerCompact?'8px 0':'16px 0 12px',display:'flex',gap:12,alignItems:'center',borderBottom:`1px solid ${C.border}`,marginBottom:16}}>
+        <PlayerAvatar player={player} size={40} color={roleColor(player.roles?.[0],roles)} bordered/>
+        <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:headerCompact?16:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{!headerCompact&&player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}{!headerCompact&&<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel].filter(Boolean).join(' · ')}</div>}{!headerCompact&&<CopyPlayerId fid={player.fid}/>}{!headerCompact&&<div title={player.profileLastUpdated?new Date(player.profileLastUpdated).toLocaleString():undefined} style={{fontSize:12,color:C.icy,marginTop:5}}>{relativeProfileAge(player.profileLastUpdated)} · Profile edited</div>}{!headerCompact&&player.providerStats?.retrievedAt&&<div title={new Date(player.providerStats.retrievedAt).toLocaleString()} style={{fontSize:12,color:C.icy}}>API data · {relativeProfileAge(player.providerStats.retrievedAt).replace(/^Updated /,'')}</div>}</div>
         <button style={profileButton} aria-label="Close profile" onClick={onClose}>✕</button>
       </header>
       <ProfileTroops key={`troops:${player.id}`} player={player} onSave={onSave}/>
+      <ProfileMovementSummary player={player}/>
       <ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/>
       <ProfileJoiners key={`heroes:${player.id}`} player={player} onSave={onSave}/>
       <ProfileTeamwork key={`tal-teamwork:${player.id}`} player={player} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} onSavePlayer={onSave}/>
