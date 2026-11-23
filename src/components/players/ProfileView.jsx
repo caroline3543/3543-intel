@@ -9,7 +9,7 @@ import { fmtDateShort } from '../../utils/dates.js';
 import { calcMetrics } from '../../data/metrics.js';
 import { PlayerAvatar } from './PlayerAvatar.jsx';
 import { ProfileSection, ProfileDetails, profileButton } from './ProfileParts.jsx';
-import { ProfileStrengthSummary } from './ProfileStrengthSummary.jsx';
+import { ProfileOrderedSections } from './ProfileOrderedSections.jsx';
 import { membershipFreshness } from '../../services/profileFreshness.js';
 import { ProfileMovementSummary } from './ProfileMovementSummary.jsx';
 import { ProfileIdentity } from './ProfileIdentity.jsx';
@@ -68,11 +68,8 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
         <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:headerCompact?16:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{!headerCompact&&player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}{!headerCompact&&<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel].filter(Boolean).join(' · ')}</div>}{!headerCompact&&<CopyPlayerId fid={player.fid}/>}{!headerCompact&&<div title={player.profileLastUpdated?new Date(player.profileLastUpdated).toLocaleString():undefined} style={{fontSize:12,color:C.icy,marginTop:5}}>{relativeProfileAge(player.profileLastUpdated)} · Profile edited</div>}{!headerCompact&&<div title={player.membershipLastSuccessfulAt?new Date(player.membershipLastSuccessfulAt).toLocaleString():undefined} style={{fontSize:12,color:C.icy}}>{membershipFreshness(player).label}</div>}{!headerCompact&&player.providerStats?.retrievedAt&&<div title={new Date(player.providerStats.retrievedAt).toLocaleString()} style={{fontSize:12,color:C.icy}}>API data · {relativeProfileAge(player.providerStats.retrievedAt).replace(/^Updated /,'')}</div>}</div>
         <button style={profileButton} aria-label="Close profile" onClick={onClose}>✕</button>
       </header>
-      <ProfileStrengthSummary key={`strength:${player.id}`} player={player} onSave={onSave}/>
-      <ProfileMovementSummary player={player}/>
-      <ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/>
-      <ProfileJoiners key={`heroes:${player.id}`} player={player} onSave={onSave}/>
-      <ProfileTeamwork key={`tal-teamwork:${player.id}`} player={player} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} onSavePlayer={onSave}/>
+      <ProfileOrderedSections key={player.id} player={player} onSave={onSave} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} events={events}/>
+      <ProfileDetails title="Identity administration"><ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/></ProfileDetails>
       <ProfileSection title="Check username with API">
         <p style={{fontSize:13,color:C.icy,margin:'0 0 10px'}}>Look up this Player ID directly. This checks the provider separately from the alliance roster and won't change saved data without confirmation.</p>
         <button type="button" style={profileButton} disabled={!player.fid||playerLookup?.status==='loading'} onClick={()=>onCheckPlayerName?.(player)}>{playerLookup?.status==='loading'?'Checking…':'Refresh player name'}</button>
@@ -87,44 +84,8 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
       </ProfileSection>
       {player.blacklisted&&<p style={{fontSize:14,color:C.red}}>Excluded from battle plans{player.blacklistReason?`: ${player.blacklistReason}`:''}</p>}
       <ProfileSection title="Alliance rank"><p style={{fontSize:14,color:C.icy,margin:'0 0 12px'}}>Tap a rank to set it. Tap again to clear.</p><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{ALLIANCE_RANKS.map(rank=><button key={rank} style={{...profileButton,color:player.allianceRank===rank?C.gold:C.icy,borderColor:player.allianceRank===rank?C.gold:C.border}} aria-pressed={player.allianceRank===rank} onClick={()=>setAllianceRank(rank)}>{rank}</button>)}</div></ProfileSection>
-      <ProfileTalCapacity key={`tal-capacity:${player.id}`} player={player} onSave={onSave}/>
       <ProfileRoles key={`roles:${player.id}`} player={player} roles={roles} onSave={onSave}/>
       <ProfileSheetImport player={player}/>
-      <ProfileNotes key={`notes:${player.id}`} player={player} onSave={onSave}/>
-      <ProfileDetails title="Game stats"><ProviderStatsSection player={player}/></ProfileDetails>
-      <ProfileDetails title="Heroes & equipment"><PlayerEquipmentSection player={player} onSave={onSave}/></ProfileDetails>
-      <ProfileDetails title="Rankings"><PlayerRankingsSection player={player}/></ProfileDetails>
-      <ProfileDetails title="History & attendance"><PlayerHistorySection player={player}/>
-
-        {metrics&&(
-          <ProfileSection title="Event attendance">
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
-              {[['Attendance',`${metrics.attendancePct}%`,metrics.attendancePct>=70?C.green:C.gold],['Discord',`${metrics.voicePct}%`,C.icy],['Reliability score',`${metrics.reliabilityScore}/100`,metrics.reliabilityScore>=70?C.green:C.gold]].map(([l,v,c])=>(
-                <div key={l} style={{ background:C.card, borderRadius:10, padding:10, textAlign:'center' }}>
-                  <div style={{ fontSize:18, fontWeight:700, color:c }}>{v}</div>
-                  <div style={{ fontSize:13, color:C.icy, marginTop:2 }}>{l}</div>
-                </div>
-              ))}
-            </div>
-            {snaps.slice(0,4).map(s=>(
-              <div key={s.snapshotId} style={{ padding:'8px 0', borderBottom:`1px solid ${C.border}22`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <div>
-                  <div style={{ fontSize:13, fontWeight:600, color:C.white }}>{s.eventName}</div>
-                  <div style={{ fontSize:13, color:C.icy }}>{fmtDateShort(s.eventDate)}</div>
-                </div>
-                <div style={{ display:'flex', gap:4 }}>
-                  {s.attendance?.attended===true&&<span style={{ fontSize:11, padding:'2px 6px', borderRadius:8, background:C.green+'18', color:C.green }}>✓</span>}
-                  {s.attendance?.noShow&&<span style={{ fontSize:11, padding:'2px 6px', borderRadius:8, background:C.red+'18', color:C.red }}>✗</span>}
-                  {s.voice?.joined===true&&<span style={{ fontSize:11, padding:'2px 6px', borderRadius:8, background:C.icy+'18', color:C.icy }}>🎙️</span>}
-                </div>
-              </div>
-            ))}
-          </ProfileSection>
-        )}
-
-
-        {troopPowerHistory.length>0&&<ProfileSection title="Event troop power"><TroopPowerChart points={troopPowerHistory}/><p style={{fontSize:13,color:C.icy}}>Recorded in Foundry and Canyon Clash.</p></ProfileSection>}
-      </ProfileDetails>
       <button onClick={onClose} style={{...profileButton,width:'100%',marginBottom:'env(safe-area-inset-bottom)'}}>Done</button>
     </section>
   </div>;
