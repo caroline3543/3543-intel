@@ -54,6 +54,7 @@ begin
   '{"id":"123","allianceTag":"HOT","notes":"tampered","cityPower":999}'::jsonb
  );
  if v_tamper <> 'not_saved' then raise exception 'Non-allowlisted field changed';end if;
+ perform set_config('app.expected_version',v_version::text,false);
  if (select data->>'notes' from public.players where state_id='3573' and id='123') <> 'first editor'
  then raise exception 'Saved notes were overwritten';end if;
 end $$;
@@ -62,7 +63,7 @@ do $$
 declare v_status text;
 begin
  select status into v_status from public.update_player_if_unchanged(
-  '3573','123',(select '2026-11-23T10:00:00Z'::timestamptz),'HOT',
+  '3573','123',current_setting('app.expected_version')::timestamptz,'HOT',
   '{"id":"123","allianceTag":"HOT","notes":"unauthorised","cityPower":100}'::jsonb
  );
  if v_status <> 'not_saved' then raise exception 'RLS denied edit succeeded';end if;
