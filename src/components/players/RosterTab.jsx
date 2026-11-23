@@ -1,6 +1,7 @@
 import {supabase} from '../../services/supabaseClient.js';
 import {activeStateId} from '../../services/stateWorkspaceService.js';
 import {beginGuardedProfileEdit,commitGuardedProfileEdit} from '../../services/profileConflictService.js';
+import {readApproved3573Profile,saveApproved3573Profile} from '../../services/approved3573ProfileService.js';
 import { monthlyTransferHistory } from '../../services/automaticMembershipPolicy.js';
 import { transferNavigation,filterTransferPlayers,normalizeTransferEvents } from '../../services/automaticMembershipTransferView.js';
 import { mightpulseRequest } from '../../services/mightpulseService.js';
@@ -166,18 +167,20 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
   },[initialPlayerId,players,onInitialPlayerOpened]);
   // Disabled by default until the reviewed CAS migration and RLS policy are deployed.
   // A failed guarded edit must never fall back to the legacy local-first save.
-  const guardedNotesEnabled=import.meta.env.VITE_ENABLE_GUARDED_PROFILE_NOTES==='true';
+  const approvedOrganiserNotesEnabled=import.meta.env.VITE_ENABLE_3573_APPROVED_ORGANISER_NOTES==='true';
+  const guardedNotesEnabled=approvedOrganiserNotesEnabled||import.meta.env.VITE_ENABLE_GUARDED_PROFILE_NOTES==='true';
   async function saveGuardedNotes(player,notes,originalNotes){
     if(!guardedNotesEnabled)return {persisted:false,reason:'Guarded notes editing is disabled'};
     try{
       const stateId=activeStateId();
       if(stateId!=='3573')return {persisted:false,reason:'Guarded notes editing is limited to State 3573'};
-      const snapshot=await beginGuardedProfileEdit({playerId:player.id,stateId,client:supabase});
+      const snapshot=approvedOrganiserNotesEnabled
+        ?await readApproved3573Profile({playerId:player.id,stateId,client:supabase})
+        :await beginGuardedProfileEdit({playerId:player.id,stateId,client:supabase});
       if(!snapshot.ready)return {persisted:false,reason:snapshot.reason};
-      const result=await commitGuardedProfileEdit({
-        snapshot,changes:{notes},expectedFields:{notes:originalNotes},
-        stateId,client:supabase
-      });
+      const result=approvedOrganiserNotesEnabled
+        ?await saveApproved3573Profile({snapshot,changes:{notes},expectedFields:{notes:originalNotes},stateId,client:supabase})
+        :await commitGuardedProfileEdit({snapshot,changes:{notes},expectedFields:{notes:originalNotes},stateId,client:supabase});
       if(!result.persisted)return result;
       const applied=onApplyConfirmedProfileSave?.(result);
       return applied?.applied?result:{persisted:false,reason:'Cloud saved, but local roster refresh was not confirmed'};
