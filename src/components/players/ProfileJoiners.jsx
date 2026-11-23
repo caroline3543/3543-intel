@@ -5,29 +5,42 @@ export function ProfileJoiners({player,onSave}){
   const [addingHero,setAddingHero]=useState(false);
   const [heroName,setHeroName]=useState('');
   const [heroSkill,setHeroSkill]=useState(5);
+  const [saving,setSaving]=useState(false);
+  const [saveError,setSaveError]=useState('');
+  async function persist(next){
+    if(saving)return false;
+    setSaving(true);setSaveError('');
+    try{
+      const result=await onSave(next);
+      if(result?.persisted===true)return true;
+      setSaveError(result?.reason||'Cloud save not confirmed. The change may be stored only on this device.');
+      return false;
+    }catch(error){setSaveError(error?.message||'Cloud save not confirmed');return false;}
+    finally{setSaving(false);}
+  }
   const joiners=player.joinerHeroes||[];
   // Typing a name that already exists (case-insensitive) replaces that
   // entry's skill level rather than creating a duplicate.
-  function addHero() {
+  async function addHero() {
     const name = heroName.trim();
     if (!name) return;
     const existing = joiners.filter(jh => jh.hero.toLowerCase() !== name.toLowerCase());
-    onSave({ ...player, joinerHeroes: [...existing, { hero: name, skillLevel: heroSkill, verified: true, verificationSource: 'manual', updatedAt: new Date().toISOString() }] });
-    setHeroName(''); setHeroSkill(5); setAddingHero(false);
+    const saved=await persist({ ...player, joinerHeroes: [...existing, { hero: name, skillLevel: heroSkill, verified: true, verificationSource: 'manual', updatedAt: new Date().toISOString() }] });
+    if(saved){setHeroName(''); setHeroSkill(5); setAddingHero(false);}
   }
 
-  function removeHero(hero) {
-    onSave({ ...player, joinerHeroes: joiners.filter(jh => jh.hero !== hero) });
+  async function removeHero(hero) {
+    await persist({ ...player, joinerHeroes: joiners.filter(jh => jh.hero !== hero) });
   }
 
 
-return (        <ProfileSection title="Joiner heroes"><p style={{fontSize:14,color:C.icy,margin:"0 0 12px"}}>Record the top-right expedition skill. Only Skill 5 counts towards joiner coverage.</p>
+return (        <ProfileSection title="Joiner heroes">{saveError&&<p role="alert" style={{color:C.red,fontSize:13}}>{saveError}</p>}<p style={{fontSize:14,color:C.icy,margin:"0 0 12px"}}>Record the top-right expedition skill. Only Skill 5 counts towards joiner coverage.</p>
           {joiners.length>0 && (
             <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:12 }}>
               {joiners.map(jh=>(
                 <span key={jh.hero} style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 12px 8px 16px', borderRadius:20, background:C.gold+'18', border:`1px solid ${C.gold}44`, color:C.gold, fontWeight:600, fontSize:14 }}>
                   {jh.hero}{jh.stars!=null?` · ${jh.stars}★`:''}{jh.skillLevel==null?' · Skill not recorded':''}{jh.skillLevel!=null?` · Skill ${jh.skillLevel}`:''}{jh.verified?' · Confirmed':' · Needs review'}
-                  <button onClick={() => removeHero(jh.hero)} aria-label={`Remove ${jh.hero}`}
+                  <button disabled={saving} onClick={() => removeHero(jh.hero)} aria-label={`Remove ${jh.hero}`}
                     style={{ width:44, height:44, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'none', border:'none', color:C.gold+'99', fontSize:13, cursor:'pointer', padding:0 }}>✕</button>
                 </span>
               ))}
@@ -54,10 +67,10 @@ return (        <ProfileSection title="Joiner heroes"><p style={{fontSize:14,col
                 ))}
               </div>
               <div style={{ display:'flex', gap:8 }}>
-                <button onClick={() => { setAddingHero(false); setHeroName(''); }}
+                <button disabled={saving} onClick={() => { setAddingHero(false); setHeroName(''); }}
                   style={{ flex:1, height:44, borderRadius:10, background:'none', border:`1px solid ${C.border}`, color:C.muted, fontWeight:600, fontSize:14, cursor:'pointer' }}>Cancel</button>
-                <button onClick={addHero} disabled={!heroName.trim()}
-                  style={{ flex:2, height:44, borderRadius:10, background:heroName.trim()?C.gold:C.section, border:'none', color:heroName.trim()?C.bg:C.muted, fontWeight:700, fontSize:14, cursor:heroName.trim()?'pointer':'default' }}>Save hero</button>
+                <button onClick={addHero} disabled={saving||!heroName.trim()}
+                  style={{ flex:2, height:44, borderRadius:10, background:heroName.trim()?C.gold:C.section, border:'none', color:heroName.trim()?C.bg:C.muted, fontWeight:700, fontSize:14, cursor:heroName.trim()?'pointer':'default' }}>{saving?'Saving…':'Save hero'}</button>
               </div>
             </div>
           ) : (
