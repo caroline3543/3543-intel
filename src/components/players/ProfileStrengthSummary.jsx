@@ -28,6 +28,6 @@ export function ProfileStrengthSummary({player,onSave,section='all'}){
   </>}
   {(section==='all'||section==='troop-tiers')&&<div style={{marginTop:8}}><ProfileTroops player={player} onSave={onSave}/></div>}
   {(section==='all'||section==='quick-statistics')&&<><div style={{marginTop:18}}><div style={{fontSize:13,color:C.icy,marginBottom:10}}>Labyrinth</div><div style={{display:'flex',gap:20}}><Stat label="Rank" value={labRank==null?'—':`#${labRank.toLocaleString()}`}/><Stat label="Score" value={labScore==null?'—':labScore.toLocaleString()}/></div></div>
-  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:20,fontSize:14}}><span style={{color:C.icy}}>City power</span><strong style={{color:C.white,fontVariantNumeric:'tabular-nums'}}>{compact(city)}</strong></div>
+  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:20,fontSize:14}}><span style={{color:C.icy}}>City power</span><strong style={{color:C.white,fontVariantNumeric:'tabular-nums'}} >{compact(city)}</strong></div></>}
  </div>;
 }
