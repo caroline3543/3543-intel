@@ -1,3 +1,6 @@
+import {supabase} from '../../services/supabaseClient.js';
+import {activeStateId} from '../../services/stateWorkspaceService.js';
+import {beginGuardedProfileEdit,commitGuardedProfileEdit} from '../../services/profileConflictService.js';
 import { monthlyTransferHistory } from '../../services/automaticMembershipPolicy.js';
 import { transferNavigation,filterTransferPlayers,normalizeTransferEvents } from '../../services/automaticMembershipTransferView.js';
 import { mightpulseRequest } from '../../services/mightpulseService.js';
@@ -161,6 +164,25 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     if(player){setViewingPlayer(player);setProfileOpen(true);}
     onInitialPlayerOpened?.();
   },[initialPlayerId,players,onInitialPlayerOpened]);
+  // Disabled by default until the reviewed CAS migration and RLS policy are deployed.
+  // A failed guarded edit must never fall back to the legacy local-first save.
+  const guardedNotesEnabled=import.meta.env.VITE_ENABLE_GUARDED_PROFILE_NOTES==='true';
+  async function saveGuardedNotes(player,notes,originalNotes){
+    if(!guardedNotesEnabled)return {persisted:false,reason:'Guarded notes editing is disabled'};
+    try{
+      const stateId=activeStateId();
+      if(stateId!=='3573')return {persisted:false,reason:'Guarded notes editing is limited to State 3573'};
+      const snapshot=await beginGuardedProfileEdit({playerId:player.id,stateId,client:supabase});
+      if(!snapshot.ready)return {persisted:false,reason:snapshot.reason};
+      const result=await commitGuardedProfileEdit({
+        snapshot,changes:{notes},expectedFields:{notes:originalNotes},
+        stateId,client:supabase
+      });
+      if(!result.persisted)return result;
+      const applied=onApplyConfirmedProfileSave?.(result);
+      return applied?.applied?result:{persisted:false,reason:'Cloud saved, but local roster refresh was not confirmed'};
+    }catch(error){return {persisted:false,reason:error?.message||'Unable to save officer notes'};}
+  }
   // Keep open profiles current after API refreshes and manual edits.
   const currentPlayer=players.find(p=>p.id===viewingPlayer?.id)||viewingPlayer;
   const matchesSearch=p=>!search||[p.username,p.alias,p.fid,...(p.pastUsernames||[])].some(v=>String(v||'').toLocaleLowerCase().includes(search.toLocaleLowerCase()));
@@ -291,7 +313,7 @@ export function RosterTab({initialPlayerId,onInitialPlayerOpened,players,events,
     {(!enable3573Tracking||trackingView==='current')&&(grouped?groups.filter(g=>g.members.length).map(group=><section key={group.name}><h3 style={{fontSize:16,color:C.icy}}>{group.name} · {group.members.length}</h3>{group.members.map(card)}</section>):displayed.map(card))}
     {(!enable3573Tracking||trackingView==='current')&&visibleCount<visible.length&&<div ref={loadRef} role="status" style={{textAlign:'center',padding:18,color:C.icy,fontSize:13}}>Showing {displayed.length} of {visible.length} · More players load as you scroll <button style={{...button,marginLeft:8}} onClick={()=>setVisibleCount(n=>Math.min(n+20,visible.length))}>Load more</button></div>}
     {filtersOpen && <RosterFilters players={players} roles={roles} filters={filters} onChange={next=>setFilters(next)} onClose={()=>setFiltersOpen(false)} count={visible.length}/>}
-    <ProfileView player={currentPlayer} playerLookup={playerLookup} onCheckPlayerName={checkPlayerName} onApplyCheckedName={applyCheckedName} players={players} teamworkPreferences={teamworkPreferences} onSaveTeamworkPreferences={onSaveTeamworkPreferences} roles={roles} open={profileOpen} onClose={()=>setProfileOpen(false)} onEdit={()=>{setProfileOpen(false);setEditingPlayer(currentPlayer);}} events={events} onOpenLeaderProfile={()=>setLeaderOpen(true)} onSave={savePlayer} onApplyConfirmedProfileSave={onApplyConfirmedProfileSave}/>
+    <ProfileView player={currentPlayer} playerLookup={playerLookup} onCheckPlayerName={checkPlayerName} onApplyCheckedName={applyCheckedName} players={players} teamworkPreferences={teamworkPreferences} onSaveTeamworkPreferences={onSaveTeamworkPreferences} roles={roles} open={profileOpen} onClose={()=>setProfileOpen(false)} onEdit={()=>{setProfileOpen(false);setEditingPlayer(currentPlayer);}} events={events} onOpenLeaderProfile={()=>setLeaderOpen(true)} onSave={savePlayer} onApplyConfirmedProfileSave={onApplyConfirmedProfileSave} onGuardedSaveNotes={guardedNotesEnabled?saveGuardedNotes:null}/>
     <RallyLeaderProfileSheet player={currentPlayer} open={leaderOpen} onClose={()=>setLeaderOpen(false)} onSave={savePlayer}/>
     <PlayerSheet open={!!editingPlayer} player={editingPlayer} roles={roles} onClose={()=>setEditingPlayer(null)} onSave={savePlayer} existingTags={[...new Set(players.map(p=>p.allianceTag).filter(Boolean))]} existingPlayers={players} onOpenExisting={openProfile} onGoToIntel={onGoToIntel}/>
     <RoleManagerSheet open={rolesOpen} onClose={()=>setRolesOpen(false)} roles={roles} onSaveCustomRoles={onSaveCustomRoles} players={players} onUpdatePlayers={onUpdatePlayers}/>
