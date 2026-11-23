@@ -1,4 +1,3 @@
-import {supabase} from './supabaseClient.js';
 import {normalizeStateId} from './stateWorkspaceService.js';
 
 /**
@@ -6,7 +5,7 @@ import {normalizeStateId} from './stateWorkspaceService.js';
  * No fallback to upsert: an unavailable RPC must fail closed.
  * The server function is SECURITY INVOKER and respects players RLS.
  */
-export async function saveProfileIfUnchanged({player,expectedUpdatedAt,stateId,client=supabase}){
+export async function saveProfileIfUnchanged({player,expectedUpdatedAt,stateId,client}){
  if(!client) return {persisted:false,reason:'Cloud sync unavailable'};
  if(!player?.id || !expectedUpdatedAt || !Number.isFinite(Date.parse(expectedUpdatedAt))){
   return {persisted:false,reason:'Reload this profile to obtain its server version before editing'};
