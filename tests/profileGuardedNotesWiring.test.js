@@ -35,3 +35,12 @@ test('confirmed-save local updater cannot call unguarded upsert',()=>{
  assert.match(body,/result\?\.persisted !== true/);
  assert.doesNotMatch(body,/pushPlayer|upsert|savePlayer\(/);
 });
+
+test('guarded SQL is scoped to state 3573 and preserves alliance metadata',()=>{
+ const sql=read('database/3573_player_profile_compare_and_swap.sql');
+ assert.match(sql,/p_state_id <> '3573'/);
+ assert.match(sql,/security invoker/i);
+ assert.match(sql,/coalesce\(alliance_tag,''\)=coalesce\(p_alliance_tag,''\)/);
+ assert.match(sql,/set data=p_data, updated_at=clock_timestamp\(\)/);
+ assert.match(sql,/revoke all on function public\.update_player_if_unchanged/);
+});
