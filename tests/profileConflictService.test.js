@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {saveProfileIfUnchanged,loadPlayerVersion,commitGuardedProfileEdit} from '../src/services/profileConflictService.js';
+import {saveProfileIfUnchanged,loadPlayerVersion,beginGuardedProfileEdit,commitGuardedProfileEdit} from '../src/services/profileConflictService.js';
 const player={id:'123',allianceTag:'HOT',notes:'updated'};
 const args={player,expectedUpdatedAt:'2026-11-23T10:00:00.000Z',stateId:'3573'};
 test('rejects missing version without attempting a write',async()=>{
@@ -96,4 +96,32 @@ test('guarded commit never falls back to upsert when RPC fails',async()=>{
  const result=await commitGuardedProfileEdit({snapshot,changes:{notes:'after'},expectedFields:{notes:'before'},stateId:'3573',client});
  assert.equal(result.persisted,false);
  assert.equal(upsertCalled,false);
+});
+
+test('two editors: first save succeeds, second fails atomically without overwriting',async()=>{
+ let row={updated_at:'2026-11-23T10:00:00.000Z',data:{id:'123',allianceTag:'HOT',notes:'initial',cityPower:100}};
+ let writes=0;
+ const client={
+  from:()=>({
+   select:()=>({eq:()=>({eq:()=>({maybeSingle:async()=>({data:structuredClone(row),error:null})})})})
+  }),
+  rpc:async(_name,args)=>{
+   if(args.p_expected_updated_at!==row.updated_at)return {data:[{status:'not_saved',server_updated_at:null}],error:null};
+   writes++;
+   row={updated_at:'2026-11-23T10:00:01.000Z',data:structuredClone(args.p_data)};
+   return {data:[{status:'saved',server_updated_at:row.updated_at}],error:null};
+  }
+ };
+ const first=await beginGuardedProfileEdit({playerId:'123',stateId:'3573',client});
+ const second=await beginGuardedProfileEdit({playerId:'123',stateId:'3573',client});
+ assert.equal(first.ready,true);
+ assert.equal(second.ready,true);
+ const saved=await commitGuardedProfileEdit({snapshot:first,changes:{notes:'first editor'},expectedFields:{notes:'initial'},stateId:'3573',client});
+ const stale=await commitGuardedProfileEdit({snapshot:second,changes:{notes:'second editor'},expectedFields:{notes:'initial'},stateId:'3573',client});
+ assert.equal(saved.persisted,true);
+ assert.equal(stale.persisted,false);
+ assert.equal(stale.conflict,true);
+ assert.equal(row.data.notes,'first editor');
+ assert.equal(row.data.cityPower,100);
+ assert.equal(writes,1);
 });
