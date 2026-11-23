@@ -64,6 +64,8 @@ test('guarded edit preserves unrelated server fields and uses CAS',async()=>{
  const snapshot={ready:true,updatedAt:'2026-11-23T10:00:00Z',player:{id:'123',notes:'before',cityPower:100,allianceTag:'HOT'}};
  const result=await commitGuardedProfileEdit({snapshot,changes:{notes:'after'},expectedFields:{notes:'before'},stateId:'3573',client});
  assert.equal(result.persisted,true);
+ assert.equal(result.player.notes,'after');
+ assert.equal(result.player.cityPower,100);
  assert.equal(submitted.p_data.cityPower,100);
  assert.equal(submitted.p_data.notes,'after');
  assert.equal(submitted.p_expected_updated_at,snapshot.updatedAt);
@@ -82,4 +84,16 @@ test('refuses guarded edits without original field values',async()=>{
  const snapshot={ready:true,updatedAt:'2026-11-23T10:00:00Z',player:{id:'123',notes:'original'}};
  const result=await commitGuardedProfileEdit({snapshot,changes:{notes:'changed'},stateId:'3573',client:{}});
  assert.equal(result.persisted,false);
+});
+
+test('guarded commit never falls back to upsert when RPC fails',async()=>{
+ let upsertCalled=false;
+ const client={
+  rpc:async()=>({data:null,error:{message:'function unavailable'}}),
+  from:()=>({upsert:async()=>{upsertCalled=true;return {error:null}}})
+ };
+ const snapshot={ready:true,updatedAt:'2026-11-23T10:00:00Z',player:{id:'123',notes:'before'}};
+ const result=await commitGuardedProfileEdit({snapshot,changes:{notes:'after'},expectedFields:{notes:'before'},stateId:'3573',client});
+ assert.equal(result.persisted,false);
+ assert.equal(upsertCalled,false);
 });
