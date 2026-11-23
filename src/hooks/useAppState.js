@@ -101,7 +101,9 @@ export function useAppState() {
     const confirmed = result.player;
     setData(prev => ({
       ...prev,
-      players: prev.players.map(p => String(p.id) === String(confirmed.id) ? confirmed : p),
+      players: prev.players.some(p => String(p.id) === String(confirmed.id))
+        ? prev.players.map(p => String(p.id) === String(confirmed.id) ? confirmed : p)
+        : [...prev.players,confirmed],
       lastUpdated:new Date().toISOString(),
     }));
     showToast('Profile saved to cloud');
