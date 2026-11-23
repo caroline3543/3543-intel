@@ -93,6 +93,21 @@ export function useAppState() {
       });
   }, [showToast]);
 
+  // Called only with the player returned by a successful guarded server write.
+  // This path deliberately never calls pushPlayer or another cloud upsert.
+  const applyConfirmedProfileSave = useCallback((result) => {
+    if (result?.persisted !== true || !result.player?.id || !result.serverUpdatedAt)
+      return {applied:false,reason:'Cloud save was not confirmed'};
+    const confirmed = result.player;
+    setData(prev => ({
+      ...prev,
+      players: prev.players.map(p => String(p.id) === String(confirmed.id) ? confirmed : p),
+      lastUpdated:new Date().toISOString(),
+    }));
+    showToast('Profile saved to cloud');
+    return {applied:true};
+  }, [showToast]);
+
   const addPlayers = useCallback((newPlayers) => {
     const stamped = newPlayers.map(p => ({ ...p, profileLastUpdated: new Date().toISOString() }));
     setData(prev => ({
@@ -391,6 +406,7 @@ export function useAppState() {
 
     // Player ops
     savePlayer,
+    applyConfirmedProfileSave,
     addPlayers,
     updatePlayers,
     deletePlayer,
