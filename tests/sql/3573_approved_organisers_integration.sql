@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 -- Disposable PostgreSQL fixture; simulates Supabase auth.uid() using session GUC.
-create role authenticated nologin;
-create role anon nologin;
+-- PostgreSQL roles are cluster-wide and already created by the preceding fixture.
+-- The organiser fixture runs in a separate database in the same CI service.
 create schema auth;
 create table auth.users(id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $$
