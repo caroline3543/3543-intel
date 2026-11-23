@@ -14,14 +14,14 @@ Project: `3543-intel` (`nrksysaynoklqzhyhnmd`).
 
 ## Existing branch artifacts
 
-- `database/3573_player_profile_compare_and_swap.sql` is review-only and has not been applied.
+- `database/3573_player_profile_compare_and_swap.sql` is an earlier owner-RLS-dependent draft; it does not provide approved-organiser access and must not be deployed as the final organiser solution.\n- `database/3573_approved_profile_rpc_review_only.sql` drafts explicit-authorisation snapshot and field-patch RPCs using the private allowlist. It has not been applied or integration-tested with real authenticated sessions.
 - `tests/sql/3573_guarded_profile_integration.sql` runs against disposable PostgreSQL 17 with *simulated* permissions.
 - The guarded notes feature is off by default, controlled by `VITE_ENABLE_GUARDED_PROFILE_NOTES`.
 
 ## Blocking decisions
 
 1. **Who may edit? DECIDED:** The owner and explicitly approved organisers only. Alliance R4/R5 rank alone does not grant access. Actual organiser account IDs and approval/revocation administration still require configuration.
-2. **How are permissions stored? DRAFTED:** `database/3573_approved_organisers_review_only.sql` defines a private, server-managed allowlist keyed by `auth.users.id`, with approval and revocation timestamps. It has not been applied. Never use editable user metadata for authorization. Existing owner-only RLS cannot simply be widened: a permissive players UPDATE policy would expose unrestricted direct JSON updates. A server-checked guarded RPC and snapshot-read path remain to be designed and tested.
+2. **How are permissions stored? DRAFTED:** `database/3573_approved_organisers_review_only.sql` defines a private, server-managed allowlist keyed by `auth.users.id`, with approval and revocation timestamps. It has not been applied. Never use editable user metadata for authorization. Existing owner-only RLS cannot simply be widened: a permissive players UPDATE policy would expose unrestricted direct JSON updates. Server-checked guarded RPC and snapshot-read drafts now exist; real authenticated integration testing and client integration remain outstanding.
 3. **Existing writer compatibility.** Identify current service-role and client-side writes to `players` before narrowing existing table grants or RLS policies. The current `ALL` policy is not a per-field editor restriction.
 4. **Isolated environment.** Create or explicitly designate a separate State 3573 Supabase test project. The existing content-planner staging project is unrelated and must not be repurposed without approval.
 
