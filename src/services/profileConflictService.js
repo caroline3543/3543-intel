@@ -54,6 +54,7 @@ export async function beginGuardedProfileEdit({playerId,stateId,client}){
 export async function commitGuardedProfileEdit({snapshot,changes,stateId,client,expectedFields}){
  if(!snapshot?.ready||!snapshot?.updatedAt||!snapshot?.player?.id)
   return {persisted:false,reason:'Reload the server profile before saving'};
+ if(!client)return {persisted:false,reason:'Cloud sync unavailable'};
  if(!changes||typeof changes!=='object'||Array.isArray(changes))
   return {persisted:false,reason:'Invalid changes'};
  // Only whitelisted profile fields may be patched through this API.
@@ -69,5 +70,6 @@ export async function commitGuardedProfileEdit({snapshot,changes,stateId,client,
    return {persisted:false,conflict:true,reason:'This field changed since you opened the editor. Reload before retrying.'};
  }
  const player={...snapshot.player,...changes,profileLastUpdated:new Date().toISOString()};
- return saveProfileIfUnchanged({player,expectedUpdatedAt:snapshot.updatedAt,stateId,client});
+ const result=await saveProfileIfUnchanged({player,expectedUpdatedAt:snapshot.updatedAt,stateId,client});
+ return result.persisted?{...result,player}:result;
 }
