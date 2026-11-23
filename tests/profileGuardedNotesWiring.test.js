@@ -44,3 +44,10 @@ test('guarded SQL is scoped to state 3573 and preserves alliance metadata',()=>{
  assert.match(sql,/set data=p_data, updated_at=clock_timestamp\(\)/);
  assert.match(sql,/revoke all on function public\.update_player_if_unchanged/);
 });
+
+test('notes editor preserves draft and displays conflict recovery guidance',()=>{
+ const notes=read('src/components/players/ProfilePlanning.jsx');
+ assert.match(notes,/setSaveConflict\(Boolean\(result\?\.conflict\)\)/);
+ assert.match(notes,/Your draft is still here\. Copy it before reloading the profile\./);
+ assert.match(notes,/setSaveConflict\(false\)/);
+});
