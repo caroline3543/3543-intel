@@ -69,6 +69,32 @@ begin
  '456',v_before,'HOT','{"notes":"tamper"}'::jsonb);
  if v_status<>'not_saved' then raise exception 'Cross-state update succeeded';end if;
 end $$;
+-- Anonymous and missing-identity sessions must not be able to invoke the RPCs.
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub','',false);
+do $
+declare denied boolean:=false;
+begin
+ begin perform public.read_3573_profile_for_edit('123');
+ exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'Anonymous read RPC succeeded';end if;
+ denied:=false;
+ begin perform public.update_3573_profile_fields(
+  '123','2026-11-23T10:00:00Z'::timestamptz,'HOT','{"notes":"anonymous"}'::jsonb);
+ exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'Anonymous update RPC succeeded';end if;
+end $;
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub','',false);
+do $
+declare denied boolean:=false;
+begin
+ begin perform public.read_3573_profile_for_edit('123');
+ exception when sqlstate '42501' then denied:=true;end;
+ if not denied then raise exception 'Missing identity could read';end if;
+end $;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
 do $$
 declare denied boolean:=false;
