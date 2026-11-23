@@ -26,6 +26,7 @@ const display = value => value==null||value===''||!Number.isFinite(Number(value)
 export function ProfileOrderedSections({player,onSave,players,preferences,onSavePreferences,events,history}) {
  const [order,setOrder]=useState(()=>normalizeProfileSectionOrder());
  const [arranging,setArranging]=useState(false);
+ const [allNames,setAllNames]=useState(false);
  const [layoutStatus,setLayoutStatus]=useState('loading');
  const [layoutError,setLayoutError]=useState('');
  const [layoutBusy,setLayoutBusy]=useState(false);
@@ -47,13 +48,17 @@ export function ProfileOrderedSections({player,onSave,players,preferences,onSave
   finally{setLayoutBusy(false);}
  }
 
- const names=[...new Set((player.pastUsernames||[]).filter(Boolean))].slice(-3).reverse();
+ const names=[...new Set((player.pastUsernames||[]).filter(Boolean))].reverse();
+ const shownNames=allNames?names:names.slice(0,3);
+ const location=player.lastKnownLocation;
+ const locationTime=location?.observedAt||location?.retrievedAt||location?.updatedAt;
+ const locationAge=locationTime&&Number.isFinite(Date.parse(locationTime))?Math.max(0,Math.floor((Date.now()-Date.parse(locationTime))/86400000)):null;
  function render(id){
   switch(id){
    case 'event-power': case 'troop-tiers': case 'quick-statistics':
     return <ProfileStrengthSummary player={player} onSave={onSave} section={id}/>;
    case 'previous-usernames':
-    return <ProfileSection title="Previous usernames">{names.length?<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{names.map(name=><span key={name} style={{border:`1px solid ${C.border}`,padding:8,borderRadius:8,overflowWrap:'anywhere'}}>{name}</span>)}</div>:<p>None recorded</p>}</ProfileSection>;
+    return <ProfileSection title="Previous usernames">{names.length?<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{shownNames.map(name=><span key={name} style={{border:`1px solid ${C.border}`,padding:8,borderRadius:8,overflowWrap:'anywhere'}}>{name}</span>)}{names.length>3&&<button type="button" style={profileButton} aria-expanded={allNames} onClick={()=>setAllNames(x=>!x)}>{allNames?'Show fewer':`View all (${names.length})`}</button>}</div>:<p>None recorded</p>}</ProfileSection>;
    case 'alliance-movements':return <ProfileMovementSummary player={player}/>;
    case 'hero-pet-expert-power':
     return <ProfileSection title="Hero, pet & expert power"><div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:12}}>{[
@@ -64,7 +69,7 @@ export function ProfileOrderedSections({player,onSave,players,preferences,onSave
    case 'teamwork':return <ProfileTeamwork player={player} players={players} preferences={preferences} onSavePreferences={onSavePreferences} onSavePlayer={onSave}/>;
    case 'officer-notes':return <ProfileNotes player={player} onSave={onSave}/>;
    case 'last-known-location':
-    return <ProfileSection title="Last known location"><p style={{fontSize:14,color:C.icy}}>{player.lastKnownLocation?.state&&player.lastKnownLocation?.x!=null&&player.lastKnownLocation?.y!=null?`State ${player.lastKnownLocation.state} · X:${player.lastKnownLocation.x} Y:${player.lastKnownLocation.y}`:'Location not recorded'}</p></ProfileSection>;
+    return <ProfileSection title="Last known location">{location?.state&&location.x!=null&&location.y!=null?<><p style={{fontSize:14,color:C.icy}}>{`State ${location.state} · X:${location.x} Y:${location.y}`}</p><p style={{fontSize:12,color:C.icy}}>{locationAge==null?'Observation time unknown':locationAge===0?'Observed today':`Observed ${locationAge} days ago`}</p><button type="button" style={profileButton} onClick={()=>navigator.clipboard?.writeText(`State ${location.state} X:${location.x} Y:${location.y}`)}>Copy coordinates</button></>:<p style={{fontSize:14,color:C.icy}}>Location not recorded</p>}</ProfileSection>;
    case 'more':return <ProfileDetails title="More"><ProfileDetails title="History and attendance"><PlayerHistorySection player={player}/>{history}</ProfileDetails><ProfileDetails title="Heroes and equipment"><PlayerEquipmentSection player={player} onSave={onSave}/></ProfileDetails><ProfileDetails title="Other rankings"><PlayerRankingsSection player={player}/></ProfileDetails></ProfileDetails>;
    default:return null;
   }
