@@ -33,6 +33,9 @@ begin
  if has_function_privilege('anon','public.read_3573_profile_for_edit(text)','EXECUTE')
  or has_function_privilege('anon','public.update_3573_profile_fields(text,timestamptz,text,jsonb)','EXECUTE')
  then raise exception 'Anonymous RPC access granted';end if;
+ if has_table_privilege('authenticated','public.players','UPDATE')
+ or has_table_privilege('authenticated','public.players','SELECT')
+ then raise exception 'Organiser must not bypass guarded RPC with direct table access';end if;
  if has_table_privilege('authenticated','app_private.state3573_profile_editors','SELECT')
  then raise exception 'Private allowlist exposed';end if;
 end $$;
@@ -55,6 +58,10 @@ begin
  begin
   perform public.update_3573_profile_fields('123',v_after,'HOT','{"cityPower":999}'::jsonb);
   raise exception 'Forbidden field was accepted';
+ exception when sqlstate '22023' then null;end;
+ begin
+  perform public.update_3573_profile_fields('123',v_after,'HOT','{}'::jsonb);
+  raise exception 'Empty patch was accepted';
  exception when sqlstate '22023' then null;end;
  if exists(select 1 from public.read_3573_profile_for_edit('456'))
  then raise exception 'Cross-state read succeeded';end if;
