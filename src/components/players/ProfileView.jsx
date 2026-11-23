@@ -70,7 +70,7 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
       </header>
       <ProfileOrderedSections key={player.id} player={player} onSave={onSave} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} events={events}/>
       <ProfileDetails title="Identity administration"><ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/></ProfileDetails>
-      <ProfileSection title="Check username with API">
+      <ProfileDetails title="Officer tools"><ProfileSection title="Check username with API">
         <p style={{fontSize:13,color:C.icy,margin:'0 0 10px'}}>Look up this Player ID directly. This checks the provider separately from the alliance roster and won't change saved data without confirmation.</p>
         <button type="button" style={profileButton} disabled={!player.fid||playerLookup?.status==='loading'} onClick={()=>onCheckPlayerName?.(player)}>{playerLookup?.status==='loading'?'Checking…':'Refresh player name'}</button>
         {playerLookup?.fid===String(player.fid)&&playerLookup.status==='error'&&<p role="alert" style={{fontSize:13,color:C.red}}>{playerLookup.message}</p>}
@@ -85,7 +85,7 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
       {player.blacklisted&&<p style={{fontSize:14,color:C.red}}>Excluded from battle plans{player.blacklistReason?`: ${player.blacklistReason}`:''}</p>}
       <ProfileSection title="Alliance rank"><p style={{fontSize:14,color:C.icy,margin:'0 0 12px'}}>Tap a rank to set it. Tap again to clear.</p><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{ALLIANCE_RANKS.map(rank=><button key={rank} style={{...profileButton,color:player.allianceRank===rank?C.gold:C.icy,borderColor:player.allianceRank===rank?C.gold:C.border}} aria-pressed={player.allianceRank===rank} onClick={()=>setAllianceRank(rank)}>{rank}</button>)}</div></ProfileSection>
       <ProfileRoles key={`roles:${player.id}`} player={player} roles={roles} onSave={onSave}/>
-      <ProfileSheetImport player={player}/>
+      <ProfileSheetImport player={player}/></ProfileDetails>
       <button onClick={onClose} style={{...profileButton,width:'100%',marginBottom:'env(safe-area-inset-bottom)'}}>Done</button>
     </section>
   </div>;
