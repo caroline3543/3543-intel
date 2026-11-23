@@ -33,7 +33,7 @@ function relativeProfileAge(raw){
  const months=Math.floor(days/30);if(days<365)return 'Updated '+Math.max(1,months)+' month'+(months===1?'':'s')+' ago';
  const years=Math.floor(days/365);return 'Updated '+years+' year'+(years===1?'':'s')+' ago';
 }
-export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,onApplyConfirmedProfileSave,players=[],teamworkPreferences={},onSaveTeamworkPreferences,playerLookup,onCheckPlayerName,onApplyCheckedName}) {
+export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeaderProfile,onSave,onApplyConfirmedProfileSave,onGuardedSaveNotes,players=[],teamworkPreferences={},onSaveTeamworkPreferences,playerLookup,onCheckPlayerName,onApplyCheckedName}) {
   const panel=useRef(null);
   const [headerCompact, setHeaderCompact] = useState(false);
   const close=useRef(onClose);close.current=onClose;
@@ -68,7 +68,7 @@ export function ProfileView({player,roles=[],open,onClose,events=[],onOpenLeader
         <div style={{flex:1,minWidth:0}}><h2 style={{fontSize:headerCompact?16:20,color:C.white,margin:0,overflowWrap:'anywhere'}}>{name}</h2>{!headerCompact&&player.alias&&player.username&&<div style={{fontSize:14,color:C.icy,marginTop:3}}>{player.alias}</div>}{!headerCompact&&<div style={{fontSize:14,color:C.icy,marginTop:4}}>{[player.allianceTag?`[${player.allianceTag}]`:null,player.furnaceLevel].filter(Boolean).join(' · ')}</div>}{!headerCompact&&<CopyPlayerId fid={player.fid}/>}{!headerCompact&&<div title={player.profileLastUpdated?new Date(player.profileLastUpdated).toLocaleString():undefined} style={{fontSize:12,color:C.icy,marginTop:5}}>{relativeProfileAge(player.profileLastUpdated)} · Profile edited</div>}{!headerCompact&&<div title={player.membershipLastSuccessfulAt?new Date(player.membershipLastSuccessfulAt).toLocaleString():undefined} style={{fontSize:12,color:C.icy}}>{membershipFreshness(player).label}</div>}{!headerCompact&&player.providerStats?.retrievedAt&&<div title={new Date(player.providerStats.retrievedAt).toLocaleString()} style={{fontSize:12,color:C.icy}}>API data · {relativeProfileAge(player.providerStats.retrievedAt).replace(/^Updated /,'')}</div>}</div>
         <button style={profileButton} aria-label="Close profile" onClick={onClose}>✕</button>
       </header>
-      <ProfileOrderedSections key={player.id} player={player} onSave={onSave} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} events={events}/>
+      <ProfileOrderedSections key={player.id} player={player} onSave={onSave} onGuardedSaveNotes={onGuardedSaveNotes} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} events={events}/>
       <ProfileDetails title="Identity administration"><ProfileIdentity key={`identity:${player.id}`} player={player} onSave={onSave}/></ProfileDetails>
       <ProfileDetails title="Officer tools"><ProfileSection title="Check username with API">
         <p style={{fontSize:13,color:C.icy,margin:'0 0 10px'}}>Look up this Player ID directly. This checks the provider separately from the alliance roster and won't change saved data without confirmation.</p>
