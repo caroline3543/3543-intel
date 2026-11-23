@@ -23,7 +23,7 @@ const labels={
 const display = value => value==null||value===''||!Number.isFinite(Number(value))?'Not recorded':new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}).format(Number(value));
 
 /** Account-specific layout is saved only after an authenticated RLS-protected write. */
-export function ProfileOrderedSections({player,onSave,players,preferences,onSavePreferences,events,history}) {
+export function ProfileOrderedSections({player,onSave,onGuardedSaveNotes,players,preferences,onSavePreferences,events,history}) {
  const [order,setOrder]=useState(()=>normalizeProfileSectionOrder());
  const [arranging,setArranging]=useState(false);
  const [allNames,setAllNames]=useState(false);
@@ -71,7 +71,7 @@ export function ProfileOrderedSections({player,onSave,players,preferences,onSave
     ].map(([name,value])=><div key={name} style={{minWidth:0}}><div style={{fontSize:12,color:C.icy}}>{name}</div><strong style={{fontSize:18,overflowWrap:'anywhere'}}>{display(value)}</strong></div>)}</div></ProfileSection>;
    case 'joiner-heroes':return <ProfileJoiners player={player} onSave={onSave}/>;
    case 'teamwork':return <ProfileTeamwork player={player} players={players} preferences={preferences} onSavePreferences={onSavePreferences} onSavePlayer={onSave}/>;
-   case 'officer-notes':return <ProfileNotes player={player} onSave={onSave}/>;
+   case 'officer-notes':return <ProfileNotes player={player} onSave={onSave} onGuardedSaveNotes={onGuardedSaveNotes}/>;
    case 'last-known-location':
     return <ProfileSection title="Last known location">{location?.state&&location.x!=null&&location.y!=null?<><p style={{fontSize:14,color:C.icy}}>{`State ${location.state} · X:${location.x} Y:${location.y}`}</p><p style={{fontSize:12,color:C.icy}}>{locationAge==null?'Observation time unknown':locationAge===0?'Observed today':`Observed ${locationAge} days ago`}</p><button type="button" style={profileButton} onClick={()=>navigator.clipboard?.writeText(`State ${location.state} X:${location.x} Y:${location.y}`)}>Copy coordinates</button></>:<p style={{fontSize:14,color:C.icy}}>Location not recorded</p>}</ProfileSection>;
    case 'more':return <ProfileDetails title="More"><ProfileDetails title="History and attendance"><PlayerHistorySection player={player}/>{history}</ProfileDetails><ProfileDetails title="Heroes and equipment"><PlayerEquipmentSection player={player} onSave={onSave}/></ProfileDetails><ProfileDetails title="Other rankings"><PlayerRankingsSection player={player}/></ProfileDetails></ProfileDetails>;
