@@ -23,10 +23,10 @@ begin
   end if;
 
   update public.players
-     set data=p_data, alliance_tag=p_alliance_tag, updated_at=clock_timestamp()
+     set data=p_data, updated_at=clock_timestamp()
    where state_id=p_state_id and id=p_id
      and updated_at=p_expected_updated_at
-     and alliance_tag is not distinct from p_alliance_tag
+     and coalesce(alliance_tag,'')=coalesce(p_alliance_tag,'')
      and (data - array['notes','joinerHeroes','teamworkTraitStates','communicationLanguage','profileLastUpdated']::text[])
        = (p_data - array['notes','joinerHeroes','teamworkTraitStates','communicationLanguage','profileLastUpdated']::text[])
      and p_data->>'id'=p_id
