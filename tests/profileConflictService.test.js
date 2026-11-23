@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {saveProfileIfUnchanged,loadPlayerVersion} from '../src/services/profileConflictService.js';
+import {saveProfileIfUnchanged,loadPlayerVersion,commitGuardedProfileEdit} from '../src/services/profileConflictService.js';
 const player={id:'123',allianceTag:'HOT',notes:'updated'};
 const args={player,expectedUpdatedAt:'2026-11-23T10:00:00.000Z',stateId:'3573'};
 test('rejects missing version without attempting a write',async()=>{
@@ -49,4 +49,22 @@ test('version lookup fails closed for missing row',async()=>{
  const client={from:()=>({select:()=>({eq:()=>({eq:()=>({maybeSingle:async()=>({data:null,error:null})})})})})};
  const result=await loadPlayerVersion({playerId:'123',stateId:'3573',client});
  assert.equal(result.ready,false);
+});
+
+test('guarded edit rejects fields outside explicit allowlist',async()=>{
+ let called=false;
+ const client={rpc:async()=>{called=true;return {data:[]}}};
+ const snapshot={ready:true,updatedAt:'2026-11-23T10:00:00Z',player:{id:'123',notes:'before'}};
+ const result=await commitGuardedProfileEdit({snapshot,changes:{cityPower:999},stateId:'3573',client});
+ assert.equal(result.persisted,false);assert.equal(called,false);
+});
+test('guarded edit preserves unrelated server fields and uses CAS',async()=>{
+ let submitted;
+ const client={rpc:async(name,args)=>{submitted=args;return {data:[{status:'saved',server_updated_at:'2026-11-23T10:01:00Z'}]}}};
+ const snapshot={ready:true,updatedAt:'2026-11-23T10:00:00Z',player:{id:'123',notes:'before',cityPower:100,allianceTag:'HOT'}};
+ const result=await commitGuardedProfileEdit({snapshot,changes:{notes:'after'},stateId:'3573',client});
+ assert.equal(result.persisted,true);
+ assert.equal(submitted.p_data.cityPower,100);
+ assert.equal(submitted.p_data.notes,'after');
+ assert.equal(submitted.p_expected_updated_at,snapshot.updatedAt);
 });
