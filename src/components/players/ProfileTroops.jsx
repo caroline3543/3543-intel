@@ -9,7 +9,7 @@ export function ProfileTroops({player,onSave}) {
   function choose(value){
     const at=new Date().toISOString();
     onSave({...player,troops:{...player.troops,[editing]:value},tiersUpdatedAt:at,profileLastUpdated:at});
-    setMessage(`${current[1]} saved: ${value||'Unknown'}`);setEditing(null);
+    setMessage(`${current[1]} change submitted: ${value||'Unknown'}. Confirm it persists after refreshing.`);setEditing(null);
   }
   return <ProfileSection title="Troop tiers">
     <p style={{fontSize:14,color:C.icy,margin:'0 0 12px'}}>Tap a troop type to change its tier.</p>
