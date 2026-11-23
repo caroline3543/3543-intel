@@ -17,7 +17,7 @@ as $$
 declare
   v_updated_at timestamptz;
 begin
-  if p_state_id !~ '^[1-9][0-9]{0,4}$' or p_id is null or length(p_id)=0
+  if p_state_id <> '3573' or p_id is null or length(p_id)=0
      or p_expected_updated_at is null or p_data is null or jsonb_typeof(p_data)<>'object' then
     raise exception 'Invalid player update arguments' using errcode='22023';
   end if;
