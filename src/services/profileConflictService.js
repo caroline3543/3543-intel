@@ -23,3 +23,18 @@ export async function saveProfileIfUnchanged({player,expectedUpdatedAt,stateId,c
   return {persisted:false,conflict:true,reason:'Profile changed, was removed, or you lack permission. Reload before retrying.'};
  return {persisted:true,serverUpdatedAt:result.server_updated_at};
 }
+
+/**
+ * Fetch the authoritative row version. A profileLastUpdated timestamp inside
+ * player JSON is NOT an acceptable substitute for the database updated_at.
+ */
+export async function loadPlayerVersion({playerId,stateId,client}){
+ if(!client)return {ready:false,reason:'Cloud sync unavailable'};
+ if(playerId==null||String(playerId).trim()==='')return {ready:false,reason:'Missing player ID'};
+ const {data,error}=await client.from('players').select('updated_at,data')
+   .eq('state_id',normalizeStateId(stateId)).eq('id',String(playerId)).maybeSingle();
+ if(error)return {ready:false,reason:'Unable to verify player version',error:error.message};
+ if(!data?.updated_at)return {ready:false,reason:'Player is unavailable or you lack permission'};
+ if(!Number.isFinite(Date.parse(data.updated_at)))return {ready:false,reason:'Invalid server version'};
+ return {ready:true,updatedAt:data.updated_at,player:data.data};
+}
