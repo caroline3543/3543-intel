@@ -32,13 +32,15 @@ export function ProfileOrderedSections({player,onSave,players,preferences,onSave
  const [layoutBusy,setLayoutBusy]=useState(false);
  useEffect(()=>{
   let active=true;
+  let request=0;
   async function load(){
-   try{const result=await loadProfileSectionOrder();if(!active)return;setOrder(result.order);setLayoutStatus(result.status);setLayoutError('');}
-   catch(error){if(active){setLayoutStatus('error');setLayoutError(error.message||'Unable to load saved layout');}}
+   const current=++request;
+   try{const result=await loadProfileSectionOrder();if(!active||current!==request)return;setOrder(result.order);setLayoutStatus(result.status);setLayoutError('');}
+   catch(error){if(active&&current===request){setLayoutStatus('error');setLayoutError(error.message||'Unable to load saved layout');}}
   }
   load();
   const subscription=supabase?.auth.onAuthStateChange(()=>{if(active)queueMicrotask(load);}).data.subscription;
-  return ()=>{active=false;subscription?.unsubscribe();};
+  return ()=>{active=false;request++;subscription?.unsubscribe();};
  },[]);
  async function commitOrder(next){
   if(layoutStatus!=='ready'){setLayoutError('Sign in through Settings to save your personal section order.');return;}
