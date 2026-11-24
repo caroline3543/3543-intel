@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   attendanceOpen, eventStart, plannerAlliances, plannerSlot, recentNoShow, resizePlannerTeams,
-  updateEventPlanner, formatPlannerPower,
+  updateEventPlanner, formatPlannerPower, EVENT_LIMITS,
 } from '../src/services/eventPlanner.js';
 import {validateEventPlannerData} from '../roster-site/server/eventPlannerValidation.js';
 
@@ -20,8 +20,8 @@ test('event alliance priority and independent legion plans preserve legacy Found
   const data=initial(),second={...slot,legion:2};
   assert.equal(read(data).teamNames.Blue,'Anchor');
   assert.deepEqual(read(data,second).registrations,{});
-  const next=updateEventPlanner(data,{...second,plan:{...read(data,second),registrations:{b:'join'},registeredUnder:{b:'ARC'}}},early);
-  assert.equal(read(next,second).registrations.b,'join');
+  const next=updateEventPlanner(data,{...second,plan:{...read(data,second),registrations:{c:'join'},registeredUnder:{c:'ARC'}}},early);
+  assert.equal(read(next,second).registrations.c,'join');
   assert.equal(read(next).registrations.b,'sub');
   assert.deepEqual(next.foundry.teams,data.foundry.teams);
 });
@@ -104,4 +104,45 @@ test('the workspace save rejects decisions made before the cutoff or unused subs
   assert.throws(()=>validateEventPlannerData(failed,cutoff),/Invalid attendance/);
   sub.markedAt=new Date(cutoff).toISOString();
   assert.equal(validateEventPlannerData(failed,cutoff),failed);
+});
+
+test('moving a player changes both legions, clears the old team and carries the recorded power',()=>{
+  const second={...slot,legion:2};
+  let data=schedule(schedule(),second);
+  data=updateEventPlanner(data,{...slot,powers:[{id:'a',value:54321}]},early);
+  const source=read(data),destination=read(data,second);
+  const action={...second,expectedOccurrenceId:destination.occurrenceId,
+    move:{id:'a',role:'join',sourceOccurrenceId:source.occurrenceId}};
+  const next=updateEventPlanner(data,action,early);
+  assert.equal(read(next).registrations.a,undefined);
+  assert.equal(read(next).teams.a,undefined);
+  assert.equal(read(next).assignments.a,undefined);
+  assert.equal(read(next,second).registrations.a,'join');
+  assert.equal(read(next,second).powerByPlayer.a,54321);
+  assert.equal(record(next),undefined);
+  assert.equal(record(next,0,second).role,'join');
+  assert.equal(updateEventPlanner(next,action,early),next);
+  assert.equal(updateEventPlanner(data,{...action,move:{...action.move,role:'sub'}},early),data);
+  assert.equal(updateEventPlanner(data,{...action,move:{...action.move,sourceOccurrenceId:'stale'}},early),data);
+  assert.equal(updateEventPlanner(data,{...second,plan:{...destination,registrations:{a:'join'},registeredUnder:{a:'ARC'}}},early),data);
+  assert.equal(validateEventPlannerData(next,early),next);
+});
+
+test('legion moves preserve past attendance, and full destinations reject the entire move',()=>{
+  const second={...slot,legion:2};
+  let data=schedule();
+  data=updateEventPlanner(data,{...slot,attendance:{id:'b',result:'not-called'}},cutoff);
+  const source=read(data),destination=read(data,second);
+  const action={...second,expectedOccurrenceId:destination.occurrenceId,
+    move:{id:'b',role:'sub',sourceOccurrenceId:source.occurrenceId}};
+  const next=updateEventPlanner(data,action,cutoff);
+  assert.equal(record(next,1).result,'not-called');
+  assert.equal(read(next,second).registrations.b,'sub');
+  const registrations=Object.fromEntries(Array.from({length:10},(_,i)=>['sub-'+i,'sub']));
+  const full=updateEventPlanner(data,{...second,plan:{...destination,registrations}},cutoff);
+  assert.equal(updateEventPlanner(full,action,cutoff),full);
+  assert.equal(read(full).registrations.b,'sub');
+  assert.deepEqual(EVENT_LIMITS,{foundry:{join:30,sub:10},canyon:{join:30,sub:10},tal:{join:30,sub:20}});
+  const overflow=updateEventPlanner(full,{...second,plan:{...destination,registrations:{...registrations,overflow:'sub'}}},cutoff);
+  assert.throws(()=>validateEventPlannerData(overflow,cutoff),/Invalid event registration/);
 });

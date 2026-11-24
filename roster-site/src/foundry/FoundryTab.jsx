@@ -1,10 +1,11 @@
+import './legionRoster.css';
 import {BulkPlayerImport} from '../components/BulkPlayerImport.jsx';
 import {foundryShareMessages,foundryMessageStats,FOUNDRY_DEFAULT_INSTRUCTIONS} from './foundryShare.js';
 import {useMemo,useState,useRef,useEffect} from 'react';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
 import {playerSearchFields} from '../../../src/services/playerNames.js';
 import {PlannerAttendance} from './PlannerAttendance.jsx';
-import {EVENT_NAMES,REGISTRATION_ROLES,TEAM_NAMES,plannerAlliances,eventStart,recentNoShow,resizePlannerTeams,formatPlannerPower} from '../../../src/services/eventPlanner.js';
+import {EVENT_NAMES,EVENT_LIMITS,REGISTRATION_ROLES,isParticipant,legionMoveError,TEAM_NAMES,plannerAlliances,eventStart,recentNoShow,resizePlannerTeams,formatPlannerPower} from '../../../src/services/eventPlanner.js';
 import {gameLanguageName,gameLanguageCode} from '../../../src/services/gameLanguageService.js';
 const supportedLanguageCodes=new Set(['en','ko','zh-TW','zh-CN','tr','ar','ru','es','pl','uk','it','fr','ka','de','pt','ja']);
 const languageOptions=['English','Korean','Traditional Chinese','Simplified Chinese','Turkish','Arabic','Russian','Spanish','Polish','Ukrainian','Italian','French','Georgian','German','Portuguese','Japanese'];
@@ -20,7 +21,9 @@ const allBuildings=Object.values(standardBuildings).flat();
 const style={background:'#142438',border:'1px solid #30465a',borderRadius:16,padding:12,marginBottom:10};
 const btn={border:'1px solid #40546a',borderRadius:12,background:'#21354b',color:'#e9f2fa',padding:'9px 12px',minHeight:40,fontWeight:650,cursor:'pointer'};
 const name=p=>p.username||p.alias||p.name||String(p.fid||p.id);
-const power=(p,kind)=>kind==='foundry'?Number(p.lastFoundryTroopPower??p.troopPower??p.lastTroopPower??0)||0:Number(p.lastCanyonClashTroopPower??p.lastCanyonTroopPower??0)||0;
+const power=(p,kind)=>kind==='foundry'
+ ?p.lastFoundryTroopPower??p.troopPower??p.lastTroopPower
+ :p.lastCanyonClashTroopPower??p.lastCanyonTroopPower;
 const alliance=p=>String(p.alliance||p.homeAlliance||p.allianceTag||p.alliance_name||'Unassigned').trim()||'Unassigned';
 const rank=p=>{const r=String(p.allianceRank??p.rank??p.alliance_rank??'').toUpperCase();return /^R[1-5]$/.test(r)?r:'Unranked'};
 
@@ -31,31 +34,32 @@ function NoShow(){return <small style={{display:'flex',alignItems:'center',gap:4
  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21 4 13a5 5 0 0 1 7-7l1 1 1-1a5 5 0 0 1 7 7l-8 8ZM12 7l-2 5h4l-2 5"/></svg>
  Recent no-show</small>;}
 
-function InlinePower({player,onSave,metric}){
+function InlinePower({player,onSave,metric,onClose}){
  const [value,setValue]=useState(String(player.power??''));
  const [focused,setFocused]=useState(false);
  const [error,setError]=useState(false);
  const cancel=useRef(false);
- const latest=String(player.power??'');
+ const latest=player.hasPower?String(player.power):'';
  const commit=()=>{
    setFocused(false);
-   if(cancel.current){cancel.current=false;setError(false);return;}
+   if(cancel.current){cancel.current=false;setError(false);onClose();return;}
    const raw=value.replace(/,/g,'').trim();
-   if(!raw){setValue(latest);setError(false);return;}
+   if(!raw){onClose();return;}
    const number=Number(raw);
    if(!Number.isSafeInteger(number)||number<0){setError(true);return;}
    setError(false);
-   if(number!==player.power)onSave(player.id,number);
-   setValue(String(number));
+   if(!player.hasPower||number!==player.power)onSave(player.id,number);
+   onClose();
  };
- return <div style={{width:96,flexShrink:0}}>
-  <input id={'foundry-power-'+player.id} aria-label={metric+' for '+player.name} inputMode="numeric" type="text" value={focused?value:latest} onFocus={()=>{setValue(latest);setFocused(true)}} onChange={e=>{setValue(e.target.value);setError(false)}} onBlur={commit} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape'){cancel.current=true;setValue(latest);e.currentTarget.blur()}}} style={{width:'100%',boxSizing:'border-box',height:32,minHeight:32,padding:'4px 6px',fontSize:13,fontWeight:600,textAlign:'center',fontVariantNumeric:'tabular-nums',color:'#eef5fc',background:'#20344a',border:'1px solid '+(error?'#f1a9a9':'#496077'),borderRadius:999}} placeholder="0"/>
+ return <div style={{width:112,maxWidth:"100%"}}>
+  <input autoFocus id={'foundry-power-'+player.id} aria-label={metric+' for '+player.name} inputMode="numeric" type="text" value={focused?value:latest} onFocus={()=>{setValue(latest);setFocused(true)}} onChange={e=>{setValue(e.target.value);setError(false)}} onBlur={commit} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();if(e.key==='Escape'){cancel.current=true;setValue(latest);e.currentTarget.blur()}}} style={{width:'100%',boxSizing:'border-box',height:32,minHeight:32,padding:'4px 6px',fontSize:13,fontWeight:600,textAlign:'center',fontVariantNumeric:'tabular-nums',color:'#eef5fc',background:'#20344a',border:'1px solid '+(error?'#f1a9a9':'#496077'),borderRadius:999}} placeholder="0"/>
   {error&&<span role="alert" style={{fontSize:10,color:'#f1a9a9'}}>Whole number only</span>}
  </div>;
 }
 export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',chosen,legion,changeSelection,sharedFoundry={},
-  onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
+  otherPlan,otherLegion,onMoveLegion,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
  const title=EVENT_NAMES[kind],isFoundry=kind==='foundry',metric=isFoundry?'Troop power':'Canyon Clash power';
+ const limits=EVENT_LIMITS[kind];
  const colours=TEAM_NAMES.slice(0,sharedFoundry.teamCount||4);
  const buildings={...standardBuildings, Purple:allBuildings,Teal:allBuildings,
   ...(colours.length===3?{Green:[...standardBuildings.Green,...standardBuildings.Pink]}:{})};
@@ -69,7 +73,9 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const [focusTeam,setFocusTeam]=useState('Blue'),[moving,setMoving]=useState(null),[confirmGenerate,setConfirmGenerate]=useState(false);
  const [addRole,setAddRole]=useState('join');
  const [managing,setManaging]=useState(null);
- const [roleFilter,setRoleFilter]=useState('join'),[bulkMode,setBulkMode]=useState(false),[bulkSelected,setBulkSelected]=useState([]),[rankExpanded,setRankExpanded]=useState({R5:true,R4:true,R3:true,R2:true,R1:true});
+ const [participantsOnly,setParticipantsOnly]=useState(true),[rosterSearch,setRosterSearch]=useState('');
+ const [rosterSort,setRosterSort]=useState('power'),[editingPower,setEditingPower]=useState(null),[confirmMove,setConfirmMove]=useState(null);
+ const [roleFilter,setRoleFilter]=useState('all'),[bulkMode,setBulkMode]=useState(false),[bulkSelected,setBulkSelected]=useState([]),[rankExpanded,setRankExpanded]=useState({R5:true,R4:true,R3:true,R2:true,R1:true});
  const [editIds,setEditIds]=useState(null);
  const [bulkAction,setBulkAction]=useState(''),[bulkLanguage,setBulkLanguage]=useState(''),[bulkRelationshipMode,setBulkRelationshipMode]=useState('add'),[teammateQuery,setTeammateQuery]=useState(''),[teammateIds,setTeammateIds]=useState([]);
  const [expanded,setExpanded]=useState({});
@@ -83,22 +89,24 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  useEffect(()=>setInstructions(saved.shareInstructions||FOUNDRY_DEFAULT_INSTRUCTIONS),[saved.shareInstructions]);
  const avatarFor=p=>players.find(x=>String(x.id??x.fid??name(x))===p.id)||{username:p.name};
  const entries=useMemo(()=>{
-  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));return [id,{id,name:name(p),power:saved.powerByPlayer?.[id]??power(p,kind),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),furnaceLevel:p.furnaceLevel??p.furnace??p.furnace_level??null,cityPower:p.cityPower??p.powerLevel??p.power??null,language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim(),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String),recentNoShow:recentNoShow(p.plannerAttendance,eventStart(saved.date,saved.time))}]}));
-  for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:saved.powerByPlayer?.[p.id]??p.power??current.power}:{...p,alliance:p.alliance||'Unassigned',matched:false});}
+  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));const reading=saved.powerByPlayer?.[id]??power(p,kind);return [id,{id,name:name(p),power:Number(reading)||0,hasPower:reading!=null&&reading!==''&&Number.isFinite(Number(reading)),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),furnaceLevel:p.furnaceLevel??p.furnace??p.furnace_level??null,cityPower:p.cityPower??p.powerLevel??p.power??null,language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim(),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String),recentNoShow:recentNoShow(p.plannerAttendance,eventStart(saved.date,saved.time))}]}));
+  for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:saved.powerByPlayer?.[p.id]??p.power??current.power,hasPower:(saved.powerByPlayer?.[p.id]??p.power)!=null||current.hasPower}:{...p,hasPower:p.power!=null,alliance:p.alliance||'Unassigned',matched:false});}
   return [...map.values()].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
  },[players,kind,saved.imports,saved.powerByPlayer,saved.date,saved.time]);
  const alliances=plannerAlliances([...entries.map(p=>p.alliance),chosen]);
  const registrations=saved.registrations||{},teams=saved.teams||{},assignments=saved.assignments||{},registeredUnder=saved.registeredUnder||{};
  const joined=entries.filter(p=>registrations[p.id]==='join'&&registeredUnder[p.id]===chosen),subs=entries.filter(p=>registrations[p.id]==='sub'&&registeredUnder[p.id]===chosen);
- const optedOut=entries.filter(p=>registrations[p.id]==='out'&&registeredUnder[p.id]===chosen);
+ const otherRole=id=>otherPlan.registeredUnder[id]===chosen&&isParticipant(otherPlan.registrations[id])?otherPlan.registrations[id]:'';
+ const activeRole=id=>registeredUnder[id]===chosen?registrations[id]||'':'';
  const active=joined.filter(p=>teams[p.id]&&colours.includes(teams[p.id]));
  const teammateNames=p=>{const prefs=teamworkPreferences||{};const related=new Set();for(const pair of prefs.pairs||[]){if(!Array.isArray(pair)||pair.length<2)continue;const ids=pair.map(String);if(ids.includes(p.id))ids.filter(id=>id!==p.id).forEach(id=>related.add(id));}for(const group of prefs.groups||[]){const ids=(group.memberIds||[]).map(String);if(ids.includes(p.id))ids.filter(id=>id!==p.id).forEach(id=>related.add(id));}return active.filter(other=>other.id!==p.id&&teams[other.id]===teams[p.id]&&related.has(other.id)).map(other=>other.name);};
 
  const validAssignments=isFoundry?Object.fromEntries(active.map(p=>[p.id,buildings[teams[p.id]].includes(assignments[p.id])?assignments[p.id]:buildings[teams[p.id]][0]])):{};
  const update=(patch,msg,powers)=>{setUndo(saved);onSaveFoundry?.({...saved,...patch},powers);setNotice(msg||'Updated · syncing across devices');};
  const setStatus=(id,status)=>{const current=registeredUnder[id]===chosen?registrations[id]:'';const next=status===current?'':status;
-  if(next==='join'&&joined.length>=30&&current!=='join'){setNotice('30 combatant slots are full');return}
-  if(next==='sub'&&subs.length>=10&&current!=='sub'){setNotice('10 substitute slots are full');return}
+  if(isParticipant(next)&&otherRole(id)){setNotice('Already assigned to Legion '+otherLegion+'. Open the player’s role to move them.');return}
+  if(next==='join'&&joined.length>=limits.join){setNotice(limits.join+' combatant slots are full');return}
+  if(next==='sub'&&subs.length>=limits.sub){setNotice(limits.sub+' substitute slots are full');return}
   if(registrations[id]&&registeredUnder[id]!==chosen){setNotice('Already registered under '+registeredUnder[id]+'. Remove that registration before moving.');return}
   const nextRegs={...registrations,[id]:next},nextUnder={...registeredUnder,[id]:chosen},nextTeams={...teams},nextAssignments={...assignments};
   if(next!=='join'){delete nextTeams[id];delete nextAssignments[id]}
@@ -141,9 +149,29 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const searchMatches=query.trim()?entries.filter(p=>p.matched&&fields(p).some(v=>norm(v).includes(norm(query))||(plain(query).length>=3&&plain(v).length>=3&&plain(v).includes(plain(query))))).slice(0,8):[];
  const pastedList=value=>/\\r|\\n/.test(value)||value.split(/\\s*[,;]\\s*/).filter(Boolean).length>=3;
  const onSearchInput=value=>{if(pastedList(value)){setPaste(value.replace(/\\s*;\\s*/g,'\\n'));setShowPaste(true);setQuery('');setNotice('Multiple players detected. Review the pasted list below.')}else setQuery(value)};
- const filteredRegistrations=roleFilter==='join'?joined:roleFilter==='sub'?subs:optedOut;
+ const matchesRoster=p=>!rosterSearch.trim()||fields(p).some(field=>norm(field).includes(norm(rosterSearch)));
+ const roster=entries.filter(p=>activeRole(p.id)||otherRole(p.id)||p.alliance===chosen);
+ const sortedRoster=roster.filter(p=>matchesRoster(p)&&(
+   roleFilter!=='all'?activeRole(p.id)===roleFilter:
+   !participantsOnly||isParticipant(activeRole(p.id))
+ )).sort((a,b)=>rosterSort==='name'?a.name.localeCompare(b.name):
+   Number(b.hasPower)-Number(a.hasPower)||b.power-a.power||a.name.localeCompare(b.name));
+ const filteredRegistrations=sortedRoster.filter(p=>activeRole(p.id));
  const groupedRanks=['R5','R4','R3','R2','R1','Unranked'];
- const bulkUpdate=(role)=>{const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};let joins=joined.length,substitutes=subs.length;for(const id of ids){if(nextRegs[id]===role)continue;if(nextRegs[id]==='join')joins--;else if(nextRegs[id]==='sub')substitutes--;if(role==='join')joins++;else if(role==='sub')substitutes++;nextRegs[id]=role;if(role!=='join'){delete nextTeams[id];delete nextAssignments[id]}}if(joins>30||substitutes>10){setNotice('Not enough registration slots for this change');return}update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' registration roles updated');setRoleFilter(role);setBulkSelected([]);setBulkMode(false)};
+ const bulkUpdate=(role)=>{
+  const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));
+  if(isParticipant(role)&&ids.some(otherRole)){setNotice('Move players assigned to the other legion individually.');return}
+  const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};
+  for(const id of ids){
+   nextRegs[id]=role;
+   if(role!=='join'){delete nextTeams[id];delete nextAssignments[id]}
+  }
+  if(Object.values(nextRegs).filter(value=>value===role).length>(limits[role]??Infinity)){
+   setNotice('Not enough registration slots for this change');return;
+  }
+  update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' registration roles updated');
+  setBulkSelected([]);setBulkMode(false);
+ };
  const selectedIds=()=>editIds||bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));
  const closeEditor=()=>{setBulkAction('');setEditIds(null);setTeammateQuery('');setTeammateIds([])};
  const openEditor=(kind,ids)=>{setEditIds(ids);setBulkAction(kind);setBulkLanguage('');setTeammateQuery('');setTeammateIds([]);setBulkRelationshipMode(ids.length>1?'each':'others')};
@@ -158,6 +186,10 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   if(!p||!p.matched){setNotice('Select a matched player profile');return}
   if(registrations[id]&&registeredUnder[id]!==chosen){setNotice('Already registered under '+registeredUnder[id]);return}
   if(registrations[id]===role&&registeredUnder[id]===chosen){setNotice(p.name+' is already registered');return}
+  if(otherRole(id)){
+   setRoleFilter('all');setParticipantsOnly(false);setRosterSearch(p.name);setManaging(id);setQuery('');
+   return;
+  }
   setStatus(id,role);setQuery('');
  };
  const confirmBulkImport=rows=>{
@@ -168,13 +200,14 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    const id=String(row.id),p=entries.find(x=>x.id===id&&x.matched);
    if(!p)return {error:'A selected player is no longer in the roster. Review the import.'};
    if(ids.has(id))return {error:'Duplicate Player ID. Review the import.'};ids.add(id);
+   if(isParticipant(addRole)&&otherRole(id))return {error:p.name+' is assigned to Legion '+otherLegion+'. Move them from the roster first.'};
    const current=nextRegs[id],under=nextUnder[id];
    if(current&&under!==chosen)return {error:p.name+' is registered under '+under+'. Review before importing.'};
    if(current===addRole&&under===chosen){already++;}
    else {
     if(current==='join')joins--;if(current==='sub')substitutes--;
     if(addRole==='join')joins++;else if(addRole==='sub')substitutes++;
-    if(joins>30||substitutes>10)return {error:'Not enough '+(addRole==='join'?'combatant':'substitute')+' slots. Adjust registration before importing.'};
+    if(joins>limits.join||substitutes>limits.sub)return {error:'Not enough '+(addRole==='join'?'combatant':'substitute')+' slots. Adjust registration before importing.'};
     nextRegs[id]=addRole;nextUnder[id]=chosen;
     if(addRole!=='join'){delete nextTeams[id];delete nextAssignments[id]}
     added++;
@@ -202,23 +235,74 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const teamTotals=Object.fromEntries(colours.map(c=>[c,total(active.filter(p=>teams[p.id]===c))]));
  const assignedCount=active.length;
  const average=assignedCount?Object.values(teamTotals).reduce((a,b)=>a+b,0)/colours.length:0;
- const missingPower=joined.filter(p=>p.power<=0);
+ const missingPower=joined.filter(p=>!p.hasPower);
  const balanceSpread=average?Math.round((Math.max(...Object.values(teamTotals))-Math.min(...Object.values(teamTotals)))/average*100):0;
+ const renderRosterPlayer=p=>{
+  const role=activeRole(p.id),other=otherRole(p.id);
+  const elsewhere=other&&!isParticipant(role);
+  const label=elsewhere?'Legion '+otherLegion+' · '+REGISTRATION_ROLES.find(([id])=>id===other)[1]:
+    REGISTRATION_ROLES.find(([id])=>id===role)?.[1]||'Unassigned';
+  const selectedForMove=confirmMove===p.id;
+  const moveError=selectedForMove?legionMoveError(otherPlan,saved,p.id,other):'';
+  return <div key={p.id} className="legion-player">
+    <div className="legion-player-main">
+      <div className="legion-player-identity">
+        {bulkMode&&role&&<input type="checkbox" aria-label={'Select '+p.name} checked={bulkSelected.includes(p.id)} onChange={()=>setBulkSelected(ids=>ids.includes(p.id)?ids.filter(id=>id!==p.id):[...ids,p.id])}/>}
+        <PlayerAvatar player={avatarFor(p)} size={34}/>
+        <div style={{minWidth:0}}>
+          <button type="button" className="legion-player-name" aria-label={'Open profile for '+p.name} onClick={()=>onOpenPlayerProfile?.(p.id)}>{p.name}</button>
+          <small className="legion-player-context">{p.alliance} · {p.rank}{!p.matched?' · Needs matching':''}{p.language?' · '+languageLabel(p.language):''}</small>
+          {editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
+            <button type="button" className="legion-player-power" aria-label={'Edit '+metric.toLowerCase()+' for '+p.name} onClick={()=>setEditingPower(p.id)}>{p.hasPower?format(p.power):'Add power'}</button>}
+          {p.recentNoShow&&<NoShow/>}
+        </div>
+      </div>
+      {!bulkMode&&<button type="button" className="legion-role" data-role={elsewhere?'other':role} aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}>{label}</button>}
+    </div>
+    {!bulkMode&&managing===p.id&&<div style={{display:'grid',gap:8,marginTop:10}}>
+      {elsewhere?<div style={{display:'grid',gap:8}}>
+        <button type="button" style={btn} onClick={()=>changeSelection(chosen,otherLegion)}>Switch to Legion {otherLegion}</button>
+        {!selectedForMove?<button type="button" style={btn} onClick={()=>setConfirmMove(p.id)}>Move here</button>:
+          <div role="group" aria-label="Confirm legion move" style={{display:'grid',gap:8}}>
+            <span>Move {p.name} to Legion {legion} as {REGISTRATION_ROLES.find(([id])=>id===other)[1].toLowerCase()}?</span>
+            {moveError&&<small role="alert" style={{color:'#f0b1b8'}}>{moveError}</small>}
+            {!moveError&&p.matched&&<button type="button" style={btn} onClick={()=>{onMoveLegion(p.id,other);setConfirmMove(null);setManaging(null);setUndo(null)}}>Confirm move</button>}
+            <button type="button" style={btn} onClick={()=>setConfirmMove(null)}>Cancel</button>
+          </div>}
+      </div>:<>
+        <label style={{display:'flex',alignItems:'center',gap:6,minHeight:40}}>
+          <input type="checkbox" aria-label={'Opted in: '+p.name} checked={isParticipant(role)} onChange={e=>{if(!e.target.checked)setStatus(p.id,'out');else setStatus(p.id,'join')}}/> Opted in
+        </label>
+        <div role="group" aria-label={'Registration role for '+p.name} style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {REGISTRATION_ROLES.map(([value,text])=><button key={value} type="button" aria-pressed={role===value} style={btn} onClick={()=>{if(role!==value)setStatus(p.id,value);setManaging(null)}}>{text}</button>)}
+        </div>
+        {role&&<button type="button" style={btn} onClick={()=>{setStatus(p.id,role);setManaging(null)}}>Remove from {title}</button>}
+        {p.matched&&<><button type="button" style={btn} onClick={()=>{openEditor('language',[p.id]);setManaging(null)}}>Language</button>
+          <button type="button" style={btn} onClick={()=>{openEditor('relationships',[p.id]);setManaging(null)}}>Works well with</button></>}
+      </>}
+    </div>}
+  </div>;
+ };
  return <section style={{padding:'10px 16px 110px',color:'#eef5fc'}}>
   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:9}}><div><h1 style={{fontSize:25,margin:'0 0 2px'}}>{title}</h1></div><button style={btn} onClick={()=>{if(undo){onSaveFoundry?.(undo);setUndo(null);setNotice('Last change undone')}}} disabled={!undo}>Undo</button></div>
-  <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:8,marginBottom:10}}>
-    <label style={{fontSize:12,color:'#a9bfd0'}}>Registration alliance<select aria-label={title+' registration alliance'} value={chosen} onChange={e=>changeSelection(e.target.value,legion)} style={{...btn,width:'100%',marginTop:4}}>{alliances.map(a=><option key={a}>{a}</option>)}</select></label>
-    <label style={{fontSize:12,color:'#a9bfd0'}}>Legion<select aria-label="Legion" value={legion} onChange={e=>changeSelection(chosen,Number(e.target.value))} style={{...btn,width:'100%',marginTop:4}}><option value={1}>Legion 1</option><option value={2}>Legion 2</option></select></label>
+  <div className="legion-context">
+    <label>Registration alliance<select aria-label={title+' registration alliance'} value={chosen} onChange={e=>changeSelection(e.target.value,legion)} style={{...btn,width:'100%',marginTop:4}}>{alliances.map(a=><option key={a}>{a}</option>)}</select></label>
+    <fieldset><legend>Legion</legend><div className="legion-switch">{[1,2].map(number=><button key={number} type="button" aria-pressed={legion===number} onClick={()=>changeSelection(chosen,number)} style={{...btn,padding:'6px 3px',borderColor:legion===number?'#a3cbef':'#40546a',background:legion===number?'#2b4660':'#21354b'}}>Legion {number}</button>)}</div></fieldset>
   </div>
-  <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:6,marginBottom:10}}>{[['join','Combatants',joined.length,30],['sub','Substitutes',subs.length,10],['out','Not participating',optedOut.length,null]].map(([key,label,count,limit])=><button key={key} type="button" aria-pressed={roleFilter===key} onClick={()=>{setRoleFilter(key);setView('players');setBulkSelected([]);setBulkMode(false)}} style={{...style,marginBottom:0,textAlign:'left',cursor:'pointer',border:roleFilter===key?'2px solid #eab14f':'1px solid #30465a',background:roleFilter===key?'#24364b':'#142438',minHeight:78,padding:12}}><div style={{fontSize:13,color:'#c2d2e1',display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><span>{label}</span>{roleFilter===key?<span aria-label="Selected" style={{color:'#eab14f',fontSize:14}}>✓</span>:null}</div><strong style={{fontSize:24,color:'#eef5fc'}}>{count}{limit!=null&&<span style={{color:'#8ea7bd',fontSize:14}}>/{limit}</span>}</strong></button>)}</div>
   <div style={{display:'grid',gridTemplateColumns:'repeat('+(isFoundry?3:2)+',minmax(0,1fr))',gap:6,marginBottom:10}}>{[['players','Players'],['teams','Teams'],...(isFoundry?[['buildings','Buildings']]:[])].map(([id,label])=><button key={id} onClick={()=>setView(id)} style={{...btn,background:view===id?'#f5ad38':'#172a3e',color:view===id?'#101b28':'#e9f2fa',padding:'8px 3px',minHeight:40}}>{label}</button>)}</div>
   {notice&&<div role="status" style={{...style,fontSize:13,color:'#f5bd5b'}}>{notice}</div>}
   {view==='players'&&<>
+   <div style={{...style,display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
+     {[['join','Combatants',joined.length],['sub','Substitutes',subs.length]].map(([role,label,count])=><button key={role} type="button" aria-pressed={roleFilter===role} onClick={()=>{setRoleFilter(roleFilter===role?'all':role);setBulkSelected([])}} style={{...btn,textAlign:'left',minHeight:60,borderColor:roleFilter===role?'#a3cbef':'#40546a'}}>
+       <strong style={{display:'block',fontSize:19,color:role==='join'?'#a0e2bf':'#b7dbff'}}>{count}/{limits[role]}</strong>{label}
+     </button>)}
+     <div style={{gridColumn:'1 / -1',fontSize:13,color:'#adc2d6'}}>Combatant power <strong style={{color:'#eef5fc'}}>{joined.length>0&&joined.length===missingPower.length?'—':format(total(joined))}</strong>{missingPower.length>0&&<span> · {missingPower.length} missing</span>}</div>
+   </div>
    <PlannerAttendance kind={kind} alliance={chosen} legion={legion} plan={saved} players={attendancePlayers}
     onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
-   <div style={{...style,padding:11}}>
-     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:7,flexWrap:'wrap'}}>
-       <strong style={{fontSize:15}}>Add players</strong>
+   <details style={{...style,padding:11}}>
+     <summary style={{cursor:'pointer',fontWeight:650}}>Add players</summary>
+     <div style={{display:'flex',alignItems:'center',gap:8,margin:'7px 0',flexWrap:'wrap'}}>
        <div role="group" aria-label="Registration role" style={{display:'flex',gap:4,flexWrap:'wrap',background:'#0d1b2c',borderRadius:10,padding:3}}>
          {REGISTRATION_ROLES.map(([role,label])=><button key={role} type="button" aria-pressed={addRole===role} onClick={()=>setAddRole(role)} style={{...btn,minHeight:32,padding:'5px 9px',fontSize:12,borderRadius:9,border:'none',background:addRole===role?'#344c63':'transparent'}}>{label}</button>)}
        </div>
@@ -229,38 +313,35 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
        {query&&<button type="button" aria-label="Clear search" onClick={()=>setQuery('')} style={{...btn,padding:'4px 8px',minHeight:32}}>×</button>}
      </div>
      <button type="button" style={{...btn,background:'transparent',border:0,padding:'5px 2px',minHeight:30,color:'#a9c4dc',fontSize:13}} onClick={()=>setShowPaste(v=>!v)}>{showPaste?'Hide bulk import':'＋ Paste multiple players'}</button>
-   </div>
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} · {metric}</small>{p.recentNoShow&&<NoShow/>}</span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
    {showPaste&&<BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
+   </details>
    <div style={{...style,padding:12}}>
-     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:6}}>
-       <div><h2 style={{fontSize:16,margin:'0 0 3px'}}>{roleFilter==='join'?'Combatants':roleFilter==='sub'?'Substitutes':'Not participating'}</h2><div style={{fontSize:12,color:'#a9bfd0'}}>By alliance rank · Highest power first</div></div>
+     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+       <h2 style={{fontSize:16,margin:0}}>Legion {legion} roster</h2>
        <button type="button" style={{...btn,background:bulkMode?'#344c63':'#21354b'}} onClick={()=>{setBulkMode(v=>!v);setBulkSelected([])}}>{bulkMode?'Done':'Select'}</button>
      </div>
-     {bulkMode&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',fontSize:12,color:'#b9cad9'}}><span>{bulkSelected.length} selected</span><button style={{...btn,minHeight:34,padding:'6px 10px'}} onClick={()=>setBulkSelected(filteredRegistrations.map(p=>p.id))}>Select all</button></div>}
-     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 2px 6px',fontSize:11,color:'#a9bfd0'}}><span>Player</span><div style={{display:'flex',alignItems:'center',gap:9}}><span style={{width:96,textAlign:'center'}} >{metric}</span><span style={{width:42}} aria-hidden="true"/></div></div>
-     {groupedRanks.map(group=>{const ranked=filteredRegistrations.filter(p=>p.rank===group).sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));const eligible=entries.filter(p=>p.rank===group&&p.alliance===chosen).length;if(!ranked.length)return null;return <div key={group} style={{marginTop:8}}>
-       <button type="button" aria-expanded={rankExpanded[group]!==false} onClick={()=>setRankExpanded(v=>({...v,[group]:v[group]===false}))} style={{...btn,width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#20344a',textAlign:'left',borderRadius:9,minHeight:34,padding:'6px 10px',fontSize:12}}>
-         <span style={{display:'flex',gap:7,alignItems:'center'}}><strong style={{fontSize:12,color:'#f0c176'}}>{group}</strong><span style={{fontSize:12,color:'#a9bfd0'}}>{group==='R5'?'Alliance leader':group==='R4'?'Officers':group==='Unranked'?'Rank not recorded':'Members'}</span></span>
-         <span style={{fontSize:12,color:'#c8d7e4',fontVariantNumeric:'tabular-nums'}}>{ranked.length}/{group==='R5'&&eligible<=1?1:eligible||ranked.length} {rankExpanded[group]===false?'⌄':'⌃'}</span>
-       </button>
-       {rankExpanded[group]!==false&&(ranked.length?ranked.map(p=><div key={p.id} style={{borderBottom:'1px solid #2c4155',padding:'8px 0'}}>
-         <div style={{display:'flex',alignItems:'center',gap:9}}>
-           <button type="button" aria-label={'Open profile for '+p.name} onClick={()=>bulkMode?setBulkSelected(v=>v.includes(p.id)?v.filter(x=>x!==p.id):[...v,p.id]):onOpenPlayerProfile?.(p.id)} style={{background:'transparent',border:0,padding:0,cursor:'pointer',minWidth:44,minHeight:44,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}><PlayerAvatar player={avatarFor(p)} size={34}/>{bulkMode&&<span aria-label={bulkSelected.includes(p.id)?'Selected':'Not selected'} style={{position:'absolute',right:0,bottom:0,width:17,height:17,borderRadius:'50%',background:bulkSelected.includes(p.id)?'#eab14f':'#20344a',border:'1px solid #b6c7d9',fontSize:12,color:'#102034'}}>{bulkSelected.includes(p.id)?'✓':''}</span>}</button>
-           <div style={{flex:1,minWidth:0}}><button type="button" onClick={()=>onOpenPlayerProfile?.(p.id)} style={{background:'none',border:0,padding:0,color:'#eef5fc',fontSize:14,fontWeight:700,textAlign:'left',overflowWrap:'anywhere',cursor:'pointer'}}>{p.name}</button>{p.recentNoShow&&<NoShow/>}<div style={{fontSize:11,color:'#a9bfd0',display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}><span>{p.alliance}{!p.matched?' · Needs matching':''}</span>{p.language&&<span style={{borderRadius:6,background:'#263b50',padding:'2px 5px',color:'#c9d9e8'}}>{languageLabel(p.language)}</span>}</div></div>
-           <input type="checkbox" aria-label={'Opted in: '+p.name} checked={registrations[p.id]!=='out'} onChange={e=>{if(!e.target.checked)setStatus(p.id,'out');else setManaging(p.id);}}/>
-           <InlinePower player={p} metric={metric} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power saved for '+p.name)}}/>
-           {!bulkMode&&<button aria-label={'Manage '+p.name} aria-expanded={managing===p.id} style={{...btn,width:42,minWidth:42,minHeight:44,fontSize:20,padding:5,background:'transparent',border:'none'}} onClick={()=>setManaging(managing===p.id?null:p.id)}>⋯</button>}
-         </div>
-         {!bulkMode&&managing===p.id&&<div style={{display:'grid',gap:8,marginTop:10}}>
-           <div style={{fontSize:12,color:'#a9bfd0'}}>Registration role</div>
-           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(95px,1fr))',gap:6}}>{REGISTRATION_ROLES.map(([role,label])=><button key={role} aria-pressed={registrations[p.id]===role} style={{...btn,background:registrations[p.id]===role?'#66502d':'#20344a',borderColor:registrations[p.id]===role?'#eab14f':'#40546a'}} onClick={()=>{if(registrations[p.id]!==role){setStatus(p.id,role);setRoleFilter(role)}setManaging(null)}}>{label}</button>)}</div>
-           <button style={btn} onClick={()=>{openEditor('language',[p.id]);setManaging(null)}}>Language</button>
-           <button style={btn} onClick={()=>{openEditor('relationships',[p.id]);setManaging(null)}}>Works well with</button>
-           <button style={{...btn,color:'#f1a9a9',borderColor:'#79525b'}} onClick={()=>{setStatus(p.id,registrations[p.id]);setManaging(null)}}>Remove from {title}</button>
-         </div>}
-       </div>):<div style={{padding:'12px 4px',fontSize:12,color:'#839bae'}}>No players at this rank</div>)}
-     </div>})}
+     <div className="legion-roster-tools">
+       <input type="search" aria-label="Search roster" placeholder="Search roster" style={btn} value={rosterSearch} onChange={e=>{setRosterSearch(e.target.value);setBulkSelected([])}}/>
+       <select aria-label="Sort roster" value={rosterSort} onChange={e=>setRosterSort(e.target.value)} style={btn}>
+         <option value="power">Highest power</option><option value="name">Name A–Z</option><option value="rank">Alliance rank</option>
+       </select>
+       <label><input type="checkbox" checked={participantsOnly} onChange={e=>{setParticipantsOnly(e.target.checked);setRoleFilter('all');setBulkSelected([])}}/> Participants only</label>
+       {roleFilter!=='all'&&<button type="button" style={btn} onClick={()=>{setRoleFilter('all');setBulkSelected([])}}>Clear role filter</button>}
+     </div>
+     {bulkMode&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',fontSize:12,color:'#b9cad9'}}><span>{bulkSelected.length} selected</span><button style={btn} onClick={()=>setBulkSelected(filteredRegistrations.map(p=>p.id))}>Select all</button></div>}
+     {sortedRoster.length===0&&<p style={{color:'#adc2d6'}}>{rosterSearch?'No matching players.':'No players in this view.'}</p>}
+     {(rosterSort==='rank'?groupedRanks:[null]).map(group=>{
+       const rows=group?sortedRoster.filter(p=>p.rank===group):sortedRoster;
+       if(!rows.length)return null;
+       const groupCount=roster.filter(p=>p.rank===group).length;
+       return <div key={group||'all'}>
+         {group&&<button type="button" aria-expanded={rankExpanded[group]!==false} onClick={()=>setRankExpanded(v=>({...v,[group]:v[group]===false}))} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between'}}>
+           <span>{group}</span><span>{rows.length}/{groupCount} {rankExpanded[group]===false?'⌄':'⌃'}</span>
+         </button>}
+         {rankExpanded[group]!==false&&rows.map(renderRosterPlayer)}
+       </div>;
+     })}
      {(editIds||(bulkMode&&bulkSelected.length>0))&&<div role={editIds?'dialog':undefined} aria-label={editIds?'Edit Foundry player preferences':undefined} style={{position:editIds?'fixed':'sticky',left:editIds?0:undefined,right:editIds?0:undefined,bottom:editIds?0:75,zIndex:editIds?100:4,background:'#26384d',border:'1px solid #eab14f',borderRadius:12,padding:12,marginTop:12,maxHeight:editIds?'75vh':undefined,overflowY:editIds?'auto':undefined,boxShadow:editIds?'0 -12px 50px #0009':undefined}}>
        <div style={{display:'flex',alignItems:'center',gap:8}}><strong style={{flex:1,fontSize:13}}>{editIds?entries.find(p=>p.id===editIds[0])?.name:bulkSelected.length+' selected'}</strong>{editIds?<button style={btn} onClick={closeEditor}>Close</button>:<><button style={{...btn,minHeight:34,padding:'5px 10px'}} onClick={()=>{setBulkSelected([]);closeEditor()}}>Clear</button><button style={{...btn,minHeight:34,padding:'5px 10px'}} onClick={()=>{setEditIds(null);setBulkAction(v=>v==='actions'?'':'actions')}}>Actions {bulkAction?'⌃':'⌄'}</button></>}</div>
        {bulkAction&&<div style={{maxHeight:'55vh',overflowY:'auto',marginTop:8,display:'grid',gap:8}}>

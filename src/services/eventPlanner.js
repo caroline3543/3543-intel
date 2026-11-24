@@ -1,4 +1,7 @@
 export const EVENT_NAMES = {foundry:'Foundry', canyon:'Canyon Clash'};
+const FOUNDRY_LIMITS = Object.freeze({join:30,sub:10});
+export const EVENT_LIMITS = Object.freeze({foundry:FOUNDRY_LIMITS,canyon:FOUNDRY_LIMITS,tal:Object.freeze({join:30,sub:20})});
+export const isParticipant = role => role==='join'||role==='sub';
 export const REGISTRATION_ROLES = [['join','Combatant'], ['sub','Substitute'], ['out','Not participating']];
 export const ATTENDANCE_RESULTS = [['attended','Attended'], ['excused','Excused absence'], ['no-show','No-show'], ['not-called','Not called up']];
 export const TEAM_NAMES = ['Blue','Yellow','Green','Pink','Purple','Teal'];
@@ -90,13 +93,19 @@ function savePower(player,kind,id,value,at) {
   return {...player,[field]:value,[dateField]:at,plannerPowerReadings:readings};
 }
 
-export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId},now=Date.now()) {
+export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId,move},now=Date.now()) {
+  if(!Object.hasOwn(EVENT_NAMES,kind)||![1,2].includes(legion))return workspace;
+  if(move)return moveLegion(workspace,{kind,alliance,legion,expectedOccurrenceId,move},now);
   const storage = workspace.foundry||{};
   const key = plannerKey(kind,alliance,legion);
   const current = plannerSlot(storage,kind,alliance,legion);
   const fresh = plan||current;
   if(expectedOccurrenceId && current.occurrenceId!==expectedOccurrenceId)return workspace;
-  if(!EVENT_NAMES[kind]||![1,2].includes(legion))return workspace;
+  if(plan){
+    const other=plannerSlot(storage,kind,alliance,legion===1?2:1);
+    if(Object.entries(plan.registrations).some(([id,role])=>isParticipant(role)&&
+      !isParticipant(current.registrations[id])&&isParticipant(other.registrations[id])))return workspace;
+  }
   const start = eventStart(current.date,current.time);
   if(fresh.occurrenceId===current.occurrenceId&&start&&Date.parse(start)<=now &&
     eventStart(fresh.date,fresh.time)!==start)return workspace;
@@ -122,6 +131,47 @@ export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[
   return {...workspace,players,...(shouldSave?{foundry:{...storage,eventPlans:{...storage.eventPlans,[key]:{
     ...fresh,...(matched.size?{powerByPlayer:perPlayer}:{}),
   }}}}:{})};
+}
+
+export function legionMoveError(source,destination,id,role,now=Date.now()) {
+  if(!isParticipant(role)||source.registrations[id]!==role||isParticipant(destination.registrations[id])){
+    return 'The registration changed. Review both legions and try again.';
+  }
+  const start=eventStart(destination.date,destination.time);
+  if(start&&Date.parse(start)<=now)return 'The destination legion has already started.';
+  if(Object.values(destination.registrations).filter(value=>value===role).length>=EVENT_LIMITS.foundry[role]){
+    return 'The destination has no '+(role==='join'?'combatant':'substitute')+' slots left.';
+  }
+  return '';
+}
+
+function withoutPlayer(fields,id) {
+  const next={...fields};
+  delete next[id];
+  return next;
+}
+
+function moveLegion(workspace,{kind,alliance,legion,expectedOccurrenceId,move},now) {
+  const storage=workspace.foundry;
+  const otherLegion=legion===1?2:1;
+  const source=plannerSlot(storage,kind,alliance,otherLegion);
+  const destination=plannerSlot(storage,kind,alliance,legion);
+  const {id,role,sourceOccurrenceId}=move;
+  if(destination.occurrenceId!==expectedOccurrenceId||source.occurrenceId!==sourceOccurrenceId||
+    source.registeredUnder[id]!==alliance||legionMoveError(source,destination,id,role,now)||
+    !workspace.players.some(player=>String(player.id)===id))return workspace;
+  const from={...source,
+    registrations:withoutPlayer(source.registrations,id),registeredUnder:withoutPlayer(source.registeredUnder,id),
+    teams:withoutPlayer(source.teams,id),assignments:withoutPlayer(source.assignments,id)};
+  const to={...destination,registrations:{...destination.registrations,[id]:role},
+    registeredUnder:{...destination.registeredUnder,[id]:alliance}};
+  const sourcePower=source.powerByPlayer?.[id];
+  if(sourcePower!=null&&to.powerByPlayer?.[id]==null)to.powerByPlayer={...to.powerByPlayer,[id]:sourcePower};
+  const players=workspace.players.map(player=>String(player.id)===id
+    ?reconcileSchedule(reconcileSchedule(player,from,{kind,alliance,legion:otherLegion},now),to,{kind,alliance,legion},now)
+    :player);
+  return {...workspace,players,foundry:{...storage,eventPlans:{...storage?.eventPlans,
+    [plannerKey(kind,alliance,otherLegion)]:from,[plannerKey(kind,alliance,legion)]:to}}};
 }
 
 export function resizePlannerTeams(plan,count) {

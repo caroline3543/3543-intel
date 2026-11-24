@@ -24,18 +24,19 @@ export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendanc
   const start = choices.get(selected);
   const unlocked = attendanceOpen(start,clock);
   return <>
-    <div style={card}>
-      <strong>Event schedule · UTC</strong>
+    <details style={card}>
+      <summary style={{cursor:'pointer',fontWeight:650}}>
+        Event schedule · {currentStart?utc(currentStart):'Set UTC start'}
+      </summary>
       <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8,margin:'8px 0'}}>
         <label>Date<input aria-label="Event date (UTC)" type="date" value={date} disabled={started} onChange={e=>setDate(e.target.value)} style={{...button,width:'100%',marginTop:4,minWidth:0}}/></label>
         <label>Start time<input aria-label="Event start time (UTC)" type="time" value={time} disabled={started} onChange={e=>setTime(e.target.value)} style={{...button,width:'100%',marginTop:4,minWidth:0}}/></label>
       </div>
       {!started && <button type="button" style={button} disabled={!eventStart(date,time)||(date===plan.date&&time===plan.time)} onClick={()=>onSchedule(date,time)}>Save schedule</button>}
-      {currentStart && <p style={{fontSize:12,color:'#a9bfd0',margin:'8px 0 0'}}>Starts {utc(currentStart)}</p>}
       {started&&<button type="button" style={{...button,marginTop:8}} disabled={!attendanceOpen(currentStart,clock)} onClick={()=>{
         if(window.confirm('Start a new event for this legion? The previous attendance and power history are kept.')){setOccurrence('');onNewEvent();}
       }}>Start a new event</button>}
-    </div>
+    </details>
     {choices.size>0&&<details style={card}>
       <summary style={{cursor:'pointer',fontWeight:650,minHeight:32}}>Attendance</summary>
       {choices.size>1&&<label style={{display:'block',marginBottom:8}}>Attendance event<select aria-label="Attendance event" value={selected} style={{...button,width:'100%',marginTop:4}} onChange={e=>setOccurrence(e.target.value)}>

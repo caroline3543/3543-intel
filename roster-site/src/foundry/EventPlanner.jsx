@@ -7,9 +7,13 @@ export function EventPlanner({kind,players,storage,onUpdate,...props}) {
   const [alliance,setAlliance]=useState(()=>localStorage.getItem(storageKey)||'ARC');
   const [legion,setLegion]=useState(1);
   const plan=plannerSlot(storage,kind,alliance,legion);
+  const otherLegion=legion===1?2:1;
+  const otherPlan=plannerSlot(storage,kind,alliance,otherLegion);
   const update=fields=>onUpdate({kind,alliance,legion,expectedOccurrenceId:plan.occurrenceId,...fields});
   return <FoundryTab key={plannerKey(kind,alliance,legion)} {...props} kind={kind} chosen={alliance} legion={legion} players={players}
     changeSelection={(tag,number)=>{setAlliance(tag);setLegion(tag===alliance?number:1);localStorage.setItem(storageKey,tag);}}
+    otherLegion={otherLegion} otherPlan={otherPlan}
+    onMoveLegion={(id,role)=>update({move:{id,role,sourceOccurrenceId:otherPlan.occurrenceId}})}
     sharedFoundry={plan} onSaveFoundry={(next,powers)=>update({plan:next,powers})}
     onSaveTroopPower={(id,value)=>update({powers:[{id,value}]})}
     onAttendance={attendance=>update({attendance})}

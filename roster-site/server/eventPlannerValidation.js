@@ -1,4 +1,4 @@
-import {ATTENDANCE_RESULTS,EVENT_NAMES,attendanceOpen,eventStart,plannerKey,TEAM_NAMES} from '../../src/services/eventPlanner.js';
+import {ATTENDANCE_RESULTS,EVENT_LIMITS,EVENT_NAMES,attendanceOpen,eventStart,plannerKey,TEAM_NAMES} from '../../src/services/eventPlanner.js';
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 
 export function validateEventPlannerData(data,now=Date.now()) {
@@ -30,8 +30,8 @@ export function validateEventPlannerData(data,now=Date.now()) {
        !plain(plan.teams)||!plain(plan.assignments)||
        ((plan.date||plan.time)&&!eventStart(plan.date,plan.time)))throw Error('Invalid event plan.');
     const roles=Object.values(plan.registrations);
-    if(roles.some(role=>!['','join','sub','out'].includes(role))||roles.filter(role=>role==='join').length>30||
-       roles.filter(role=>role==='sub').length>10||Object.entries(plan.teams).some(([id,team])=>
+    if(roles.some(role=>!['','join','sub','out'].includes(role))||roles.filter(role=>role==='join').length>EVENT_LIMITS[kind].join||
+       roles.filter(role=>role==='sub').length>EVENT_LIMITS[kind].sub||Object.entries(plan.teams).some(([id,team])=>
        plan.registrations[id]!=='join'||!TEAM_NAMES.slice(0,plan.teamCount).includes(team)))throw Error('Invalid event registration or team.');
    }
   }
