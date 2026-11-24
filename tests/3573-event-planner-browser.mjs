@@ -75,7 +75,8 @@ try {
     await page.getByRole('button',{name:'Open profile for Northvale'}).click();
     await eventPower.getByText('1.25B',{exact:true}).waitFor();
     await profile.getByText('Event attendance',{exact:true}).click();
-    await profile.getByText('No-show',{exact:true}).waitFor();
+    const attendanceHistory=profile.locator('details[open]').filter({hasText:'Event attendance'});
+    assert.match(await attendanceHistory.innerText(),/Combatant\s*No-show/);
     await profile.getByRole('button',{name:'Close profile'}).click();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     assert.deepEqual(errors,[]);
