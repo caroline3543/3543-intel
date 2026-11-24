@@ -13,6 +13,7 @@ try {
   browser=await chromium.launch();
   for(const width of [390,1280]){
     const page=await browser.newPage({viewport:{width,height:844}});
+    page.setDefaultTimeout(10000);
     const errors=[];
     page.on('pageerror',error=>errors.push(error.message));
     await page.clock.setFixedTime(new Date('2026-11-26T00:30:00Z'));
@@ -70,9 +71,12 @@ try {
     await optIn.click();
     assert.equal(await page.getByRole('button',{name:'Kite · Not participating',exact:true}).count(),0);
     await page.getByRole('checkbox',{name:'Participants only'}).uncheck();
-    await page.getByRole('button',{name:'Kite · Not participating',exact:true}).click();
+    const optedOut=page.getByRole('button',{name:'Kite · Not participating',exact:true});
+    await optedOut.waitFor();
+    if(await optedOut.getAttribute('aria-expanded')==='false')await optedOut.click();
     assert.equal(await optIn.isChecked(),false);
     await optIn.check();
+    await page.getByRole('button',{name:'Kite · Combatant',exact:true}).waitFor();
     await page.getByRole('button',{name:'Teams',exact:true}).click();
     const count=page.getByRole('combobox',{name:'Teams per legion'});
     for(const size of [3,4,5,6])await count.selectOption(String(size));
