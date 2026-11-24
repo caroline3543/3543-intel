@@ -67,7 +67,7 @@ try {
 
     await page.getByRole('button',{name:'Kite · Combatant',exact:true}).click();
     const optIn=page.getByRole('checkbox',{name:'Opted in: Kite'});
-    await optIn.uncheck();
+    await optIn.click();
     assert.equal(await page.getByRole('button',{name:'Kite · Not participating',exact:true}).count(),0);
     await page.getByRole('checkbox',{name:'Participants only'}).uncheck();
     await page.getByRole('button',{name:'Kite · Not participating',exact:true}).click();
