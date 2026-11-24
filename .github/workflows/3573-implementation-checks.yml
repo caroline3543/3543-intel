@@ -49,3 +49,16 @@ jobs:
 
       - name: Bulk import mobile and desktop interaction test
         run: node tests/3573-bulk-import-browser.mjs
+
+      - name: State 3573 Soft Dark profile interaction and visual captures
+        run: |
+          BUILD_PROFILE_FIXTURE=1 npm run build --prefix roster-site
+          node tests/3573-soft-dark-profile-browser.mjs
+
+      - name: Upload Soft Dark visual comparisons
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: 3573-soft-dark-profile-captures
+          path: profile-review-captures/
+          if-no-files-found: ignore

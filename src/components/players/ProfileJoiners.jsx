@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { C } from '../../utils/constants.js';
-import { ProfileSection } from './ProfileParts.jsx';
-export function ProfileJoiners({player,onSave}){
+import { ProfileSection, ProfileRow } from './ProfileParts.jsx';
+export function ProfileJoiners({player,onSave,softDark=false}){
   const [addingHero,setAddingHero]=useState(false);
   const [heroName,setHeroName]=useState('');
   const [heroSkill,setHeroSkill]=useState(5);
@@ -21,6 +21,9 @@ export function ProfileJoiners({player,onSave}){
   }
 
 
+if(softDark&&!addingHero)return <ProfileSection title="Joiner heroes" action={onSave&&<button type="button" className="soft-profile-edit" onClick={()=>setAddingHero(true)}>{joiners.length?'Edit':'Add hero'}</button>}>
+  {joiners.length?joiners.map(hero=><ProfileRow key={hero.hero} label={hero.hero} value={hero.skillLevel==null?'Skill not recorded':<strong>Skill {hero.skillLevel}</strong>}/>):<p className="soft-profile-muted">Not recorded</p>}
+</ProfileSection>;
 return (        <ProfileSection title="Joiner heroes"><p style={{fontSize:14,color:C.icy,margin:"0 0 12px"}}>Record the top-right expedition skill. Only Skill 5 counts towards joiner coverage.</p>
           {joiners.length>0 && (
             <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:12 }}>

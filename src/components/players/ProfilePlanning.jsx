@@ -12,9 +12,9 @@ export function ProfileRoles({player,roles,onSave}) {
     {editing&&<p style={{fontSize:13,color:C.icy,marginBottom:0}}>Changes save as you tap. Players without a rally leader role can join rallies.</p>}
   </ProfileSection>;
 }
-export function ProfileNotes({player,onSave}) {
+export function ProfileNotes({player,onSave,softDark=false}) {
   const [draft,setDraft]=useState(null);
-  return <ProfileSection title="Officer notes" action={draft===null?<button style={profileButton} onClick={()=>setDraft(player.notes||'')}>Edit</button>:null}>
+  return <ProfileSection title="Officer notes" action={draft===null&&onSave?<button className={softDark?'soft-profile-edit':undefined} style={softDark?undefined:profileButton} onClick={()=>setDraft(player.notes||'')}>Edit</button>:null}>
     {draft===null?<p style={{fontSize:14,color:C.icy,lineHeight:1.6,whiteSpace:'pre-wrap',margin:0}}>{player.notes||'No notes yet.'}</p>:<form onSubmit={event=>{event.preventDefault();onSave({...player,notes:draft,profileLastUpdated:new Date().toISOString()});setDraft(null);}}>
       <textarea autoFocus aria-label="Officer notes" value={draft} onChange={event=>setDraft(event.target.value)} style={{...profileButton,width:'100%',minHeight:100,boxSizing:'border-box',fontSize:16,fontFamily:'inherit',resize:'vertical',color:C.white,cursor:'text'}}/>
       <div style={{display:'flex',gap:8,marginTop:10}}><button type="button" style={{...profileButton,flex:1}} onClick={()=>setDraft(null)}>Cancel</button><button style={{...profileButton,flex:1,background:C.gold,color:C.bg}} type="submit">Save notes</button></div>
