@@ -1,32 +1,202 @@
-.legion-context {
-  position: sticky;
-  top: 0;
-  z-index: 3;
+.legion-planner, .planner-sheet {
+  --planner-canvas: #111c2a;
+  --planner-surface: #1d2b3c;
+  --planner-control: #28384c;
+  --planner-ink: #f5f7fa;
+  --planner-muted: #b6c4d4;
+  --planner-accent: #bad8fa;
+  --planner-line: #40536c;
+  --planner-field-edge: #6c819b;
+  --planner-gutter: 20px;
+  --planner-target: max(44px, 2.75rem);
+  color-scheme: dark;
+  color: var(--planner-ink);
+  font: 1rem/1.45 system-ui, sans-serif;
+}
+.legion-planner {
+  max-inline-size: 760px;
+  margin-inline: auto;
+  background: var(--planner-canvas);
+  padding: 16px var(--planner-gutter) max(104px, env(safe-area-inset-bottom));
+}
+.legion-planner *, .planner-sheet * { box-sizing: border-box; }
+.legion-planner h1, .legion-planner h2,
+.planner-sheet :is(h2,h3,h4,p) { margin: 0; }
+.legion-planner h1 { font-size: 1.625rem; line-height: 1.2; }
+.legion-planner h2, .planner-sheet h2 { font-size: 1.3125rem; line-height: 1.25; }
+.planner-title-row, .legion-roster-filters, .legion-filter-callout, .legion-notice {
+  display: flex;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.planner-button, .planner-plain, .planner-close, .legion-context select,
+.legion-roster-tools select, .planner-search, .legion-tabs button,
+.legion-capacity, .planner-field :is(input,select) {
+  min-block-size: var(--planner-target);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--planner-control);
+  color: var(--planner-ink);
+  font: inherit;
+  font-size: .875rem;
+}
+.legion-planner button, .planner-sheet button { cursor: pointer; }
+.legion-planner button:disabled, .planner-sheet button:disabled { cursor: default; }
+.legion-planner :is(button,input,select,summary):focus-visible,
+.planner-sheet :is(button,input,textarea,select):focus-visible {
+  outline: 2px solid var(--planner-accent);
+  outline-offset: 2px;
+}
+.planner-primary { background: var(--planner-accent); color: #112239; font-weight: 650; }
+.planner-primary:disabled { background: #28384c; color: #a6b8cc; }
+.planner-plain { background: transparent; color: var(--planner-accent); padding-inline: 4px; }
+.planner-close { min-inline-size: var(--planner-target); padding: 0; font-size: 1.35rem; }
+.legion-context, .legion-capacities {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr);
-  gap: 8px;
-  padding: 8px 0;
-  background: #101c2a;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 12px;
 }
-.legion-context label, .legion-context fieldset { min-width: 0; }
-.legion-context fieldset { border: 0; padding: 0; margin: 0; }
-.legion-context legend, .legion-context label { font-size: 12px; color: #a9bfd0; }
-.legion-switch { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; margin-top: 4px; }
-.legion-roster-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
-.legion-roster-tools input[type=search] { flex: 1 1 135px; min-width: 0; }
-.legion-roster-tools label { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 13px; }
-.legion-player { background: #192b3e; border: 1px solid #30465a; border-radius: 12px; padding: 8px; margin: 6px 0; }
-.legion-player-main { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,8rem); align-items: center; gap: 8px; }
-.legion-player-identity { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.legion-player-name { border: 0; background: transparent; color: #eef5fc; padding: 0; font: inherit; font-weight: 700; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
-.legion-player-power, .legion-player-context { display: block; color: #adc2d6; font-size: 12px; overflow-wrap: anywhere; }
-.legion-player-power { background: none; border: 0; padding: 5px 0; font-weight: 650; text-align: left; cursor: pointer; }
-.legion-role { width: 100%; min-height: 44px; padding: 6px; border: 1px solid #475d75; border-radius: 10px; color: #dae6f1; background: #21354b; font-size: 12px; font-weight: 700; cursor: pointer; }
-.legion-role[data-role=join] { color: #a0e2bf; background: #214036; border-color: #487363; }
-.legion-role[data-role=sub] { color: #b7dbff; background: #223d59; border-color: #4e708f; }
-.legion-role[data-role=other] { color: #ded4fa; background: #37324d; border-color: #655d80; }
-.legion-player input[type=checkbox], .legion-roster-tools input[type=checkbox] { accent-color: #a3cbef; width: 17px; height: 17px; }
-.legion-player :is(button,input):focus-visible, .legion-context :is(button,select):focus-visible { outline: 2px solid #a3cbef; outline-offset: 2px; }
-@media(max-width:360px) {
-  .legion-player-main { grid-template-columns: minmax(0,1fr) minmax(0,6.5rem); }
+.legion-context { margin-top: 12px; }
+.legion-context select, .legion-roster-tools select {
+  width: 100%;
+  border-color: var(--planner-field-edge);
+  text-align: center;
 }
+.legion-tabs {
+  display: flex;
+  gap: 2px;
+  margin-block: 12px;
+  padding: 2px;
+  border-radius: 24px;
+  background: var(--planner-surface);
+}
+.legion-tabs button { flex: 1; background: transparent; padding-inline: 4px; color: var(--planner-muted); overflow-wrap: anywhere; }
+.legion-tabs button[aria-current], .legion-capacity[aria-pressed=true] {
+  background: #314560;
+  color: var(--planner-ink);
+  border-color: var(--planner-accent);
+}
+.legion-capacity {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1px 6px;
+  border-radius: 15px;
+  background: var(--planner-surface);
+  font-size: .8125rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.legion-capacity strong { color: #b6d9fb; font-size: 1rem; }
+.legion-capacity[data-role=join] strong { color: #b4e2c8; }
+.legion-capacity strong, .legion-power-total, .legion-player-power { font-variant-numeric: tabular-nums; }
+.legion-power-total, .planner-muted, .planner-sheet-header p, .planner-draft p {
+  color: var(--planner-muted);
+  font-size: .875rem;
+  overflow-wrap: anywhere;
+}
+.legion-power-total { margin: 6px 0 14px; }
+.legion-power-total strong { font-weight: 550; }
+.legion-roster-tools {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(5.5rem,30%);
+  gap: 12px;
+  margin-top: 8px;
+}
+.planner-search, .planner-field :is(input,select) {
+  width: 100%;
+  border-radius: 14px;
+  border-color: var(--planner-field-edge);
+}
+.planner-search::placeholder { color: var(--planner-muted); }
+.legion-roster-filters { margin-block: 2px 6px; }
+.legion-roster-filters label { display: inline-flex; align-items: center; gap: 8px; min-height: var(--planner-target); font-size: .875rem; }
+.legion-filter-callout, .legion-notice {
+  padding-inline: 12px;
+  border-radius: 14px;
+  background: var(--planner-surface);
+  color: var(--planner-muted);
+  font-size: .875rem;
+  margin-bottom: 6px;
+}
+.legion-notice { padding-block: 4px; min-block-size: var(--planner-target); }
+.legion-player { border-bottom: 1px solid #304258; padding-block: 4px; }
+.legion-player-main { display: grid; grid-template-columns: minmax(0,1fr) minmax(0, min(7rem,36%)); align-items: center; gap: 0 10px; }
+.legion-player-main[data-bulk] { grid-template-columns: minmax(0,1fr); }
+.legion-player-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.legion-player-name, .legion-player-power {
+  min-block-size: var(--planner-target);
+  max-inline-size: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--planner-ink);
+  padding: 0;
+  font: inherit;
+  font-weight: 650;
+  line-height: 1.25;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.legion-player-power, .legion-player-context { display: block; font-size: .8125rem; overflow-wrap: anywhere; }
+.legion-player-context { color: var(--planner-muted); font-weight: 450; margin-top: 2px; }
+.legion-player-power { color: var(--planner-accent); font-weight: 500; }
+.legion-role {
+  justify-self: end;
+  min-inline-size: min(44px,100%);
+  min-block-size: var(--planner-target);
+  max-inline-size: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--planner-muted);
+  font: inherit;
+  font-size: .75rem;
+}
+.legion-role > span { display: block; border-radius: 16px; padding: 5px 8px; background: var(--planner-control); overflow-wrap: anywhere; }
+.legion-role-chevron { margin-inline-start: 4px; white-space: nowrap; }
+.legion-role[data-role=join] > span { color: #b4e2c8; background: #223b35; }
+.legion-role[data-role=sub] > span { color: #c0ddff; background: #223a57; }
+.legion-role[data-role=other] > span { color: #e7d9ff; background: #39314a; }
+.legion-player input[type=checkbox], .legion-roster-filters input[type=checkbox] { accent-color: var(--planner-accent); width: 17px; height: 17px; margin: 0; flex-shrink: 0; }
+.legion-attendance { margin-top: 12px; }
+.legion-attendance-hidden { display: none; }
+.planner-sheet {
+  inline-size: min(100%, 480px);
+  max-inline-size: 100%;
+  max-block-size: 92dvh;
+  inset: auto 0 0;
+  margin: 0 auto;
+  padding: 0;
+  background: var(--planner-surface);
+  border: 1px solid var(--planner-line);
+  border-radius: 26px 26px 0 0;
+  overflow: hidden;
+}
+.planner-sheet::backdrop { background: #080f1aba; }
+.planner-sheet-layout { display: flex; flex-direction: column; max-block-size: calc(92dvh - 2px); }
+.planner-sheet-header { padding: 9px var(--planner-gutter) 12px; }
+.planner-sheet-grab { width: 36px; height: 4px; margin: 0 auto 5px; border-radius: 4px; background: #7188a1; }
+.planner-sheet-body, .planner-sheet-footer { display: grid; gap: 12px; padding: 8px var(--planner-gutter) 16px; }
+.planner-sheet-body { overflow: auto; min-block-size: 0; }
+.planner-sheet-footer { border-top: 1px solid var(--planner-line); padding-top: 12px; }
+.planner-sheet-layout > :last-child { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.planner-field { display: grid; gap: 6px; min-width: 0; font-size: .875rem; font-weight: 600; }
+.planner-field :is(input,select) { display: block; min-width: 0; font-weight: 500; }
+.planner-sheet-link { display: flex; justify-content: space-between; align-items: center; text-align: left; border-radius: 14px; }
+.planner-draft { background: var(--planner-control); padding: 12px 14px; border-radius: 15px; display: grid; gap: 3px; }
+.planner-draft h3, .planner-bulk-import h3 { font-size: 1.0625rem; }
+.planner-error { color: #ffb0b5; font-size: .875rem; }
+.planner-confirm-actions { display: grid; gap: 6px; border-top: 1px solid var(--planner-line); padding-top: 12px; }
+@media (max-width: 22rem) {
+  .legion-roster-tools { grid-template-columns: minmax(0,1fr) minmax(4.75rem,33%); }
+  .legion-capacity { justify-content: center; text-align: center; }
+  .legion-player-main { grid-template-columns: minmax(0,1fr); }
+  .legion-role { grid-column: 1; }
+}
+@media (min-width: 650px) { .planner-sheet { inset: 0; margin: auto; border-radius: 26px; } }

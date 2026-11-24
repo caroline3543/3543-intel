@@ -93,7 +93,15 @@ function savePower(player,kind,id,value,at) {
   return {...player,[field]:value,[dateField]:at,plannerPowerReadings:readings};
 }
 
-export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId,move},now=Date.now()) {
+export function importRegistrationState(plan,other,id) {
+  return JSON.stringify([
+    plan.occurrenceId,plan.registrations[id]??null,plan.registeredUnder[id]??null,
+    other.occurrenceId,other.registrations[id]??null,other.registeredUnder[id]??null,
+    plan.powerByPlayer?.[id]??null,
+  ]);
+}
+
+export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId,move,expectedRegistrations},now=Date.now()) {
   if(!Object.hasOwn(EVENT_NAMES,kind)||![1,2].includes(legion))return workspace;
   if(move)return moveLegion(workspace,{kind,alliance,legion,expectedOccurrenceId,move},now);
   const storage = workspace.foundry||{};
@@ -103,6 +111,7 @@ export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[
   if(expectedOccurrenceId && current.occurrenceId!==expectedOccurrenceId)return workspace;
   if(plan){
     const other=plannerSlot(storage,kind,alliance,legion===1?2:1);
+    if(expectedRegistrations&&Object.entries(expectedRegistrations).some(([id,expected])=>importRegistrationState(current,other,id)!==expected))return workspace;
     if(Object.entries(plan.registrations).some(([id,role])=>isParticipant(role)&&
       !isParticipant(current.registrations[id])&&isParticipant(other.registrations[id])))return workspace;
   }

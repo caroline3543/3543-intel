@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   attendanceOpen, eventStart, plannerAlliances, plannerSlot, recentNoShow, resizePlannerTeams,
-  updateEventPlanner, formatPlannerPower, EVENT_LIMITS,
+  updateEventPlanner, formatPlannerPower, EVENT_LIMITS, importRegistrationState,
 } from '../src/services/eventPlanner.js';
 import {validateEventPlannerData} from '../roster-site/server/eventPlannerValidation.js';
 
@@ -24,6 +24,17 @@ test('event alliance priority and independent legion plans preserve legacy Found
   assert.equal(read(next,second).registrations.c,'join');
   assert.equal(read(next).registrations.b,'sub');
   assert.deepEqual(next.foundry.teams,data.foundry.teams);
+});
+test('an import cannot commit after its reviewed player changes role or power',()=>{
+  const data=initial(), other={...slot,legion:2};
+  const plan=read(data);
+  const expectedRegistrations={b:importRegistrationState(plan,read(data,other),'b')};
+  const action={...slot,expectedRegistrations,plan:{...plan,registrations:{...plan.registrations,b:'join'}}};
+  assert.equal(read(updateEventPlanner(data,action,early)).registrations.b,'join');
+  const changed=updateEventPlanner(data,{...slot,plan:{...plan,registrations:{...plan.registrations,b:'out'}}},early);
+  assert.equal(updateEventPlanner(changed,action,early),changed);
+  const powered=updateEventPlanner(data,{...slot,powers:[{id:'b',value:200}]},early);
+  assert.equal(updateEventPlanner(powered,action,early),powered);
 });
 test('schedule updates are idempotent and opting out removes only future attendance',()=>{
   const data=schedule();

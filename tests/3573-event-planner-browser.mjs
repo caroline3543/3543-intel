@@ -19,7 +19,7 @@ try {
     await page.clock.setFixedTime(new Date('2026-11-26T00:30:00Z'));
     await page.goto(origin+'/event-preview.html'+(process.env.EVENT_PREVIEW_QUERY||''));
     const foundry=page.getByRole('combobox',{name:'Foundry registration alliance'});
-    assert.deepEqual((await foundry.locator('option').allTextContents()).slice(0,4),['ARC','HOT','RKG','WAR']);
+    assert.deepEqual((await foundry.locator('option').allTextContents()).slice(0,4),['Alliance · ARC','Alliance · HOT','Alliance · RKG','Alliance · WAR']);
     assert.ok(await page.getByRole('button',{name:'Buildings',exact:true}).isVisible());
     const roster=page.locator('.legion-player');
     assert.equal(await roster.count(),7);
@@ -35,7 +35,7 @@ try {
     await rank.click();
     assert.equal(await page.getByRole('button',{name:'Lumen · Substitute',exact:true}).count(),0);
     await sort.selectOption('power');
-    await page.getByRole('button',{name:'Legion 2',exact:true}).click();
+    await page.getByRole('combobox',{name:'Legion',exact:true}).selectOption('2');
     assert.equal(await roster.count(),1);
     await page.getByRole('checkbox',{name:'Participants only'}).uncheck();
     await page.getByRole('button',{name:'Cypress · Unassigned',exact:true}).waitFor();
@@ -52,9 +52,9 @@ try {
     await page.getByRole('button',{name:'Move here',exact:true}).click();
     await page.getByRole('button',{name:'Confirm move',exact:true}).click();
     await page.getByRole('button',{name:'Aster · Substitute',exact:true}).waitFor();
-    await page.getByRole('button',{name:'Legion 2',exact:true}).click();
+    await page.getByRole('combobox',{name:'Legion',exact:true}).selectOption('2');
     assert.equal(await roster.count(),0);
-    await page.getByRole('button',{name:'Legion 1',exact:true}).click();
+    await page.getByRole('combobox',{name:'Legion',exact:true}).selectOption('1');
     await page.getByRole('button',{name:'Edit troop power for Northvale'}).click();
     const input=page.getByRole('textbox',{name:'Troop power for Northvale',exact:true});
     await input.fill('946105130');await input.press('Enter');
@@ -91,7 +91,7 @@ try {
     await page.getByRole('combobox',{name:'Assign Northvale to team',exact:true}).waitFor();
 
     await page.getByRole('button',{name:'Players',exact:true}).click();
-    await page.getByText(/Event schedule ·/).click();
+    await page.getByRole('button',{name:'Set UTC start'}).click();
     await page.getByLabel('Event date (UTC)',{exact:true}).fill('2026-11-25');
     await page.getByLabel('Event start time (UTC)',{exact:true}).fill('23:30');
     await page.getByRole('button',{name:'Save schedule'}).click();
@@ -104,7 +104,8 @@ try {
 
     await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
     assert.equal(await page.getByRole('button',{name:'Buildings',exact:true}).count(),0);
-    await page.getByText('Add players',{exact:true}).click();
+    await page.getByRole('button',{name:'Add players',exact:true}).click();
+    await page.getByRole('button',{name:'Find a player to add'}).click();
     const search=page.getByRole('textbox',{name:'Search and add player by name or ID'});
     await search.fill('Northvale');
     const candidate=page.getByRole('button',{name:/Northvale.*Recent no-show/});

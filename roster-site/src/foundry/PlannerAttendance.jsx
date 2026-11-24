@@ -1,9 +1,12 @@
 import {useEffect,useState} from 'react';
-import {ATTENDANCE_RESULTS,attendanceOpen,eventStart} from '../../../src/services/eventPlanner.js';
+import {createPortal} from 'react-dom';
+import {PlannerSheet} from './PlannerSheet.jsx';
+import {ATTENDANCE_RESULTS,EVENT_NAMES,attendanceOpen,eventStart} from '../../../src/services/eventPlanner.js';
 
 const utc = value => new Date(value).toISOString().slice(0,16).replace('T',' ')+' UTC';
 
-export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendance,onSchedule,onNewEvent,card,button}) {
+export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendance,onSchedule,onNewEvent,card,button,scheduleTarget}) {
+  const [scheduleOpen,setScheduleOpen] = useState(false);
   const [clock,setClock] = useState(Date.now);
   const [date,setDate] = useState(plan.date||'');
   const [time,setTime] = useState(plan.time||'');
@@ -23,20 +26,17 @@ export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendanc
   const selected = choices.has(occurrence) ? occurrence : currentStart ? plan.occurrenceId : [...choices.keys()].at(-1);
   const start = choices.get(selected);
   const unlocked = attendanceOpen(start,clock);
+  const scheduleTrigger=<button className="planner-button" type="button" onClick={()=>{setDate(plan.date||'');setTime(plan.time||'');setScheduleOpen(true);}}>{currentStart?plan.time+' UTC':'Set UTC start'}</button>;
   return <>
-    <details style={card}>
-      <summary style={{cursor:'pointer',fontWeight:650}}>
-        Event schedule · {currentStart?utc(currentStart):'Set UTC start'}
-      </summary>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8,margin:'8px 0'}}>
-        <label>Date<input aria-label="Event date (UTC)" type="date" value={date} disabled={started} onChange={e=>setDate(e.target.value)} style={{...button,width:'100%',marginTop:4,minWidth:0}}/></label>
-        <label>Start time<input aria-label="Event start time (UTC)" type="time" value={time} disabled={started} onChange={e=>setTime(e.target.value)} style={{...button,width:'100%',marginTop:4,minWidth:0}}/></label>
-      </div>
-      {!started && <button type="button" style={button} disabled={!eventStart(date,time)||(date===plan.date&&time===plan.time)} onClick={()=>onSchedule(date,time)}>Save schedule</button>}
-      {started&&<button type="button" style={{...button,marginTop:8}} disabled={!attendanceOpen(currentStart,clock)} onClick={()=>{
-        if(window.confirm('Start a new event for this legion? The previous attendance and power history are kept.')){setOccurrence('');onNewEvent();}
+    {scheduleTarget&&createPortal(scheduleTrigger,scheduleTarget)}
+    <PlannerSheet open={scheduleOpen} onClose={()=>setScheduleOpen(false)} title="Event schedule" context={EVENT_NAMES[kind]+' · '+alliance+' · Legion '+legion} footer={!started&&<button type="button" className="planner-button planner-primary" disabled={!eventStart(date,time)||(date===plan.date&&time===plan.time)} onClick={()=>{onSchedule(date,time);setScheduleOpen(false);}}>Save schedule</button>}>
+      <label className="planner-field">Date<input aria-label="Event date (UTC)" type="date" value={date} disabled={started} onChange={e=>setDate(e.target.value)}/></label>
+      <label className="planner-field">Start time (UTC)<input aria-label="Event start time (UTC)" type="time" value={time} disabled={started} onChange={e=>setTime(e.target.value)}/></label>
+      <p className="planner-muted">Attendance opens one hour after the start.</p>
+      {started&&<button type="button" className="planner-button" disabled={!attendanceOpen(currentStart,clock)} onClick={()=>{
+        if(window.confirm('Start a new event for this legion? The previous attendance and power history are kept.')){setOccurrence('');setScheduleOpen(false);onNewEvent();}
       }}>Start a new event</button>}
-    </details>
+    </PlannerSheet>
     {choices.size>0&&<details style={card}>
       <summary style={{cursor:'pointer',fontWeight:650,minHeight:32}}>Attendance</summary>
       {choices.size>1&&<label style={{display:'block',marginBottom:8}}>Attendance event<select aria-label="Attendance event" value={selected} style={{...button,width:'100%',marginTop:4}} onChange={e=>setOccurrence(e.target.value)}>

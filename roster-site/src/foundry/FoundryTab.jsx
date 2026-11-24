@@ -5,7 +5,8 @@ import {useMemo,useState,useRef,useEffect} from 'react';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
 import {playerSearchFields} from '../../../src/services/playerNames.js';
 import {PlannerAttendance} from './PlannerAttendance.jsx';
-import {EVENT_NAMES,EVENT_LIMITS,REGISTRATION_ROLES,isParticipant,legionMoveError,TEAM_NAMES,plannerAlliances,eventStart,recentNoShow,resizePlannerTeams,formatPlannerPower} from '../../../src/services/eventPlanner.js';
+import {PlannerSheet} from './PlannerSheet.jsx';
+import {EVENT_NAMES,EVENT_LIMITS,REGISTRATION_ROLES,isParticipant,legionMoveError,TEAM_NAMES,plannerAlliances,eventStart,recentNoShow,resizePlannerTeams,formatPlannerPower,importRegistrationState} from '../../../src/services/eventPlanner.js';
 import {gameLanguageName,gameLanguageCode} from '../../../src/services/gameLanguageService.js';
 const supportedLanguageCodes=new Set(['en','ko','zh-TW','zh-CN','tr','ar','ru','es','pl','uk','it','fr','ka','de','pt','ja']);
 const languageOptions=['English','Korean','Traditional Chinese','Simplified Chinese','Turkish','Arabic','Russian','Spanish','Polish','Ukrainian','Italian','French','Georgian','German','Portuguese','Japanese'];
@@ -66,6 +67,11 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const format=n=>formatPlannerPower(n,kind);
  const saved=sharedFoundry||{};
  const [view,setView]=useState('players'),[query,setQuery]=useState('');
+ const [scheduleTarget,setScheduleTarget]=useState(null);
+ const [addPanel,setAddPanel]=useState('');
+ const [draftSummary,setDraftSummary]=useState(null);
+ const [discardDraft,setDiscardDraft]=useState(false);
+ const contextLabel=title+' · '+chosen+' · Legion '+legion;
  const [paste,setPaste]=useState(''),[showPaste,setShowPaste]=useState(false),[notice,setNotice]=useState(''),[selected,setSelected]=useState(null);
  const [undo,setUndo]=useState(null);
  const teamRefs=useRef({});
@@ -102,7 +108,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const teammateNames=p=>{const prefs=teamworkPreferences||{};const related=new Set();for(const pair of prefs.pairs||[]){if(!Array.isArray(pair)||pair.length<2)continue;const ids=pair.map(String);if(ids.includes(p.id))ids.filter(id=>id!==p.id).forEach(id=>related.add(id));}for(const group of prefs.groups||[]){const ids=(group.memberIds||[]).map(String);if(ids.includes(p.id))ids.filter(id=>id!==p.id).forEach(id=>related.add(id));}return active.filter(other=>other.id!==p.id&&teams[other.id]===teams[p.id]&&related.has(other.id)).map(other=>other.name);};
 
  const validAssignments=isFoundry?Object.fromEntries(active.map(p=>[p.id,buildings[teams[p.id]].includes(assignments[p.id])?assignments[p.id]:buildings[teams[p.id]][0]])):{};
- const update=(patch,msg,powers)=>{setUndo(saved);onSaveFoundry?.({...saved,...patch},powers);setNotice(msg||'Updated · syncing across devices');};
+ const update=(patch,msg,powers,expectedRegistrations)=>{setUndo(saved);onSaveFoundry?.({...saved,...patch},powers,expectedRegistrations);setNotice(msg||'Updated · syncing across devices');};
  const setStatus=(id,status)=>{const current=registeredUnder[id]===chosen?registrations[id]:'';const next=status===current?'':status;
   if(isParticipant(next)&&otherRole(id)){setNotice('Already assigned to Legion '+otherLegion+'. Open the player’s role to move them.');return}
   if(next==='join'&&joined.length>=limits.join){setNotice(limits.join+' combatant slots are full');return}
@@ -148,7 +154,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const fields=p=>[p.name,...(p.searchFields||[]),p.id].filter(v=>String(v||'').trim());
  const searchMatches=query.trim()?entries.filter(p=>p.matched&&fields(p).some(v=>norm(v).includes(norm(query))||(plain(query).length>=3&&plain(v).length>=3&&plain(v).includes(plain(query))))).slice(0,8):[];
  const pastedList=value=>/\\r|\\n/.test(value)||value.split(/\\s*[,;]\\s*/).filter(Boolean).length>=3;
- const onSearchInput=value=>{if(pastedList(value)){setPaste(value.replace(/\\s*;\\s*/g,'\\n'));setShowPaste(true);setQuery('');setNotice('Multiple players detected. Review the pasted list below.')}else setQuery(value)};
+ const onSearchInput=value=>{if(pastedList(value)){setPaste(value.replace(/\\s*;\\s*/g,'\\n'));setShowPaste(true);setAddPanel('import');setQuery('');setNotice('Multiple players detected. Review the pasted list below.')}else setQuery(value)};
  const matchesRoster=p=>!rosterSearch.trim()||fields(p).some(field=>norm(field).includes(norm(rosterSearch)));
  const roster=entries.filter(p=>activeRole(p.id)||otherRole(p.id)||p.alliance===chosen);
  const sortedRoster=roster.filter(p=>matchesRoster(p)&&(
@@ -187,12 +193,14 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   if(registrations[id]&&registeredUnder[id]!==chosen){setNotice('Already registered under '+registeredUnder[id]);return}
   if(registrations[id]===role&&registeredUnder[id]===chosen){setNotice(p.name+' is already registered');return}
   if(otherRole(id)){
-   setRoleFilter('all');setParticipantsOnly(false);setRosterSearch(p.name);setManaging(id);setQuery('');
+   setRoleFilter('all');setParticipantsOnly(false);setRosterSearch(p.name);setManaging(id);setQuery('');setAddPanel('');
    return;
   }
-  setStatus(id,role);setQuery('');
+  setStatus(id,role);setQuery('');setAddPanel('');
  };
- const confirmBulkImport=rows=>{
+ const registrationForImport=id=>importRegistrationState(saved,otherPlan,id);
+ const confirmBulkImport=(rows,expected)=>{
+  if(rows.some(row=>expected?.[row.id]!==registrationForImport(row.id)))return {error:'A player’s registration changed. Return to review and check the current assignments.'};
   const ids=new Set(),nextRegs={...registrations},nextUnder={...registeredUnder};
   const nextTeams={...teams},nextAssignments={...assignments},imports=[...(saved.imports||[])];
   let joins=joined.length,substitutes=subs.length,added=0,already=0;
@@ -218,7 +226,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     const index=imports.findIndex(x=>x.id===id);if(index>=0)imports[index]=record;else imports.push(record);
    }
   }
-  update({imports,registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments},added+' registered · '+already+' already registered',rows.filter(row=>row.power!==null).map(row=>({id:String(row.id),value:row.power})));
+  update({imports,registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments},added+' registered · '+already+' already registered',rows.filter(row=>row.power!==null).map(row=>({id:String(row.id),value:row.power})),expected);
   return {message:added+' registered · '+already+' already registered'};
  };
  const assign=(id,colour)=>{const nextTeams={...teams,[id]:colour};const nextAlloc={...assignments};if(isFoundry&&!buildings[colour].includes(nextAlloc[id]))nextAlloc[id]=buildings[colour][0];update({teams:nextTeams,assignments:nextAlloc},'Team updated')};
@@ -245,19 +253,21 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   const selectedForMove=confirmMove===p.id;
   const moveError=selectedForMove?legionMoveError(otherPlan,saved,p.id,other):'';
   return <div key={p.id} className="legion-player">
-    <div className="legion-player-main">
+    <div className="legion-player-main" data-bulk={bulkMode||undefined}>
       <div className="legion-player-identity">
         {bulkMode&&role&&<input type="checkbox" aria-label={'Select '+p.name} checked={bulkSelected.includes(p.id)} onChange={()=>setBulkSelected(ids=>ids.includes(p.id)?ids.filter(id=>id!==p.id):[...ids,p.id])}/>}
         <PlayerAvatar player={avatarFor(p)} size={34}/>
         <div style={{minWidth:0}}>
-          <button type="button" className="legion-player-name" aria-label={'Open profile for '+p.name} onClick={()=>onOpenPlayerProfile?.(p.id)}>{p.name}</button>
-          <small className="legion-player-context">{p.alliance} · {p.rank}{!p.matched?' · Needs matching':''}{p.language?' · '+languageLabel(p.language):''}</small>
+          <button type="button" className="legion-player-name" aria-label={'Open profile for '+p.name} onClick={()=>onOpenPlayerProfile?.(p.id)}>
+            {p.name}
+            <small className="legion-player-context">{p.alliance} · {p.rank}{!p.matched?' · Needs matching':''}{p.language?' · '+languageLabel(p.language):''}</small>
+          </button>
           {editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
-            <button type="button" className="legion-player-power" aria-label={'Edit '+metric.toLowerCase()+' for '+p.name} onClick={()=>setEditingPower(p.id)}>{p.hasPower?format(p.power):'Add power'}</button>}
+            <button type="button" className="legion-player-power" aria-label={'Edit '+metric.toLowerCase()+' for '+p.name} onClick={()=>setEditingPower(p.id)}>{p.hasPower?format(p.power)+' · Edit':'Add power'}</button>}
           {p.recentNoShow&&<NoShow/>}
         </div>
       </div>
-      {!bulkMode&&<button type="button" className="legion-role" data-role={elsewhere?'other':role} aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}>{label}</button>}
+      {!bulkMode&&<button type="button" className="legion-role" data-role={elsewhere?'other':role} aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}><span>{label}<span className="legion-role-chevron" aria-hidden="true">⌄</span></span></button>}
     </div>
     {!bulkMode&&managing===p.id&&<div style={{display:'grid',gap:8,marginTop:10}}>
       {elsewhere?<div style={{display:'grid',gap:8}}>
@@ -283,52 +293,46 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     </div>}
   </div>;
  };
- return <section style={{padding:'10px 16px 110px',color:'#eef5fc'}}>
-  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:9}}><div><h1 style={{fontSize:25,margin:'0 0 2px'}}>{title}</h1></div><button style={btn} onClick={()=>{if(undo){onSaveFoundry?.(undo);setUndo(null);setNotice('Last change undone')}}} disabled={!undo}>Undo</button></div>
+ const closeAdd=()=>{setAddPanel('');setDiscardDraft(false);setQuery('');if(!draftSummary){setShowPaste(false);setPaste('');}};
+ const clearDraft=()=>{setPaste('');setShowPaste(false);setDraftSummary(null);setDiscardDraft(false);};
+ const addFooter=addPanel==='menu'&&draftSummary&&<>
+   <button type="button" className="planner-button planner-primary" onClick={()=>setAddPanel('import')}>Resume bulk import</button>
+   <button type="button" className="planner-plain" onClick={()=>setDiscardDraft(true)}>Discard draft</button>
+ </>;
+ return <section className="legion-planner">
+  <div className="planner-title-row"><h1>{title}</h1><div ref={setScheduleTarget}/></div>
   <div className="legion-context">
-    <label>Registration alliance<select aria-label={title+' registration alliance'} value={chosen} onChange={e=>changeSelection(e.target.value,legion)} style={{...btn,width:'100%',marginTop:4}}>{alliances.map(a=><option key={a}>{a}</option>)}</select></label>
-    <fieldset><legend>Legion</legend><div className="legion-switch">{[1,2].map(number=><button key={number} type="button" aria-pressed={legion===number} onClick={()=>changeSelection(chosen,number)} style={{...btn,padding:'6px 3px',borderColor:legion===number?'#a3cbef':'#40546a',background:legion===number?'#2b4660':'#21354b'}}>Legion {number}</button>)}</div></fieldset>
+    <select aria-label={title+' registration alliance'} value={chosen} onChange={e=>changeSelection(e.target.value,legion)}>{alliances.map(a=><option value={a} key={a}>Alliance · {a}</option>)}</select>
+    <select aria-label="Legion" value={legion} onChange={e=>changeSelection(chosen,Number(e.target.value))}>{[1,2].map(number=><option key={number} value={number}>Legion {number}</option>)}</select>
   </div>
-  <div style={{display:'grid',gridTemplateColumns:'repeat('+(isFoundry?3:2)+',minmax(0,1fr))',gap:6,marginBottom:10}}>{[['players','Players'],['teams','Teams'],...(isFoundry?[['buildings','Buildings']]:[])].map(([id,label])=><button key={id} onClick={()=>setView(id)} style={{...btn,background:view===id?'#f5ad38':'#172a3e',color:view===id?'#101b28':'#e9f2fa',padding:'8px 3px',minHeight:40}}>{label}</button>)}</div>
-  {notice&&<div role="status" style={{...style,fontSize:13,color:'#f5bd5b'}}>{notice}</div>}
+  <nav className="legion-tabs" aria-label={title+' sections'}>{[['players','Players'],['teams','Teams'],...(isFoundry?[['buildings','Buildings']]:[])].map(([id,label])=><button type="button" key={id} onClick={()=>setView(id)} aria-current={view===id?'page':undefined}>{label}</button>)}</nav>
+  {(notice||undo)&&<div className="legion-notice">
+    <span role="status">{notice}</span>
+    {undo&&<button type="button" className="planner-plain" onClick={()=>{onSaveFoundry?.(undo);setUndo(null);setNotice('Last change undone')}}>Undo</button>}
+  </div>}
   {view==='players'&&<>
-   <div style={{...style,display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
-     {[['join','Combatants',joined.length],['sub','Substitutes',subs.length]].map(([role,label,count])=><button key={role} type="button" aria-pressed={roleFilter===role} onClick={()=>{setRoleFilter(roleFilter===role?'all':role);setBulkSelected([])}} style={{...btn,textAlign:'left',minHeight:60,borderColor:roleFilter===role?'#a3cbef':'#40546a'}}>
-       <strong style={{display:'block',fontSize:19,color:role==='join'?'#a0e2bf':'#b7dbff'}}>{count}/{limits[role]}</strong>{label}
+   <div className="legion-capacities">
+     {[['join','Combatants',joined.length],['sub','Substitutes',subs.length]].map(([role,label,count])=><button key={role} type="button" aria-pressed={roleFilter===role} onClick={()=>{setRoleFilter(roleFilter===role?'all':role);setBulkSelected([])}} className="legion-capacity" data-role={role}>
+       <strong>{count}/{limits[role]}</strong>{' '}<span>{label}</span>
      </button>)}
-     <div style={{gridColumn:'1 / -1',fontSize:13,color:'#adc2d6'}}>Combatant power <strong style={{color:'#eef5fc'}}>{joined.length>0&&joined.length===missingPower.length?'—':format(total(joined))}</strong>{missingPower.length>0&&<span> · {missingPower.length} missing</span>}</div>
    </div>
-   <PlannerAttendance kind={kind} alliance={chosen} legion={legion} plan={saved} players={attendancePlayers}
-    onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
-   <details style={{...style,padding:11}}>
-     <summary style={{cursor:'pointer',fontWeight:650}}>Add players</summary>
-     <div style={{display:'flex',alignItems:'center',gap:8,margin:'7px 0',flexWrap:'wrap'}}>
-       <div role="group" aria-label="Registration role" style={{display:'flex',gap:4,flexWrap:'wrap',background:'#0d1b2c',borderRadius:10,padding:3}}>
-         {REGISTRATION_ROLES.map(([role,label])=><button key={role} type="button" aria-pressed={addRole===role} onClick={()=>setAddRole(role)} style={{...btn,minHeight:32,padding:'5px 9px',fontSize:12,borderRadius:9,border:'none',background:addRole===role?'#344c63':'transparent'}}>{label}</button>)}
-       </div>
-     </div>
-     <div style={{display:'flex',alignItems:'center',gap:9,background:'#20344a',border:'1px solid #496077',borderRadius:12,padding:'0 12px'}}>
-       <span aria-hidden="true" style={{fontSize:20,color:'#eeb85a'}}>⊕</span>
-       <input aria-label="Search and add player by name or ID" value={query} onChange={e=>onSearchInput(e.target.value)} placeholder="Search name or Player ID to add" style={{background:'transparent',color:'#eef5fc',border:0,outline:'none',minHeight:42,width:'100%',fontSize:14}}/>
-       {query&&<button type="button" aria-label="Clear search" onClick={()=>setQuery('')} style={{...btn,padding:'4px 8px',minHeight:32}}>×</button>}
-     </div>
-     <button type="button" style={{...btn,background:'transparent',border:0,padding:'5px 2px',minHeight:30,color:'#a9c4dc',fontSize:13}} onClick={()=>setShowPaste(v=>!v)}>{showPaste?'Hide bulk import':'＋ Paste multiple players'}</button>
-   {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} · {metric}</small>{p.recentNoShow&&<NoShow/>}</span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
-   {showPaste&&<BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
-   </details>
-   <div style={{...style,padding:12}}>
-     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-       <h2 style={{fontSize:16,margin:0}}>Legion {legion} roster</h2>
-       <button type="button" style={{...btn,background:bulkMode?'#344c63':'#21354b'}} onClick={()=>{setBulkMode(v=>!v);setBulkSelected([])}}>{bulkMode?'Done':'Select'}</button>
+   <p className="legion-power-total">Combatant power <strong>{joined.length>0&&joined.length===missingPower.length?'—':format(total(joined))}</strong>{missingPower.length>0&&<span> · {missingPower.length} missing</span>}</p>
+   <div className="legion-roster">
+     <div className="planner-title-row">
+       <h2 aria-label={'Legion '+legion+' roster'}>Roster</h2>
+       <button type="button" className="planner-button planner-primary" onClick={()=>setAddPanel('menu')}>Add players</button>
      </div>
      <div className="legion-roster-tools">
-       <input type="search" aria-label="Search roster" placeholder="Search roster" style={btn} value={rosterSearch} onChange={e=>{setRosterSearch(e.target.value);setBulkSelected([])}}/>
-       <select aria-label="Sort roster" value={rosterSort} onChange={e=>setRosterSort(e.target.value)} style={btn}>
-         <option value="power">Highest power</option><option value="name">Name A–Z</option><option value="rank">Alliance rank</option>
+       <input className="planner-search" type="search" aria-label="Search roster" placeholder="Search roster" value={rosterSearch} onChange={e=>{setRosterSearch(e.target.value);setBulkSelected([])}}/>
+       <select aria-label="Sort roster" value={rosterSort} onChange={e=>setRosterSort(e.target.value)}>
+         <option value="power">Power</option><option value="name">Name A–Z</option><option value="rank">Alliance rank</option>
        </select>
-       <label><input type="checkbox" checked={participantsOnly} onChange={e=>{setParticipantsOnly(e.target.checked);setRoleFilter('all');setBulkSelected([])}}/> Participants only</label>
-       {roleFilter!=='all'&&<button type="button" style={btn} onClick={()=>{setRoleFilter('all');setBulkSelected([])}}>Clear role filter</button>}
      </div>
+     <div className="legion-roster-filters">
+       <label><input type="checkbox" checked={participantsOnly} onChange={e=>{setParticipantsOnly(e.target.checked);setRoleFilter('all');setBulkSelected([])}}/> Participants only</label>
+       <button type="button" className="planner-plain" aria-pressed={bulkMode} onClick={()=>{setBulkMode(v=>!v);setBulkSelected([]);closeEditor()}}>{bulkMode?'Done':'Manage'}</button>
+     </div>
+     {roleFilter!=='all'&&<div className="legion-filter-callout"><span>Showing {sortedRoster.length} {roleFilter==='join'?'combatant':'substitute'}{sortedRoster.length===1?'':'s'}</span><button type="button" className="planner-plain" onClick={()=>{setRoleFilter('all');setBulkSelected([])}}>Clear role filter</button></div>}
      {bulkMode&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',fontSize:12,color:'#b9cad9'}}><span>{bulkSelected.length} selected</span><button style={btn} onClick={()=>setBulkSelected(filteredRegistrations.map(p=>p.id))}>Select all</button></div>}
      {sortedRoster.length===0&&<p style={{color:'#adc2d6'}}>{rosterSearch?'No matching players.':'No players in this view.'}</p>}
      {(rosterSort==='rank'?groupedRanks:[null]).map(group=>{
@@ -359,6 +363,35 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      </div>}
    </div>
   </>}
+  <div className={view==='players'?'legion-attendance':'legion-attendance-hidden'}>
+    <PlannerAttendance kind={kind} alliance={chosen} legion={legion} plan={saved} players={attendancePlayers}
+      scheduleTarget={scheduleTarget}
+      onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
+  </div>
+  <PlannerSheet open={!!addPanel} onClose={closeAdd}
+    title={discardDraft?'Discard import draft?':addPanel==='find'?'Find a player to add':addPanel==='import'?'Bulk import':'Add players'}
+    context={contextLabel} footer={discardDraft?<><button type="button" className="planner-button" onClick={()=>{clearDraft();}}>Discard draft</button><button type="button" className="planner-plain" onClick={()=>setDiscardDraft(false)}>Keep draft</button></>:addFooter}>
+    {discardDraft?<p className="planner-muted">The pasted names and import choices will be removed.</p>:addPanel==='menu'&&<>
+      {!draftSummary&&<label className="planner-field">Registration role<select value={addRole} onChange={e=>setAddRole(e.target.value)}>
+        {REGISTRATION_ROLES.map(([role,label])=><option value={role} key={role}>{label}</option>)}
+      </select></label>}
+      <button className="planner-button planner-sheet-link" type="button" onClick={()=>setAddPanel('find')}>Find a player to add <span aria-hidden="true">›</span></button>
+      {draftSummary?<div className="planner-draft"><h3>Unfinished bulk import</h3><p>{draftSummary.matched} matched · {draftSummary.pending} need review{draftSummary.stage==='paste'?' · '+draftSummary.total+' pasted':''}</p></div>:
+        <button className="planner-button planner-sheet-link" type="button" onClick={()=>{setShowPaste(true);setAddPanel('import')}}>Paste multiple players <span aria-hidden="true">›</span></button>}
+    </>}
+    {addPanel==='find'&&<>
+     <div style={{display:'flex',alignItems:'center',gap:9,background:'#20344a',border:'1px solid #496077',borderRadius:12,padding:'0 12px'}}>
+       <span aria-hidden="true" style={{fontSize:20,color:'#eeb85a'}}>⊕</span>
+       <input aria-label="Search and add player by name or ID" value={query} onChange={e=>onSearchInput(e.target.value)} placeholder="Search name or Player ID to add" className="planner-search"/>
+       {query&&<button type="button" aria-label="Clear search" onClick={()=>setQuery('')} style={{...btn,padding:'4px 8px',minHeight:32}}>×</button>}
+     </div>
+   {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} · {metric}</small>{p.recentNoShow&&<NoShow/>}</span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
+    </>}
+    {showPaste&&<div hidden={addPanel!=='import'}>
+      <BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title+' · '+chosen+' · Legion '+legion} initialText={paste}
+        reviewRegistration={registrationForImport} onDraftChange={setDraftSummary} onConfirm={confirmBulkImport} onClose={()=>{clearDraft();closeAdd()}}/>
+    </div>}
+  </PlannerSheet>
   {(view==='teams'||view==='buildings')&&<>
    <div style={{...style,padding:12}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><strong>Team balance</strong><span style={{fontSize:12,color:'#a9bfd0'}}>{assignedCount}/{joined.length} assigned</span></div>
