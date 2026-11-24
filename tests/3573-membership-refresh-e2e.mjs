@@ -157,7 +157,7 @@ try{
     await chips.getByRole('button',{name:/More/}).click();
     await page.getByRole('button',{name:/^FARM ·/}).click();
     await page.getByText('Test player 001',{exact:true}).click();
-    await page.getByText('Membership verified ·',{exact:false}).locator('time').waitFor();
+    await page.getByRole('dialog',{name:'Player profile: Test player 001'}).getByText(/^Membership verified (just now|\d+ (minute|hour|day)s? ago)$/).waitFor();
     await context.close();
   }
   assert.deepEqual(errors,[]);

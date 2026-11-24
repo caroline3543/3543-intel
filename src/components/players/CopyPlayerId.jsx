@@ -1,13 +1,17 @@
 import {useState} from 'react';
 import {C} from '../../utils/constants.js';
 import {profileButton} from './ProfileParts.jsx';
-export function CopyPlayerId({fid}) {
+export function CopyPlayerId({fid,compact=false}) {
   const [status,setStatus]=useState('');
   if(!fid)return null;
   async function copy(){
     try { await navigator.clipboard.writeText(String(fid)); setStatus('Copied'); }
     catch { setStatus('Select the ID to copy it.'); }
   }
+  if(compact)return <div className="soft-profile-copy">
+    <button type="button" className="soft-profile-button" onClick={copy} aria-label={`Copy player ID ${fid}`}>ID {fid} <span aria-hidden="true">⧉</span></button>
+    {status&&<p className="soft-profile-muted" role="status">{status}</p>}
+  </div>;
   return <div style={{marginTop:8}}>
     <button type="button" onClick={copy} aria-label={`Copy player ID ${fid}`} style={{...profileButton,width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
       <span style={{color:C.icy}}>Player ID</span><span style={{color:C.white}}>{fid}</span>

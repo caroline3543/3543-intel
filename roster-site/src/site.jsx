@@ -221,6 +221,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
    }
   },[sync.dirty,sync.syncing,sync.issue,sync.conflicts?.length,sync.joined,sync.mode]);
   function saveTalPlan(talPlan){
+   const recordedAt = new Date().toISOString();
    pendingTalSync.current={active:true,sawDirty:false};
    setData(prev=>{
     const previous=new Map((prev.talPlan?.teams||[]).flatMap(t=>(t.members||[]).map(m=>[t.id+':'+String(m.id),m])));
@@ -231,7 +232,19 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
       ...(old.roleLocked&&m.roleLocked!==false?{role:old.role}:{})
      };
     })}));
-    return {...prev,talPlan:{...talPlan,teams,autoRoles:false}};
+    const records = Object.fromEntries(Object.entries(talPlan.records || {}).map(([id,record]) => {
+      const old = prev.talPlan?.records?.[id];
+      const power = record.troopPower;
+      if (power === '' || power == null) {
+        if (!record.troopPowerRecordedAt) return [id, record];
+        const cleared = {...record};
+        delete cleared.troopPowerRecordedAt;
+        return [id, cleared];
+      }
+      if (String(power) === String(old?.troopPower)) return [id, record];
+      return [id, {...record,troopPowerRecordedAt:recordedAt}];
+    }));
+    return {...prev,talPlan:{...talPlan,records,teams,autoRoles:false}};
    });
    setMessage('TAL changes saved on this device · syncing to the shared workspace…');
   }

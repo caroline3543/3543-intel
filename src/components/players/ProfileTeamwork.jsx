@@ -5,8 +5,9 @@ import {normaliseRallyPreferences} from '../../services/talTeamPreferences.js';
 
 const traits=[['priority','Priority joiner'],['reliable','Reliable'],['strategy','Understands strategy'],['voice','Voice chat'],['punctual','On time']];
 const pairKey=(a,b)=>[String(a),String(b)].sort().join(':');
-export function ProfileTeamwork({player,players=[],preferences={},onSavePreferences,onSavePlayer}){
+export function ProfileTeamwork({player,players=[],preferences={},onSavePreferences,onSavePlayer,softDark=false}){
  const [partner,setPartner]=useState('');
+ const [editingPairs,setEditingPairs]=useState(false);
  const [partnerQuery,setPartnerQuery]=useState('');
  const values=preferences.players?.[String(player.id)]||{};
  const pairs=(preferences.pairs||[]).filter(([a,b])=>String(a)===String(player.id)||String(b)===String(player.id));
@@ -21,7 +22,7 @@ export function ProfileTeamwork({player,players=[],preferences={},onSavePreferen
  }
  function removePair(a,b){save({...preferences,pairs:(preferences.pairs||[]).filter(([x,y])=>pairKey(x,y)!==pairKey(a,b))});}
  return <ProfileSection title="Teamwork">
-   <p style={{fontSize:13,color:C.icy,lineHeight:1.5}}>Officer-recorded preferences for working together. Not an automatic assessment of the player.</p>
+   {!softDark&&<><p style={{fontSize:13,color:C.icy,lineHeight:1.5}}>Officer-recorded preferences for working together. Not an automatic assessment of the player.</p>
    <label style={{fontSize:13,color:C.icy,display:'block',margin:'10px 0 14px'}}>Voice communication language
      <select aria-label="Preferred voice communication language" value={player.communicationLanguage||''}
        onChange={e=>onSavePlayer?.({...player,communicationLanguage:e.target.value,profileLastUpdated:new Date().toISOString()})}
@@ -34,7 +35,14 @@ export function ProfileTeamwork({player,players=[],preferences={},onSavePreferen
    {traits.map(([key,title])=><label key={key} style={{display:'flex',gap:10,alignItems:'center',minHeight:44,fontSize:14,color:C.white}}>
      <input type="checkbox" checked={values[key]===true} onChange={e=>trait(key,e.target.checked)}/>{title}
    </label>)}
-   <p style={{fontSize:13,color:C.icy,margin:'12px 0 6px'}}>Works well with</p>
+   </>}
+   {softDark&&[['voice','Voice chat'],['reliable','Reliable'],['strategy','Understands strategy']].map(([key,title])=><div key={key} className="soft-profile-row soft-profile-divider">
+     <span>{title}</span><button type="button" className="soft-profile-button" role="switch" aria-label={title} aria-checked={values[key]===true} disabled={!onSavePreferences} onClick={()=>trait(key,values[key]!==true)}>{values[key]===true?'On':'Off'}</button>
+   </div>)}
+   {softDark&&<div className="soft-profile-row soft-profile-divider">
+     <span>Works well with</span><span>{pairs.map(([a,b])=>name(String(a)===String(player.id)?b:a)).join(', ')||'Not recorded'}{onSavePreferences&&<button type="button" className="soft-profile-edit" aria-expanded={editingPairs} onClick={()=>setEditingPairs(!editingPairs)}>{editingPairs?'Done':'Edit'}</button>}</span>
+   </div>}
+   {(!softDark||editingPairs)&&<><p style={{fontSize:13,color:C.icy,margin:'12px 0 6px'}}>Works well with</p>
    {pairs.map(([a,b])=><div key={pairKey(a,b)} style={{display:'flex',gap:8,justifyContent:'space-between',alignItems:'center',minHeight:40}}>
      <span style={{fontSize:13,color:C.white}}>{name(String(a)===String(player.id)?b:a)}</span>
      <button type="button" style={profileButton} onClick={()=>removePair(a,b)}>Remove</button>
@@ -50,6 +58,6 @@ export function ProfileTeamwork({player,players=[],preferences={},onSavePreferen
        </div>}
       </div>
       <button type="button" style={profileButton} disabled={!partner} onClick={addPair}>Add</button>
-   </div>
+   </div></>}
  </ProfileSection>;
 }
