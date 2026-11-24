@@ -3,6 +3,7 @@ import {ALLIANCE_RANKS} from '../../utils/constants.js';
 import {verifiedMembershipTime} from '../../services/rosterViewService.js';
 import {providerField} from '../../services/gameLanguageService.js';
 import {latestTroopPowers} from '../../services/rosterExportRows.js';
+import {lastProfileLocation} from '../../services/profileLocation.js';
 import {PlayerAvatar} from './PlayerAvatar.jsx';
 import {CopyPlayerId} from './CopyPlayerId.jsx';
 import {ProfileSection, ProfileRow} from './ProfileParts.jsx';
@@ -50,11 +51,16 @@ function Stats({items, events = false}) {
   </div>;
 }
 
-function eventPowers(player, events) {
+function eventPowers(player, events, talRecord) {
   const latest = latestTroopPowers(player, events);
+  const savedTalPower = player.lastTalTroopPower ?? player.lastTALTroopPower;
+  const savedTalTime = player.lastTalTroopPowerAt ?? player.lastTALTroopPowerAt;
+  const planTalTime = talRecord?.troopPowerRecordedAt;
+  const usePlan = number(talRecord?.troopPower) !== null && (number(savedTalPower) === null ||
+    (Date.parse(planTalTime) || 0) > (Date.parse(savedTalTime) || 0));
   return [
     ['Foundry','foundry',player.lastFoundryTroopPower,player.lastFoundryTroopPowerAt],
-    ['TAL','tal',player.lastTalTroopPower ?? player.lastTALTroopPower,player.lastTalTroopPowerAt ?? player.lastTALTroopPowerAt],
+    ['TAL','tal',usePlan ? talRecord.troopPower : savedTalPower,usePlan ? planTalTime : savedTalTime],
     ['Canyon Clash','canyon',player.lastCanyonTroopPower ?? player.lastCanyonClashTroopPower,player.lastCanyonTroopPowerAt ?? player.lastCanyonClashTroopPowerAt],
   ].map(([label, key, value, at]) => {
     const record = latest[key];
@@ -120,7 +126,7 @@ function More({player,onSave,canFetchEquipment}) {
   </ProfileSection>;
 }
 
-export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamworkPreferences,onSaveTeamworkPreferences,canFetchEquipment=true}) {
+export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamworkPreferences,onSaveTeamworkPreferences,canFetchEquipment=true,talRecord}) {
   const panel = useRef(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -165,8 +171,8 @@ export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamw
           ['Lab score', lab?.score ?? player.providerDetails?.ranks?.labyrinth],
           ['Lab rank', lab?.rank ?? player.providerDetails?.ranks?.labyrinth_rank],
         ]}/></ProfileSection>
-        <ProfileSection title="Last recorded event power"><Stats events items={eventPowers(player,events)}/></ProfileSection>
-        <Location location={player.lastKnownLocation}/>
+        <ProfileSection title="Last recorded event power"><Stats events items={eventPowers(player,events,talRecord)}/></ProfileSection>
+        <Location location={lastProfileLocation(player)}/>
         <ProfileSection title="Alliance rank">
           <div className="soft-profile-ranks">{ALLIANCE_RANKS.map(rank => <button key={rank} type="button" className="soft-profile-button" aria-pressed={player.allianceRank === rank} disabled={!onSave} onClick={() => onSave({...player,allianceRank:player.allianceRank === rank ? null : rank})}>{rank}</button>)}</div>
         </ProfileSection>

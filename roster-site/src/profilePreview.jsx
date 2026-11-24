@@ -11,7 +11,7 @@ const complete = {
   troops:{infantry:'FC6',lancer:'FC6',marksman:'FC5'},
   power:252451388,providerRankings:{labyrinth:{score:18420,rank:24}},kills:2121064,
   lastFoundryTroopPower:112400000,lastFoundryTroopPowerAt:ago(97),
-  lastTalTroopPower:108700000,lastTalTroopPowerAt:ago(289),
+
   lastCanyonClashTroopPower:116200000,lastCanyonClashTroopPowerAt:ago(169),
   lastKnownLocation:{x:432,y:618,observedAt:ago(2.1)},
   allianceHistory:[
@@ -34,7 +34,7 @@ function Preview() {
     <div style={{padding:'12px 16px'}}><small>Sample player · Preview only</small>{!open&&<p><button type="button" onClick={()=>setOpen(true)}>Open player profile</button></p>}</div>
     {open&&<SoftDarkProfile player={player} players={[player,teammate]} onClose={()=>setOpen(false)}
       onSave={editable ? setPlayer : undefined} teamworkPreferences={teamwork}
-      onSaveTeamworkPreferences={editable ? setTeamwork : undefined} canFetchEquipment={false}/>}
+      onSaveTeamworkPreferences={editable ? setTeamwork : undefined} canFetchEquipment={false} talRecord={params.has('sparse') ? undefined : {troopPower:108700000,troopPowerRecordedAt:ago(289)}}/>}
   </main>;
 }
 createRoot(document.getElementById('root')).render(<Preview/>);
