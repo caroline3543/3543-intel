@@ -28,11 +28,18 @@ try {
     await input.fill('946105130');await input.press('Enter');
     await page.getByRole('button',{name:'Open profile for Northvale',exact:true}).click();
     const profile=page.getByRole('dialog',{name:/Player profile/});
-    await profile.getByText('946,105,130',{exact:true}).waitFor();
-    await profile.getByText('98,256,120',{exact:true}).waitFor();
-    await profile.getByText('1.52B',{exact:true}).waitFor();
+    const eventPower=profile.locator('.soft-profile-stats.event-stats');
+    await eventPower.getByText('946,105,130',{exact:true}).waitFor();
+    await eventPower.getByText('98,256,120',{exact:true}).waitFor();
+    await eventPower.getByText('1.52B',{exact:true}).waitFor();
     await profile.getByRole('button',{name:'Close profile'}).click();
 
+    const optIn=page.getByRole('checkbox',{name:'Opted in: Kite'});
+    await optIn.uncheck();
+    await page.getByRole('button',{name:/^Not participating.*2/}).click();
+    assert.equal(await optIn.isChecked(),false);
+    await optIn.click();
+    await page.getByRole('button',{name:'Combatant',exact:true}).last().click();
     await page.getByRole('button',{name:'Teams',exact:true}).click();
     const count=page.getByRole('combobox',{name:'Teams per legion'});
     for(const size of [3,4,5,6])await count.selectOption(String(size));
@@ -66,7 +73,7 @@ try {
     const canyon=page.getByRole('textbox',{name:'Canyon Clash power for Northvale',exact:true});
     await canyon.fill('1251234567');await canyon.press('Enter');
     await page.getByRole('button',{name:'Open profile for Northvale'}).click();
-    await profile.getByText('1.25B',{exact:true}).waitFor();
+    await eventPower.getByText('1.25B',{exact:true}).waitFor();
     await profile.getByText('Event attendance',{exact:true}).click();
     await profile.getByText('No-show',{exact:true}).waitFor();
     await profile.getByRole('button',{name:'Close profile'}).click();
