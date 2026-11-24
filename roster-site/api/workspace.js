@@ -1,3 +1,4 @@
+import {validateEventPlannerData} from '../server/eventPlannerValidation.js';
 import {gameApiConfig} from '../server/gameApi.js';
 import {gzipSync,gunzipSync} from 'node:zlib';
 import {accessContext,sameOrigin,respond} from '../server/access.js';
@@ -17,7 +18,7 @@ export default async function handler(req,res){
    if(!input||Object.keys(input).some(k=>!['revision','encoded','data'].includes(k))||!Number.isSafeInteger(input.revision)||input.revision<0)throw Error('Invalid save request.');
    const data=input.encoded?JSON.parse(gunzipSync(Buffer.from(input.encoded,'base64'),{maxOutputLength:24*1024*1024}).toString('utf8')):input.data;
    if(JSON.stringify(data).length>24*1024*1024)throw Error('Workspace is too large. Export a backup.');
-   body.action='commit';body.revision=input.revision;body.data=validateWorkspace(data);
+   body.action='commit';body.revision=input.revision;body.data=validateEventPlannerData(validateWorkspace(data));
   }catch(e){return respond(res,400,{error:e.message||'Invalid workspace data.'});}
  }
  const config=gameApiConfig();

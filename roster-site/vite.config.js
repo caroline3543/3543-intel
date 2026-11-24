@@ -10,7 +10,7 @@ export default defineConfig({
   build:{
     outDir:'dist',
     ...(includeProfilePreview ? {
-      rollupOptions:{input:{index:resolve('index.html'),profilePreview:resolve('profile-preview.html')}},
+      rollupOptions:{input:{index:resolve('index.html'),profilePreview:resolve('profile-preview.html'),eventPreview:resolve('event-preview.html')}},
     } : {}),
   },
 });
