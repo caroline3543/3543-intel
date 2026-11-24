@@ -35,7 +35,7 @@ try {
     await profile.getByRole('button',{name:'Close profile'}).click();
 
     const optIn=page.getByRole('checkbox',{name:'Opted in: Kite'});
-    await optIn.uncheck();
+    await optIn.click();
     await page.getByRole('button',{name:/^Not participating.*2/}).click();
     assert.equal(await optIn.isChecked(),false);
     await optIn.click();
