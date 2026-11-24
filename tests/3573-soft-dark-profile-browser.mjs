@@ -54,7 +54,7 @@ try {
     assert.equal(await profile.getByRole('button',{name:'R4',exact:true}).getAttribute('aria-pressed'),'true');
     await profile.getByRole('switch',{name:'Voice chat'}).click();
     assert.equal(await profile.getByRole('switch',{name:'Voice chat'}).getAttribute('aria-checked'),'false');
-    const notes=profile.locator('section').filter({has:profile.getByRole('heading',{name:'Officer notes',exact:true})});
+    const notes=profile.locator('section').filter({has:page.getByRole('heading',{name:'Officer notes',exact:true})});
     await notes.getByRole('button',{name:'Edit',exact:true}).click();
     await notes.getByRole('textbox',{name:'Officer notes'}).fill('Saved in the fixture');
     await notes.getByRole('button',{name:'Save notes'}).click();
