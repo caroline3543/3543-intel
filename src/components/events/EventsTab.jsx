@@ -1,3 +1,8 @@
+import {WorkspaceIntro} from '../common/WorkspaceIntro.jsx';
+import { ImportedWorksheetIntel } from '../spreadsheets/ImportedWorksheetIntel.jsx';
+import {readEventCloudRows,saveEventCloudIfUnchanged} from '../../services/eventCloudService.js';
+import {compareEventCopies,proposeSnapshotRestores,applySnapshotRestore,describeSnapshotChanges} from '../../services/eventCloudComparison.js';
+import {proposeSheetEventPower,applySheetEventPowerProposal} from '../../services/sheetEventMatchService.js';
 import { useState, useEffect, useRef } from 'react';
 import { C, EVENT_TYPES, EVENT_ICONS, TROOP_POWER_EVENTS, SHOWS_RSVP_TYPES, ALLIANCE_RANKS } from '../../utils/constants.js';
 import { vibe } from '../../utils/vibe.js';
@@ -36,7 +41,89 @@ import { SquadBalancerPanel } from './SquadBalancerPanel.jsx';
 // hard eligibility filter for leader/joiner picks), it's just set
 // automatically the moment someone is added here, not chosen manually.
 export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDeleteEvent, onAddPlayers, onUpdatePlayers, plans = [] }) {
+  const [cloudBackupBusy,setCloudBackupBusy]=useState(false);
+  const [snapshotRestores,setSnapshotRestores]=useState([]);
   const [filterType, setFilterType]   = useState('All');
+  const sheetMatches=proposeSheetEventPower({events,players});
+  async function backupEventToCloud(){
+    if(!activeEvent||cloudBackupBusy)return;
+    setCloudBackupBusy(true);
+    try{
+      const cloud=await readEventCloudRows();
+      const existing=cloud.find(row=>row.id===activeEvent.id);
+      if(existing){
+        const same=JSON.stringify(existing.data)===JSON.stringify(activeEvent);
+        if(same){showToast('Cloud backup is already up to date.');return;}
+        if(!window.confirm('An existing cloud backup was found. Replace that backup with this device\'s event? The save will be rejected if another device changed the cloud copy.'))return;
+      }else if(!window.confirm('Create a cloud backup of this event?'))return;
+      await saveEventCloudIfUnchanged(activeEvent,existing?.updated_at??null);
+      showToast('Event cloud backup confirmed.');
+    }catch(e){showToast(e.message||'Cloud backup failed');}
+    finally{setCloudBackupBusy(false)}
+  }
+  async function restoreEventFromCloud(){
+    if(!activeEvent||cloudBackupBusy)return;
+    setCloudBackupBusy(true);
+    try{
+      const cloud=await readEventCloudRows();
+      const existing=cloud.find(row=>row.id===activeEvent.id);
+      if(!existing){showToast('No cloud backup exists for this event.');return;}
+      if(existing.data?.id!==activeEvent.id)throw Error('Cloud event identity mismatch');
+      const comparison=compareEventCopies(activeEvent,existing.data);
+      if(comparison.unchanged){showToast('Event already matches the cloud backup.');return;}
+      const summary=[
+        'Restore cloud copy of '+(activeEvent.name||activeEvent.type)+'?',
+        'Participants added: '+comparison.added,
+        'Participants removed: '+comparison.removed,
+        'Changed participant snapshots: '+comparison.changedSnapshots,
+        'Squads or assignments changed: '+(comparison.changedSquads?'Yes':'No'),
+        'Changed event fields: '+(comparison.changedDetails.join(', ')||'None'),
+        'This replaces this device\'s version. Continue?',
+      ].join('\\n');
+      if(!window.confirm(summary))return;
+      onUpdateEvent({...existing.data,id:activeEvent.id});
+      showToast('Cloud event restored to this device.');
+    }catch(e){showToast(e.message||'Cloud restore failed');}
+    finally{setCloudBackupBusy(false)}
+  }
+  async function reviewSnapshotRestores(){
+    if(!activeEvent||cloudBackupBusy)return;
+    setCloudBackupBusy(true);setSnapshotRestores([]);
+    try{
+      const cloud=await readEventCloudRows();
+      const backup=cloud.find(row=>row.id===activeEvent.id);
+      if(!backup){showToast('No cloud event backup found.');return;}
+      const proposals=proposeSnapshotRestores(activeEvent,backup.data);
+      setSnapshotRestores(proposals.map(p=>({...p,eventId:activeEvent.id})));
+      if(!proposals.length)showToast('No eligible participant snapshots differ.');
+    }catch(e){showToast(e.message||'Could not compare snapshots');}
+    finally{setCloudBackupBusy(false)}
+  }
+  async function restoreOneSnapshot(proposal){
+    if(cloudBackupBusy)return;
+    const latest=events.find(e=>e.id===proposal.eventId);
+    if(!latest)return;
+    if(!window.confirm('Restore this participant snapshot? Changed fields: '+(describeSnapshotChanges(proposal.localSnapshot,proposal.cloudSnapshot).join(', ')||'Other snapshot data')+'. Event team assignments remain unchanged.'))return;
+    setCloudBackupBusy(true);
+    try{
+      const cloud=await readEventCloudRows();
+      const source=cloud.find(row=>row.id===proposal.eventId);
+      const fresh=source&&proposeSnapshotRestores(latest,source.data).find(p=>p.playerId===proposal.playerId);
+      if(!fresh||JSON.stringify(fresh.cloudSnapshot)!==JSON.stringify(proposal.cloudSnapshot))throw Error('Cloud backup changed since review. Review again.');
+      if(JSON.stringify(fresh.localSnapshot)!==JSON.stringify(proposal.localSnapshot))throw Error('Local participant changed since review. Review again.');
+      onUpdateEvent(applySnapshotRestore(latest,proposal));
+      setSnapshotRestores([]);
+      showToast('Participant snapshot restored locally. Back up to cloud separately if needed.');
+    }catch(e){setSnapshotRestores([]);showToast(e.message||'Restore blocked. Review again.');}
+    finally{setCloudBackupBusy(false)}
+  }
+  function approveSheetPower(proposal){
+    const event=events.find(e=>e.id===proposal.eventId);
+    if(!event)return;
+    if(!window.confirm('Apply imported troop power '+proposal.power+' to '+proposal.playerName+' in '+event.name+' on this device only? This is not a cloud-synced event update. Attendance and assignments will remain unchanged.'))return;
+    try{onUpdateEvent(applySheetEventPowerProposal(event,proposal));showToast('Troop power saved to this device. Event cloud sync is not yet available.');}
+    catch(e){window.alert(e.message||'Could not apply imported power.');}
+  }
   const [toastMsg, setToastMsg]       = useState(null);
   function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3500); }
   // { mode:'swap', player, sibling } — trying to add someone already in
@@ -572,6 +659,28 @@ export function EventsTab({ events, players, onCreateEvent, onUpdateEvent, onDel
 
   return (
     <div style={{ padding:'16px 20px 0' }}>
+      <WorkspaceIntro title="Events" description="Organise event schedules, attendance and team assignments." detail="Select an event to manage participants. Cloud backups are separate from local edits."/>
+      <ImportedWorksheetIntel kind="Events" players={players} />
+      {activeEvent&&<details style={{margin:'8px 0 12px',background:C.section,borderRadius:12,padding:12}}><summary style={{minHeight:44,fontSize:15,fontWeight:650,cursor:'pointer'}}>Cloud backup and restore options</summary><div style={{display:'flex',flexWrap:'wrap',gap:8,paddingTop:8}}> 
+        <button type="button" disabled={cloudBackupBusy} onClick={backupEventToCloud} style={{minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>
+          {cloudBackupBusy?'Checking cloud…':'Back up event to cloud'}
+        </button>
+        <button type="button" disabled={cloudBackupBusy} onClick={restoreEventFromCloud} style={{minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>Restore cloud backup</button>
+        <button type="button" disabled={cloudBackupBusy} onClick={reviewSnapshotRestores} style={{marginLeft:8,minHeight:44,padding:'8px 14px',background:'#1E3A52',border:'1px solid #5A7A94',borderRadius:10,color:'white'}}>Review participant restores</button>
+        {snapshotRestores.filter(p=>p.eventId===activeEvent.id).slice(0,30).map(p=><div key={p.playerId} style={{padding:'7px 0',fontSize:13,color:'#A8C4D8'}}>Participant: {players.find(x=>x.id===p.playerId)?.username||p.playerId} · Changes: {describeSnapshotChanges(p.localSnapshot,p.cloudSnapshot).join(', ')||'Other snapshot data'}
+          <button type="button" disabled={cloudBackupBusy} onClick={()=>restoreOneSnapshot(p)} style={{marginLeft:8,minHeight:40,padding:'8px 12px',borderRadius:8,background:'#1E3A52',color:'white'}}>Restore snapshot</button>
+        </div>)}
+        <p style={{fontSize:12,color:'#A8C4D8'}}>Backup updates use cloud version checks. Restore replaces this device's event only after confirmation.</p>
+      </div></details>}
+      {(sheetMatches.proposals.length>0||sheetMatches.conflicts.length>0)&&<section style={{margin:'12px 0',padding:14,background:'#152236',borderRadius:12,border:'1px solid #36536B',color:'#A8C4D8'}}>
+        <strong style={{color:'white'}}>Spreadsheet event matches</strong>
+        <p style={{fontSize:12}}>Approved changes are saved in this device's event workspace. They are not backed up or synced to Supabase yet.</p>
+        <p style={{fontSize:13}}>{sheetMatches.proposals.length} safe troop-power updates · {sheetMatches.conflicts.length} conflicts needing manual review</p>
+        {sheetMatches.proposals.slice(0,20).map(x=><div key={x.eventId+':'+x.playerId} style={{padding:'6px 0',fontSize:13}}>{x.playerName} · {x.power.toLocaleString()} troop power
+          <button type="button" onClick={()=>approveSheetPower(x)} style={{marginLeft:8,minHeight:40,padding:'8px 12px',borderRadius:8,background:'#1E3A52',color:'white',border:'1px solid #5A7A94'}}>Apply to event</button>
+        </div>)}
+        {sheetMatches.conflicts.slice(0,10).map((c,i)=><p key={i} style={{fontSize:12,color:'#FFC5A8',margin:'5px 0'}}>{c.reason} · {c.key}</p>)}
+      </section>}
       {toastMsg && (
         <div style={{ position:'fixed', top:20, left:'50%', transform:'translateX(-50%)', background:C.card+'ee', backdropFilter:'blur(12px)', border:`1px solid ${C.gold}44`, borderRadius:20, padding:'10px 20px', fontSize:13, fontWeight:600, color:C.gold, zIndex:800, maxWidth:'90%', textAlign:'center', pointerEvents:'none' }}>
           {toastMsg}

@@ -100,6 +100,11 @@ function mergePlayer(existing, incoming) {
     if (!ex || jh.skillLevel >= ex.skillLevel) jm.set(jh.hero, jh);
   });
   base.joinerHeroes = [...jm.values()];
+  // Cloud imports are authoritative for imported worksheet fields. A stale local
+  // profile timestamp must not hide an approved cloud worksheet update.
+  for(const field of ['sheetCombat','sheetEvents']) {
+    if(Object.prototype.hasOwnProperty.call(incoming,field)) base[field] = incoming[field];
+  }
   base.observationHistory = mergeObservationHistory(existing.observationHistory || [],incoming.observationHistory || []);
 
   const hm = new Map((existing.eventHistory || []).map(s => [s.snapshotId, s]));

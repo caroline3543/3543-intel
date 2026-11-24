@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {parseJoinerHeroes} from '../src/services/joinerHeroSheetParser.js';import {planStateRosterImport} from '../src/services/stateRosterImportPreview.js';
+test('validates structured joiner hero skills',()=>{assert.deepEqual(parseJoinerHeroes('Jessie:5; Norah:5'),[{hero:'Jessie',skillLevel:5},{hero:'Norah',skillLevel:5}]);assert.deepEqual(parseJoinerHeroes('Jessie'),[{hero:'Jessie',skillLevel:5}]);assert.throws(()=>parseJoinerHeroes('Jessie:5; jessie:5'),/Duplicate/);});
+test('previews new hero skills without replacing roster',()=>{const players=[{id:'one',fid:'123456789',allianceTag:'LUN',joinerHeroes:[{hero:'Jessie',skillLevel:4}]}];const p=planStateRosterImport({values:[['Player ID','State','Joiner Heroes'],['123456789','3573','Jessie:5; Norah:5']],mapping:{chief_id:'0',state:'1',joiner_heroes:'2'},players,stateId:'3573',worksheetAlliance:'LUN'});assert.equal(p.proposedChanges,1);assert.equal(p.candidates[0].changedHeroes,true);assert.equal(players[0].joinerHeroes[0].skillLevel,4);});
+
+test('rejects lower-level heroes rather than treating them as qualified',()=>assert.throws(()=>parseJoinerHeroes('Norah:4'),/only level-5 joiners/));
+
+test('name-only skill-5 joiners work on mobile',()=>assert.deepEqual(parseJoinerHeroes('Jessie; Norah'),[{hero:'Jessie',skillLevel:5},{hero:'Norah',skillLevel:5}]));

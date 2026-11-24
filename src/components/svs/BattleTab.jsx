@@ -1,3 +1,5 @@
+import {WorkspaceIntro} from '../common/WorkspaceIntro.jsx';
+import { ImportedWorksheetIntel } from '../spreadsheets/ImportedWorksheetIntel.jsx';
 import { useBattlePool } from '../../hooks/useBattlePool.js';
 import { mergePoolPlayers } from '../../services/battlePoolService.js';
 import { useState } from 'react';
@@ -68,6 +70,8 @@ export function BattleTab({ plans, players, events, onSave, onDelete, showToast,
 
   return (
     <>
+    <ImportedWorksheetIntel kind="Combat" players={players} />
+      <WorkspaceIntro title="Battle" description="Plan rallies, coordinate assignments and manage live battle timing." detail="Choose a plan or open the live rally room. Imported Combat stats are reference data."/>
     <PlanList
       plans={plans}
       onSelectPlan={setActivePlanId}

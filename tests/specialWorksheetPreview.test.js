@@ -1,0 +1,33 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {previewSpecialWorksheet} from '../src/services/specialWorksheetPreview.js';
+const players=[{id:'p1',fid:'123456789',username:'Test',allianceTag:'LUN'}];
+test('Combat accepts three troop types for the same player',()=>{const values=[['Player ID','State','Alliance','Troop Type','Attack %'],['123456789','3573','LUN','Infantry','120'],['123456789','3573','LUN','Lancer','70'],['123456789','3573','LUN','Marksman','80']];const p=previewSpecialWorksheet({type:'Combat',values,players,stateId:'3573'});assert.equal(p.matched,3);assert.equal(p.errors.length,0)});
+test('Events permits one player on multiple events',()=>{const values=[['Player ID','State','Alliance','Event ID','Event Date UTC'],['123456789','3573','LUN','F1','2026-11-03'],['123456789','3573','LUN','F2','2026-11-04']];const p=previewSpecialWorksheet({type:'Events',values,players,stateId:'3573'});assert.equal(p.matched,2);assert.equal(p.errors.length,0)});
+test('Reject cross-state rows',()=>{const p=previewSpecialWorksheet({type:'Events',values:[['Player ID','State','Alliance'],['123456789','3543','LUN']],players,stateId:'3573'});assert.equal(p.matched,0);assert.equal(p.errors.length,1)});
+
+test('Workbook placeholder event rows are not importable',()=>{const p=previewSpecialWorksheet({type:'Events',values:[['Player ID','State','Alliance','Event ID','Event Date UTC','Event Troop Power'],['123456789','3573','LUN','','','']],players,stateId:'3573'});assert.equal(p.matched,0);assert.equal(p.errors.length,0)});
+test('Incomplete or impossible UTC event dates are rejected',()=>{const p=previewSpecialWorksheet({type:'Events',values:[['Player ID','State','Alliance','Event ID','Event Date UTC','Event Troop Power'],['123456789','3573','LUN','F1','2026-02-30','120'],['123456789','3573','LUN','F2','','100']],players,stateId:'3573'});assert.equal(p.matched,0);assert.equal(p.errors.length,2)});
+
+test('Reject malformed numeric spreadsheet values',()=>{const p=previewSpecialWorksheet({type:'Combat',values:[['Player ID','State','Alliance','Troop Type','Attack %'],['123456789','3573','LUN','Infantry','1,2,3']],players,stateId:'3573'});assert.equal(p.matched,0);assert.equal(p.errors.length,1)});
+test('Warn if imported worksheet is longer than 100 rows',()=>{const values=[['Player ID','State','Alliance','Troop Type'],...Array.from({length:101},(_,i)=>['123456789','3573','LUN','Infantry'])];const p=previewSpecialWorksheet({type:'Combat',values,players,stateId:'3573'});assert.ok(p.errors.some(e=>e.includes('100-row')))});
+
+test('Workbook creation prepares the resulting spreadsheet ID for preview',async()=>{const {readFileSync}=await import('node:fs');const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');assert.ok(source.includes('setSpreadsheetId(result.spreadsheetId)'));});
+
+test('Switching spreadsheet invalidates previously reviewed imports and exports',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');
+ const input=source.slice(source.indexOf('setSpreadsheetId(found?found[1]:value)'),source.indexOf('placeholder="Paste the Google Sheets link for this state"'));
+ for(const reset of ['setPreviewRows(null)','setWriteBaseline(null)','setWriteReview(null)','setExportReceipt(null)','setRecordedExportReview(null)','setSheetInfo(null)','setColumnMapping({})']){
+  assert.ok(input.includes(reset),'Missing reset: '+reset);
+ }
+ assert.ok(source.includes('previewRows.spreadsheetId!==spreadsheetId.trim()'));
+});
+
+test('Approved special-row import must recheck live spreadsheet source',async()=>{const {readFileSync}=await import('node:fs');const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');const method=source.slice(source.indexOf('async function applySpecialRow'),source.indexOf('async function applyJoinerHeroes'));assert.ok(method.includes("'/functions/v1/sheets-rows-preview'"));assert.ok(method.includes('latest.rows?.[row.row-1]'));assert.ok(method.includes('latest.truncated'));});
+
+test('Server rejects malformed event keys and impossible calendar dates',async()=>{const {readFileSync}=await import('node:fs');const source=readFileSync(new URL('../supabase/functions/sheets-apply-troop-import/index.ts',import.meta.url),'utf8');assert.ok(source.includes(String.raw`\|[0-9]{4}-[0-9]{2}-[0-9]{2}$`));assert.ok(source.includes("toISOString().slice(0,10)"));});
+
+test('Cloud worksheet fields are not lost to an older local copy',async()=>{const {mergeImportedData}=await import('../src/services/exportImportService.js');const current={players:[{id:'p1',profileLastUpdated:'2099-01-01',sheetEvents:{old:{a:1}}}],events:[],svsPlans:[]};const incoming={players:[{id:'p1',profileLastUpdated:'2026-01-01',sheetEvents:{new:{a:2}}}],events:[],svsPlans:[]};const merged=mergeImportedData(current,incoming);assert.deepEqual(merged.players[0].sheetEvents,{new:{a:2}});});
+
+test('Connection status refresh gives visible progress and distinguishes saved credentials from Google API reachability',async()=>{const {readFileSync}=await import('node:fs');const source=readFileSync(new URL('../src/components/spreadsheets/SpreadsheetManager.jsx',import.meta.url),'utf8');assert.ok(source.includes('Checking connection…'));assert.ok(source.includes('Last checked:'));assert.ok(source.includes('Status check failed:'));assert.ok(source.includes('This does not test Google API access.'));assert.ok(source.includes('aria-live="polite"'));});
+
+test('Empty selected-state roster gives one actionable error instead of one per worksheet row',()=>{const values=[['Player ID','State','Alliance','Troop Type'],...Array.from({length:100},()=>['123456789','3543','ABC','Infantry'])];const p=previewSpecialWorksheet({type:'Combat',values,players:[],stateId:'3543'});assert.equal(p.matched,0);assert.equal(p.errors.length,1);assert.match(p.errors[0],/No players loaded in State 3543/);});

@@ -1,2 +1,7 @@
 [functions.whiteoutstats]
 verify_jwt = false
+
+# Google redirects to this function without a Supabase JWT.
+# /start verifies the authenticated user itself; /callback consumes a single-use OAuth nonce.
+[functions.sheets-oauth]
+verify_jwt = false
