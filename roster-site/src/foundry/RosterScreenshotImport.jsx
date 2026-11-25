@@ -118,7 +118,7 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
       const player = name || 'Unread player name';
       return power === null ? player : player + '\t' + power;
     }).join('\n');
-    setReview({ legion: group.legion, source, occurrenceId: batch.occurrenceIds[group.legion] });
+    setReview({ legion: group.legion, source, rows: group.rows, occurrenceId: batch.occurrenceIds[group.legion] });
   }
 
   return <section className="screenshot-import" aria-label="Troop power upload">
@@ -157,6 +157,15 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
           Review Legion {group.legion} · {group.rows.length} {group.rows.length === 1 ? 'reading' : 'readings'}
         </button>)}
     </>}
+    {review && <details open>
+      <summary>Detected registration and OCR warnings · Legion {review.legion}</summary>
+      <p>Registration readings are advisory only. Saving below updates troop power, not assignments.</p>
+      <ul className="screenshot-results">{review.rows.map((row,index)=><li key={index}>
+        <strong>{row.name || 'Unread player name'}</strong> · {row.power ?? 'Power missing'} · {row.registration === 'other-legion' ? (row.otherLegion ? 'Legion '+row.otherLegion+' dispatched' : 'Other legion, unconfirmed') : row.registration || 'Unknown'}
+        {row.conflict && <p role="alert">Conflicting screenshot readings. Verify before saving.</p>}
+        {row.powerConflict && <p role="alert">Power readings disagree: {row.powerConflict.join(' / ')}. Verify against screenshot.</p>}
+      </li>)}</ul>
+    </details>}
     {review && <BulkPlayerImport title="Review screenshot readings" players={players} alliance={alliance}
       context={title} roleLabel={'Legion ' + review.legion} initialText={review.source} requirePower verifyReadings startWithMatches parsePower={readScreenshotPower}
       onConfirm={rows => {
