@@ -163,6 +163,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  )).sort((a,b)=>rosterSort==='name'?a.name.localeCompare(b.name):
    Number(b.hasPower)-Number(a.hasPower)||b.power-a.power||a.name.localeCompare(b.name));
  const filteredRegistrations=sortedRoster.filter(p=>activeRole(p.id));
+ const rosterTeammates=new Map(entries.map(player=>[player.id,player.name]));
  const groupedRanks=['R5','R4','R3','R2','R1','Unranked'];
  const rankLabels={R5:'Alliance leader',R4:'Officers',R3:'Members',R2:'Members',R1:'Members'};
  const bulkUpdate=(role)=>{
@@ -254,6 +255,13 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   const elsewhere=other&&!isParticipant(role);
   const label=elsewhere?'Legion '+otherLegion+' · '+REGISTRATION_ROLES.find(([id])=>id===other)[1]:
     REGISTRATION_ROLES.find(([id])=>id===role)?.[1]||'Unassigned';
+  const linkedIds=new Set(relatedTo(p.id));
+  for(const group of teamworkPreferences.groups||[]){
+    const ids=(group.memberIds||[]).map(String);
+    if(ids.includes(p.id))ids.filter(id=>id!==p.id).forEach(id=>linkedIds.add(id));
+  }
+  const teammates=[...linkedIds].map(id=>rosterTeammates.get(id)).filter(Boolean);
+  const visibleRole=elsewhere?REGISTRATION_ROLES.find(([id])=>id===other)[1]+' · Legion '+otherLegion:label;
   const selectedForMove=confirmMove===p.id;
   const moveError=selectedForMove?legionMoveError(otherPlan,saved,p.id,other):'';
   return <div key={p.id} className="legion-player">
@@ -267,12 +275,18 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
             <small className="legion-player-context">{playerContext}{p.language&&<> <span className="legion-language">{languageLabel(p.language)}</span></>}</small>
             <span className="planner-sr-only"> · Open profile</span>
           </button>
-          {(roleFilter==='all'||elsewhere)&&<small className="legion-row-status" data-role={elsewhere?'other':role}>{label}</small>}
+          {teammates.length>0&&<div className="legion-teammates" role="group" aria-label={'Works well with '+p.name}>
+            {teammates.slice(0,2).map((teammate,index)=><span key={index} className="legion-language">{teammate}</span>)}
+            {teammates.length>2&&<details><summary aria-label={'Show '+(teammates.length-2)+' more teammates'}>+{teammates.length-2}</summary>
+              {teammates.slice(2).map((teammate,index)=><span key={index} className="legion-language">{teammate}</span>)}
+            </details>}
+          </div>}
           {p.recentNoShow&&<NoShow/>}
         </div>
       </div>
-      {editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
+      <div className="legion-player-metric">{editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
         <button type="button" className="legion-player-power" aria-label={powerLabel} onClick={()=>setEditingPower(p.id)}>{powerValue===null?'Add power':<>{powerValue}<span className="planner-sr-only"> · Edit</span></>}</button>}
+      <span className="legion-row-status" data-role={elsewhere?'other':role}>{visibleRole}</span></div>
       {!bulkMode&&<button type="button" className="legion-role" aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}><span aria-hidden="true">⋯</span></button>}
     </div>
     {!bulkMode&&managing===p.id&&<div style={{display:'grid',gap:8,marginTop:10}}>

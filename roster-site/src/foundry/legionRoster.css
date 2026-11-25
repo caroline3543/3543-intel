@@ -241,3 +241,24 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.legion-planner, .planner-sheet {
+  --planner-canvas: #0e1829;
+  --planner-surface: #152636;
+  --planner-control: #203548;
+  --planner-gold: #f5ad38;
+}
+.legion-tabs button[aria-current] { background: var(--planner-gold); color: #111c2a; border-color: var(--planner-gold); }
+.legion-capacity[aria-pressed=true], .legion-capacity strong, .legion-capacity[data-role=join] strong,
+.legion-rank-heading strong { color: var(--planner-gold); }
+.legion-capacity[aria-pressed=true] { border-color: var(--planner-gold); }
+.legion-player-metric { display: grid; justify-items: stretch; gap: 4px; min-width: 0; text-align: center; }
+.legion-row-status { padding: 2px 4px; border-radius: 6px; font-weight: 650; background: var(--planner-surface); }
+.legion-row-status[data-role=join] { background: #20382f; }
+.legion-row-status[data-role=sub] { background: #203750; }
+.legion-row-status[data-role=other] { background: #363047; }
+.legion-teammates { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 4px 0; }
+.legion-teammates .legion-language, .legion-teammates summary { font-size: .75rem; overflow-wrap: anywhere; color: var(--planner-muted); }
+.legion-teammates summary { cursor: pointer; min-block-size: 44px; min-inline-size: 44px; align-content: center; }
+.legion-teammates details[open] { flex-basis: 100%; }
+.legion-teammates details .legion-language { display: inline-block; margin-inline-end: 4px; }
