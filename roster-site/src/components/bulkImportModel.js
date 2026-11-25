@@ -1,6 +1,6 @@
 /** Shared across 3573 bulk-paste workflows. Never merge identities on fuzzy similarity. */
 export function normaliseBulkName(value){
- return String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/[\p{P}\p{S}\p{M}\s]/gu,'');
+ return String(value||'').normalize('NFKC').toLocaleLowerCase().normalize('NFD').replace(/[\p{P}\p{S}\p{M}\s]/gu,'');
 }
 export function parseBulkPlayers(text,parsePower){
  return String(text||'').split(/\r?\n/).map((line,index)=>{
@@ -25,10 +25,10 @@ export function bulkCandidates(name,players,preferredAlliance){
   const idExact=String(player.playerId||player.fid||player.id)===String(name).trim()&&/^\d+$/.test(String(name).trim());
   const exact=String(player.name||'').trim()===String(name).trim();
   const normalized=key.length>=3&&fields.some(v=>normaliseBulkName(v)===key);
-  const fuzzy=key.length>=4&&fields.some(v=>{const k=normaliseBulkName(v);return k.length>=4&&(k.includes(key)||key.includes(k)||editDistance(k,key)<=2)});
+  const fuzzy=key.length>=4&&fields.some(v=>{const k=normaliseBulkName(v);return k.length>=4&&(k.includes(key)||key.includes(k)||editDistance(k,key)<=(key.length>=8?2:1))});
   const score=idExact?110:exact?100:normalized?90:fuzzy?60:0;
   return {...player,score};
- }).filter(p=>p.score>0).sort((a,b)=>b.score-a.score||(a.alliance===preferredAlliance?-1:1)||a.name.localeCompare(b.name)).slice(0,8);
+ }).filter(p=>p.score>0).sort((a,b)=>b.score-a.score||(Number(b.alliance===preferredAlliance)-Number(a.alliance===preferredAlliance))||a.name.localeCompare(b.name)).slice(0,8);
 }
 function editDistance(a,b){
  if(Math.abs(a.length-b.length)>2)return 3;
