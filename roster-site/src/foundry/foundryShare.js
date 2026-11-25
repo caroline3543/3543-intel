@@ -11,18 +11,19 @@ export function foundryMessageStats(message){
  const value=String(message);
  return {characters:[...value].length,lines:value.split('\n').length};
 }
-export function foundryShareMessages({teamNames={},buildings={},active=[],teams={},assignments={},instructions=FOUNDRY_DEFAULT_INSTRUCTIONS}){
+export function foundryShareMessages({teamNames={},buildings={},active=[],teams={},assignments={},instructions=FOUNDRY_DEFAULT_INSTRUCTIONS,colours=['Blue','Yellow','Green','Pink']}){
  const block=colour=>{
   const title=String(teamNames[colour]||colour).trim()||colour;
-  return [title.toUpperCase()+' · '+FOUNDRY_POSITIONS[colour],...(buildings[colour]||[]).map(building=>{
+  return [title.toUpperCase()+(FOUNDRY_POSITIONS[colour]?' · '+FOUNDRY_POSITIONS[colour]:''),...(buildings[colour]||[]).map(building=>{
    const label=FOUNDRY_BUILDING_LABELS[building]||building;
    const names=active.filter(player=>teams[player.id]===colour&&assignments[player.id]===building).map(player=>player.name);
    return label+' · '+names.join(', ');
   })].join('\n');
  };
+ const pairs=[['Blue','Pink'],['Green','Yellow'],['Purple','Teal']]
+  .map(pair=>pair.filter(colour=>colours.includes(colour))).filter(pair=>pair.length);
  return [
-  ['Blue + Pink',['INITIAL ASSIGNMENTS (1/2)',block('Blue'),block('Pink')].join('\n\n')],
-  ['Green + Yellow',['INITIAL ASSIGNMENTS (2/2)',block('Green'),block('Yellow')].join('\n\n')],
+  ...pairs.map((pair,index)=>[pair.join(' + '),['INITIAL ASSIGNMENTS ('+(index+1)+'/'+pairs.length+')',...pair.map(block)].join('\n\n')]),
   ['Foundry instructions',['FOUNDRY INSTRUCTIONS',instructions].join('\n\n')]
  ];
 }

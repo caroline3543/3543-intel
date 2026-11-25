@@ -109,7 +109,7 @@ test('3573 active-player allocation and TAL under-development access are preserv
  const {readFileSync}=await import('node:fs');
  const source=readFileSync(new URL('../roster-site/src/site.jsx',import.meta.url),'utf8');
  assert.ok(source.includes("const activePlayers=players.filter(p=>p.membershipStatus!=='transferred_out')"));
- assert.ok(source.includes('<FoundryTab players={activePlayers}'));
+ assert.ok(source.includes('kind={kind} players={activePlayers}'));
  assert.ok(source.includes('Tundra Arms League under development'));
  assert.ok(!source.includes('<TalTab workspace='),'TAL editor is intentionally hidden');
  assert.ok(source.includes('value={data.talPlan}')===false,'TAL editor is not mounted');
@@ -146,7 +146,7 @@ test('Events uses compact accessible rows and locks unavailable events',async()=
  assert.ok(source.includes("tab==='events'?'Events'"));
  assert.ok(source.includes("disabled={!available} aria-disabled={!available}"));
  assert.ok(source.includes("['castle','Castle Battle','Coming soon',false]"));
- assert.ok(source.includes("['canyon','Canyon Clash','Coming soon',false]"));
+ assert.ok(source.includes("['canyon','Canyon Clash','Team planning and attendance',true]"));
 });
 
 test('No alliance is a distinct roster filter and a verified same-state allocation',async()=>{

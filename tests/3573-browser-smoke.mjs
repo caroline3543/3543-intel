@@ -63,7 +63,9 @@ try{
   const expectedTabs=['Members','Events','Compare','Changes'];
   const mainNav=page.getByRole('navigation',{name:'Main navigation'});
   assert.deepEqual(await mainNav.getByRole('button').allTextContents(),expectedTabs,'Main navigation must show the four primary tabs');
-  await page.getByRole('group',{name:'Recent transfers'}).getByRole('button',{name:'Transferred In · 1'}).waitFor();
+  assert.equal(await page.getByText('Transfer history',{exact:true}).count(),0);
+  await page.getByRole('group',{name:'Filter by alliance'}).getByRole('button',{name:/More/}).click();
+  await page.getByRole('group',{name:'Other alliances'}).getByRole('button',{name:/Transferred out · /i}).waitFor();
   await page.getByText('Transfer history',{exact:true}).click();
   await page.getByText(/1 in · 1 out · 0 net/).click();
   await page.getByText('Departed player',{exact:true}).waitFor();
@@ -71,7 +73,7 @@ try{
   stage='events';
   await mainNav.getByRole('button',{name:'Events',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:/Castle Battle/}).isDisabled(),true,'Unavailable Castle Battle must not be clickable');
-  assert.equal(await page.getByRole('button',{name:/Canyon Clash/}).isDisabled(),true,'Unavailable Canyon Clash must not be clickable');
+  assert.equal(await page.getByRole('button',{name:/Canyon Clash/}).isEnabled(),true);
   assert.equal(await page.getByRole('region',{name:'Events'}).count(),1);
   stage='tal-placeholder';
   const talEntry=page.getByRole('button',{name:/Tundra Arms League/});

@@ -1,3 +1,4 @@
+import {EVENT_NAMES,attendanceLabel,formatPlannerPower} from '../../services/eventPlanner.js';
 import {useEffect, useRef, useState} from 'react';
 import {ALLIANCE_RANKS} from '../../utils/constants.js';
 import {verifiedMembershipTime} from '../../services/rosterViewService.js';
@@ -43,7 +44,7 @@ function Stats({items, events = false}) {
       return <div key={label}>
         <span>{label}</span>
         <strong data-missing={value === null || undefined} title={value === null ? undefined : String(value)}>
-          {value === null ? 'Not recorded' : (rank ? '#' : '') + formatter.format(value)}
+          {value === null ? 'Not recorded' : events ? formatPlannerPower(value,label==='Canyon Clash'?'canyon':'foundry') : (rank ? '#' : '') + formatter.format(value)}
         </strong>
         {events && value !== null && <small>{profileAge(timestamp) || 'Date not recorded'}</small>}
       </div>;
@@ -61,7 +62,7 @@ function eventPowers(player, events, talRecord) {
   return [
     ['Foundry','foundry',player.lastFoundryTroopPower,player.lastFoundryTroopPowerAt],
     ['TAL','tal',usePlan ? talRecord.troopPower : savedTalPower,usePlan ? planTalTime : savedTalTime],
-    ['Canyon Clash','canyon',player.lastCanyonTroopPower ?? player.lastCanyonClashTroopPower,player.lastCanyonTroopPowerAt ?? player.lastCanyonClashTroopPowerAt],
+    ['Canyon Clash','canyon',player.lastCanyonClashTroopPower ?? player.lastCanyonTroopPower,player.lastCanyonClashTroopPowerAt ?? player.lastCanyonTroopPowerAt],
   ].map(([label, key, value, at]) => {
     const record = latest[key];
     const directTime = Date.parse(at || '');
@@ -108,8 +109,17 @@ function More({player,onSave,canFetchEquipment}) {
   delete ranks.labyrinth;
   delete details.labyrinth;
   delete details.labyrinth_rank;
+  const readings=Object.values(player.plannerPowerReadings||{}).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+  const attendance=Object.values(player.plannerAttendance||{}).sort((a,b)=>b.startAt.localeCompare(a.startAt));
+  const utc=at=>Number.isFinite(Date.parse(at))?new Date(at).toISOString().slice(0,16).replace('T',' ')+' UTC':'Date not recorded';
   return <ProfileSection title="More">
-    <details><summary>Power history</summary><PlayerHistorySection player={player}/></details>
+    <details><summary>Power history</summary><PlayerHistorySection player={player}/>
+      {readings.map((row,index)=><ProfileRow key={index} label={EVENT_NAMES[row.kind]+' · '+utc(row.at)} value={formatPlannerPower(row.value,row.kind)}/>)}
+    </details>
+    {attendance.length>0&&<details><summary>Event attendance</summary>{attendance.map((row,index)=><div key={index} className="soft-profile-row soft-profile-divider">
+      <span>{EVENT_NAMES[row.kind]} · {row.alliance} · Legion {row.legion}<br/><small>{utc(row.startAt)}</small></span>
+      <span>{row.role==='sub'?'Substitute':'Combatant'}<br/>{attendanceLabel(row.result)}</span>
+    </div>)}</details>}
     <details><summary>Kills &amp; activity</summary>
       <ProfileRow label="Kills" value={number(player.kills ?? player.providerStats?.kills)?.toLocaleString() ?? 'Not recorded'}/>
       {activity != null ? <RecordedActivity value={activity}/> : <ProfileRow label="Last known activity" value="Not recorded"/>}

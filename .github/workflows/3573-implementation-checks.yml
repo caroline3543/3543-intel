@@ -62,3 +62,6 @@ jobs:
           name: 3573-soft-dark-profile-captures
           path: profile-review-captures/
           if-no-files-found: ignore
+
+      - name: Foundry and Canyon Clash mobile and desktop interactions
+        run: node tests/3573-event-planner-browser.mjs
