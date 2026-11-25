@@ -46,7 +46,7 @@ test('missing, stale, partial or duplicate evidence cannot justify an unverified
   assert.deepEqual(result.workspace.players,players);
 });
 
-test('quick button requests exactly five lists and saves only the targeted candidates', async () => {
+test('quick button waits for five lists and follows up only on a pending roster', async () => {
   const {default:handle}=await import('../roster-site/api/priority-roster-refresh.js');
   const {sessionToken}=await import('../roster-site/server/access.js');
   const host='fixture.example';
@@ -69,13 +69,17 @@ test('quick button requests exactly five lists and saves only the targeted candi
         saved=input;
         return Response.json({queued:input.missing.length});
       }
+      assert.equal(input.wait,input.tag==='HOT' && calls.filter(tag=>tag==='HOT').length===2 ? 10 : 25);
+      if(input.tag==='HOT' && input.wait===25){
+        return Response.json({data:{fresh:false,refresh:'queued',retry_after:0}});
+      }
       const body=roster(input.tag,input.tag==='HOT'?['1002']:[]);
       body.data.cached_at=new Date(Date.now()-1000).toISOString();
       return Response.json(body);
     };
     const res={status(code){this.code=code;return this;},setHeader(){},json(body){return {status:this.code,body};}};
     const result=await handle({method:'POST',headers:{host,origin:'https://'+host,cookie:'__Host-caroline_access='+sessionToken(config)}},res);
-    assert.deepEqual(calls,['read',...PRIORITY_ALLIANCES,'priority-roster-refresh']);
+    assert.deepEqual(calls,['read',...PRIORITY_ALLIANCES,'HOT','priority-roster-refresh']);
     assert.deepEqual(saved.missing,['1001']);
     assert.equal(saved.data.players[1].allianceTag,'HOT');
     assert.deepEqual(result,{status:200,body:{succeeded:PRIORITY_ALLIANCES,unavailable:[],found:1,missing:1,queued:1}});
