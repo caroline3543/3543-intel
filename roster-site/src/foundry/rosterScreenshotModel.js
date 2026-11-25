@@ -64,3 +64,22 @@ export function combineScreenshotRows(screenshots) {
     return true;
   }));
 }
+
+ // Bright tick pixels are distinct from the muted empty checkbox fill.
+export function classifyRosterCheckboxes(pixels,width,height,top,bottom){
+ const h=bottom-top;
+ if(h<height*.065)return 'unknown';
+ function inspect(cx,blue){
+  let bright=0,fill=0,total=0;
+  for(let y=Math.max(top,Math.round(top+h*.23));y<Math.min(bottom,Math.round(top+h*.76));y++)
+   for(let x=Math.round(width*(cx-.019));x<Math.round(width*(cx+.019));x++){
+    const i=(y*width+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2];total++;
+    if(blue?b>r+35&&g>r+15&&b>g+10:g>r+15&&g>b+20)fill++;
+    if(blue?b>190&&g>145&&b-r>65&&g-r>45:g>155&&g-r>45&&g-b>65)bright++;
+   }
+  return {checked:bright>total*.045,visible:fill>total*.13};
+ }
+ const a=inspect(.755,false),b=inspect(.877,true);
+ if(!a.visible||!b.visible||a.checked&&b.checked)return 'unknown';
+ return a.checked?'combatant':b.checked?'substitute':'unassigned';
+}
