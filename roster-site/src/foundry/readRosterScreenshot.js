@@ -51,10 +51,10 @@ export async function createRosterReader() {
 // A cut-off row may contain only a formatted power and part of its icon.
 const isPowerLine = value => /(?:^|\D)\d{1,3}(?:[.,]\d{3}){2,}\s*$/.test(value);
 
-async function completeCanyonRow(worker, screen, region, row) {
+async function completeRosterRow(worker, screen, region, row) {
   const { left, top, textWidth, rowHeight } = region;
   const needsName = !row.name || isPowerLine(row.name);
-  if (!needsName && row.power !== null) return row;
+  const originalPower = row.power;
   await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
   try {
     if (needsName) {
@@ -68,7 +68,6 @@ async function completeCanyonRow(worker, screen, region, row) {
       if (!row.name && top <= screen.height * .334) return null;
       await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
     }
-    if (row.power !== null) return row;
     const powerLeft = Math.round(screen.width * .265);
     const powerTop = top + Math.floor(rowHeight * .49);
     const powerCrop = textCrop(screen, powerLeft, powerTop, Math.round(screen.width * .32), top + rowHeight - powerTop);
@@ -78,7 +77,11 @@ async function completeCanyonRow(worker, screen, region, row) {
     // The game prints full integers with groups of three. OCR can mistake
     // a comma for a dot. Leave compact decimals such as 1.25B alone.
     const value = /^\d{1,3}(?:[.,]\d{3})+$/.test(text) ? text.replace(/\./g, ',') : text;
-    row.power = readScreenshotPower(value);
+    const independentPower = readScreenshotPower(value);
+    row.power = originalPower ?? independentPower;
+    if (originalPower !== null && independentPower !== null && originalPower !== independentPower) {
+      row.powerConflict = [originalPower, independentPower];
+    }
     return row;
   } finally {
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK, tessedit_char_whitelist: '' });
@@ -127,7 +130,7 @@ export async function readRosterScreenshot(worker, file, kind) {
       const reading = await worker.recognize(crop);
       const row = readScreenshotRow(reading.data.text);
       if (!row) continue;
-      const completed = await completeCanyonRow(worker, screen, { left, top, textWidth, rowHeight }, row);
+      const completed = await completeRosterRow(worker, screen, { left, top, textWidth, rowHeight }, row);
       if (completed && otherLegionMarker) completed.otherLegionMarker = true;
       if (completed) {
         completed.registration = completed.otherLegion || otherLegionMarker ? 'other-legion' : classifyRosterCheckboxes(pixels,width,height,top,bottom);
