@@ -7,7 +7,7 @@ function canvas(width, height) {
   return Object.assign(document.createElement('canvas'), { width, height });
 }
 
-function textCrop(source, left, top, width, height, invert = false) {
+function textCrop(source, left, top, width, height, { invert = false, powerIconWidth = 0 } = {}) {
   const border = 12;
   const output = canvas(width + 2 * border, height + 2 * border);
   const context = output.getContext('2d', { willReadFrequently: true });
@@ -19,7 +19,9 @@ function textCrop(source, left, top, width, height, invert = false) {
     const light = .213 * pixels.data[i] + .715 * pixels.data[i + 1] + .072 * pixels.data[i + 2];
     const red = pixels.data[i], green = pixels.data[i + 1], blue = pixels.data[i + 2];
     const blueText = light < 148 && blue - red > 50 && blue - green > 20;
-    const ink = invert ? light > 183 : blueText;
+    const pixel = i / 4;
+    const powerIcon = powerIconWidth && pixel % width < powerIconWidth && pixel >= width * height * .53;
+    const ink = invert ? light > 183 : blueText && !powerIcon;
     pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = ink ? 0 : 255;
   }
   context.putImageData(pixels, border, border);
@@ -46,7 +48,7 @@ export async function createRosterReader(language, onProgress) {
   }
 }
 
-export async function readRosterScreenshot(worker, file) {
+export async function readRosterScreenshot(worker, file, kind) {
   const url = URL.createObjectURL(file);
   const source = new Image();
   try {
@@ -67,7 +69,7 @@ export async function readRosterScreenshot(worker, file) {
     const left = Math.round(width * .223);
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
     const header = textCrop(screen, Math.round(width * .24), Math.round(height * .17),
-      Math.round(width * .55), Math.round(height * .048), true);
+      Math.round(width * .55), Math.round(height * .048), { invert: true });
     const result = await worker.recognize(header);
     const legion = readScreenshotLegion(result.data.text);
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
@@ -81,10 +83,21 @@ export async function readRosterScreenshot(worker, file) {
         if (marker[i + 1] - marker[i] > 40 && marker[i + 1] - marker[i + 2] > 38) greenInk++;
       }
       if (greenInk > width * (bottom - top) * .002) continue;
-      const crop = textCrop(screen, left, top, Math.round(width * .49), bottom - top);
+      const textWidth = Math.round(width * .49);
+      const rowHeight = bottom - top;
+      const crop = textCrop(screen, left, top, textWidth, rowHeight);
       const reading = await worker.recognize(crop);
       const row = readScreenshotRow(reading.data.text);
-      if (row) rows.push(row);
+      if (!row) continue;
+      if (kind === 'canyon' && row.power === null) {
+        // The blue fist sometimes reads as a character beside Canyon power.
+        // Retry with the icon masked and keep the original name reading.
+        const powerIconWidth = Math.round(width * .265) - left;
+        const retry = textCrop(screen, left, top, textWidth, rowHeight, { powerIconWidth });
+        const revised = await worker.recognize(retry);
+        row.power = readScreenshotRow(revised.data.text)?.power ?? null;
+      }
+      rows.push(row);
     }
     return { legion, rows };
   } finally {

@@ -318,7 +318,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} · {metric}</small>{p.recentNoShow&&<NoShow/>}</span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
    <button type="button" style={{...btn,margin:'6px 0 6px 8px'}} aria-expanded={showScreenshot}
      onClick={()=>setShowScreenshot(value=>!value)}>{showScreenshot?'Hide screenshot reader':'Read screenshot'}</button>
-   {showScreenshot&&<RosterScreenshotImport title={title} alliance={chosen} players={entries.filter(p=>p.matched)}
+   {showScreenshot&&<RosterScreenshotImport kind={kind} title={title} alliance={chosen} players={entries.filter(p=>p.matched)}
      occurrenceIds={{[legion]:saved.occurrenceId,[otherLegion]:otherPlan.occurrenceId}} onSave={onSaveScreenshotPowers}/>}
    {showPaste&&<BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
    </details>

@@ -5,7 +5,7 @@ import './rosterScreenshot.css';
 
 const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
-export function RosterScreenshotImport({ title, alliance, players, occurrenceIds, onSave }) {
+export function RosterScreenshotImport({ kind, title, alliance, players, occurrenceIds, onSave }) {
   const [file, setFile] = useState(null);
   const [imageUrl, setImageUrl] = useState('');
   const [language, setLanguage] = useState('eng');
@@ -58,7 +58,7 @@ export function RosterScreenshotImport({ title, alliance, players, occurrenceIds
         if (!task.cancelled && status === 'recognizing text') setJob('Reading legion and player rows…');
       });
       if (task.cancelled) return;
-      const reading = await readRosterScreenshot(task.worker, file);
+      const reading = await readRosterScreenshot(task.worker, file, kind);
       if (task.cancelled) return;
       const rows = reading.rows.filter(row => row.name || row.power !== null);
       setResult({ ...reading, rows, occurrenceIds });
