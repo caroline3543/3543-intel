@@ -1,3 +1,5 @@
+import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
+import {verifiedMembershipTime} from '../../../src/services/rosterViewService.js';
 import {PlayerSearch} from '../../../src/components/players/PlayerSearch.jsx';
 import {useEffect,useState} from 'react';
 import {C} from '../../../src/utils/constants.js';
@@ -54,19 +56,28 @@ export function NameChanges({players,plan,onOpen}){
     {items.map(row=>{
      const p=playerById.get(row.playerId);
      const name=p.username||p.alias||String(p.fid||'Unknown player');
+     const alliance=p.membershipStatus==='transferred_out' ? p.transferDestinationAlliance||'Alliance unknown' :
+       p.allianceTag ? p.allianceName||p.allianceTag :
+       p.manualMembershipAt||verifiedMembershipTime(p)?'No Alliance':'Alliance unknown';
      const label=row.type==='alliance'?'Alliance':row.type==='furnace'?'Furnace':'Name';
      return <article key={row.id} style={{background:C.card,borderRadius:14,padding:'13px 14px',marginBottom:9}}>
+      <div style={{display:'flex',gap:10,alignItems:'center'}}>
+       <PlayerAvatar player={p} size={38}/>
+       <div style={{minWidth:0}}>
       <button type="button" aria-label={`Copy username ${name}`} onClick={()=>copyName(name,row.id)} style={{border:0,background:'transparent',padding:'3px 0',display:'inline-flex',alignItems:'center',gap:8,maxWidth:'100%',textAlign:'left',color:C.white,cursor:'pointer'}}>
-       <span style={{fontSize:17,fontWeight:700,overflowWrap:'anywhere',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{name}</span>
+       <span style={{fontSize:17,fontWeight:700,overflowWrap:'anywhere',minWidth:0}}>{name}</span>
        <span aria-hidden="true" style={{fontSize:14,color:copied===row.id?green:C.icy,flexShrink:0}}>{copied===row.id?'✓':'⧉'}</span>
       </button>
-      <div style={{fontSize:12,color:C.muted,marginTop:2}}>ID {p.fid||p.id}</div>
+      <div style={{fontSize:12,color:C.icy,overflowWrap:'anywhere'}}>{alliance}</div>
+      <div style={{fontSize:12,color:C.icy,marginTop:2}}>ID {p.fid||p.id}</div>
+       </div>
+      </div>
       <button type="button" onClick={()=>onOpen(p.id)} aria-label={`View ${name} profile and ${label.toLowerCase()} change`} style={{display:'block',width:'100%',background:'transparent',border:0,color:C.white,textAlign:'left',padding:'9px 0 0',cursor:'pointer',minHeight:50}}>
        <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap',fontSize:14}}>
         <span style={{fontSize:12,color:C.icy}}>{label}</span>
-        <span style={{color:C.white}}>{row.before}</span>
+        <span style={{color:C.white,overflowWrap:'anywhere',minWidth:0}}>{row.before}</span>
         <span style={{color:C.icy}}>→</span>
-        <strong style={{color:green,fontWeight:650}}>{row.after}</strong>
+        <strong style={{color:green,fontWeight:650,overflowWrap:'anywhere',minWidth:0}}>{row.after}</strong>
         <span style={{color:C.icy,marginLeft:'auto'}}>›</span>
        </div>
        <div title={new Date(row.at).toLocaleString()} style={{fontSize:11,color:C.muted,marginTop:8}}>{relativeTime(row.at,now)}</div>

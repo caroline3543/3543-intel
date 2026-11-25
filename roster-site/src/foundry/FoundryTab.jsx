@@ -6,7 +6,7 @@ import {useMemo,useState,useRef,useEffect} from 'react';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
 import {playerSearchFields} from '../../../src/services/playerNames.js';
 import {PlannerAttendance} from './PlannerAttendance.jsx';
-import {EVENT_NAMES,EVENT_LIMITS,REGISTRATION_ROLES,isParticipant,legionMoveError,TEAM_NAMES,plannerAlliances,eventStart,recentNoShow,resizePlannerTeams,formatPlannerPower} from '../../../src/services/eventPlanner.js';
+import {EVENT_NAMES,EVENT_LIMITS,REGISTRATION_ROLES,isParticipant,TEAM_NAMES,plannerAlliances,eventStart,recentNoShow,resizePlannerTeams,formatPlannerPower} from '../../../src/services/eventPlanner.js';
 import {gameLanguageName,gameLanguageCode,recordedLanguageNames} from '../../../src/services/gameLanguageService.js';
 const supportedLanguageCodes=new Set(['en','ko','zh-TW','zh-CN','tr','ar','ru','es','pl','uk','it','fr','ka','de','pt','ja']);
 const languageOptions=['English','Korean','Traditional Chinese','Simplified Chinese','Turkish','Arabic','Russian','Spanish','Polish','Ukrainian','Italian','French','Georgian','German','Portuguese','Japanese'];
@@ -26,7 +26,7 @@ const power=(p,kind)=>kind==='foundry'
  ?p.lastFoundryTroopPower??p.troopPower??p.lastTroopPower
  :p.lastCanyonClashTroopPower??p.lastCanyonTroopPower;
 const alliance=p=>String(p.alliance||p.homeAlliance||p.allianceTag||p.alliance_name||'Unassigned').trim()||'Unassigned';
-const rank=p=>{const r=String(p.allianceRank??p.rank??p.alliance_rank??'').toUpperCase();return /^R[1-5]$/.test(r)?r:'Unranked'};
+const rank=p=>{const r=String(p.allianceRank??'').toUpperCase();return /^R[1-5]$/.test(r)?r:'Unranked'};
 
 const T10=[66,71,76,83,88,94,99,104,110,115,121],T11=[80,86,92,100,106,114,120,126,135,141,148];
 const tierValue=raw=>{const x=String(raw||'').trim().toUpperCase();if(!x)return null;const fc=Number(x.match(/FC\s*(\d+)/)?.[1]||0);if(/T12|EXALTED/.test(x))return 96;if(/HELIOS|T11/.test(x))return T11[Math.min(fc,10)]??null;if(/FC\s*\d+|T10/.test(x))return T10[Math.min(fc,10)]??null;return ({7:28,8:38,9:50})[Number(x.match(/T\s*(\d+)/)?.[1]||0)]??null;};
@@ -69,7 +69,7 @@ function InlinePower({player,onSave,metric,onClose}){
  </div>;
 }
 export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',chosen,legion,changeSelection,sharedFoundry={},
-  otherPlan,otherLegion,onMoveLegion,onSaveScreenshotPowers,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
+  otherPlan,otherLegion,eventRegistrations,onChangeRoles,onRoleFeedback,onSaveScreenshotPowers,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
  const title=EVENT_NAMES[kind],isFoundry=kind==='foundry',metric=isFoundry?'Troop power':'Canyon Clash power';
  const limits=EVENT_LIMITS[kind];
  const colours=TEAM_NAMES.slice(0,sharedFoundry.teamCount||4);
@@ -108,7 +108,9 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const alliances=plannerAlliances([...entries.map(p=>p.alliance),chosen]);
  const registrations=saved.registrations||{},teams=saved.teams||{},assignments=saved.assignments||{},registeredUnder=saved.registeredUnder||{};
  const joined=entries.filter(p=>registrations[p.id]==='join'&&registeredUnder[p.id]===chosen),subs=entries.filter(p=>registrations[p.id]==='sub'&&registeredUnder[p.id]===chosen);
- const otherRole=id=>otherPlan.registeredUnder[id]===chosen&&isParticipant(otherPlan.registrations[id])?otherPlan.registrations[id]:'';
+ const elsewhereFor=id=>(eventRegistrations.get(id)||[]).filter(item=>item.alliance!==chosen||item.legion!==legion);
+ const roleTitle=role=>REGISTRATION_ROLES.find(([id])=>id===role)?.[1]||'Unassigned';
+ const assignmentLabel=({alliance,legion:number,role})=>(alliance===chosen?'':alliance+' · ')+'Legion '+number+' '+roleTitle(role);
  const activeRole=id=>registeredUnder[id]===chosen?registrations[id]||'':'';
  const active=joined.filter(p=>teams[p.id]&&colours.includes(teams[p.id]));
  const teammateNames=(p,available=entries)=>{
@@ -119,14 +121,29 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
 
  const validAssignments=isFoundry?Object.fromEntries(active.map(p=>[p.id,buildings[teams[p.id]].includes(assignments[p.id])?assignments[p.id]:buildings[teams[p.id]][0]])):{};
  const update=(patch,msg,powers)=>{setUndo(saved);onSaveFoundry?.({...saved,...patch},powers);setNotice(msg||'Updated · syncing across devices');};
- const setStatus=(id,status)=>{const current=registeredUnder[id]===chosen?registrations[id]:'';const next=status===current?'':status;
-  if(isParticipant(next)&&otherRole(id)){setNotice('Already assigned to Legion '+otherLegion+'. Open the player’s role to move them.');return}
-  if(next==='join'&&joined.length>=limits.join){setNotice(limits.join+' combatant slots are full');return}
-  if(next==='sub'&&subs.length>=limits.sub){setNotice(limits.sub+' substitute slots are full');return}
-  if(registrations[id]&&registeredUnder[id]!==chosen){setNotice('Already registered under '+registeredUnder[id]+'. Remove that registration before moving.');return}
-  const nextRegs={...registrations,[id]:next},nextUnder={...registeredUnder,[id]:chosen},nextTeams={...teams},nextAssignments={...assignments};
-  if(next!=='join'){delete nextTeams[id];delete nextAssignments[id]}
-  update({registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments},'Registration updated');
+ const commitRoles=changes=>{
+  const result=onChangeRoles(changes);
+  if(result.error){setNotice(result.error);return false;}
+  onRoleFeedback?.();
+  const moved=changes.filter(change=>change.moveFrom).length;
+  setUndo(moved?null:saved);
+  setNotice(moved?moved+' '+(moved===1?'player moved':'players moved'):'Registration updated');
+  setConfirmMove(null);
+  setManaging(null);
+  return true;
+ };
+ const requestRoles=(ids,role)=>{
+  const changes=[];
+  for(const id of ids){
+   const locations=isParticipant(role)?elsewhereFor(id):[];
+   if(locations.length>1){setNotice('A selected player has multiple assignments. Review those rosters before moving them.');return false}
+   changes.push({id,role,expectedRole:registrations[id]||'',...(locations.length?{moveFrom:locations[0]}:{})});
+  }
+  if(changes.some(change=>change.moveFrom)){
+   setConfirmMove({changes,error:''});
+   return false;
+  }
+  return commitRoles(changes);
  };
  const autoTeams=(mode='all')=>{
   setConfirmGenerate(false);
@@ -166,7 +183,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const pastedList=value=>/\\r|\\n/.test(value)||value.split(/\\s*[,;]\\s*/).filter(Boolean).length>=3;
  const onSearchInput=value=>{if(pastedList(value)){setPaste(value.replace(/\\s*;\\s*/g,'\\n'));setShowPaste(true);setQuery('');setNotice('Multiple players detected. Review the pasted list below.')}else setQuery(value)};
  const matchesRoster=p=>!rosterSearch.trim()||fields(p).some(field=>norm(field).includes(norm(rosterSearch)));
- const roster=entries.filter(p=>activeRole(p.id)||otherRole(p.id)||p.alliance===chosen);
+ const roster=entries.filter(p=>activeRole(p.id)||elsewhereFor(p.id).length||p.alliance===chosen);
  const sortedRoster=roster.filter(p=>matchesRoster(p)&&(
    roleFilter!=='all'?activeRole(p.id)===roleFilter:
    !participantsOnly||isParticipant(activeRole(p.id))
@@ -180,20 +197,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const openEditor=(kind,ids)=>{setEditIds(ids);setBulkAction(kind);setBulkLanguage('');setTeammateQuery('');setTeammateIds([]);setBulkRelationshipMode(ids.length>1?'each':'others')};
  const bulkUpdate=role=>{
   const ids=selectedIds();
-  if(!ids.length)return;
-  if(isParticipant(role)&&ids.some(otherRole)){setNotice('Move players assigned to the other legion individually.');return}
-  const nextRegs={...registrations},nextUnder={...registeredUnder},nextTeams={...teams},nextAssignments={...assignments};
-  for(const id of ids){
-   if(registrations[id]&&registeredUnder[id]!==chosen){setNotice('A selected player is already registered under '+registeredUnder[id]+'.');return}
-   nextRegs[id]=role;
-   nextUnder[id]=chosen;
-   if(role!=='join'){delete nextTeams[id];delete nextAssignments[id]}
-  }
-  if(Object.keys(nextRegs).filter(id=>nextUnder[id]===chosen&&nextRegs[id]===role).length>(limits[role]??Infinity)){
-   setNotice('Not enough registration slots for this change');return;
-  }
-  update({registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments},ids.length+' registration roles updated');
-  endSelection();
+  if(ids.length&&requestRoles(ids,role))endSelection();
  };
  const addLanguage=code=>{
   const ids=selectedIds();
@@ -205,17 +209,12 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const removeTeammate=(a,b)=>{const pairs=(teamworkPreferences.pairs||[]).filter(pair=>!Array.isArray(pair)||!(pair.map(String).includes(String(a))&&pair.map(String).includes(String(b))));const groups=[];const pairKeys=new Set(pairs.map(pair=>pair.map(String).sort().join('|')));for(const group of teamworkPreferences.groups||[]){const ids=(group.memberIds||[]).map(String);if(!ids.includes(String(a))||!ids.includes(String(b))){groups.push(group);continue}for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const pair=[ids[i],ids[j]],key=pair.slice().sort().join('|');if(key!==[String(a),String(b)].sort().join('|')&&!pairKeys.has(key)){pairs.push(pair);pairKeys.add(key)}}}onSaveTeamworkPreferences?.({...teamworkPreferences,pairs,groups})};
  const relatedTo=id=>[...new Set((teamworkPreferences.pairs||[]).filter(pair=>Array.isArray(pair)&&pair.map(String).includes(String(id))).flatMap(pair=>pair.map(String).filter(other=>other!==String(id))))];
  const teammateMatches=teammateQuery.trim()?entries.filter(p=>p.matched&&!selectedIds().includes(p.id)&&!teammateIds.includes(p.id)&&fields(p).some(field=>norm(field).includes(norm(teammateQuery)))).sort((a,b)=>{const score=p=>p.id===teammateQuery.trim()?0:norm(p.name)===norm(teammateQuery)?1:fields(p).some(v=>norm(v).startsWith(norm(teammateQuery)))?2:3;return score(a)-score(b)||a.name.localeCompare(b.name)}).slice(0,6):[];
- const bulkRemove=()=>{const ids=selectedIds().filter(id=>activeRole(id));const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};ids.forEach(id=>{delete nextRegs[id];delete nextTeams[id];delete nextAssignments[id]});update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' removed from registration');endSelection()};
+ const bulkRemove=()=>{const ids=selectedIds().filter(id=>activeRole(id));if(ids.length&&requestRoles(ids,''))endSelection()};
  const add=(id,role=addRole)=>{
-  const p=entries.find(x=>x.id===id);
-  if(!p||!p.matched){setNotice('Select a matched player profile');return}
-  if(registrations[id]&&registeredUnder[id]!==chosen){setNotice('Already registered under '+registeredUnder[id]);return}
-  if(registrations[id]===role&&registeredUnder[id]===chosen){setNotice(p.name+' is already registered');return}
-  if(otherRole(id)){
-   setRoleFilter('all');setParticipantsOnly(false);setRosterSearch(p.name);setManaging(id);setQuery('');
-   return;
-  }
-  setStatus(id,role);setQuery('');
+  const p=entries.find(x=>x.id===id&&x.matched);
+  if(!p){setNotice('Select a matched player profile');return}
+  if(activeRole(id)===role){setNotice(p.name+' is already registered');return}
+  requestRoles([id],role);setQuery('');
  };
  const confirmBulkImport=rows=>{
   const ids=new Set(),nextRegs={...registrations},nextUnder={...registeredUnder};
@@ -225,7 +224,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    const id=String(row.id),p=entries.find(x=>x.id===id&&x.matched);
    if(!p)return {error:'A selected player is no longer in the roster. Review the import.'};
    if(ids.has(id))return {error:'Duplicate Player ID. Review the import.'};ids.add(id);
-   if(isParticipant(addRole)&&otherRole(id))return {error:p.name+' is assigned to Legion '+otherLegion+'. Move them from the roster first.'};
+   if(isParticipant(addRole)&&elsewhereFor(id).length)return {error:p.name+' is assigned to '+assignmentLabel(elsewhereFor(id)[0])+'. Confirm a move from the roster before importing.'};
    const current=nextRegs[id],under=nextUnder[id];
    if(current&&under!==chosen)return {error:p.name+' is registered under '+under+'. Review before importing.'};
    if(current===addRole&&under===chosen){already++;}
@@ -263,12 +262,9 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const missingPower=joined.filter(p=>!p.hasPower);
  const balanceSpread=average?Math.round((Math.max(...Object.values(teamTotals))-Math.min(...Object.values(teamTotals)))/average*100):0;
  const renderRosterPlayer=p=>{
-  const role=activeRole(p.id),other=otherRole(p.id);
-  const elsewhere=other&&!isParticipant(role);
-  const label=elsewhere?'Legion '+otherLegion+' · '+REGISTRATION_ROLES.find(([id])=>id===other)[1]:
-    REGISTRATION_ROLES.find(([id])=>id===role)?.[1]||'Unassigned';
-  const selectedForMove=confirmMove===p.id;
-  const moveError=selectedForMove?legionMoveError(otherPlan,saved,p.id,other):'';
+  const role=activeRole(p.id),elsewhere=elsewhereFor(p.id)[0];
+  const label=elsewhere?assignmentLabel(elsewhere):isParticipant(role)?assignmentLabel({alliance:chosen,legion,role}):roleTitle(role);
+  const nextRole=elsewhere?'join':role==='join'?'sub':role==='sub'?'':'join';
   const isSelected=bulkSelected.includes(p.id);
   return <div key={p.id} className="legion-player" data-selected={bulkMode&&isSelected}>
     {bulkMode&&p.matched&&<button type="button" className="legion-card-select" aria-label={'Select '+p.name}
@@ -285,41 +281,53 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
           {p.recentNoShow&&<NoShow/>}
         </div>
       </div>
-      {bulkMode?<small className="legion-player-context">{label}</small>:<button type="button" className="legion-role" data-role={elsewhere?'other':role} aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}>{label}</button>}
+      {bulkMode?<small className="legion-player-context">{label}</small>:<div className="legion-role-controls">
+        <button type="button" data-role-feedback className="legion-role" data-role={elsewhere?'other':role} disabled={!p.matched}
+          aria-label={p.name+' · '+label} onClick={()=>requestRoles([p.id],nextRole)}>{label}</button>
+        {p.matched&&<button type="button" className="legion-more" aria-label={'More actions for '+p.name}
+          aria-expanded={managing===p.id} onClick={()=>setManaging(managing===p.id?null:p.id)}>•••</button>}
+      </div>}
     </div>
-    {!bulkMode&&managing===p.id&&<div style={{display:'grid',gap:8,marginTop:10}}>
-      {elsewhere?<div style={{display:'grid',gap:8}}>
-        <button type="button" style={btn} onClick={()=>changeSelection(chosen,otherLegion)}>Switch to Legion {otherLegion}</button>
-        {!selectedForMove?<button type="button" style={btn} onClick={()=>setConfirmMove(p.id)}>Move here</button>:
-          <div role="group" aria-label="Confirm legion move" style={{display:'grid',gap:8}}>
-            <span>Move {p.name} to Legion {legion} as {REGISTRATION_ROLES.find(([id])=>id===other)[1].toLowerCase()}?</span>
-            {moveError&&<small role="alert" style={{color:'#f0b1b8'}}>{moveError}</small>}
-            {!moveError&&p.matched&&<button type="button" style={btn} onClick={()=>{onMoveLegion(p.id,other);setConfirmMove(null);setManaging(null);setUndo(null)}}>Confirm move</button>}
-            <button type="button" style={btn} onClick={()=>setConfirmMove(null)}>Cancel</button>
-          </div>}
-      </div>:<>
-        <label style={{display:'flex',alignItems:'center',gap:6,minHeight:40}}>
-          <input type="checkbox" aria-label={'Opted in: '+p.name} checked={isParticipant(role)} onChange={e=>{if(!e.target.checked)setStatus(p.id,'out');else setStatus(p.id,'join')}}/> Opted in
-        </label>
-        <div role="group" aria-label={'Registration role for '+p.name} style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          {REGISTRATION_ROLES.map(([value,text])=><button key={value} type="button" aria-pressed={role===value} style={btn} onClick={()=>{if(role!==value)setStatus(p.id,value);setManaging(null)}}>{text}</button>)}
-        </div>
-        {role&&<button type="button" style={btn} onClick={()=>{setStatus(p.id,role);setManaging(null)}}>Remove from {title}</button>}
-        {p.matched&&<><button type="button" style={btn} onClick={()=>{openEditor('language',[p.id]);setManaging(null)}}>Language</button>
-          <button type="button" style={btn} onClick={()=>{openEditor('relationships',[p.id]);setManaging(null)}}>Works well with</button></>}
+    {!bulkMode&&managing===p.id&&<div className="legion-player-options">
+      {elsewhere&&<button type="button" style={btn} onClick={()=>changeSelection(elsewhere.alliance,elsewhere.legion)}>View {assignmentLabel(elsewhere)}</button>}
+      {!elsewhere&&<>
+        <button type="button" data-role-feedback style={btn} onClick={()=>requestRoles([p.id],'out')}>Not participating</button>
+        {role&&<button type="button" data-role-feedback style={btn} onClick={()=>requestRoles([p.id],'')}>Unassign</button>}
       </>}
+      <button type="button" style={btn} onClick={()=>{openEditor('language',[p.id]);setManaging(null)}}>Language</button>
+      <button type="button" style={btn} onClick={()=>{openEditor('relationships',[p.id]);setManaging(null)}}>Works well with</button>
     </div>}
   </div>;
  };
  return <section style={{padding:'10px 16px 110px',color:'#eef5fc'}}>
   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:9}}><div><h1 style={{fontSize:25,margin:'0 0 2px'}}>{title}</h1></div><button style={btn} onClick={()=>{if(undo){onSaveFoundry?.(undo);setUndo(null);setNotice('Last change undone')}}} disabled={!undo}>Undo</button></div>
   <div className="legion-context">
-    <label>Registration alliance<select aria-label={title+' registration alliance'} value={chosen} onChange={e=>changeSelection(e.target.value,legion)} style={{...btn,width:'100%',marginTop:4}}>{alliances.map(a=><option key={a}>{a}</option>)}</select></label>
+    <label>Registration alliance<select aria-label={title+' registration alliance'} value={chosen} onChange={e=>changeSelection(e.target.value,1)} style={{...btn,width:'100%',marginTop:4}}>{alliances.map(a=><option key={a}>{a}</option>)}</select></label>
     <fieldset><legend>Legion</legend><div className="legion-switch">{[1,2].map(number=><button key={number} type="button" aria-pressed={legion===number} onClick={()=>changeSelection(chosen,number)} style={{...btn,padding:'6px 3px',borderColor:legion===number?'#a3cbef':'#40546a',background:legion===number?'#2b4660':'#21354b'}}>Legion {number}</button>)}</div></fieldset>
   </div>
   <div style={{display:'grid',gridTemplateColumns:'repeat('+(isFoundry?3:2)+',minmax(0,1fr))',gap:6,marginBottom:10}}>{[['players','Players'],['teams','Teams'],...(isFoundry?[['buildings','Buildings']]:[])].map(([id,label])=><button key={id} onClick={()=>setView(id)} style={{...btn,background:view===id?'#f5ad38':'#172a3e',color:view===id?'#101b28':'#e9f2fa',padding:'8px 3px',minHeight:40}}>{label}</button>)}</div>
   {notice&&<div role="status" style={{...style,fontSize:13,color:'#f5bd5b'}}>{notice}</div>}
   {view==='players'&&<>
+   {confirmMove&&<div className="legion-move-overlay"><div role="dialog" aria-modal="true" aria-label="Confirm player moves" className="legion-bulk-dialog legion-move-dialog"
+     onKeyDown={event=>{if(event.key==='Escape')setConfirmMove(null)}}>
+     <h2 style={{margin:'0 0 6px',fontSize:18}}>Are you sure?</h2>
+     <ul>{confirmMove.changes.filter(change=>change.moveFrom).map(change=><li key={change.id}>
+       <strong>{entries.find(player=>player.id===change.id)?.name||change.id}</strong>
+       <div>From {change.moveFrom.alliance} · Legion {change.moveFrom.legion} {roleTitle(change.moveFrom.role)}</div>
+       <div>To {chosen} · Legion {legion} {roleTitle(change.role)}</div>
+     </li>)}</ul>
+     {confirmMove.changes.some(change=>!change.moveFrom)&&<p>{confirmMove.changes.filter(change=>!change.moveFrom).length} other selected {confirmMove.changes.filter(change=>!change.moveFrom).length===1?'player':'players'} will also be updated.</p>}
+     {confirmMove.error&&<p role="alert">{confirmMove.error}</p>}
+     <div className="legion-bulk-buttons">
+       <button type="button" autoFocus style={btn} onClick={()=>setConfirmMove(null)}>Cancel</button>
+       <button type="button" data-role-feedback style={{...btn,background:'#f5ad38',color:'#101b28'}} onClick={()=>{
+         const result=onChangeRoles(confirmMove.changes);
+         if(result.error){setConfirmMove({...confirmMove,error:result.error});return}
+         onRoleFeedback?.();
+         setConfirmMove(null);setUndo(null);setManaging(null);endSelection();setNotice('Registration updated');
+       }}>Confirm move</button>
+     </div>
+   </div></div>}
    <div style={{...style,display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
      {[['join','Combatants',joined.length],['sub','Substitutes',subs.length]].map(([role,label,count])=><button key={role} type="button" aria-pressed={roleFilter===role} onClick={()=>{setRoleFilter(roleFilter===role?'all':role)}} style={{...btn,textAlign:'left',minHeight:60,borderColor:roleFilter===role?'#a3cbef':'#40546a'}}>
        <strong style={{display:'block',fontSize:19,color:role==='join'?'#a0e2bf':'#b7dbff'}}>{count}/{limits[role]}</strong>{label}
@@ -384,13 +392,13 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
          {rankExpanded[group]!==false&&rows.map(renderRosterPlayer)}
        </div>;
      })}
-     {editIds&&<div role="dialog" aria-label={'Edit '+title+' players'} className="legion-bulk-dialog">
+     {editIds&&!confirmMove&&<div role="dialog" aria-label={'Edit '+title+' players'} className="legion-bulk-dialog">
        <div style={{display:'flex',alignItems:'center',gap:8}}><strong style={{flex:1,fontSize:13}}>{editIds.length===1?entries.find(p=>p.id===editIds[0])?.name:editIds.length+' selected'}</strong><button type="button" style={btn} onClick={closeEditor}>Close</button></div>
        {bulkAction&&<div style={{maxHeight:'55vh',overflowY:'auto',marginTop:8,display:'grid',gap:8}}>
          {bulkAction==='actions'&&[['out','Set as not participating'],['relationships','Works well with'],['remove','Remove from registration']].map(([key,label])=><button key={key} style={{...btn,textAlign:'left'}} onClick={()=>openEditor(key,selectedIds())}>{label} ›</button>)}
          {REGISTRATION_ROLES.some(([role])=>role===bulkAction)&&<>
            <strong>Set as {REGISTRATION_ROLES.find(([role])=>role===bulkAction)[1]}</strong>
-           <button style={btn} onClick={()=>bulkUpdate(bulkAction)}>Apply to {editIds.length} {editIds.length===1?'player':'players'}</button>
+           <button data-role-feedback style={btn} onClick={()=>bulkUpdate(bulkAction)}>Apply to {editIds.length} {editIds.length===1?'player':'players'}</button>
          </>}
          {bulkAction==='language'&&<><label style={{fontSize:12,color:'#b9cad9'}}>Language<input aria-label="Language" value={bulkLanguage} onChange={e=>setBulkLanguage(e.target.value)} placeholder="Type a language or code, e.g. ko" style={{...btn,width:'100%',boxSizing:'border-box',marginTop:5}}/></label>{bulkLanguage.trim()&&languageOptions.filter(n=>n.toLowerCase().includes(bulkLanguage.toLowerCase())||resolveLanguage(bulkLanguage)===resolveLanguage(n)).slice(0,6).map(n=><button key={n} style={{...btn,textAlign:'left'}} onClick={()=>setBulkLanguage(n)}>{n}</button>)}<button style={btn} onClick={()=>addLanguage(resolveLanguage(bulkLanguage))}>Add language to {editIds.length} {editIds.length===1?'player':'players'}</button></>}
          {bulkAction==='relationships'&&<>
@@ -399,7 +407,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
            {selectedIds().length===1&&relatedTo(selectedIds()[0]).map(id=><div key={id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:12}}><span>{entries.find(p=>p.id===id)?.name||id}</span><button style={btn} aria-label={'Unlink '+id} onClick={()=>removeTeammate(selectedIds()[0],id)}>×</button></div>)}
            <button style={btn} onClick={applyBulkRelationships}>Save teammates</button>
          </>}
-         {bulkAction==='remove'&&<><span style={{fontSize:12}}>Remove {bulkSelected.length} registrations? Profiles are retained.</span><button style={{...btn,color:'#f1a9a9'}} onClick={bulkRemove}>Confirm removal</button></>}
+         {bulkAction==='remove'&&<><span style={{fontSize:12}}>Remove {bulkSelected.length} registrations? Profiles are retained.</span><button data-role-feedback style={{...btn,color:'#f1a9a9'}} onClick={bulkRemove}>Confirm removal</button></>}
        </div>}
      </div>}
    </div>

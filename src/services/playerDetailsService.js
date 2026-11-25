@@ -29,7 +29,7 @@ export function applyPlayerDetails(player,response,state){
   const {details,base,ranks,at}=normalizePlayerDetails(response,player,state);
   const member={...base,chief_id:player.fid,alliance_rank_label:base.alliance?.rank_label ?? base.alliance_rank_label,alliance_rank:base.alliance?.rank ?? base.alliance_rank};
   const tag=typeof base.alliance?.abbr==='string'?base.alliance.abbr:'';
-  const rows=allianceRows({retrieved_at:at,data:{members:[member]}},String(state),tag);
+  const rows=allianceRows({retrieved_at:at,data:{members:[member],alliance:tag?{...base.alliance,kid:state}:null}},String(state),tag);
   let updated=mergeAllianceProfiles([player],rows,String(state)).updated[0];
   if(!updated)throw new Error('Unable to match this player. Nothing was changed.');
   const explicitAlliance=base.alliance===null||typeof base.alliance?.abbr==='string';
@@ -42,16 +42,16 @@ export function applyPlayerDetails(player,response,state){
   const evidence=String(state)==='3573'?(verifiedLocation?{tag:verifiedLocation.tag,at:verifiedLocation.at,noAlliance:!verifiedLocation.tag}:prior.at?prior:null):(explicitAlliance?{tag:tag.trim(),at,noAlliance:!tag.trim()}:prior.at?prior:null);
   updated={...updated,providerDetails:details,providerStats:{...updated.providerStats,allianceObservation:evidence}};
   if(explicitAlliance&&!tag.trim()&&(String(state)!=='3573'||verifiedLocation)){
-    updated.allianceTag='';updated.allianceRank=null;updated.providerStats.allianceTag='';
+    updated.allianceTag='';updated.allianceRank=null;updated.allianceName='';updated.providerStats.allianceTag='';
     if(player.allianceTag)updated.allianceHistory=[...(player.allianceHistory||[]),{from:player.allianceTag,to:'',at}];
   }
   if(String(state)==='3573'){
     if(verifiedLocation){
-      try{const confirmed=applyVerifiedMembership(player,verifiedLocation);for(const key of ['allianceTag','allianceHistory','lastKnownAlliance','membershipStatus','membershipObservedAt','membershipLastSuccessfulAt','membershipCheckedAt','membershipReviewedAt','manualMembershipAt','transferredOutAt','transferDestinationState','transferDestinationAlliance']){if(Object.prototype.hasOwnProperty.call(confirmed,key))updated[key]=structuredClone(confirmed[key]);else delete updated[key];}}
+      try{const confirmed=applyVerifiedMembership(player,verifiedLocation);for(const key of ['allianceTag','allianceRank','allianceName','allianceHistory','lastKnownAlliance','membershipStatus','membershipObservedAt','membershipLastSuccessfulAt','membershipCheckedAt','membershipReviewedAt','manualMembershipAt','transferredOutAt','transferDestinationState','transferDestinationAlliance']){if(Object.prototype.hasOwnProperty.call(confirmed,key))updated[key]=structuredClone(confirmed[key]);else delete updated[key];}}
       catch{verifiedLocation=null;}
     }
     if(!verifiedLocation){
-      const protectedFields=['allianceTag','allianceRank','allianceHistory','lastKnownAlliance','membershipStatus','membershipObservedAt','membershipLastSuccessfulAt','membershipCheckedAt','membershipReviewedAt','manualMembershipAt','transferredOutAt','transferDestinationState','transferDestinationAlliance'];
+      const protectedFields=['allianceTag','allianceRank','allianceName','allianceHistory','lastKnownAlliance','membershipStatus','membershipObservedAt','membershipLastSuccessfulAt','membershipCheckedAt','membershipReviewedAt','manualMembershipAt','transferredOutAt','transferDestinationState','transferDestinationAlliance'];
       for(const key of protectedFields)if(Object.prototype.hasOwnProperty.call(player,key))updated[key]=structuredClone(player[key]);else delete updated[key];
       updated.providerStats={...updated.providerStats,allianceTag:player.providerStats?.allianceTag,allianceObservation:prior.at?prior:null};
     }

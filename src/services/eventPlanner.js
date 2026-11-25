@@ -93,8 +93,94 @@ function savePower(player,kind,id,value,at) {
   return {...player,[field]:value,[dateField]:at,plannerPowerReadings:readings};
 }
 
-export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId,move},now=Date.now()) {
+export function eventAssignments(storage,kind) {
+  const slots=new Map();
+  if(kind==='foundry')for(const alliance of new Set(Object.values(storage?.registeredUnder||{}))){
+    if(alliance)slots.set(plannerKey(kind,alliance,1),{alliance,legion:1});
+  }
+  for(const key of Object.keys(storage?.eventPlans||{})){
+    let slot;
+    try{slot=JSON.parse(key)}catch{continue}
+    if(Array.isArray(slot)&&slot[0]===kind&&typeof slot[1]==='string'&&[1,2].includes(slot[2])){
+      slots.set(key,{alliance:slot[1],legion:slot[2]});
+    }
+  }
+  const assignments=new Map();
+  for(const {alliance,legion} of slots.values()){
+    const plan=plannerSlot(storage,kind,alliance,legion);
+    for(const [id,role] of Object.entries(plan.registrations)){
+      if(!isParticipant(role)||plan.registeredUnder[id]!==alliance)continue;
+      const assignment={alliance,legion,role,occurrenceId:plan.occurrenceId};
+      assignments.set(id,[...(assignments.get(id)||[]),assignment]);
+    }
+  }
+  return assignments;
+}
+
+export function prepareEventRoles(storage,{kind,alliance,legion,expectedOccurrenceId},changes,now=Date.now()) {
+  const destination=plannerSlot(storage,kind,alliance,legion);
+  const fail=error=>({error});
+  if(destination.occurrenceId!==expectedOccurrenceId)return fail('The selected event changed. Try again.');
+  const assignments=eventAssignments(storage,kind),from=new Map(),to={...destination};
+  to.registrations={...destination.registrations};
+  to.registeredUnder={...destination.registeredUnder};
+  to.teams={...destination.teams};
+  to.assignments={...destination.assignments};
+  const seen=new Set();
+  for(const {id,role,expectedRole,moveFrom} of changes){
+    if(seen.has(id)||!['','out','join','sub'].includes(role)||(destination.registrations[id]||'')!==expectedRole){
+      return fail('A registration changed. Check the current role and try again.');
+    }
+    seen.add(id);
+    const elsewhere=(assignments.get(id)||[]).filter(item=>item.alliance!==alliance||item.legion!==legion);
+    if(elsewhere.length&&isParticipant(role)){
+      const source=elsewhere[0];
+      if(elsewhere.length!==1)return fail('A player has multiple existing assignments. Review those rosters before moving them.');
+      if(!moveFrom||['alliance','legion','role','occurrenceId'].some(key=>source[key]!==moveFrom[key])){
+        return fail('The player is assigned elsewhere. Confirm the current assignment before moving them.');
+      }
+      const start=eventStart(destination.date,destination.time);
+      if(start&&Date.parse(start)<=now)return fail('The destination legion has already started.');
+      const key=plannerKey(kind,source.alliance,source.legion);
+      const prior=from.get(key)?.plan||plannerSlot(storage,kind,source.alliance,source.legion);
+      from.set(key,{...source,plan:{...prior,registrations:withoutPlayer(prior.registrations,id),
+        registeredUnder:withoutPlayer(prior.registeredUnder,id),teams:withoutPlayer(prior.teams,id),
+        assignments:withoutPlayer(prior.assignments,id)}});
+      if(prior.powerByPlayer?.[id]!=null&&to.powerByPlayer?.[id]==null)to.powerByPlayer={...to.powerByPlayer,[id]:prior.powerByPlayer[id]};
+    }else if(moveFrom)return fail('The original assignment changed. Review the rosters before moving the player.');
+    if(role){
+      to.registrations[id]=role;
+      to.registeredUnder[id]=alliance;
+    }else{
+      delete to.registrations[id];
+      delete to.registeredUnder[id];
+    }
+    if(role!=='join'){
+      delete to.teams[id];
+      delete to.assignments[id];
+    }
+  }
+  for(const [role,label] of REGISTRATION_ROLES.filter(([role])=>isParticipant(role))){
+    const limit=EVENT_LIMITS[kind][role];
+    if(Object.values(to.registrations).filter(value=>value===role).length>limit)return fail('The destination has only '+limit+' '+label.toLowerCase()+' slots.');
+  }
+  return {slots:[...from.values(),{alliance,legion,plan:to}]};
+}
+
+export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId,move,roleChanges},now=Date.now()) {
   if(!Object.hasOwn(EVENT_NAMES,kind)||![1,2].includes(legion))return workspace;
+  if(roleChanges){
+    const ids=new Set(workspace.players.filter(p=>p.membershipStatus!=='transferred_out').map(p=>String(p.id)));
+    if(!roleChanges.length||roleChanges.some(change=>!ids.has(change.id)))return workspace;
+    const {slots}=prepareEventRoles(workspace.foundry,{kind,alliance,legion,expectedOccurrenceId},roleChanges,now);
+    if(!slots)return workspace;
+    const eventPlans={...workspace.foundry?.eventPlans};
+    for(const slot of slots)eventPlans[plannerKey(kind,slot.alliance,slot.legion)]=slot.plan;
+    const affected=new Set(roleChanges.map(change=>change.id));
+    const players=workspace.players.map(p=>affected.has(String(p.id))?slots.reduce((player,slot)=>
+      reconcileSchedule(player,slot.plan,{kind,alliance:slot.alliance,legion:slot.legion},now),p):p);
+    return {...workspace,players,foundry:{...workspace.foundry,eventPlans}};
+  }
   if(move)return moveLegion(workspace,{kind,alliance,legion,expectedOccurrenceId,move},now);
   const storage = workspace.foundry||{};
   const key = plannerKey(kind,alliance,legion);
@@ -102,9 +188,9 @@ export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[
   const fresh = plan||current;
   if(expectedOccurrenceId && current.occurrenceId!==expectedOccurrenceId)return workspace;
   if(plan){
-    const other=plannerSlot(storage,kind,alliance,legion===1?2:1);
+    const assignments=eventAssignments(storage,kind);
     if(Object.entries(plan.registrations).some(([id,role])=>isParticipant(role)&&
-      !isParticipant(current.registrations[id])&&isParticipant(other.registrations[id])))return workspace;
+      current.registrations[id]!==role&&(assignments.get(id)||[]).some(item=>item.alliance!==alliance||item.legion!==legion)))return workspace;
   }
   const start = eventStart(current.date,current.time);
   if(fresh.occurrenceId===current.occurrenceId&&start&&Date.parse(start)<=now &&
@@ -133,18 +219,6 @@ export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[
   }}}}:{})};
 }
 
-export function legionMoveError(source,destination,id,role,now=Date.now()) {
-  if(!isParticipant(role)||source.registrations[id]!==role||isParticipant(destination.registrations[id])){
-    return 'The registration changed. Review both legions and try again.';
-  }
-  const start=eventStart(destination.date,destination.time);
-  if(start&&Date.parse(start)<=now)return 'The destination legion has already started.';
-  if(Object.values(destination.registrations).filter(value=>value===role).length>=EVENT_LIMITS.foundry[role]){
-    return 'The destination has no '+(role==='join'?'combatant':'substitute')+' slots left.';
-  }
-  return '';
-}
-
 function withoutPlayer(fields,id) {
   const next={...fields};
   delete next[id];
@@ -152,26 +226,12 @@ function withoutPlayer(fields,id) {
 }
 
 function moveLegion(workspace,{kind,alliance,legion,expectedOccurrenceId,move},now) {
-  const storage=workspace.foundry;
-  const otherLegion=legion===1?2:1;
-  const source=plannerSlot(storage,kind,alliance,otherLegion);
-  const destination=plannerSlot(storage,kind,alliance,legion);
-  const {id,role,sourceOccurrenceId}=move;
-  if(destination.occurrenceId!==expectedOccurrenceId||source.occurrenceId!==sourceOccurrenceId||
-    source.registeredUnder[id]!==alliance||legionMoveError(source,destination,id,role,now)||
-    !workspace.players.some(player=>String(player.id)===id))return workspace;
-  const from={...source,
-    registrations:withoutPlayer(source.registrations,id),registeredUnder:withoutPlayer(source.registeredUnder,id),
-    teams:withoutPlayer(source.teams,id),assignments:withoutPlayer(source.assignments,id)};
-  const to={...destination,registrations:{...destination.registrations,[id]:role},
-    registeredUnder:{...destination.registeredUnder,[id]:alliance}};
-  const sourcePower=source.powerByPlayer?.[id];
-  if(sourcePower!=null&&to.powerByPlayer?.[id]==null)to.powerByPlayer={...to.powerByPlayer,[id]:sourcePower};
-  const players=workspace.players.map(player=>String(player.id)===id
-    ?reconcileSchedule(reconcileSchedule(player,from,{kind,alliance,legion:otherLegion},now),to,{kind,alliance,legion},now)
-    :player);
-  return {...workspace,players,foundry:{...storage,eventPlans:{...storage?.eventPlans,
-    [plannerKey(kind,alliance,otherLegion)]:from,[plannerKey(kind,alliance,legion)]:to}}};
+  const sourceLegion=legion===1?2:1;
+  const destination=plannerSlot(workspace.foundry,kind,alliance,legion);
+  return updateEventPlanner(workspace,{kind,alliance,legion,expectedOccurrenceId,roleChanges:[{
+    id:move.id,role:move.role,expectedRole:destination.registrations[move.id]||'',
+    moveFrom:{alliance,legion:sourceLegion,role:move.role,occurrenceId:move.sourceOccurrenceId},
+  }]},now);
 }
 
 export function resizePlannerTeams(plan,count) {
