@@ -4,8 +4,8 @@ import {EventPlanner} from './foundry/EventPlanner.jsx';
 import {SoftDarkProfile} from '../../src/components/players/SoftDarkProfile.jsx';
 import {plannerKey,plannerSlot,updateEventPlanner} from '../../src/services/eventPlanner.js';
 
-const players=['Northvale','Juniper','Solace','Ember','Tides','Kite','Lumen','Cypress','Aster','Wren'].map((username,index)=>({
-  id:'sample-'+index,username,fid:String(357301200+index),allianceTag:'ARC',allianceRank:['R3','R2','R4','R3','R1','R3','R5'][index%7],furnaceLevel:'FC6',
+const players=['Northvale','Juniper','Solace','Ember','Tides','Kite','Lumen','Cypress','Aster','Wren','Harbour'].map((username,index)=>({
+  id:'sample-'+index,username,fid:String(357301200+index),allianceTag:username==='Harbour'?'HOT':'ARC',allianceRank:['R3','R2','R4','R3','R1','R3','R5'][index%7],furnaceLevel:'FC6',
   lastFoundryTroopPower:index===9?null:96000000-index*3500000,lastCanyonClashTroopPower:1520000000-index*135000000,
   lastTalTroopPower:98256120-index*3400000,troops:{infantry:'FC6',lancer:'FC6',marksman:'FC5'},
 }));

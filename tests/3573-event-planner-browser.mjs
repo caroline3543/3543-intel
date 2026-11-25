@@ -23,8 +23,9 @@ try {
     assert.deepEqual((await foundry.locator('option').allTextContents()).slice(0,4),['Alliance · ARC','Alliance · HOT','Alliance · RKG','Alliance · WAR']);
     assert.ok(await page.getByRole('button',{name:'Buildings',exact:true}).isVisible());
     const roster=page.locator('.legion-player');
-    assert.equal(await roster.count(),7);
-    assert.equal(await page.getByRole('checkbox',{name:'Participants only'}).isChecked(),true);
+    assert.equal(await roster.count(),10);
+    assert.equal(await page.getByRole('checkbox',{name:'Participants only'}).isChecked(),false);
+    assert.equal(await page.getByRole('combobox',{name:'Sort roster'}).evaluate(el=>el.value),'rank');
     const total=await page.getByText(/^Combatant power/).innerText();
     await page.getByRole('button',{name:/1\/10 Substitutes/}).click();
     assert.equal(await roster.count(),1);
@@ -37,8 +38,7 @@ try {
     assert.equal(await page.getByRole('button',{name:'Lumen · Substitute',exact:true}).count(),0);
     await sort.selectOption('power');
     await page.getByRole('combobox',{name:'Legion',exact:true}).selectOption('2');
-    assert.equal(await roster.count(),1);
-    await page.getByRole('checkbox',{name:'Participants only'}).uncheck();
+    assert.equal(await roster.count(),10);
     await page.getByRole('button',{name:'Cypress · Unassigned',exact:true}).waitFor();
     const rosterSearch=page.getByRole('searchbox',{name:'Search roster'});
     await rosterSearch.fill('Northvale');
@@ -54,7 +54,7 @@ try {
     await page.getByRole('button',{name:'Confirm move',exact:true}).click();
     await page.getByRole('button',{name:'Aster · Substitute',exact:true}).waitFor();
     await page.getByRole('combobox',{name:'Legion',exact:true}).selectOption('2');
-    assert.equal(await roster.count(),0);
+    assert.equal(await roster.count(),10);
     await page.getByRole('combobox',{name:'Legion',exact:true}).selectOption('1');
     await page.getByRole('button',{name:'Edit troop power for Northvale'}).click();
     const input=page.getByRole('textbox',{name:'Troop power for Northvale',exact:true});
@@ -67,6 +67,7 @@ try {
     await eventPower.getByText('1.52B',{exact:true}).waitFor();
     await profile.getByRole('button',{name:'Close profile'}).click();
 
+    await page.getByRole('checkbox',{name:'Participants only'}).check();
     await page.getByRole('button',{name:'Kite · Combatant',exact:true}).click();
     const optIn=page.getByRole('checkbox',{name:'Opted in: Kite'});
     await optIn.click();
@@ -140,6 +141,17 @@ try {
     await page.getByRole('button',{name:'Add 1 player',exact:true}).click();
     await page.getByRole('button',{name:'Done',exact:true}).click();
     await page.getByRole('button',{name:'Wren · Combatant',exact:true}).waitFor();
+    await page.getByRole('button',{name:'Wren · Combatant',exact:true}).click();
+    await page.getByRole('button',{name:'Remove from event',exact:true}).click();
+    await page.getByRole('button',{name:'Wren · Unassigned',exact:true}).waitFor();
+    await page.getByRole('button',{name:'Add players',exact:true}).click();
+    await page.getByRole('button',{name:'Find a player to add'}).click();
+    await page.getByRole('textbox',{name:'Search and add player by name or ID'}).fill('Harbour');
+    await page.getByRole('button',{name:/Harbour HOT/}).click();
+    await page.getByRole('button',{name:'Harbour · Combatant',exact:true}).click();
+    await page.getByRole('button',{name:'Remove from event',exact:true}).click();
+    assert.equal(await page.getByRole('button',{name:/Harbour/}).count(),0);
+
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     assert.deepEqual(errors,[]);
     console.log(engine.name()+': Foundry and Canyon Clash verified at '+width+'px');

@@ -79,8 +79,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const [focusTeam,setFocusTeam]=useState('Blue'),[moving,setMoving]=useState(null),[confirmGenerate,setConfirmGenerate]=useState(false);
  const [addRole,setAddRole]=useState('join');
  const [managing,setManaging]=useState(null);
- const [participantsOnly,setParticipantsOnly]=useState(true),[rosterSearch,setRosterSearch]=useState('');
- const [rosterSort,setRosterSort]=useState('power'),[editingPower,setEditingPower]=useState(null),[confirmMove,setConfirmMove]=useState(null);
+ const [participantsOnly,setParticipantsOnly]=useState(false),[rosterSearch,setRosterSearch]=useState('');
+ const [rosterSort,setRosterSort]=useState('rank'),[editingPower,setEditingPower]=useState(null),[confirmMove,setConfirmMove]=useState(null);
  const [roleFilter,setRoleFilter]=useState('all'),[bulkMode,setBulkMode]=useState(false),[bulkSelected,setBulkSelected]=useState([]),[rankExpanded,setRankExpanded]=useState({R5:true,R4:true,R3:true,R2:true,R1:true});
  const [editIds,setEditIds]=useState(null);
  const [bulkAction,setBulkAction]=useState(''),[bulkLanguage,setBulkLanguage]=useState(''),[bulkRelationshipMode,setBulkRelationshipMode]=useState('add'),[teammateQuery,setTeammateQuery]=useState(''),[teammateIds,setTeammateIds]=useState([]);
@@ -164,6 +164,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    Number(b.hasPower)-Number(a.hasPower)||b.power-a.power||a.name.localeCompare(b.name));
  const filteredRegistrations=sortedRoster.filter(p=>activeRole(p.id));
  const groupedRanks=['R5','R4','R3','R2','R1','Unranked'];
+ const rankLabels={R5:'Alliance leader',R4:'Officers',R3:'Members',R2:'Members',R1:'Members'};
  const bulkUpdate=(role)=>{
   const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));
   if(isParticipant(role)&&ids.some(otherRole)){setNotice('Move players assigned to the other legion individually.');return}
@@ -247,7 +248,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const balanceSpread=average?Math.round((Math.max(...Object.values(teamTotals))-Math.min(...Object.values(teamTotals)))/average*100):0;
  const renderRosterPlayer=p=>{
   const role=activeRole(p.id),other=otherRole(p.id);
-  const playerContext=[p.alliance,p.rank,!p.matched&&'Needs matching',p.language&&languageLabel(p.language)].filter(Boolean).join(' · ');
+  const playerContext=p.alliance+(p.matched?'':' · Needs matching');
   const powerValue=p.hasPower?format(p.power):null;
   const powerLabel=powerValue===null?'Add power for '+p.name:powerValue+' · Edit '+metric.toLowerCase()+' for '+p.name;
   const elsewhere=other&&!isParticipant(role);
@@ -263,15 +264,16 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
         <div style={{minWidth:0}}>
           <button type="button" className="legion-player-name" onClick={()=>onOpenPlayerProfile?.(p.id)}>
             {p.name}
-            <small className="legion-player-context">{playerContext}</small>
+            <small className="legion-player-context">{playerContext}{p.language&&<> <span className="legion-language">{languageLabel(p.language)}</span></>}</small>
             <span className="planner-sr-only"> · Open profile</span>
           </button>
-          {editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
-            <button type="button" className="legion-player-power" aria-label={powerLabel} onClick={()=>setEditingPower(p.id)}>{powerValue===null?'Add power':powerValue+' · Edit'}</button>}
+          {(roleFilter==='all'||elsewhere)&&<small className="legion-row-status" data-role={elsewhere?'other':role}>{label}</small>}
           {p.recentNoShow&&<NoShow/>}
         </div>
       </div>
-      {!bulkMode&&<button type="button" className="legion-role" data-role={elsewhere?'other':role} aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}><span>{label}<span className="legion-role-chevron" aria-hidden="true">⌄</span></span></button>}
+      {editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
+        <button type="button" className="legion-player-power" aria-label={powerLabel} onClick={()=>setEditingPower(p.id)}>{powerValue===null?'Add power':<>{powerValue}<span className="planner-sr-only"> · Edit</span></>}</button>}
+      {!bulkMode&&<button type="button" className="legion-role" aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}><span aria-hidden="true">⋯</span></button>}
     </div>
     {!bulkMode&&managing===p.id&&<div style={{display:'grid',gap:8,marginTop:10}}>
       {elsewhere?<div style={{display:'grid',gap:8}}>
@@ -290,7 +292,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
         <div role="group" aria-label={'Registration role for '+p.name} style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           {REGISTRATION_ROLES.map(([value,text])=><button key={value} type="button" aria-pressed={role===value} style={btn} onClick={()=>{if(role!==value)setStatus(p.id,value);setManaging(null)}}>{text}</button>)}
         </div>
-        {role&&<button type="button" style={btn} onClick={()=>{setStatus(p.id,role);setManaging(null)}}>Remove from {title}</button>}
+        {role&&<button type="button" style={btn} onClick={()=>{setStatus(p.id,role);setManaging(null)}}>Remove from event</button>}
         {p.matched&&<><button type="button" style={btn} onClick={()=>{openEditor('language',[p.id]);setManaging(null)}}>Language</button>
           <button type="button" style={btn} onClick={()=>{openEditor('relationships',[p.id]);setManaging(null)}}>Works well with</button></>}
       </>}
@@ -323,7 +325,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    <p className="legion-power-total">Combatant power <strong>{joined.length>0&&joined.length===missingPower.length?'—':format(total(joined))}</strong>{missingPower.length>0&&<span> · {missingPower.length} missing</span>}</p>
    <div className="legion-roster">
      <div className="planner-title-row">
-       <h2 aria-label={'Legion '+legion+' roster'}>Roster</h2>
+       <h2>{roleFilter==='join'?'Combatants':roleFilter==='sub'?'Substitutes':participantsOnly?'Participants':'All players'}</h2>
        <button type="button" className="planner-button planner-primary" onClick={()=>setAddPanel('menu')}>Add players</button>
      </div>
      <div className="legion-roster-tools">
@@ -344,8 +346,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
        if(!rows.length)return null;
        const groupCount=roster.filter(p=>p.rank===group).length;
        return <div key={group||'all'}>
-         {group&&<button type="button" aria-expanded={rankExpanded[group]!==false} onClick={()=>setRankExpanded(v=>({...v,[group]:v[group]===false}))} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between'}}>
-           <span>{group}</span><span>{rows.length}/{groupCount} {rankExpanded[group]===false?'⌄':'⌃'}</span>
+         {group&&<button type="button" aria-expanded={rankExpanded[group]!==false} onClick={()=>setRankExpanded(v=>({...v,[group]:v[group]===false}))} className="planner-button legion-rank-heading">
+           <span><strong>{group}</strong>{rankLabels[group]&&' '+rankLabels[group]}</span><span>{rows.length}/{groupCount} {rankExpanded[group]===false?'⌄':'⌃'}</span>
          </button>}
          {rankExpanded[group]!==false&&rows.map(renderRosterPlayer)}
        </div>;

@@ -128,8 +128,8 @@
 }
 .legion-notice { padding-block: 4px; min-block-size: var(--planner-target); }
 .legion-player { border-bottom: 1px solid #304258; padding-block: 4px; }
-.legion-player-main { display: grid; grid-template-columns: minmax(0,1fr) minmax(0, min(7rem,36%)); align-items: center; gap: 0 10px; }
-.legion-player-main[data-bulk] { grid-template-columns: minmax(0,1fr); }
+.legion-player-main { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,min(7.5rem,30%)) var(--planner-target); align-items: center; gap: 0 6px; }
+.legion-player-main[data-bulk] { grid-template-columns: minmax(0,1fr) minmax(0,min(7.5rem,30%)); }
 .legion-player-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .legion-player-name, .legion-player-power {
   min-block-size: var(--planner-target);
@@ -146,24 +146,43 @@
 }
 .legion-player-power, .legion-player-context { display: block; font-size: .8125rem; overflow-wrap: anywhere; }
 .legion-player-context { color: var(--planner-muted); font-weight: 450; margin-top: 2px; }
-.legion-player-power { color: var(--planner-accent); font-weight: 500; }
+.legion-player-power {
+  inline-size: 100%;
+  color: var(--planner-ink);
+  background: var(--planner-control);
+  border: 1px solid var(--planner-field-edge);
+  border-radius: 999px;
+  padding: 4px;
+  font-weight: 650;
+  text-align: center;
+}
 .legion-role {
-  justify-self: end;
-  min-inline-size: min(44px,100%);
   min-block-size: var(--planner-target);
-  max-inline-size: 100%;
+  inline-size: 100%;
   padding: 0;
   border: 0;
+  border-radius: 10px;
   background: transparent;
-  color: var(--planner-muted);
-  font: inherit;
-  font-size: .75rem;
+  color: var(--planner-accent);
+  font: 700 1.25rem/1 system-ui,sans-serif;
 }
-.legion-role > span { display: block; border-radius: 16px; padding: 5px 8px; background: var(--planner-control); overflow-wrap: anywhere; }
-.legion-role-chevron { margin-inline-start: 4px; white-space: nowrap; }
-.legion-role[data-role=join] > span { color: #b4e2c8; background: #223b35; }
-.legion-role[data-role=sub] > span { color: #c0ddff; background: #223a57; }
-.legion-role[data-role=other] > span { color: #e7d9ff; background: #39314a; }
+.legion-role[aria-expanded=true] { background: var(--planner-control); }
+.legion-language { background: var(--planner-control); border-radius: 6px; padding: 1px 4px; box-decoration-break: clone; }
+.legion-row-status { display: block; color: var(--planner-muted); font-size: .75rem; overflow-wrap: anywhere; }
+.legion-row-status[data-role=join] { color: #b4e2c8; }
+.legion-row-status[data-role=sub] { color: #c0ddff; }
+.legion-row-status[data-role=other] { color: #e7d9ff; }
+.legion-rank-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  inline-size: 100%;
+  margin-block: 8px 2px;
+  border-radius: 10px;
+  text-align: start;
+}
+.legion-rank-heading strong { color: var(--planner-accent); margin-inline-end: 4px; }
 .legion-player input[type=checkbox], .legion-roster-filters input[type=checkbox] { accent-color: var(--planner-accent); width: 17px; height: 17px; margin: 0; flex-shrink: 0; }
 .legion-attendance { margin-top: 12px; }
 .legion-attendance-hidden { display: none; }
@@ -199,8 +218,6 @@
   .legion-context select { padding-inline: 3px; }
   .legion-roster-tools { grid-template-columns: minmax(0,1fr) minmax(4.75rem,33%); }
   .legion-capacity { justify-content: center; text-align: center; }
-  .legion-player-main { grid-template-columns: minmax(0,1fr); }
-  .legion-role { grid-column: 1; }
 }
 @media (min-width: 650px) { .planner-sheet { inset: 0; margin: auto; border-radius: 26px; } }
 
@@ -209,6 +226,9 @@
   .legion-tabs { flex-wrap: wrap; }
   .legion-tabs button { flex: 1 1 4.5em; overflow-wrap: normal; }
   .legion-capacity { justify-content: space-between; }
+  .legion-player-main, .legion-player-main[data-bulk] { grid-template-columns: minmax(0,1fr) var(--planner-target); }
+  .legion-player-main > :nth-child(2) { grid-row: 2; grid-column: 1; }
+  .legion-player-main > .legion-role { grid-row: 1; grid-column: 2; }
 }
 
 .planner-sr-only {
