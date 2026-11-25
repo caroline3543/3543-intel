@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {chromium} from 'playwright';
+import {chromium,webkit} from 'playwright';
 
 const origin=process.env.EVENT_PREVIEW_ORIGIN || 'http://127.0.0.1:4184';
 const server=process.env.EVENT_PREVIEW_ORIGIN ? null : spawn('./node_modules/.bin/vite',['preview','roster-site','--host','127.0.0.1','--port','4184','--strictPort'],{stdio:'inherit'});
@@ -10,8 +10,9 @@ try {
     try{if((await fetch(origin+'/event-preview.html'+(process.env.EVENT_PREVIEW_QUERY||''))).ok)break;}catch{}
     await new Promise(resolve=>setTimeout(resolve,250));
   }
-  browser=await chromium.launch();
-  for(const width of [390,1280]){
+  const engine=process.env.EVENT_PREVIEW_ENGINE==='webkit'?webkit:chromium;
+  browser=await engine.launch();
+  for(const width of [320,390,428,1280]){
     const page=await browser.newPage({viewport:{width,height:844}});
     page.setDefaultTimeout(10000);
     const errors=[];
@@ -92,6 +93,10 @@ try {
 
     await page.getByRole('button',{name:'Players',exact:true}).click();
     await page.getByRole('button',{name:'Set UTC start'}).click();
+    const schedule=page.getByRole('dialog',{name:'Event schedule'});
+    await schedule.getByRole('heading',{name:'Event schedule'}).press('Escape');
+    assert.equal(await page.getByRole('button',{name:'Set UTC start'}).evaluate(el=>el===document.activeElement),true);
+    await page.getByRole('button',{name:'Set UTC start'}).click();
     await page.getByLabel('Event date (UTC)',{exact:true}).fill('2026-11-25');
     await page.getByLabel('Event start time (UTC)',{exact:true}).fill('23:30');
     await page.getByRole('button',{name:'Save schedule'}).click();
@@ -119,9 +124,25 @@ try {
     const attendanceHistory=profile.locator('details[open]').filter({hasText:'Event attendance'});
     assert.match(await attendanceHistory.innerText(),/Combatant\s*No-show/);
     await profile.getByRole('button',{name:'Close profile'}).click();
+    await page.getByRole('button',{name:'Add players',exact:true}).click();
+    await page.getByRole('button',{name:/Paste multiple players/}).click();
+    const paste=page.getByRole('textbox',{name:'Paste names and troop power'});
+    await paste.fill('Wren, 84000000');
+    await page.getByRole('button',{name:/Find roster matches/}).click();
+    const reviewHeading=page.getByRole('heading',{name:'Review roster matches'});
+    assert.equal(await reviewHeading.evaluate(el=>el===document.activeElement),true);
+    await reviewHeading.press('Escape');
+    await page.getByRole('button',{name:'Add players',exact:true}).click();
+    await page.getByRole('button',{name:'Resume bulk import'}).click();
+    await page.getByRole('button',{name:'Continue to confirmation'}).click();
+    const confirmHeading=page.getByRole('heading',{name:'Confirm import'});
+    assert.equal(await confirmHeading.evaluate(el=>el===document.activeElement),true);
+    await page.getByRole('button',{name:'Add 1 player',exact:true}).click();
+    await page.getByRole('button',{name:'Done',exact:true}).click();
+    await page.getByRole('button',{name:'Wren · Combatant',exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     assert.deepEqual(errors,[]);
-    console.log('Foundry and Canyon Clash verified at '+width+'px');
+    console.log(engine.name()+': Foundry and Canyon Clash verified at '+width+'px');
     await page.close();
   }
 } finally {await browser?.close();server?.kill();}

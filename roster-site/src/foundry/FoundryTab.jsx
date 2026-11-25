@@ -389,7 +389,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     </>}
     {showPaste&&<div hidden={addPanel!=='import'}>
       <BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title+' · '+chosen+' · Legion '+legion} initialText={paste}
-        reviewRegistration={registrationForImport} onDraftChange={setDraftSummary} onConfirm={confirmBulkImport} onClose={()=>{clearDraft();closeAdd()}}/>
+        reviewRegistration={registrationForImport} active={addPanel==='import'} onDraftChange={setDraftSummary} onConfirm={confirmBulkImport} onClose={()=>{clearDraft();closeAdd()}}/>
     </div>}
   </PlannerSheet>
   {(view==='teams'||view==='buildings')&&<>

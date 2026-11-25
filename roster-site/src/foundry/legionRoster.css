@@ -194,6 +194,8 @@
 .planner-error { color: #ffb0b5; font-size: .875rem; }
 .planner-confirm-actions { display: grid; gap: 6px; border-top: 1px solid var(--planner-line); padding-top: 12px; }
 @media (max-width: 22rem) {
+  .legion-context { grid-template-columns: minmax(0,1.12fr) minmax(0,1fr); }
+  .legion-context select { padding-inline: 3px; }
   .legion-roster-tools { grid-template-columns: minmax(0,1fr) minmax(4.75rem,33%); }
   .legion-capacity { justify-content: center; text-align: center; }
   .legion-player-main { grid-template-columns: minmax(0,1fr); }

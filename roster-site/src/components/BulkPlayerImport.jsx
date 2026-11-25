@@ -1,12 +1,16 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {parseBulkPlayers,resolveBulkRows,normaliseBulkName} from './bulkImportModel.js';
 const palette={surface:'#1A293D',elevated:'#26384D',border:'#364B62',text:'#F5F7FA',secondary:'#A8B8CA',success:'#83B8A0',warning:'#F0C17A',accent:'#8FA8D8'};
 const card={border:'1px solid '+palette.border,borderRadius:16,padding:12,background:palette.surface};
 const control={background:palette.elevated,border:'1px solid '+palette.border,borderRadius:12,color:palette.text,minHeight:44,padding:'9px 12px',fontSize:14,boxSizing:'border-box'};
 const button={...control,fontWeight:650,cursor:'pointer'};
 const secondary={fontSize:12,color:palette.secondary};
-export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',onConfirm,onClose,initialText='',title='Import players',context='Foundry',requirePower=false,reviewRegistration,onDraftChange}){
+export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',onConfirm,onClose,initialText='',title='Import players',context='Foundry',requirePower=false,reviewRegistration,onDraftChange,active=true}){
  const [expanded,setExpanded]=useState(null),[searching,setSearching]=useState({}),[source,setSource]=useState(initialText),[stage,setStage]=useState('paste'),[choices,setChoices]=useState({}),[powers,setPowers]=useState({}),[filter,setFilter]=useState('review'),[search,setSearch]=useState({}),[status,setStatus]=useState('');
+ const stageHeading=useRef(null);
+ const usesConfirmation=Boolean(reviewRegistration);
+ useEffect(()=>{if(usesConfirmation&&active)stageHeading.current?.focus();},[stage,active,usesConfirmation]);
+ const stageLabel={paste:'Paste player names',review:'Review roster matches',confirm:'Confirm import',done:'Import complete'};
  const [reviewed,setReviewed]=useState({});
  const rows=useMemo(()=>parseBulkPlayers(source),[source]);
  const evaluated=useMemo(()=>resolveBulkRows(rows,players,choices,powers,alliance),[rows,players,choices,powers,alliance]);
@@ -34,11 +38,11 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
  const submit=()=>{if(!ready)return;const result=onConfirm?.(selected.map(r=>({id:r.player.id,name:r.player.name,power:r.power,source:r.raw})),reviewRegistration?Object.fromEntries(selected.map(row=>[row.player.id,reviewed[row.player.id]])):undefined);if(result?.error){setStatus(result.error);return;}setStage('done');setStatus(result?.message||'Import prepared');};
  return <section aria-label={title} className={reviewRegistration?'planner-bulk-import':undefined} style={{...card,...(reviewRegistration?{border:0,background:'transparent',padding:0}:{padding:14}),display:'grid',gap:12,color:palette.text}}>
   <header style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:8}}>
-   <div>{!reviewRegistration&&<h2 style={{fontSize:18,margin:0}}>{title}</h2>}<div style={secondary}>{reviewRegistration?roleLabel:context+' · '+(alliance||'All alliances')+' · '+roleLabel}</div></div>
+   <div>{reviewRegistration?<h3 ref={stageHeading} tabIndex={-1}>{stageLabel[stage]}</h3>:<h2 style={{fontSize:18,margin:0}}>{title}</h2>}<div style={secondary}>{reviewRegistration?roleLabel:context+' · '+(alliance||'All alliances')+' · '+roleLabel}</div></div>
    <button type="button" onClick={reset} style={{...button,fontSize:12,minHeight:44}}>↻ Reset</button>
   </header>
   <div aria-label="Import progress" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-   {['1. Paste','2. Review','3. Confirm'].map((label,i)=><div key={label}><div style={{height:4,borderRadius:9,background:(stage==='paste'?i===0:stage==='review'?i===1:i===2)?palette.accent:palette.border}}/><div style={{...secondary,marginTop:6}}>{label}</div></div>)}
+   {[['paste','1. Paste'],['review','2. Review'],['confirm','3. Confirm']].map(([step,label],i)=><div key={step} aria-current={stage===step?'step':undefined}><div style={{height:4,borderRadius:9,background:(stage==='paste'?i===0:stage==='review'?i===1:i===2)?palette.accent:palette.border}}/><div style={{...secondary,marginTop:6}}>{label}</div></div>)}
   </div>
   {stage==='paste'&&<>
    <label style={{fontSize:14,fontWeight:650}}>Paste names and troop power<textarea aria-label="Paste names and troop power" value={source} onChange={e=>editSource(e.target.value)} rows={10} placeholder={'Username, power\nPlayer One, 3500\nPlayer Two, 4.2M'} style={{...control,width:'100%',marginTop:8,resize:'vertical',lineHeight:1.6,fontFamily:'inherit'}}/></label>
@@ -103,7 +107,7 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
     <button type="button" className="planner-plain" onClick={()=>{setStatus('');setStage('review')}}>Back to review</button>
    </div>
   </>}
-  {stage==='done'&&<div style={{textAlign:'center',padding:'24px 8px',display:'grid',gap:12}}><div style={{fontSize:32,color:palette.success}}>✓</div><h3 style={{fontSize:18,margin:0}}>Import complete</h3><p style={{...secondary,margin:0}}>{status}</p><button type="button" onClick={onClose} style={{...button,background:palette.accent,color:'#0B1525'}}>Done</button></div>}
+  {stage==='done'&&<div style={{textAlign:'center',padding:'24px 8px',display:'grid',gap:12}}><div style={{fontSize:32,color:palette.success}}>✓</div>{!reviewRegistration&&<h3 style={{fontSize:18,margin:0}}>Import complete</h3>}<p style={{...secondary,margin:0}}>{status}</p><button type="button" onClick={onClose} style={{...button,background:palette.accent,color:'#0B1525'}}>Done</button></div>}
   {status&&stage!=='done'&&stage!=='confirm'&&<p role="alert" style={{fontSize:13,color:palette.warning,margin:0}}>{status}</p>}
  </section>;
 }
