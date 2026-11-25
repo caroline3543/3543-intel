@@ -1,3 +1,4 @@
+import { allianceIdentityFields } from './allianceRankService.js';
 import { playerSearchFields } from './playerNames.js';
 import { normalizeName } from '../utils/normalize.js';
 import { gameLanguageName } from './gameLanguageService.js';
@@ -112,14 +113,14 @@ export function restoreStateTransfer(player,location,confirmedAt=new Date().toIS
   const tag=String(location.tag||'').trim();
   const old=String(player.allianceTag||'').trim();
   const movement=old!==tag?{from:old,to:tag,at:location.at}:null;
-  return {...player,membershipStatus:'active',allianceTag:tag,lastKnownAlliance:old||player.lastKnownAlliance||'',membershipCheckedAt:location.at,membershipReviewedAt:confirmedAt,transferDestinationState:null,transferDestinationAlliance:null,allianceHistory:movement?[...(player.allianceHistory||[]),movement].slice(-20):player.allianceHistory};
+  return {...player,membershipStatus:'active',allianceTag:tag,...allianceIdentityFields(player,tag,location.rank,location.allianceName),lastKnownAlliance:old||player.lastKnownAlliance||'',membershipCheckedAt:location.at,membershipReviewedAt:confirmedAt,transferDestinationState:null,transferDestinationAlliance:null,allianceHistory:movement?[...(player.allianceHistory||[]),movement].slice(-20):player.allianceHistory};
 }
 
 /** Manual classification only: preserve the prior main alliance and its movement history. */
 export function moveReviewedPlayerToNoAlliance(player, reviewedAt=new Date().toISOString()) {
   if (!player || player.membershipStatus==='transferred_out') throw Error('Cannot reclassify an archived transfer.');
   const previous=String(player.allianceTag||'').trim();
-  return {...player,allianceTag:'',lastKnownAlliance:previous||player.lastKnownAlliance||'',membershipStatus:'active',membershipReviewedAt:reviewedAt,manualMembershipAt:reviewedAt,allianceHistory:previous?[...(player.allianceHistory||[]),{from:previous,to:'',at:reviewedAt,source:'manual-review'}].slice(-20):player.allianceHistory};
+  return {...player,allianceTag:'',...allianceIdentityFields(player,''),lastKnownAlliance:previous||player.lastKnownAlliance||'',membershipStatus:'active',membershipReviewedAt:reviewedAt,manualMembershipAt:reviewedAt,allianceHistory:previous?[...(player.allianceHistory||[]),{from:previous,to:'',at:reviewedAt,source:'manual-review'}].slice(-20):player.allianceHistory};
 }
 
 /** Manual alliance classification never updates provider observation freshness. */
@@ -129,7 +130,7 @@ export function reassignReviewedPlayer(player, destination, reviewedAt=new Date(
   if (to && !/^[A-Z0-9]{2,12}$/.test(to)) throw Error('Invalid alliance tag.');
   const from=String(player.allianceTag||'').trim();
   if (from===to) return {...player,membershipReviewedAt:reviewedAt,manualMembershipAt:reviewedAt};
-  return {...player,allianceTag:to,lastKnownAlliance:from||player.lastKnownAlliance||'',membershipStatus:'active',membershipReviewedAt:reviewedAt,manualMembershipAt:reviewedAt,allianceHistory:[...(player.allianceHistory||[]),{from,to,at:reviewedAt,source:'manual-review'}].slice(-20)};
+  return {...player,allianceTag:to,...allianceIdentityFields(player,to),lastKnownAlliance:from||player.lastKnownAlliance||'',membershipStatus:'active',membershipReviewedAt:reviewedAt,manualMembershipAt:reviewedAt,allianceHistory:[...(player.allianceHistory||[]),{from,to,at:reviewedAt,source:'manual-review'}].slice(-20)};
 }
 
 /** Persist a verified in-state lookup even when the alliance has not changed. */

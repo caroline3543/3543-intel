@@ -1,3 +1,4 @@
+import { allianceIdentityFields, allianceRankFromRoster } from './allianceRankService.js';
 import { assessAllianceRoster } from './allianceRosterValidation.js';
 import {withGameLanguage} from './gameLanguageService.js';
 import { recordPlayerObservation, PROFILE_HISTORY_FIELDS } from './playerObservationService.js';
@@ -7,10 +8,12 @@ export function allianceRows(response, stateId, tag) {
   const data = response?.data;
   if (!Array.isArray(data?.members)) throw new Error('The provider did not return an alliance roster.');
   if (data.alliance?.kid && String(data.alliance.kid) !== String(stateId)) throw new Error('The provider returned a different state. Nothing was imported.');
+  const rosterAlliance = data.alliance?.abbr === tag.trim() && String(data.alliance.kid) === String(stateId)
+    ? data.alliance : null;
   const seen = new Set();
   return data.members.map(member => {
     if (member.kid && String(member.kid) !== String(stateId)) throw new Error('The roster contains a player from another state. Nothing was imported.');
-    const rank = member.alliance_rank_label ?? (member.alliance_rank != null ? `R${member.alliance_rank}` : null);
+    const rank = allianceRankFromRoster(member, rosterAlliance);
     return {
       fid: String(member.chief_id ?? member.fid ?? member.governor_id ?? ''), username: member.nick_name || '',
       stateId: String(stateId), allianceTag: tag.trim(),
@@ -18,7 +21,7 @@ export function allianceRows(response, stateId, tag) {
       power: providerNumber(member.power), kills: providerNumber(member.kills),
       furnaceLevel: member.furnace_level ?? member.stove_lv ?? member.town_center_level ?? null,
       furnaceLabel: member.furnace_level_label ?? member.tg_label ?? null,
-      allianceRank: rank, raw: structuredClone(member),
+      allianceRank: rank, allianceName: rosterAlliance?.name ?? null, raw: structuredClone(member),
       retrievedAt: response.retrieved_at || new Date().toISOString(),
       capturedAt: member.cached_at ?? member.captured_at ?? data.cached_at ?? data.meta?.cached_at ?? null,
     };
@@ -54,8 +57,12 @@ export function mergeAllianceProfiles(existing, rows, stateId) {
     snapshot.source = 'Whiteout Stats';
     snapshot.capturedAt = row.capturedAt ?? previous?.providerStats?.capturedAt ?? null;
     if(row.allianceTag?.trim())snapshot.allianceObservation={tag:row.allianceTag.trim(),at:row.retrievedAt,noAlliance:false};
+    const identity = patch.allianceTag
+      ? allianceIdentityFields(previous, patch.allianceTag, row.allianceRank, row.allianceName) : {};
+    if (patch.allianceTag && identity.allianceRank === null) delete snapshot.allianceRank;
+    if (patch.allianceTag && !identity.allianceName) delete snapshot.allianceName;
     const player = {
-      ...(previous || newPlayer({fid:row.fid})), ...patch,
+      ...(previous || newPlayer({fid:row.fid})), ...patch, ...identity,
       providerStats:snapshot, profileLastUpdated:at, membershipStatus:'confirmed',membershipCheckedAt:at,
       ...(patch.furnaceLevel && patch.furnaceLevel !== previous?.furnaceLevel ? {tiersUpdatedAt:at} : {}),
     };

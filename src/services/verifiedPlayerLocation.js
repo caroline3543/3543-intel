@@ -1,3 +1,5 @@
+import { normalizeAllianceRank } from './allianceRankService.js';
+
 const MAX_PROVIDER_AGE_MS = 60 * 60 * 1000;
 
 export function providerObservationTime(value, now = Date.now()) {
@@ -46,7 +48,11 @@ export function verifiedPlayerLocation(response, expectedFid, now=Date.now()) {
   const observedAt=base.cached_at??payload?.cached_at??payload?.meta?.cached_at??null;
   if(!observedAt)throw Error('API did not provide a verifiable observation timestamp');
   const at=providerObservationTime(observedAt,now);
-  return {status:'verified',fresh:true,fid,state,tag,at,source:'whiteoutstats-player'};
+  const rank=tag && (normalizeAllianceRank(alliance.rank_label) ?? normalizeAllianceRank(alliance.rank) ??
+    normalizeAllianceRank(base.alliance_rank_label) ?? normalizeAllianceRank(base.alliance_rank));
+  const allianceName=tag && typeof alliance.name==='string' ? alliance.name.trim() : '';
+  return {status:'verified',fresh:true,fid,state,tag,at,source:'whiteoutstats-player',
+    ...(rank?{rank}:{}),...(allianceName?{allianceName}:{})};
 }
 
 export function verifiedAllianceRoster(response, state, tag, now = Date.now()) {

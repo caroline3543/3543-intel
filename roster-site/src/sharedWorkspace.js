@@ -1,6 +1,18 @@
+import {EVENT_NAMES,eventAssignments} from '../../src/services/eventPlanner.js';
 import {sharedData,mergeWorkspace,resolveConflicts,validateWorkspace,sameWorkspaceValue} from '../shared/workspace.js';
 const equal=sameWorkspaceValue;
 const meaningful=data=>Boolean(data?.players?.length||data?.events?.length||data?.customRoles?.length||data?.talPlan);
+export function mergeEventWorkspace(base,mine,shared) {
+ const merged=mergeWorkspace(base,mine,shared);
+ for(const kind of Object.keys(EVENT_NAMES)){
+  const local=eventAssignments(mine?.foundry,kind),remote=eventAssignments(shared?.foundry,kind);
+  if([...eventAssignments(merged.data.foundry,kind)].some(([id,rows])=>
+    rows.length>Math.max(1,local.get(id)?.length||0,remote.get(id)?.length||0))){
+   return {data:structuredClone(mine),conflicts:[{path:[],base,mine,shared}]};
+  }
+ }
+ return merged;
+}
 export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onStatus=()=>{}}){
  let state={local:sharedData(initial),base:null,revision:0,joined:false,updatedAt:null,conflicts:[],mode:'connecting',issue:null,status:'Opening shared workspace…',ready:false,deviceBackup:null,syncing:false,checkedAt:null};
  let running=false,disposed=false,timer=null,persisting=Promise.resolve(),retryTimer=null,retryDelay=2000;
@@ -21,7 +33,7 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
    if(meaningful(state.local)){state.mode='join';state.issue=null;state.remote=remote;state.status='A shared roster is ready. Choose which copy to open.';return;}
    state.local=structuredClone(remote.data);state.joined=true;
   }else{
-   const merged=mergeWorkspace(state.base,state.local,remote.data);state.local=merged.data;state.conflicts=merged.conflicts;
+   const merged=mergeEventWorkspace(state.base,state.local,remote.data);state.local=merged.data;state.conflicts=merged.conflicts;
   }
   state.base=structuredClone(remote.data);state.revision=remote.revision;state.updatedAt=remote.updatedAt;state.mode='active';
   if(state.conflicts.length||equal(state.local,state.base))state.issue=null;
@@ -43,7 +55,7 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
    const result=await request('POST',{revision,data:snapshot});
    if(result.conflict){integrate(result);await persist();emit();if(!state.conflicts.length)schedule();return;}
    if(!Number.isSafeInteger(result.revision)||result.revision<revision||!equal(result.data,snapshot))throw Error('Save could not be verified. Your edits are waiting on this device.');
-   const merged=mergeWorkspace(snapshot,state.local,result.data);
+   const merged=mergeEventWorkspace(snapshot,state.local,result.data);
    state.base=structuredClone(result.data);state.local=merged.data;state.revision=result.revision;state.updatedAt=result.updatedAt;state.conflicts=merged.conflicts;state.issue=null;
    state.status=state.conflicts.length?'Conflicting edits · review below':equal(state.local,state.base)?'Shared · all changes saved':'Syncing changes…';await persist();emit();
    if(!equal(state.local,state.base)&&!state.conflicts.length)schedule();
@@ -59,7 +71,7 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
    validateWorkspace(state.local);await persist();running=true;
    const snapshot=structuredClone(state.local),result=await request('POST',{revision:0,data:snapshot});
    if(result.conflict){state.joined=false;state.mode='join';state.remote=result;state.status='Another leader started sharing first. Open the shared roster below.';}
-   else{if(!Number.isSafeInteger(result.revision)||result.revision<1||!equal(result.data,snapshot))throw Error('Shared save could not be verified. Your device copy is kept.');const merged=mergeWorkspace(snapshot,state.local,result.data);state.base=result.data;state.local=merged.data;state.revision=result.revision;state.updatedAt=result.updatedAt;state.issue=null;state.status='Shared · all changes saved';}
+   else{if(!Number.isSafeInteger(result.revision)||result.revision<1||!equal(result.data,snapshot))throw Error('Shared save could not be verified. Your device copy is kept.');const merged=mergeEventWorkspace(snapshot,state.local,result.data);state.base=result.data;state.local=merged.data;state.revision=result.revision;state.updatedAt=result.updatedAt;state.issue=null;state.status='Shared · all changes saved';}
    await persist();emit();
   }catch(e){state.mode='active';error(e);await persist();}
   finally{running=false;}

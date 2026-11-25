@@ -67,7 +67,7 @@ export function PlayerCard({showMembershipFreshness=false,player,onClick,onDelet
         {bulkMode?<span aria-hidden="true" style={{fontSize:22,color:isSelected?C.gold:C.icy}}>{isSelected?'☑':'☐'}</span>:<PlayerAvatar player={player} size={40}/>}
         <span style={{flex:1,minWidth:0}}>
           <span style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}><span style={{fontSize:15,fontWeight:650,minWidth:0,overflowWrap:'anywhere',lineHeight:1.3}}>{name}</span>{player.furnaceLevel&&<span style={{fontSize:13,color:C.gold,flexShrink:0}}>{player.furnaceLevel}</span>}</span>
-          <span style={{display:'block',fontSize:12,color:C.icy,marginTop:3}}>{player.allianceTag?`[${player.allianceTag}]`:showMembershipFreshness&&verifiedMembershipTime(player)?'No Alliance':'Alliance unknown'}{' · '}{sortDetail && sortField!=='furnace' ? `${sortDetail.label} ${sortDetail.value}` : power!=null ? `City power ${compact(power)}` : 'City power not recorded'}</span>
+          <span style={{display:'block',fontSize:12,color:C.icy,marginTop:3}}>{player.allianceTag?`[${player.allianceTag}]`:showMembershipFreshness&&verifiedMembershipTime(player)?'No Alliance':'Alliance unknown'}{player.allianceTag&&/^R[1-5]$/.test(player.allianceRank||'')?' · '+player.allianceRank:''}{' · '}{sortDetail && sortField!=='furnace' ? `${sortDetail.label} ${sortDetail.value}` : power!=null ? `City power ${compact(power)}` : 'City power not recorded'}</span>
           {showId&&<span style={{display:'block',fontSize:12,color:C.icy,marginTop:3}}>ID {player.fid||player.id}</span>}
         </span>
       </button>

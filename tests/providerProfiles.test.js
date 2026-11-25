@@ -22,7 +22,7 @@ test('refresh updates supplied fields by FID and preserves manual data and linke
   const again=mergeAllianceProfiles(result.players,rows(member),'3573');assert.equal(again.players.length,1);assert.deepEqual(again.updated[0].pastUsernames,['Old name']);assert.equal(again.updated[0].allianceHistory.length,1);
 });
 test('missing and invalid provider fields never erase recorded values, while zero remains valid',()=>{
-  const old={id:'keep',fid:'123',username:'Keep name',power:42,kills:55,furnaceLevel:'FC8',allianceRank:'R3',notes:'Keep'};
+  const old={id:'keep',fid:'123',username:'Keep name',power:42,kills:55,furnaceLevel:'FC8',allianceTag:'LUN',allianceRank:'R3',notes:'Keep'};
   const p=mergeAllianceProfiles([old],rows({chief_id:123,nick_name:'',kid:3573,power:null,kills:'bad',furnace_level:'unknown'}),'3573').updated[0];
   for(const field of ['username','power','kills','furnaceLevel','allianceRank','notes'])assert.equal(p[field],old[field]);
   assert.equal(providerNumber(0),0);assert.equal(providerNumber('0'),0);assert.equal(providerNumber(-1),null);assert.equal(providerNumber(false),null);
@@ -43,4 +43,18 @@ test('raw roster fields cannot overwrite protected manual or identity fields',()
   const old={id:'stable',fid:'123',notes:'Keep',troops:{infantry:'FC8'}};
   const p=mergeAllianceProfiles([old],rows({...member,id:'evil',notes:'replace',troops:null}),'3573').updated[0];
   assert.equal(p.id,'stable');assert.equal(p.notes,'Keep');assert.deepEqual(p.troops,old.troops);assert.equal(p.providerStats.raw.notes,'replace');
+});
+
+test('verified roster leader FID and numeric rank survive a refresh and serialization',()=>{
+ const previous={id:'keep',fid:'123',allianceTag:'LUN',allianceRank:'R3'};
+ const response={data:{alliance:{kid:3573,abbr:'LUN',name:'Lunar',leader_chief_id:123},
+   members:[{...member,fid:123,alliance_rank_label:'Unknown'}]}};
+ const p=JSON.parse(JSON.stringify(mergeAllianceProfiles([previous],allianceRows(response,'3573','LUN'),'3573').updated[0]));
+ assert.equal(p.allianceRank,'R5');
+ assert.equal(p.allianceName,'Lunar');
+ assert.equal(rows({...member,alliance_rank_label:'Unknown',alliance_rank:5})[0].allianceRank,'R5');
+ assert.equal(mergeAllianceProfiles([p],rows({fid:'123'}),'3573').updated[0].allianceRank,'R5');
+ const moved=mergeAllianceProfiles([p],allianceRows({data:{members:[{fid:'123'}]}},'3573','WAR'),'3573').updated[0];
+ assert.equal(moved.allianceRank,null);
+ assert.equal(moved.allianceName,'');
 });

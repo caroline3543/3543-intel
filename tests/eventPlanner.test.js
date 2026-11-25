@@ -1,3 +1,4 @@
+import { mergeEventWorkspace } from '../roster-site/src/sharedWorkspace.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -145,4 +146,41 @@ test('legion moves preserve past attendance, and full destinations reject the en
   assert.deepEqual(EVENT_LIMITS,{foundry:{join:30,sub:10},canyon:{join:30,sub:10},tal:{join:30,sub:20}});
   const overflow=updateEventPlanner(full,{...second,plan:{...destination,registrations:{...registrations,overflow:'sub'}}},cutoff);
   assert.throws(()=>validateEventPlannerData(overflow,cutoff),/Invalid event registration/);
+});
+
+test('cross-alliance batch move requires current source confirmation and is atomic',()=>{
+ const kind='canyon', target={kind,alliance:'ARC',legion:1};
+ const key=JSON.stringify([kind,'WAR',2]);
+ const source={...plannerSlot(null,kind,'WAR',2),registrations:{a:'sub'},registeredUnder:{a:'WAR'}};
+ const workspace={players:[{id:'a'},{id:'b'}],foundry:{eventPlans:{[key]:source}}};
+ const expectedOccurrenceId=plannerSlot(workspace.foundry,kind,'ARC',1).occurrenceId;
+ const change={id:'a',role:'join',expectedRole:''},other={id:'b',role:'sub',expectedRole:''};
+ const action={...target,expectedOccurrenceId,roleChanges:[change,other]};
+ assert.strictEqual(updateEventPlanner(workspace,action,early),workspace);
+ const moveFrom={alliance:'WAR',legion:2,role:'sub',occurrenceId:source.occurrenceId};
+ const confirmed={...action,roleChanges:[{...change,moveFrom},other]};
+ const next=JSON.parse(JSON.stringify(updateEventPlanner(workspace,confirmed,early)));
+ assert.deepEqual(plannerSlot(next.foundry,kind,'ARC',1).registrations,{a:'join',b:'sub'});
+ assert.deepEqual(plannerSlot(next.foundry,kind,'WAR',2).registrations,{});
+ assert.strictEqual(updateEventPlanner(next,confirmed,early),next);
+ const stale={...confirmed,roleChanges:[{...change,moveFrom:{...moveFrom,role:'join'}},other]};
+ assert.strictEqual(updateEventPlanner(workspace,stale,early),workspace);
+ const full={...workspace,foundry:{eventPlans:{[key]:source,[expectedOccurrenceId]:{
+   ...plannerSlot(null,kind,'ARC',1),registrations:Object.fromEntries(Array.from({length:30},(_,n)=>['filled-'+n,'join'])),
+ }}}};
+ assert.strictEqual(updateEventPlanner(full,confirmed,early),full);
+});
+
+test('sync asks for review if concurrent registration edits would create two assignments',()=>{
+ const base={players:[{id:'a'}],events:[],customRoles:[],settings:{stateId:'3573'},foundry:{}};
+ function assign(alliance){
+  const kind='foundry',legion=1;
+  const expectedOccurrenceId=plannerSlot(base.foundry,kind,alliance,legion).occurrenceId;
+  return updateEventPlanner(base,{kind,alliance,legion,expectedOccurrenceId,
+   roleChanges:[{id:'a',role:'join',expectedRole:''}]},early);
+ }
+ const local=assign('ARC'),remote=assign('WAR');
+ const result=mergeEventWorkspace(base,local,remote);
+ assert.equal(result.conflicts.length,1);
+ assert.deepEqual(result.data.foundry,local.foundry);
 });
