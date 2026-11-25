@@ -8,14 +8,23 @@ export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendanc
   const [date,setDate] = useState(plan.date||'');
   const [time,setTime] = useState(plan.time||'');
   const [occurrence,setOccurrence] = useState('');
+  const [dateTouched,setDateTouched] = useState(false);
+  const [timeTouched,setTimeTouched] = useState(false);
   useEffect(()=>{
     const tick=()=>setClock(Date.now());
     const interval=setInterval(tick,1000);
     return ()=>clearInterval(interval);
   },[]);
-  useEffect(()=>{setDate(plan.date||'');setTime(plan.time||'');},[plan.date,plan.time,plan.occurrenceId]);
+  useEffect(()=>{setDate(plan.date||'');setTime(plan.time||'');setDateTouched(false);setTimeTouched(false);},[plan.date,plan.time,plan.occurrenceId]);
   const currentStart = eventStart(plan.date,plan.time);
   const started = currentStart!==null && Date.parse(currentStart)<=clock;
+  const typedDate=date.trim(), typedTime=time.trim();
+  const validDate=Boolean(eventStart(typedDate,'00:00'));
+  const validTime=Boolean(eventStart('2026-01-01',typedTime));
+  const dateError=dateTouched&&typedDate!==''&&!validDate;
+  const timeError=timeTouched&&typedTime!==''&&!validTime;
+  const canSave=!started&&validDate&&validTime&&(typedDate!==plan.date||typedTime!==plan.time);
+  const fieldStyle={...button,display:'block',width:'100%',minWidth:0,maxWidth:'100%',boxSizing:'border-box',marginTop:4,textAlign:'left',fontSize:16,fontVariantNumeric:'tabular-nums'};
   const choices=new Map(currentStart ? [[plan.occurrenceId,currentStart]] : []);
   const records=players.flatMap(player=>Object.entries(player.plannerAttendance||{})
     .filter(([,record])=>record.kind===kind&&record.alliance===alliance&&record.legion===legion)
@@ -28,11 +37,23 @@ export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendanc
       <summary style={{cursor:'pointer',fontWeight:650}}>
         Event schedule · {currentStart?utc(currentStart):'Set UTC start'}
       </summary>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8,margin:'8px 0'}}>
-        <label>Date<input aria-label="Event date (UTC)" type="date" value={date} disabled={started} onChange={e=>setDate(e.target.value)} style={{...button,width:'100%',marginTop:4,minWidth:0}}/></label>
-        <label>Start time<input aria-label="Event start time (UTC)" type="time" value={time} disabled={started} onChange={e=>setTime(e.target.value)} style={{...button,width:'100%',marginTop:4,minWidth:0}}/></label>
-      </div>
-      {!started && <button type="button" style={button} disabled={!eventStart(date,time)||(date===plan.date&&time===plan.time)} onClick={()=>onSchedule(date,time)}>Save schedule</button>}
+      <form onSubmit={e=>{e.preventDefault();if(canSave)onSchedule(typedDate,typedTime);}} style={{display:'grid',gap:10,marginTop:8}}>
+        <label>Date (YYYY-MM-DD)
+          <input aria-label="Event date (UTC)" type="text" autoComplete="off" spellCheck={false}
+            placeholder="YYYY-MM-DD" value={date} disabled={started} aria-invalid={dateError||undefined}
+            aria-describedby={dateError?'planner-date-error':undefined}
+            onChange={e=>setDate(e.target.value)} onBlur={()=>setDateTouched(true)} style={fieldStyle}/>
+          {dateError&&<span id="planner-date-error" style={{display:'block',marginTop:4,color:'#f3adad'}}>Enter a valid date in YYYY-MM-DD format.</span>}
+        </label>
+        <label>Start time (UTC, 24-hour)
+          <input aria-label="Event start time (UTC)" type="text" autoComplete="off" spellCheck={false}
+            placeholder="HH:MM, e.g. 20:30" value={time} disabled={started} aria-invalid={timeError||undefined}
+            aria-describedby={timeError?'planner-time-error':undefined}
+            onChange={e=>setTime(e.target.value)} onBlur={()=>setTimeTouched(true)} style={fieldStyle}/>
+          {timeError&&<span id="planner-time-error" style={{display:'block',marginTop:4,color:'#f3adad'}}>Enter a UTC time from 00:00 to 23:59.</span>}
+        </label>
+        {!started&&<button type="submit" style={{...button,justifySelf:'start'}} disabled={!canSave}>Save schedule</button>}
+      </form>
       {started&&<button type="button" style={{...button,marginTop:8}} disabled={!attendanceOpen(currentStart,clock)} onClick={()=>{
         if(window.confirm('Start a new event for this legion? The previous attendance and power history are kept.')){setOccurrence('');onNewEvent();}
       }}>Start a new event</button>}

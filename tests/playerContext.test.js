@@ -144,9 +144,9 @@ test('Events uses compact accessible rows and locks unavailable events',async()=
  const {readFileSync}=await import('node:fs');
  const source=readFileSync(new URL('../roster-site/src/site.jsx',import.meta.url),'utf8');
  assert.ok(source.includes("tab==='events'?'Events'"));
- assert.ok(source.includes("disabled={!available} aria-disabled={!available}"));
- assert.ok(source.includes("['castle','Castle Battle','Coming soon',false]"));
- assert.ok(source.includes("['canyon','Canyon Clash','Team planning and attendance',true]"));
+ assert.ok(source.includes("disabled={!available}"));
+ assert.ok(source.includes("{id:'castle',label:'Castle Battle',description:'Coming soon',available:false,"));
+ assert.ok(source.includes("{id:'canyon',label:'Canyon Clash',description:'Team planning and attendance',available:true,"));
 });
 
 test('No alliance is a distinct roster filter and a verified same-state allocation',async()=>{

@@ -73,8 +73,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const [focusTeam,setFocusTeam]=useState('Blue'),[moving,setMoving]=useState(null),[confirmGenerate,setConfirmGenerate]=useState(false);
  const [addRole,setAddRole]=useState('join');
  const [managing,setManaging]=useState(null);
- const [participantsOnly,setParticipantsOnly]=useState(true),[rosterSearch,setRosterSearch]=useState('');
- const [rosterSort,setRosterSort]=useState('power'),[editingPower,setEditingPower]=useState(null),[confirmMove,setConfirmMove]=useState(null);
+ const [participantsOnly,setParticipantsOnly]=useState(false),[rosterSearch,setRosterSearch]=useState('');
+ const [rosterSort,setRosterSort]=useState('rank'),[editingPower,setEditingPower]=useState(null),[confirmMove,setConfirmMove]=useState(null);
  const [roleFilter,setRoleFilter]=useState('all'),[bulkMode,setBulkMode]=useState(false),[bulkSelected,setBulkSelected]=useState([]),[rankExpanded,setRankExpanded]=useState({R5:true,R4:true,R3:true,R2:true,R1:true});
  const [editIds,setEditIds]=useState(null);
  const [bulkAction,setBulkAction]=useState(''),[bulkLanguage,setBulkLanguage]=useState(''),[bulkRelationshipMode,setBulkRelationshipMode]=useState('add'),[teammateQuery,setTeammateQuery]=useState(''),[teammateIds,setTeammateIds]=useState([]);
@@ -324,7 +324,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      <div className="legion-roster-tools">
        <input type="search" aria-label="Search roster" placeholder="Search roster" style={btn} value={rosterSearch} onChange={e=>{setRosterSearch(e.target.value);setBulkSelected([])}}/>
        <select aria-label="Sort roster" value={rosterSort} onChange={e=>setRosterSort(e.target.value)} style={btn}>
-         <option value="power">Highest power</option><option value="name">Name A–Z</option><option value="rank">Alliance rank</option>
+         <option value="power">Highest power</option><option value="name">Name A–Z</option><option value="rank">Rank, then power</option>
        </select>
        <label><input type="checkbox" checked={participantsOnly} onChange={e=>{setParticipantsOnly(e.target.checked);setRoleFilter('all');setBulkSelected([])}}/> Participants only</label>
        {roleFilter!=='all'&&<button type="button" style={btn} onClick={()=>{setRoleFilter('all');setBulkSelected([])}}>Clear role filter</button>}
@@ -335,7 +335,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
        const rows=group?sortedRoster.filter(p=>p.rank===group):sortedRoster;
        if(!rows.length)return null;
        const groupCount=roster.filter(p=>p.rank===group).length;
-       return <div key={group||'all'}>
+       return <div key={group||'all'} data-roster-rank={group||undefined}>
          {group&&<button type="button" aria-expanded={rankExpanded[group]!==false} onClick={()=>setRankExpanded(v=>({...v,[group]:v[group]===false}))} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between'}}>
            <span>{group}</span><span>{rows.length}/{groupCount} {rankExpanded[group]===false?'⌄':'⌃'}</span>
          </button>}

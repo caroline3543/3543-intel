@@ -74,7 +74,9 @@ try{
   await mainNav.getByRole('button',{name:'Events',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:/Castle Battle/}).isDisabled(),true,'Unavailable Castle Battle must not be clickable');
   assert.equal(await page.getByRole('button',{name:/Canyon Clash/}).isEnabled(),true);
-  assert.equal(await page.getByRole('region',{name:'Events'}).count(),1);
+  const events=page.getByRole('region',{name:'Events'});
+  assert.deepEqual(await events.locator('button strong').allTextContents(),['Canyon Clash','Castle Battle','Foundry','Tundra Arms League']);
+  assert.equal(await events.locator('button svg[aria-hidden="true"]').count(),4);
   stage='tal-placeholder';
   const talEntry=page.getByRole('button',{name:/Tundra Arms League/});
   assert.equal(await talEntry.isEnabled(),true,'TAL event should open its under-development screen');
