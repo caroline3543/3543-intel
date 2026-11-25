@@ -55,14 +55,27 @@ export function pickScreenshotRows(results, width, height) {
 // Scrolling screenshots often include the same row. Keep differing readings
 // or unread names for review so an apparent duplicate cannot hide a conflict.
 export function combineScreenshotRows(screenshots) {
-  const seen = new Set();
-  return screenshots.flatMap(screenshot => screenshot.rows.filter(row => {
-    if (!row.name || row.power === null) return true;
-    const key = JSON.stringify([row.name.normalize('NFC'), row.power]);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }));
+ const groups=new Map(), unread=[];
+ for(const [sourceIndex,screenshot] of screenshots.entries()){
+  for(const row of screenshot.rows){
+   const record={...row,sources:[sourceIndex]};
+   if(!row.name){unread.push(record);continue;}
+   const key=row.name.normalize('NFC');
+   const list=groups.get(key)||[];
+   const compatible=list.find(existing=>
+    (existing.power===null||row.power===null||existing.power===row.power)&&
+    (!existing.registration||existing.registration==='unknown'||!row.registration||row.registration==='unknown'||existing.registration===row.registration)&&
+    (!existing.otherLegion||!row.otherLegion||existing.otherLegion===row.otherLegion));
+   if(compatible){
+    compatible.power=compatible.power??row.power;
+    if(!compatible.registration||compatible.registration==='unknown')compatible.registration=row.registration;
+    compatible.otherLegion=compatible.otherLegion||row.otherLegion;
+    compatible.sources.push(sourceIndex);
+   }else list.push(record);
+   groups.set(key,list);
+  }
+ }
+ return [...groups.values()].flatMap(list=>list.map(row=>({...row,conflict:list.length>1}))).concat(unread);
 }
 
  // Bright tick pixels are distinct from the muted empty checkbox fill.
