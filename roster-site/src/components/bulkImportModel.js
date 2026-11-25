@@ -2,17 +2,18 @@
 export function normaliseBulkName(value){
  return String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/[\p{P}\p{S}\p{M}\s]/gu,'');
 }
-export function parseBulkPlayers(text){
+export function parseBulkPlayers(text,parsePower){
  return String(text||'').split(/\r?\n/).map((line,index)=>{
   const raw=line.trim();
   if(!raw||/^(name|username)\s*[,;\t]\s*(power|troop power)$/i.test(raw))return null;
-  const match=raw.match(/^(.*?)(?:\s*[,;:\t]\s*|\s+[—–-]\s+|\s+)([\d,.]+\s*[mMkK]?)$/);
+  const match=raw.match(/^(.*?)(?:\s*[,;:\t]\s*|\s+[—–-]\s+|\s+)([\d,.]+\s*[mMkKbB]?)$/);
   const username=(match?.[1]||raw).trim(),powerText=(match?.[2]||'').trim();
   let power=null;
-  if(powerText){
+  if(powerText&&parsePower)power=parsePower(powerText);
+  else if(powerText){
    const value=powerText.replace(/,/g,'').replace(/\s/g,'');
    const amount=Number.parseFloat(value);
-   if(Number.isFinite(amount))power=amount*(/[mM]$/.test(value)?1000000:/[kK]$/.test(value)?1000:1);
+   if(Number.isFinite(amount))power=amount*(/[mM]$/.test(value)?1000000:/[kK]$/.test(value)?1000:/[bB]$/.test(value)?1000000000:1);
   }
   return {key:index,raw,username,power,powerText};
  }).filter(Boolean);

@@ -13,6 +13,13 @@ export function EventPlanner({kind,players,storage,onUpdate,...props}) {
   return <FoundryTab key={plannerKey(kind,alliance,legion)} {...props} kind={kind} chosen={alliance} legion={legion} players={players}
     changeSelection={(tag,number)=>{setAlliance(tag);setLegion(tag===alliance?number:1);localStorage.setItem(storageKey,tag);}}
     otherLegion={otherLegion} otherPlan={otherPlan}
+    onSaveScreenshotPowers={(targetLegion,expectedOccurrenceId,rows)=>{
+      const target=plannerSlot(storage,kind,alliance,targetLegion);
+      if(target.occurrenceId!==expectedOccurrenceId)return {error:'This legion changed events. Scan the screenshot again for the current event.'};
+      onUpdate({kind,alliance,legion:targetLegion,expectedOccurrenceId,
+        powers:rows.map(row=>({id:row.id,value:row.power}))});
+      return {message:rows.length+(rows.length===1?' power reading saved for Legion ':' power readings saved for Legion ')+targetLegion};
+    }}
     onMoveLegion={(id,role)=>update({move:{id,role,sourceOccurrenceId:otherPlan.occurrenceId}})}
     sharedFoundry={plan} onSaveFoundry={(next,powers)=>update({plan:next,powers})}
     onSaveTroopPower={(id,value)=>update({powers:[{id,value}]})}

@@ -1,4 +1,5 @@
 import './legionRoster.css';
+import {RosterScreenshotImport} from './RosterScreenshotImport.jsx';
 import {BulkPlayerImport} from '../components/BulkPlayerImport.jsx';
 import {foundryShareMessages,foundryMessageStats,FOUNDRY_DEFAULT_INSTRUCTIONS} from './foundryShare.js';
 import {useMemo,useState,useRef,useEffect} from 'react';
@@ -57,7 +58,7 @@ function InlinePower({player,onSave,metric,onClose}){
  </div>;
 }
 export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',chosen,legion,changeSelection,sharedFoundry={},
-  otherPlan,otherLegion,onMoveLegion,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
+  otherPlan,otherLegion,onMoveLegion,onSaveScreenshotPowers,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
  const title=EVENT_NAMES[kind],isFoundry=kind==='foundry',metric=isFoundry?'Troop power':'Canyon Clash power';
  const limits=EVENT_LIMITS[kind];
  const colours=TEAM_NAMES.slice(0,sharedFoundry.teamCount||4);
@@ -67,6 +68,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const saved=sharedFoundry||{};
  const [view,setView]=useState('players'),[query,setQuery]=useState('');
  const [paste,setPaste]=useState(''),[showPaste,setShowPaste]=useState(false),[notice,setNotice]=useState(''),[selected,setSelected]=useState(null);
+ const [showScreenshot,setShowScreenshot]=useState(false);
  const [undo,setUndo]=useState(null);
  const teamRefs=useRef({});
  const jumpToTeam=c=>{setFocusTeam(c);teamRefs.current[c]?.scrollIntoView({behavior:'smooth',block:'start'});};
@@ -314,6 +316,10 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      </div>
      <button type="button" style={{...btn,background:'transparent',border:0,padding:'5px 2px',minHeight:30,color:'#a9c4dc',fontSize:13}} onClick={()=>setShowPaste(v=>!v)}>{showPaste?'Hide bulk import':'＋ Paste multiple players'}</button>
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} · {metric}</small>{p.recentNoShow&&<NoShow/>}</span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
+   <button type="button" style={{...btn,margin:'6px 0 6px 8px'}} aria-expanded={showScreenshot}
+     onClick={()=>setShowScreenshot(value=>!value)}>{showScreenshot?'Hide screenshot reader':'Read screenshot'}</button>
+   {showScreenshot&&<RosterScreenshotImport title={title} alliance={chosen} players={entries.filter(p=>p.matched)}
+     occurrenceIds={{[legion]:saved.occurrenceId,[otherLegion]:otherPlan.occurrenceId}} onSave={onSaveScreenshotPowers}/>}
    {showPaste&&<BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
    </details>
    <div style={{...style,padding:12}}>

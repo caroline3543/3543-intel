@@ -5,9 +5,9 @@ const card={border:'1px solid '+palette.border,borderRadius:16,padding:12,backgr
 const control={background:palette.elevated,border:'1px solid '+palette.border,borderRadius:12,color:palette.text,minHeight:44,padding:'9px 12px',fontSize:14,boxSizing:'border-box'};
 const button={...control,fontWeight:650,cursor:'pointer'};
 const secondary={fontSize:12,color:palette.secondary};
-export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',onConfirm,onClose,initialText='',title='Import players',context='Foundry',requirePower=false}){
+export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',onConfirm,onClose,initialText='',title='Import players',context='Foundry',requirePower=false,verifyReadings=false,parsePower}){
  const [expanded,setExpanded]=useState(null),[searching,setSearching]=useState({}),[source,setSource]=useState(initialText),[stage,setStage]=useState('paste'),[choices,setChoices]=useState({}),[powers,setPowers]=useState({}),[filter,setFilter]=useState('review'),[search,setSearch]=useState({}),[status,setStatus]=useState('');
- const rows=useMemo(()=>parseBulkPlayers(source),[source]);
+ const rows=useMemo(()=>parseBulkPlayers(source,parsePower),[source,parsePower]);
  const evaluated=useMemo(()=>resolveBulkRows(rows,players,choices,powers,alliance),[rows,players,choices,powers,alliance]);
  const matched=evaluated.filter(r=>r.status==='exact'||r.status==='approved');
  const pending=evaluated.filter(r=>r.status==='review');
@@ -28,12 +28,12 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
    <button type="button" onClick={reset} style={{...button,fontSize:12,minHeight:44}}>↻ Reset</button>
   </header>
   <div aria-label="Import progress" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-   {['1. Paste','2. Review','3. Confirm'].map((label,i)=><div key={label}><div style={{height:4,borderRadius:9,background:(stage==='paste'?i===0:stage==='review'?i===1:i===2)?palette.accent:palette.border}}/><div style={{...secondary,marginTop:6}}>{label}</div></div>)}
+   {[verifyReadings?'1. Check OCR':'1. Paste','2. Review','3. Confirm'].map((label,i)=><div key={label}><div style={{height:4,borderRadius:9,background:(stage==='paste'?i===0:stage==='review'?i===1:i===2)?palette.accent:palette.border}}/><div style={{...secondary,marginTop:6}}>{label}</div></div>)}
   </div>
   {stage==='paste'&&<>
-   <label style={{fontSize:14,fontWeight:650}}>Paste names and troop power<textarea aria-label="Paste names and troop power" value={source} onChange={e=>editSource(e.target.value)} rows={10} placeholder={'Username, power\nPlayer One, 3500\nPlayer Two, 4.2M'} style={{...control,width:'100%',marginTop:8,resize:'vertical',lineHeight:1.6,fontFamily:'inherit'}}/></label>
+   <label style={{fontSize:14,fontWeight:650}}>{verifyReadings?'Check each name and power against the screenshot. Edit any mistakes here.':'Paste names and troop power'}<textarea aria-label={verifyReadings?'Screenshot names and troop power':'Paste names and troop power'} value={source} onChange={e=>editSource(e.target.value)} rows={10} placeholder={'Username, power\nPlayer One, 3500\nPlayer Two, 4.2M'} style={{...control,width:'100%',marginTop:8,resize:'vertical',lineHeight:1.6,fontFamily:'inherit'}}/></label>
    <div style={{...secondary,display:'flex',justifyContent:'space-between'}}><span>{rows.length} players detected</span><span>Name, power · One per line</span></div>
-   <button type="button" disabled={!rows.length} onClick={()=>{setStage('review');setFilter('review');setExpanded(evaluated.find(r=>r.status==='review')?.key??null)}} style={{...button,background:palette.accent,color:'#0B1525',opacity:rows.length?1:.5}}>Find roster matches →</button>
+   <button type="button" disabled={!rows.length} onClick={()=>{setStage('review');setFilter(verifyReadings&&!pending.length?'matched':'review');setExpanded(evaluated.find(r=>r.status==='review')?.key??null)}} style={{...button,background:palette.accent,color:'#0B1525',opacity:rows.length?1:.5}}>Find roster matches →</button>
   </>}
   {stage==='review'&&<>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,fontSize:13}}>
@@ -78,7 +78,7 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
    {newPlayers.length>0&&<p style={{...secondary,margin:0}}>New profiles must be created separately. Only matched players are imported.</p>}
    {duplicates.length>0&&<p role="alert" style={{color:palette.warning,fontSize:13}}>Duplicate player IDs. Change the matches before confirming.</p>}
    {invalid.length>0&&<p role="alert" style={{color:palette.warning,fontSize:13}}>Invalid troop power. Enter a non-negative whole number.</p>}
-   <div style={{display:'grid',gap:8}}><button type="button" disabled={!ready} onClick={submit} style={{...button,background:palette.accent,color:'#0B1525',opacity:ready?1:.45}}>Confirm {selected.length} matched players</button>{!ready&&<span style={secondary}>Resolve {pending.length} entries and any missing power or duplicate identities first.</span>}<button type="button" onClick={()=>setStage('paste')} style={{...button,background:'transparent',minHeight:38}}>Edit pasted text</button></div>
+   <div style={{display:'grid',gap:8}}><button type="button" disabled={!ready} onClick={submit} style={{...button,background:palette.accent,color:'#0B1525',opacity:ready?1:.45}}>{verifyReadings?'Save '+selected.length+(selected.length===1?' power reading':' power readings'):'Confirm '+selected.length+' matched players'}</button>{!ready&&<span style={secondary}>Resolve {pending.length} entries and any missing power or duplicate identities first.</span>}<button type="button" onClick={()=>setStage('paste')} style={{...button,background:'transparent',minHeight:38}}>{verifyReadings?'Edit screenshot readings':'Edit pasted text'}</button></div>
   </>}
   {stage==='done'&&<div style={{textAlign:'center',padding:'24px 8px',display:'grid',gap:12}}><div style={{fontSize:32,color:palette.success}}>✓</div><h3 style={{fontSize:18,margin:0}}>Import complete</h3><p style={{...secondary,margin:0}}>{status}</p><button type="button" onClick={onClose} style={{...button,background:palette.accent,color:'#0B1525'}}>Done</button></div>}
   {status&&stage!=='done'&&<p role="alert" style={{fontSize:13,color:palette.warning,margin:0}}>{status}</p>}
