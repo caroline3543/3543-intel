@@ -59,7 +59,7 @@ try {
     await page.getByRole('button',{name:'Edit troop power for Northvale'}).click();
     const input=page.getByRole('textbox',{name:'Troop power for Northvale',exact:true});
     await input.fill('946105130');await input.press('Enter');
-    await page.getByRole('button',{name:'Open profile for Northvale',exact:true}).click();
+    await page.getByRole('button',{name:/^Northvale .*Open profile$/}).click();
     const profile=page.getByRole('dialog',{name:/Player profile/});
     const eventPower=profile.locator('.soft-profile-stats.event-stats');
     await eventPower.getByText('946,105,130',{exact:true}).waitFor();
@@ -118,7 +118,7 @@ try {
     await page.getByRole('button',{name:'Edit canyon clash power for Northvale'}).click();
     const canyon=page.getByRole('textbox',{name:'Canyon Clash power for Northvale',exact:true});
     await canyon.fill('1251234567');await canyon.press('Enter');
-    await page.getByRole('button',{name:'Open profile for Northvale'}).click();
+    await page.getByRole('button',{name:/^Northvale .*Open profile$/}).click();
     await eventPower.getByText('1.25B',{exact:true}).waitFor();
     await profile.getByText('Event attendance',{exact:true}).click();
     const attendanceHistory=profile.locator('details[open]').filter({hasText:'Event attendance'});

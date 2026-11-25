@@ -247,6 +247,9 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const balanceSpread=average?Math.round((Math.max(...Object.values(teamTotals))-Math.min(...Object.values(teamTotals)))/average*100):0;
  const renderRosterPlayer=p=>{
   const role=activeRole(p.id),other=otherRole(p.id);
+  const playerContext=[p.alliance,p.rank,!p.matched&&'Needs matching',p.language&&languageLabel(p.language)].filter(Boolean).join(' · ');
+  const powerValue=p.hasPower?format(p.power):null;
+  const powerLabel=powerValue===null?'Add power for '+p.name:powerValue+' · Edit '+metric.toLowerCase()+' for '+p.name;
   const elsewhere=other&&!isParticipant(role);
   const label=elsewhere?'Legion '+otherLegion+' · '+REGISTRATION_ROLES.find(([id])=>id===other)[1]:
     REGISTRATION_ROLES.find(([id])=>id===role)?.[1]||'Unassigned';
@@ -258,12 +261,13 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
         {bulkMode&&role&&<input type="checkbox" aria-label={'Select '+p.name} checked={bulkSelected.includes(p.id)} onChange={()=>setBulkSelected(ids=>ids.includes(p.id)?ids.filter(id=>id!==p.id):[...ids,p.id])}/>}
         <PlayerAvatar player={avatarFor(p)} size={34}/>
         <div style={{minWidth:0}}>
-          <button type="button" className="legion-player-name" aria-label={'Open profile for '+p.name} onClick={()=>onOpenPlayerProfile?.(p.id)}>
+          <button type="button" className="legion-player-name" onClick={()=>onOpenPlayerProfile?.(p.id)}>
             {p.name}
-            <small className="legion-player-context">{p.alliance} · {p.rank}{!p.matched?' · Needs matching':''}{p.language?' · '+languageLabel(p.language):''}</small>
+            <small className="legion-player-context">{playerContext}</small>
+            <span className="planner-sr-only"> · Open profile</span>
           </button>
           {editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
-            <button type="button" className="legion-player-power" aria-label={'Edit '+metric.toLowerCase()+' for '+p.name} onClick={()=>setEditingPower(p.id)}>{p.hasPower?format(p.power)+' · Edit':'Add power'}</button>}
+            <button type="button" className="legion-player-power" aria-label={powerLabel} onClick={()=>setEditingPower(p.id)}>{powerValue===null?'Add power':powerValue+' · Edit'}</button>}
           {p.recentNoShow&&<NoShow/>}
         </div>
       </div>

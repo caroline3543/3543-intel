@@ -41,7 +41,7 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
    <div>{reviewRegistration?<h3 ref={stageHeading} tabIndex={-1}>{stageLabel[stage]}</h3>:<h2 style={{fontSize:18,margin:0}}>{title}</h2>}<div style={secondary}>{reviewRegistration?roleLabel:context+' · '+(alliance||'All alliances')+' · '+roleLabel}</div></div>
    <button type="button" onClick={reset} style={{...button,fontSize:12,minHeight:44}}>↻ Reset</button>
   </header>
-  <div aria-label="Import progress" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+  <div role="group" aria-label="Import progress" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
    {[['paste','1. Paste'],['review','2. Review'],['confirm','3. Confirm']].map(([step,label],i)=><div key={step} aria-current={stage===step?'step':undefined}><div style={{height:4,borderRadius:9,background:(stage==='paste'?i===0:stage==='review'?i===1:i===2)?palette.accent:palette.border}}/><div style={{...secondary,marginTop:6}}>{label}</div></div>)}
   </div>
   {stage==='paste'&&<>
@@ -53,7 +53,7 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,fontSize:13}}>
     <strong>{pending.length} to review</strong><span style={secondary}>{matched.length} matched · {evaluated.length} total</span>
    </div>
-   <div aria-label="Match progress" style={{height:5,borderRadius:8,background:palette.border,overflow:'hidden'}}><div style={{width:(evaluated.length?100*(evaluated.length-pending.length)/evaluated.length:0)+'%',height:'100%',background:palette.success}}/></div>
+   <div role="progressbar" aria-label="Match progress" aria-valuemax={Math.max(evaluated.length,1)} aria-valuenow={evaluated.length-pending.length} style={{height:5,borderRadius:8,background:palette.border,overflow:'hidden'}}><div style={{width:(evaluated.length?100*(evaluated.length-pending.length)/evaluated.length:0)+'%',height:'100%',background:palette.success}}/></div>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
     <button type="button" aria-pressed={filter==='review'} onClick={()=>setFilter('review')} style={{...button,background:filter==='review'?palette.elevated:'transparent',border:0,fontSize:12}}>Needs review ({pending.length})</button>
     <button type="button" aria-pressed={filter==='matched'} onClick={()=>setFilter(filter==='matched'?'review':'matched')} style={{...button,background:filter==='matched'?palette.elevated:'transparent',border:0,fontSize:12}}>Matched ({visibleMatched.length}) {filter==='matched'?'⌃':'⌄'}</button>
