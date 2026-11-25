@@ -76,7 +76,7 @@ async function completeCanyonRow(worker, screen, region, row) {
     const text = data.text.trim();
     // The game prints full integers with groups of three. OCR can mistake
     // a comma for a dot. Leave compact decimals such as 1.25B alone.
-    const value = /^\d{1,3}(?:[.,]\d{3}){2,}$/.test(text) ? text.replace(/\./g, ',') : text;
+    const value = /^\d{1,3}(?:[.,]\d{3})+$/.test(text) ? text.replace(/\./g, ',') : text;
     row.power = readScreenshotPower(value);
     return row;
   } finally {
@@ -118,15 +118,15 @@ export async function readRosterScreenshot(worker, file, kind) {
       for (let i = 0; i < marker.length; i += 4) {
         if (marker[i + 1] - marker[i] > 40 && marker[i + 1] - marker[i + 2] > 38) greenInk++;
       }
-      if (greenInk > width * (bottom - top) * .002) continue;
+      const otherLegionMarker = greenInk > width * (bottom - top) * .002;
       const textWidth = Math.round(width * .49);
       const rowHeight = bottom - top;
       const crop = textCrop(screen, left, top, textWidth, rowHeight);
       const reading = await worker.recognize(crop);
       const row = readScreenshotRow(reading.data.text);
       if (!row) continue;
-      const completed = kind === 'canyon'
-        ? await completeCanyonRow(worker, screen, { left, top, textWidth, rowHeight }, row) : row;
+      const completed = await completeCanyonRow(worker, screen, { left, top, textWidth, rowHeight }, row);
+      if (completed && otherLegionMarker) completed.otherLegionMarker = true;
       if (completed) rows.push(completed);
     }
     return { legion, rows };
