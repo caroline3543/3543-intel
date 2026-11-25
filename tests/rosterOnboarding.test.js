@@ -19,3 +19,11 @@ test('unavailable storage and vibration cannot block button actions',()=>{
  assert.equal(tapFeedback(false,device),false);assert.equal(pulses,0);
  assert.equal(tapFeedback(true,device),true);assert.equal(pulses,1);
 });
+
+test('a confirmed planner action uses the requested short pulse',()=>{
+ const received=[];
+ const device={vibrate(duration){received.push(duration);return true}};
+ assert.equal(tapFeedback(true,device,14),true);
+ assert.equal(tapFeedback(false,device,14),false);
+ assert.deepEqual(received,[14]);
+});

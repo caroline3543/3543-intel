@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {addRecordedLanguage} from '../../src/services/gameLanguageService.js';
 import {NameChanges} from './components/NameChanges.jsx';
+import {readPreferences,tapFeedback} from './preferences.js';
 import {EventPlanner} from './foundry/EventPlanner.jsx';
 import {SoftDarkProfile} from '../../src/components/players/SoftDarkProfile.jsx';
 import {plannerKey,plannerSlot,updateEventPlanner} from '../../src/services/eventPlanner.js';
@@ -39,6 +40,7 @@ function Preview(){
       <button aria-pressed={kind==='changes'} onClick={()=>setKind('changes')}>Changes</button>
     </nav>
     {kind==='changes'?<NameChanges players={workspace.players} plan={{}} onOpen={open}/>:<EventPlanner key={kind} kind={kind} players={workspace.players} storage={workspace.foundry}
+      onRoleFeedback={()=>tapFeedback(readPreferences().haptics,navigator,14)}
       onUpdate={action=>save(prev=>updateEventPlanner(prev,action))} onOpenPlayerProfile={open}
       teamworkPreferences={teamwork} onSaveTeamworkPreferences={setTeamwork}
       onUpdatePlayerLanguage={(ids,language)=>save(prev=>({...prev,players:prev.players.map(player=>

@@ -16,6 +16,10 @@ try {
     page.setDefaultTimeout(10000);
     const errors=[];
     page.on('pageerror',error=>errors.push(error.message));
+    await page.addInitScript(()=>{
+      window.rolePulses=[];
+      navigator.vibrate=duration=>{window.rolePulses.push(duration);return true;};
+    });
     await page.clock.setFixedTime(new Date('2026-11-26T00:30:00Z'));
     await page.goto(origin+'/event-preview.html'+(process.env.EVENT_PREVIEW_QUERY||''));
     const foundry=page.getByRole('combobox',{name:'Foundry registration alliance'});
@@ -58,6 +62,7 @@ try {
     await rosterSearch.fill('Northvale');
     await page.getByRole('button',{name:'Northvale · Legion 1 Combatant',exact:true}).click();
     await page.getByRole('dialog',{name:'Confirm player moves'}).getByText('Are you sure?').waitFor();
+    assert.deepEqual(await page.evaluate(()=>window.rolePulses),[]);
     await page.getByRole('button',{name:'Cancel',exact:true}).click();
     await page.getByRole('button',{name:'Legion 1',exact:true}).click();
     await page.getByRole('button',{name:'Cypress · Not participating',exact:true}).waitFor();
@@ -69,6 +74,7 @@ try {
     await otherLegion.click();
     await page.getByRole('button',{name:'Confirm move',exact:true}).click();
     await page.getByRole('button',{name:'Aster · Legion 1 Combatant',exact:true}).waitFor();
+    assert.deepEqual(await page.evaluate(()=>window.rolePulses),[14]);
     await page.getByRole('button',{name:'Legion 2',exact:true}).click();
     await participants.check();
     assert.equal(await roster.count(),0);
@@ -88,6 +94,7 @@ try {
     await page.getByRole('button',{name:'Kite · Legion 1 Substitute',exact:true}).click();
     await page.getByRole('button',{name:'Kite · Unassigned',exact:true}).click();
     await page.getByRole('button',{name:'Kite · Legion 1 Combatant',exact:true}).waitFor();
+    assert.deepEqual(await page.evaluate(()=>window.rolePulses),[14,14,14,14]);
     await page.getByRole('button',{name:'More actions for Kite',exact:true}).click();
     await page.getByRole('button',{name:'Not participating',exact:true}).click();
     await page.getByRole('button',{name:'Kite · Not participating',exact:true}).click();

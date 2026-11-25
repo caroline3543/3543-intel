@@ -62,3 +62,9 @@
 .legion-move-dialog ul { padding-inline-start: 20px; margin-block: 8px; }
 .legion-move-dialog li { padding-block: 5px; overflow-wrap: anywhere; }
 .legion-move-overlay { position: fixed; inset: 0; z-index: 101; background: #08111bb3; }
+.legion-role:not(:disabled):active,
+.legion-move-dialog [data-role-feedback]:active {
+  filter: brightness(1.19);
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.legion-card-select:active { box-shadow: inset 0 0 0 2px #b6cee6; }

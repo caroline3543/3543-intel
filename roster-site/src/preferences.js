@@ -7,7 +7,7 @@ export function savePreferences(patch,storage=localStorage){
   try{storage.setItem(KEY,JSON.stringify(next));}catch{/* Preferences must never prevent roster use. */}
   return next;
 }
-export function tapFeedback(enabled,navigatorObject=navigator){
+export function tapFeedback(enabled,navigatorObject=navigator,duration=8){
   if(!enabled||typeof navigatorObject.vibrate!=='function')return false;
-  try{return navigatorObject.vibrate(8);}catch{return false;}
+  try{return navigatorObject.vibrate(duration);}catch{return false;}
 }

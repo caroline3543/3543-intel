@@ -69,7 +69,7 @@ function InlinePower({player,onSave,metric,onClose}){
  </div>;
 }
 export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',chosen,legion,changeSelection,sharedFoundry={},
-  otherPlan,otherLegion,eventRegistrations,onChangeRoles,onSaveScreenshotPowers,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
+  otherPlan,otherLegion,eventRegistrations,onChangeRoles,onRoleFeedback,onSaveScreenshotPowers,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
  const title=EVENT_NAMES[kind],isFoundry=kind==='foundry',metric=isFoundry?'Troop power':'Canyon Clash power';
  const limits=EVENT_LIMITS[kind];
  const colours=TEAM_NAMES.slice(0,sharedFoundry.teamCount||4);
@@ -124,6 +124,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const commitRoles=changes=>{
   const result=onChangeRoles(changes);
   if(result.error){setNotice(result.error);return false;}
+  onRoleFeedback?.();
   const moved=changes.filter(change=>change.moveFrom).length;
   setUndo(moved?null:saved);
   setNotice(moved?moved+' '+(moved===1?'player moved':'players moved'):'Registration updated');
@@ -281,7 +282,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
         </div>
       </div>
       {bulkMode?<small className="legion-player-context">{label}</small>:<div className="legion-role-controls">
-        <button type="button" className="legion-role" data-role={elsewhere?'other':role} disabled={!p.matched}
+        <button type="button" data-role-feedback className="legion-role" data-role={elsewhere?'other':role} disabled={!p.matched}
           aria-label={p.name+' · '+label} onClick={()=>requestRoles([p.id],nextRole)}>{label}</button>
         {p.matched&&<button type="button" className="legion-more" aria-label={'More actions for '+p.name}
           aria-expanded={managing===p.id} onClick={()=>setManaging(managing===p.id?null:p.id)}>•••</button>}
@@ -290,8 +291,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     {!bulkMode&&managing===p.id&&<div className="legion-player-options">
       {elsewhere&&<button type="button" style={btn} onClick={()=>changeSelection(elsewhere.alliance,elsewhere.legion)}>View {assignmentLabel(elsewhere)}</button>}
       {!elsewhere&&<>
-        <button type="button" style={btn} onClick={()=>requestRoles([p.id],'out')}>Not participating</button>
-        {role&&<button type="button" style={btn} onClick={()=>requestRoles([p.id],'')}>Unassign</button>}
+        <button type="button" data-role-feedback style={btn} onClick={()=>requestRoles([p.id],'out')}>Not participating</button>
+        {role&&<button type="button" data-role-feedback style={btn} onClick={()=>requestRoles([p.id],'')}>Unassign</button>}
       </>}
       <button type="button" style={btn} onClick={()=>{openEditor('language',[p.id]);setManaging(null)}}>Language</button>
       <button type="button" style={btn} onClick={()=>{openEditor('relationships',[p.id]);setManaging(null)}}>Works well with</button>
@@ -319,9 +320,10 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      {confirmMove.error&&<p role="alert">{confirmMove.error}</p>}
      <div className="legion-bulk-buttons">
        <button type="button" autoFocus style={btn} onClick={()=>setConfirmMove(null)}>Cancel</button>
-       <button type="button" style={{...btn,background:'#f5ad38',color:'#101b28'}} onClick={()=>{
+       <button type="button" data-role-feedback style={{...btn,background:'#f5ad38',color:'#101b28'}} onClick={()=>{
          const result=onChangeRoles(confirmMove.changes);
          if(result.error){setConfirmMove({...confirmMove,error:result.error});return}
+         onRoleFeedback?.();
          setConfirmMove(null);setUndo(null);setManaging(null);endSelection();setNotice('Registration updated');
        }}>Confirm move</button>
      </div>
@@ -396,7 +398,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
          {bulkAction==='actions'&&[['out','Set as not participating'],['relationships','Works well with'],['remove','Remove from registration']].map(([key,label])=><button key={key} style={{...btn,textAlign:'left'}} onClick={()=>openEditor(key,selectedIds())}>{label} ›</button>)}
          {REGISTRATION_ROLES.some(([role])=>role===bulkAction)&&<>
            <strong>Set as {REGISTRATION_ROLES.find(([role])=>role===bulkAction)[1]}</strong>
-           <button style={btn} onClick={()=>bulkUpdate(bulkAction)}>Apply to {editIds.length} {editIds.length===1?'player':'players'}</button>
+           <button data-role-feedback style={btn} onClick={()=>bulkUpdate(bulkAction)}>Apply to {editIds.length} {editIds.length===1?'player':'players'}</button>
          </>}
          {bulkAction==='language'&&<><label style={{fontSize:12,color:'#b9cad9'}}>Language<input aria-label="Language" value={bulkLanguage} onChange={e=>setBulkLanguage(e.target.value)} placeholder="Type a language or code, e.g. ko" style={{...btn,width:'100%',boxSizing:'border-box',marginTop:5}}/></label>{bulkLanguage.trim()&&languageOptions.filter(n=>n.toLowerCase().includes(bulkLanguage.toLowerCase())||resolveLanguage(bulkLanguage)===resolveLanguage(n)).slice(0,6).map(n=><button key={n} style={{...btn,textAlign:'left'}} onClick={()=>setBulkLanguage(n)}>{n}</button>)}<button style={btn} onClick={()=>addLanguage(resolveLanguage(bulkLanguage))}>Add language to {editIds.length} {editIds.length===1?'player':'players'}</button></>}
          {bulkAction==='relationships'&&<>
@@ -405,7 +407,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
            {selectedIds().length===1&&relatedTo(selectedIds()[0]).map(id=><div key={id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:12}}><span>{entries.find(p=>p.id===id)?.name||id}</span><button style={btn} aria-label={'Unlink '+id} onClick={()=>removeTeammate(selectedIds()[0],id)}>×</button></div>)}
            <button style={btn} onClick={applyBulkRelationships}>Save teammates</button>
          </>}
-         {bulkAction==='remove'&&<><span style={{fontSize:12}}>Remove {bulkSelected.length} registrations? Profiles are retained.</span><button style={{...btn,color:'#f1a9a9'}} onClick={bulkRemove}>Confirm removal</button></>}
+         {bulkAction==='remove'&&<><span style={{fontSize:12}}>Remove {bulkSelected.length} registrations? Profiles are retained.</span><button data-role-feedback style={{...btn,color:'#f1a9a9'}} onClick={bulkRemove}>Confirm removal</button></>}
        </div>}
      </div>}
    </div>

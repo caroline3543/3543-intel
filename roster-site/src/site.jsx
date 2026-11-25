@@ -61,7 +61,7 @@ export function SiteApp(){
   const [preferences,setPreferences]=useState(()=>readPreferences());
   function updatePreferences(patch){setPreferences(savePreferences(patch));}
   useEffect(()=>{
-    const feedback=event=>{const target=event.target.closest?.('button,[role="button"],input[type="checkbox"],input[type="radio"]');if(target&&!target.disabled&&target.getAttribute('aria-disabled')!=='true')tapFeedback(preferences.haptics);};
+    const feedback=event=>{const target=event.target.closest?.('button,[role="button"],input[type="checkbox"],input[type="radio"]');if(target&&!target.disabled&&!target.hasAttribute('data-role-feedback')&&target.getAttribute('aria-disabled')!=='true')tapFeedback(preferences.haptics);};
     document.addEventListener('click',feedback,true);
     return()=>document.removeEventListener('click',feedback,true);
   },[preferences.haptics]);
@@ -431,6 +431,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {['foundry','canyon'].filter(kind=>tab===kind||returnToPlanner===kind).map(kind=><div key={kind} style={{display:tab===kind?'block':'none'}}>
       <EventPlanner kind={kind} players={activePlayers} attendancePlayers={players} storage={data.foundry}
         onUpdate={action=>setData(prev=>updateEventPlanner(prev,action))} teamworkPreferences={data.talTeamPreferences||{}}
+        onRoleFeedback={()=>tapFeedback(preferences.haptics,navigator,14)}
         onSaveTeamworkPreferences={prefs=>setData(prev=>({...prev,talTeamPreferences:prefs}))}
         onUpdatePlayerLanguage={(ids,language)=>{
           const selected=new Set(ids.map(String)),at=new Date().toISOString();
