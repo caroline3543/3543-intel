@@ -138,7 +138,7 @@ try {
     assert.equal(await participants.isChecked(),false);
     assert.equal(await roster.count(),10);
     assert.equal(await sort.inputValue(),'rank');
-    await page.getByText('Add players',{exact:true}).click();
+    await page.getByText('More options',{exact:true}).click();
     const search=page.getByRole('textbox',{name:'Search and add player by name or ID'});
     await search.fill('Northvale');
     const candidate=page.getByRole('button',{name:/Northvale.*Recent no-show/});

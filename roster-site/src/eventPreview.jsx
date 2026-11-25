@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {createRoot} from 'react-dom/client';
+import {addRecordedLanguage} from '../../src/services/gameLanguageService.js';
 import {EventPlanner} from './foundry/EventPlanner.jsx';
 import {SoftDarkProfile} from '../../src/components/players/SoftDarkProfile.jsx';
 import {plannerKey,plannerSlot,updateEventPlanner} from '../../src/services/eventPlanner.js';
@@ -7,6 +8,7 @@ import {plannerKey,plannerSlot,updateEventPlanner} from '../../src/services/even
 const players=['Northvale','Juniper','Solace','Ember','Tides','Kite','Lumen','Cypress','Aster','Wren'].map((username,index)=>({
   id:'sample-'+index,username,fid:String(357301200+index),allianceTag:'ARC',allianceRank:['R3','R2','R4','R3','R1','R3','R5'][index%7],furnaceLevel:'FC6',
   lastFoundryTroopPower:index===9?null:96000000-index*3500000,lastCanyonClashTroopPower:1520000000-index*135000000,
+  ...(index===7?{gameLanguage:'ko',languages:['Korean','Japanese']}:{}),
   lastTalTroopPower:98256120-index*3400000,troops:{infantry:'FC6',lancer:'FC6',marksman:'FC5'},
 }));
 const foundry={
@@ -18,6 +20,7 @@ const foundry={
 function Preview(){
   const [kind,setKind]=useState('foundry');
   const [opened,open]=useState(null);
+  const [teamwork,setTeamwork]=useState({pairs:[['sample-7','sample-9']]});
   const [workspace,save]=useState({players,foundry});
   const profile=workspace.players.find(p=>p.id===opened);
   return <main>
@@ -27,7 +30,10 @@ function Preview(){
       <button aria-pressed={kind==='canyon'} onClick={()=>setKind('canyon')}>Canyon Clash</button>
     </nav>
     <EventPlanner key={kind} kind={kind} players={workspace.players} storage={workspace.foundry}
-      onUpdate={action=>save(prev=>updateEventPlanner(prev,action))} onOpenPlayerProfile={open}/>
+      onUpdate={action=>save(prev=>updateEventPlanner(prev,action))} onOpenPlayerProfile={open}
+      teamworkPreferences={teamwork} onSaveTeamworkPreferences={setTeamwork}
+      onUpdatePlayerLanguage={(ids,language)=>save(prev=>({...prev,players:prev.players.map(player=>
+        ids.includes(player.id)?addRecordedLanguage(player,language):player)}))}/>
     {profile&&<SoftDarkProfile player={profile} players={workspace.players} onClose={()=>open(null)} canFetchEquipment={false}/>}
   </main>;
 }

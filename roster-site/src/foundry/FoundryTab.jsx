@@ -1,4 +1,5 @@
 import './legionRoster.css';
+import {RosterScreenshotImport} from './RosterScreenshotImport.jsx';
 import {BulkPlayerImport} from '../components/BulkPlayerImport.jsx';
 import {foundryShareMessages,foundryMessageStats,FOUNDRY_DEFAULT_INSTRUCTIONS} from './foundryShare.js';
 import {useMemo,useState,useRef,useEffect} from 'react';
@@ -6,7 +7,7 @@ import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
 import {playerSearchFields} from '../../../src/services/playerNames.js';
 import {PlannerAttendance} from './PlannerAttendance.jsx';
 import {EVENT_NAMES,EVENT_LIMITS,REGISTRATION_ROLES,isParticipant,legionMoveError,TEAM_NAMES,plannerAlliances,eventStart,recentNoShow,resizePlannerTeams,formatPlannerPower} from '../../../src/services/eventPlanner.js';
-import {gameLanguageName,gameLanguageCode} from '../../../src/services/gameLanguageService.js';
+import {gameLanguageName,gameLanguageCode,recordedLanguageNames} from '../../../src/services/gameLanguageService.js';
 const supportedLanguageCodes=new Set(['en','ko','zh-TW','zh-CN','tr','ar','ru','es','pl','uk','it','fr','ka','de','pt','ja']);
 const languageOptions=['English','Korean','Traditional Chinese','Simplified Chinese','Turkish','Arabic','Russian','Spanish','Polish','Ukrainian','Italian','French','Georgian','German','Portuguese','Japanese'];
 const languageAliases={kr:'ko',kor:'ko',eng:'en',tw:'zh-TW',cn:'zh-CN',ua:'uk',jp:'ja',geo:'ka'};
@@ -34,6 +35,17 @@ function NoShow(){return <small style={{display:'flex',alignItems:'center',gap:4
  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21 4 13a5 5 0 0 1 7-7l1 1 1-1a5 5 0 0 1 7 7l-8 8ZM12 7l-2 5h4l-2 5"/></svg>
  Recent no-show</small>;}
 
+function PlayerChips({languages=[],teammates=[]}){
+ if(!languages.length&&!teammates.length)return null;
+ return <div className="legion-player-chips">
+   {languages.map(language=><span className="legion-chip" key={language}>{language}</span>)}
+   {teammates.map((teammate,index)=><span className="legion-chip legion-friend-chip" key={index} aria-label={'Works well with '+teammate}>
+     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+       <circle cx="9" cy="7" r="3"/><path d="M3 20v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2M16 4a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5v2"/>
+     </svg>{teammate}</span>)}
+ </div>;
+}
+
 function InlinePower({player,onSave,metric,onClose}){
  const [value,setValue]=useState(String(player.power??''));
  const [focused,setFocused]=useState(false);
@@ -57,7 +69,7 @@ function InlinePower({player,onSave,metric,onClose}){
  </div>;
 }
 export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',chosen,legion,changeSelection,sharedFoundry={},
-  otherPlan,otherLegion,onMoveLegion,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
+  otherPlan,otherLegion,onMoveLegion,onSaveScreenshotPowers,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
  const title=EVENT_NAMES[kind],isFoundry=kind==='foundry',metric=isFoundry?'Troop power':'Canyon Clash power';
  const limits=EVENT_LIMITS[kind];
  const colours=TEAM_NAMES.slice(0,sharedFoundry.teamCount||4);
@@ -89,7 +101,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  useEffect(()=>setInstructions(saved.shareInstructions||FOUNDRY_DEFAULT_INSTRUCTIONS),[saved.shareInstructions]);
  const avatarFor=p=>players.find(x=>String(x.id??x.fid??name(x))===p.id)||{username:p.name};
  const entries=useMemo(()=>{
-  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));const reading=saved.powerByPlayer?.[id]??power(p,kind);return [id,{id,name:name(p),power:Number(reading)||0,hasPower:reading!=null&&reading!==''&&Number.isFinite(Number(reading)),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),furnaceLevel:p.furnaceLevel??p.furnace??p.furnace_level??null,cityPower:p.cityPower??p.powerLevel??p.power??null,language:String(p.gameLanguage||p.language||p.languages?.[0]||'').trim(),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String),recentNoShow:recentNoShow(p.plannerAttendance,eventStart(saved.date,saved.time))}]}));
+  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));const reading=saved.powerByPlayer?.[id]??power(p,kind);return [id,{id,name:name(p),power:Number(reading)||0,hasPower:reading!=null&&reading!==''&&Number.isFinite(Number(reading)),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),furnaceLevel:p.furnaceLevel??p.furnace??p.furnace_level??null,cityPower:p.cityPower??p.powerLevel??p.power??null,languages:recordedLanguageNames(p),playerId:p.fid,searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String),recentNoShow:recentNoShow(p.plannerAttendance,eventStart(saved.date,saved.time))}]}));
   for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:saved.powerByPlayer?.[p.id]??p.power??current.power,hasPower:(saved.powerByPlayer?.[p.id]??p.power)!=null||current.hasPower}:{...p,hasPower:p.power!=null,alliance:p.alliance||'Unassigned',matched:false});}
   return [...map.values()].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
  },[players,kind,saved.imports,saved.powerByPlayer,saved.date,saved.time]);
@@ -99,7 +111,11 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const otherRole=id=>otherPlan.registeredUnder[id]===chosen&&isParticipant(otherPlan.registrations[id])?otherPlan.registrations[id]:'';
  const activeRole=id=>registeredUnder[id]===chosen?registrations[id]||'':'';
  const active=joined.filter(p=>teams[p.id]&&colours.includes(teams[p.id]));
- const teammateNames=p=>{const prefs=teamworkPreferences||{};const related=new Set();for(const pair of prefs.pairs||[]){if(!Array.isArray(pair)||pair.length<2)continue;const ids=pair.map(String);if(ids.includes(p.id))ids.filter(id=>id!==p.id).forEach(id=>related.add(id));}for(const group of prefs.groups||[]){const ids=(group.memberIds||[]).map(String);if(ids.includes(p.id))ids.filter(id=>id!==p.id).forEach(id=>related.add(id));}return active.filter(other=>other.id!==p.id&&teams[other.id]===teams[p.id]&&related.has(other.id)).map(other=>other.name);};
+ const teammateNames=(p,available=entries)=>{
+  const links=[...(teamworkPreferences.pairs||[]),...(teamworkPreferences.groups||[]).map(group=>group.memberIds)];
+  const related=new Set(links.filter(ids=>Array.isArray(ids)&&ids.map(String).includes(p.id)).flatMap(ids=>ids.map(String)));
+  return available.filter(other=>other.id!==p.id&&related.has(other.id)).map(other=>other.name);
+ };
 
  const validAssignments=isFoundry?Object.fromEntries(active.map(p=>[p.id,buildings[teams[p.id]].includes(assignments[p.id])?assignments[p.id]:buildings[teams[p.id]][0]])):{};
  const update=(patch,msg,powers)=>{setUndo(saved);onSaveFoundry?.({...saved,...patch},powers);setNotice(msg||'Updated · syncing across devices');};
@@ -120,7 +136,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   const prefs=teamworkPreferences||{},pairs=Array.isArray(prefs.pairs)?prefs.pairs:[],groups=Array.isArray(prefs.groups)?prefs.groups:[];
   const affinity=(a,b)=>{
    const linked=pairs.some(pair=>Array.isArray(pair)&&pair.map(String).includes(a.id)&&pair.map(String).includes(b.id))||groups.some(g=>Array.isArray(g.memberIds)&&g.memberIds.map(String).includes(a.id)&&g.memberIds.map(String).includes(b.id));
-   return (linked?2:0)+(a.language&&a.language.toLowerCase()===b.language?.toLowerCase()?1:0);
+   return (linked?2:0)+(a.languages?.some(language=>b.languages?.includes(language))?1:0);
   };
   const put=(p,c)=>{next[p.id]=c;totals[c]+=p.power;members[c].push(p)};
   if(mode==='add')attending.forEach(p=>{if(colours.includes(next[p.id]))put(p,next[p.id])});
@@ -156,31 +172,40 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    !participantsOnly||isParticipant(activeRole(p.id))
  )).sort((a,b)=>rosterSort==='name'?a.name.localeCompare(b.name):
    Number(b.hasPower)-Number(a.hasPower)||b.power-a.power||a.name.localeCompare(b.name));
- const filteredRegistrations=sortedRoster.filter(p=>activeRole(p.id));
+ const rosterPlayerIds=new Set(roster.filter(p=>p.matched).map(p=>p.id));
  const groupedRanks=['R5','R4','R3','R2','R1','Unranked'];
- const bulkUpdate=(role)=>{
-  const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));
+ const selectedIds=()=>editIds||bulkSelected.filter(id=>rosterPlayerIds.has(id));
+ const closeEditor=()=>{setBulkAction('');setEditIds(null);setTeammateQuery('');setTeammateIds([])};
+ const endSelection=()=>{setBulkMode(false);setBulkSelected([]);closeEditor()};
+ const openEditor=(kind,ids)=>{setEditIds(ids);setBulkAction(kind);setBulkLanguage('');setTeammateQuery('');setTeammateIds([]);setBulkRelationshipMode(ids.length>1?'each':'others')};
+ const bulkUpdate=role=>{
+  const ids=selectedIds();
+  if(!ids.length)return;
   if(isParticipant(role)&&ids.some(otherRole)){setNotice('Move players assigned to the other legion individually.');return}
-  const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};
+  const nextRegs={...registrations},nextUnder={...registeredUnder},nextTeams={...teams},nextAssignments={...assignments};
   for(const id of ids){
+   if(registrations[id]&&registeredUnder[id]!==chosen){setNotice('A selected player is already registered under '+registeredUnder[id]+'.');return}
    nextRegs[id]=role;
+   nextUnder[id]=chosen;
    if(role!=='join'){delete nextTeams[id];delete nextAssignments[id]}
   }
-  if(Object.values(nextRegs).filter(value=>value===role).length>(limits[role]??Infinity)){
+  if(Object.keys(nextRegs).filter(id=>nextUnder[id]===chosen&&nextRegs[id]===role).length>(limits[role]??Infinity)){
    setNotice('Not enough registration slots for this change');return;
   }
-  update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' registration roles updated');
-  setBulkSelected([]);setBulkMode(false);
+  update({registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments},ids.length+' registration roles updated');
+  endSelection();
  };
- const selectedIds=()=>editIds||bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));
- const closeEditor=()=>{setBulkAction('');setEditIds(null);setTeammateQuery('');setTeammateIds([])};
- const openEditor=(kind,ids)=>{setEditIds(ids);setBulkAction(kind);setBulkLanguage('');setTeammateQuery('');setTeammateIds([]);setBulkRelationshipMode(ids.length>1?'each':'others')};
- const applyBulkLanguage=()=>{const ids=selectedIds(),code=resolveLanguage(bulkLanguage);if(!code||!supportedLanguageCodes.has(code)){setNotice('Choose a recognised, specific language');return;}onUpdatePlayerLanguage?.(ids,code);setNotice('Language updated for '+ids.length+' players');closeEditor();setBulkSelected([]);setBulkMode(false)};
+ const addLanguage=code=>{
+  const ids=selectedIds();
+  if(!ids.length)return;
+  if(!code||!supportedLanguageCodes.has(code)){setNotice('Choose a recognised, specific language');return}
+  onUpdatePlayerLanguage?.(ids,code);setNotice(languageLabel(code)+' added to selected players');endSelection();
+ };
  const applyBulkRelationships=()=>{const ids=selectedIds();if(!ids.length)return;const existing=Array.isArray(teamworkPreferences.pairs)?teamworkPreferences.pairs:[];const key=p=>Array.isArray(p)?p.map(String).sort().join('|'):'';const additions=[];if(bulkRelationshipMode==='each'){for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)additions.push([ids[i],ids[j]])}else{for(const id of ids)for(const teammate of teammateIds)if(id!==teammate)additions.push([id,teammate])}if(!additions.length){setNotice('Choose at least one teammate');return}const keys=new Set(existing.map(key));const pairs=[...existing];for(const pair of additions){if(!keys.has(key(pair))){pairs.push(pair);keys.add(key(pair))}}onSaveTeamworkPreferences?.({...teamworkPreferences,pairs});setNotice('Teammate preferences updated');closeEditor();setBulkSelected([]);setBulkMode(false)};
  const removeTeammate=(a,b)=>{const pairs=(teamworkPreferences.pairs||[]).filter(pair=>!Array.isArray(pair)||!(pair.map(String).includes(String(a))&&pair.map(String).includes(String(b))));const groups=[];const pairKeys=new Set(pairs.map(pair=>pair.map(String).sort().join('|')));for(const group of teamworkPreferences.groups||[]){const ids=(group.memberIds||[]).map(String);if(!ids.includes(String(a))||!ids.includes(String(b))){groups.push(group);continue}for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const pair=[ids[i],ids[j]],key=pair.slice().sort().join('|');if(key!==[String(a),String(b)].sort().join('|')&&!pairKeys.has(key)){pairs.push(pair);pairKeys.add(key)}}}onSaveTeamworkPreferences?.({...teamworkPreferences,pairs,groups})};
  const relatedTo=id=>[...new Set((teamworkPreferences.pairs||[]).filter(pair=>Array.isArray(pair)&&pair.map(String).includes(String(id))).flatMap(pair=>pair.map(String).filter(other=>other!==String(id))))];
  const teammateMatches=teammateQuery.trim()?entries.filter(p=>p.matched&&!selectedIds().includes(p.id)&&!teammateIds.includes(p.id)&&fields(p).some(field=>norm(field).includes(norm(teammateQuery)))).sort((a,b)=>{const score=p=>p.id===teammateQuery.trim()?0:norm(p.name)===norm(teammateQuery)?1:fields(p).some(v=>norm(v).startsWith(norm(teammateQuery)))?2:3;return score(a)-score(b)||a.name.localeCompare(b.name)}).slice(0,6):[];
- const bulkRemove=()=>{const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};ids.forEach(id=>{delete nextRegs[id];delete nextTeams[id];delete nextAssignments[id]});update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' removed from registration');setBulkSelected([]);setBulkMode(false)};
+ const bulkRemove=()=>{const ids=selectedIds().filter(id=>activeRole(id));const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};ids.forEach(id=>{delete nextRegs[id];delete nextTeams[id];delete nextAssignments[id]});update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' removed from registration');endSelection()};
  const add=(id,role=addRole)=>{
   const p=entries.find(x=>x.id===id);
   if(!p||!p.matched){setNotice('Select a matched player profile');return}
@@ -244,20 +269,23 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     REGISTRATION_ROLES.find(([id])=>id===role)?.[1]||'Unassigned';
   const selectedForMove=confirmMove===p.id;
   const moveError=selectedForMove?legionMoveError(otherPlan,saved,p.id,other):'';
-  return <div key={p.id} className="legion-player">
+  const isSelected=bulkSelected.includes(p.id);
+  return <div key={p.id} className="legion-player" data-selected={bulkMode&&isSelected}>
+    {bulkMode&&p.matched&&<button type="button" className="legion-card-select" aria-label={'Select '+p.name}
+      aria-pressed={isSelected} onClick={()=>setBulkSelected(ids=>ids.includes(p.id)?ids.filter(id=>id!==p.id):[...ids,p.id])}/>}
     <div className="legion-player-main">
       <div className="legion-player-identity">
-        {bulkMode&&role&&<input type="checkbox" aria-label={'Select '+p.name} checked={bulkSelected.includes(p.id)} onChange={()=>setBulkSelected(ids=>ids.includes(p.id)?ids.filter(id=>id!==p.id):[...ids,p.id])}/>}
         <PlayerAvatar player={avatarFor(p)} size={34}/>
         <div style={{minWidth:0}}>
-          <button type="button" className="legion-player-name" aria-label={'Open profile for '+p.name} onClick={()=>onOpenPlayerProfile?.(p.id)}>{p.name}</button>
-          <small className="legion-player-context">{p.alliance} · {p.rank}{!p.matched?' · Needs matching':''}{p.language?' · '+languageLabel(p.language):''}</small>
-          {editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
+          {bulkMode?<strong>{p.name}</strong>:<button type="button" className="legion-player-name" aria-label={'Open profile for '+p.name} onClick={()=>onOpenPlayerProfile?.(p.id)}>{p.name}</button>}
+          <small className="legion-player-context">{p.alliance} · {p.rank}{!p.matched?' · Needs matching':''}</small>
+          {bulkMode?<small className="legion-player-context">{p.hasPower?format(p.power):'No power recorded'}</small>:editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
             <button type="button" className="legion-player-power" aria-label={'Edit '+metric.toLowerCase()+' for '+p.name} onClick={()=>setEditingPower(p.id)}>{p.hasPower?format(p.power):'Add power'}</button>}
+          <PlayerChips languages={p.languages} teammates={teammateNames(p)}/>
           {p.recentNoShow&&<NoShow/>}
         </div>
       </div>
-      {!bulkMode&&<button type="button" className="legion-role" data-role={elsewhere?'other':role} aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}>{label}</button>}
+      {bulkMode?<small className="legion-player-context">{label}</small>:<button type="button" className="legion-role" data-role={elsewhere?'other':role} aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}>{label}</button>}
     </div>
     {!bulkMode&&managing===p.id&&<div style={{display:'grid',gap:8,marginTop:10}}>
       {elsewhere?<div style={{display:'grid',gap:8}}>
@@ -293,15 +321,17 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   {notice&&<div role="status" style={{...style,fontSize:13,color:'#f5bd5b'}}>{notice}</div>}
   {view==='players'&&<>
    <div style={{...style,display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>
-     {[['join','Combatants',joined.length],['sub','Substitutes',subs.length]].map(([role,label,count])=><button key={role} type="button" aria-pressed={roleFilter===role} onClick={()=>{setRoleFilter(roleFilter===role?'all':role);setBulkSelected([])}} style={{...btn,textAlign:'left',minHeight:60,borderColor:roleFilter===role?'#a3cbef':'#40546a'}}>
+     {[['join','Combatants',joined.length],['sub','Substitutes',subs.length]].map(([role,label,count])=><button key={role} type="button" aria-pressed={roleFilter===role} onClick={()=>{setRoleFilter(roleFilter===role?'all':role)}} style={{...btn,textAlign:'left',minHeight:60,borderColor:roleFilter===role?'#a3cbef':'#40546a'}}>
        <strong style={{display:'block',fontSize:19,color:role==='join'?'#a0e2bf':'#b7dbff'}}>{count}/{limits[role]}</strong>{label}
      </button>)}
      <div style={{gridColumn:'1 / -1',fontSize:13,color:'#adc2d6'}}>Combatant power <strong style={{color:'#eef5fc'}}>{joined.length>0&&joined.length===missingPower.length?'—':format(total(joined))}</strong>{missingPower.length>0&&<span> · {missingPower.length} missing</span>}</div>
    </div>
    <PlannerAttendance kind={kind} alliance={chosen} legion={legion} plan={saved} players={attendancePlayers}
     onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
-   <details style={{...style,padding:11}}>
-     <summary style={{cursor:'pointer',fontWeight:650}}>Add players</summary>
+   <RosterScreenshotImport kind={kind} title={title} alliance={chosen} players={entries.filter(p=>p.matched)}
+     occurrenceIds={{[legion]:saved.occurrenceId,[otherLegion]:otherPlan.occurrenceId}} onSave={onSaveScreenshotPowers}>
+   <details className="screenshot-more-options">
+     <summary style={{cursor:'pointer',fontWeight:650}}>More options</summary>
      <div style={{display:'flex',alignItems:'center',gap:8,margin:'7px 0',flexWrap:'wrap'}}>
        <div role="group" aria-label="Registration role" style={{display:'flex',gap:4,flexWrap:'wrap',background:'#0d1b2c',borderRadius:10,padding:3}}>
          {REGISTRATION_ROLES.map(([role,label])=><button key={role} type="button" aria-pressed={addRole===role} onClick={()=>setAddRole(role)} style={{...btn,minHeight:32,padding:'5px 9px',fontSize:12,borderRadius:9,border:'none',background:addRole===role?'#344c63':'transparent'}}>{label}</button>)}
@@ -316,20 +346,32 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} · {metric}</small>{p.recentNoShow&&<NoShow/>}</span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
    {showPaste&&<BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
    </details>
+   </RosterScreenshotImport>
    <div style={{...style,padding:12}}>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
        <h2 style={{fontSize:16,margin:0}}>Legion {legion} roster</h2>
-       <button type="button" style={{...btn,background:bulkMode?'#344c63':'#21354b'}} onClick={()=>{setBulkMode(v=>!v);setBulkSelected([])}}>{bulkMode?'Done':'Select'}</button>
+       <button type="button" style={{...btn,background:bulkMode?'#344c63':'#21354b'}} aria-pressed={bulkMode} onClick={()=>{if(bulkMode)endSelection();else{setEditingPower(null);setManaging(null);setBulkMode(true)}}}>{bulkMode?'Done':'Select'}</button>
      </div>
      <div className="legion-roster-tools">
-       <input type="search" aria-label="Search roster" placeholder="Search roster" style={btn} value={rosterSearch} onChange={e=>{setRosterSearch(e.target.value);setBulkSelected([])}}/>
+       <input type="search" aria-label="Search roster" placeholder="Search roster" style={btn} value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)}/>
        <select aria-label="Sort roster" value={rosterSort} onChange={e=>setRosterSort(e.target.value)} style={btn}>
          <option value="power">Highest power</option><option value="name">Name A–Z</option><option value="rank">Rank, then power</option>
        </select>
-       <label><input type="checkbox" checked={participantsOnly} onChange={e=>{setParticipantsOnly(e.target.checked);setRoleFilter('all');setBulkSelected([])}}/> Participants only</label>
-       {roleFilter!=='all'&&<button type="button" style={btn} onClick={()=>{setRoleFilter('all');setBulkSelected([])}}>Clear role filter</button>}
+       <label><input type="checkbox" checked={participantsOnly} onChange={e=>{setParticipantsOnly(e.target.checked);setRoleFilter('all')}}/> Participants only</label>
+       {roleFilter!=='all'&&<button type="button" style={btn} onClick={()=>{setRoleFilter('all')}}>Clear role filter</button>}
      </div>
-     {bulkMode&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',fontSize:12,color:'#b9cad9'}}><span>{bulkSelected.length} selected</span><button style={btn} onClick={()=>setBulkSelected(filteredRegistrations.map(p=>p.id))}>Select all</button></div>}
+     {bulkMode&&<div className="legion-bulk-actions" aria-label="Bulk player actions">
+       <strong role="status">{bulkSelected.length} selected</strong>
+       <button type="button" style={btn} onClick={()=>setBulkSelected(ids=>[...new Set([...ids,...sortedRoster.filter(p=>p.matched).map(p=>p.id)])])}>Select all matching</button>
+       <button type="button" style={btn} disabled={!bulkSelected.length} onClick={()=>{setBulkSelected([]);closeEditor()}}>Clear selection</button>
+       {!!bulkSelected.length&&<div className="legion-bulk-buttons">
+         <button type="button" style={btn} onClick={()=>openEditor('join',selectedIds())}>Set as Combatant</button>
+         <button type="button" style={btn} onClick={()=>openEditor('sub',selectedIds())}>Set as Substitute</button>
+         <button type="button" style={btn} onClick={()=>openEditor('language',selectedIds())}>Add language</button>
+         <button type="button" style={btn} onClick={()=>{openEditor('language',selectedIds());setBulkLanguage('English')}}>Add English</button>
+         <button type="button" style={btn} onClick={()=>openEditor('actions',selectedIds())}>More actions</button>
+       </div>}
+     </div>}
      {sortedRoster.length===0&&<p style={{color:'#adc2d6'}}>{rosterSearch?'No matching players.':'No players in this view.'}</p>}
      {(rosterSort==='rank'?groupedRanks:[null]).map(group=>{
        const rows=group?sortedRoster.filter(p=>p.rank===group):sortedRoster;
@@ -342,12 +384,15 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
          {rankExpanded[group]!==false&&rows.map(renderRosterPlayer)}
        </div>;
      })}
-     {(editIds||(bulkMode&&bulkSelected.length>0))&&<div role={editIds?'dialog':undefined} aria-label={editIds?'Edit Foundry player preferences':undefined} style={{position:editIds?'fixed':'sticky',left:editIds?0:undefined,right:editIds?0:undefined,bottom:editIds?0:75,zIndex:editIds?100:4,background:'#26384d',border:'1px solid #eab14f',borderRadius:12,padding:12,marginTop:12,maxHeight:editIds?'75vh':undefined,overflowY:editIds?'auto':undefined,boxShadow:editIds?'0 -12px 50px #0009':undefined}}>
-       <div style={{display:'flex',alignItems:'center',gap:8}}><strong style={{flex:1,fontSize:13}}>{editIds?entries.find(p=>p.id===editIds[0])?.name:bulkSelected.length+' selected'}</strong>{editIds?<button style={btn} onClick={closeEditor}>Close</button>:<><button style={{...btn,minHeight:34,padding:'5px 10px'}} onClick={()=>{setBulkSelected([]);closeEditor()}}>Clear</button><button style={{...btn,minHeight:34,padding:'5px 10px'}} onClick={()=>{setEditIds(null);setBulkAction(v=>v==='actions'?'':'actions')}}>Actions {bulkAction?'⌃':'⌄'}</button></>}</div>
+     {editIds&&<div role="dialog" aria-label={'Edit '+title+' players'} className="legion-bulk-dialog">
+       <div style={{display:'flex',alignItems:'center',gap:8}}><strong style={{flex:1,fontSize:13}}>{editIds.length===1?entries.find(p=>p.id===editIds[0])?.name:editIds.length+' selected'}</strong><button type="button" style={btn} onClick={closeEditor}>Close</button></div>
        {bulkAction&&<div style={{maxHeight:'55vh',overflowY:'auto',marginTop:8,display:'grid',gap:8}}>
-         {bulkAction==='actions'&&[['join','Set as combatants'],['sub','Set as substitutes'],['out','Set as not participating'],['language','Language'],['relationships','Works well with'],['remove','Remove from registration']].map(([key,label])=><button key={key} style={{...btn,textAlign:'left'}} onClick={()=>openEditor(key,selectedIds())}>{label} ›</button>)}
-         {REGISTRATION_ROLES.some(([role])=>role===bulkAction)&&<button style={btn} onClick={()=>bulkUpdate(bulkAction)}>Apply to {bulkSelected.length} players</button>}
-         {bulkAction==='language'&&<><label style={{fontSize:12,color:'#b9cad9'}}>Language<input aria-label="Language" value={bulkLanguage} onChange={e=>setBulkLanguage(e.target.value)} placeholder="Type a language or code, e.g. ko" style={{...btn,width:'100%',boxSizing:'border-box',marginTop:5}}/></label>{bulkLanguage.trim()&&languageOptions.filter(n=>n.toLowerCase().includes(bulkLanguage.toLowerCase())||resolveLanguage(bulkLanguage)===resolveLanguage(n)).slice(0,6).map(n=><button key={n} style={{...btn,textAlign:'left'}} onClick={()=>setBulkLanguage(n)}>{n}</button>)}<button style={btn} onClick={applyBulkLanguage}>Apply language</button></>}
+         {bulkAction==='actions'&&[['out','Set as not participating'],['relationships','Works well with'],['remove','Remove from registration']].map(([key,label])=><button key={key} style={{...btn,textAlign:'left'}} onClick={()=>openEditor(key,selectedIds())}>{label} ›</button>)}
+         {REGISTRATION_ROLES.some(([role])=>role===bulkAction)&&<>
+           <strong>Set as {REGISTRATION_ROLES.find(([role])=>role===bulkAction)[1]}</strong>
+           <button style={btn} onClick={()=>bulkUpdate(bulkAction)}>Apply to {editIds.length} {editIds.length===1?'player':'players'}</button>
+         </>}
+         {bulkAction==='language'&&<><label style={{fontSize:12,color:'#b9cad9'}}>Language<input aria-label="Language" value={bulkLanguage} onChange={e=>setBulkLanguage(e.target.value)} placeholder="Type a language or code, e.g. ko" style={{...btn,width:'100%',boxSizing:'border-box',marginTop:5}}/></label>{bulkLanguage.trim()&&languageOptions.filter(n=>n.toLowerCase().includes(bulkLanguage.toLowerCase())||resolveLanguage(bulkLanguage)===resolveLanguage(n)).slice(0,6).map(n=><button key={n} style={{...btn,textAlign:'left'}} onClick={()=>setBulkLanguage(n)}>{n}</button>)}<button style={btn} onClick={()=>addLanguage(resolveLanguage(bulkLanguage))}>Add language to {editIds.length} {editIds.length===1?'player':'players'}</button></>}
          {bulkAction==='relationships'&&<>
            {selectedIds().length>1&&<div style={{display:'grid',gap:5}}><label style={{fontSize:12}}><input type="radio" checked={bulkRelationshipMode==='each'} onChange={()=>setBulkRelationshipMode('each')}/> Link selected players to each other</label><label style={{fontSize:12}}><input type="radio" checked={bulkRelationshipMode==='others'} onChange={()=>setBulkRelationshipMode('others')}/> Add teammates to all selected players</label></div>}
            {(bulkRelationshipMode==='others'||selectedIds().length===1)&&<><input aria-label="Find teammates" placeholder="Search username or Player ID" value={teammateQuery} onChange={e=>setTeammateQuery(e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box'}}/>{teammateMatches.map(p=><button key={p.id} style={{...btn,textAlign:'left'}} onClick={()=>{setTeammateIds(v=>[...v,p.id]);setTeammateQuery('')}}>+ {p.name} · {p.id}</button>)}{teammateIds.map(id=><div key={id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:12}}><span>{entries.find(p=>p.id===id)?.name}</span><button aria-label={'Remove '+id} style={btn} onClick={()=>setTeammateIds(v=>v.filter(x=>x!==id))}>×</button></div>)}</>}
@@ -372,7 +417,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     {confirmGenerate&&<div style={style}><strong>Team generation</strong><p style={{fontSize:13,color:'#a9bfd0'}}>{isFoundry&&'The strongest three combatants anchor the first three colour zones. '}Adding unassigned players keeps existing assignments.</p>{missingPower.length>0&&<p style={{fontSize:12,color:'#f5bd5b'}}>{missingPower.length} player(s) have missing troop power.</p>}<div style={{display:'grid',gap:8}}><button style={{...btn,background:'#32694d'}} onClick={()=>autoTeams('add')}>Add unassigned players only</button><button style={{...btn,background:'#70521f'}} onClick={()=>{autoTeams('all')}}>Regenerate all teams{isFoundry?' and buildings':''}</button><button style={btn} onClick={()=>setConfirmGenerate(false)}>Cancel</button></div></div>}
     {joined.some(p=>!teams[p.id])&&<div style={{...style,borderColor:'#B78B45'}}><h3 style={{margin:'0 0 12px'}}>Unallocated players <span style={{fontSize:13,color:'#a9bfd0'}}>({joined.filter(p=>!teams[p.id]).length})</span></h3>{joined.filter(p=>!teams[p.id]).map(p=><div key={p.id} style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}><div style={{flex:1,minWidth:0}}><div style={{display:'flex',gap:9,alignItems:'center'}}><PlayerAvatar player={avatarFor(p)} size={36}/><div><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:'#a9bfd0'}}>{p.power?format(p.power)+' '+metric.toLowerCase():'Missing troop power'}{p.tierScore!==null?' · Tier score '+p.tierScore:''}</div></div></div></div><select aria-label={'Assign '+p.name+' to team'} defaultValue="" onChange={e=>{if(e.target.value)assign(p.id,e.target.value)}} style={{...btn,maxWidth:130}}><option value="" disabled>Assign</option>{colours.map(c=><option key={c} value={c}>{c}</option>)}</select></div>)}</div>}
     {colours.map(c=><div key={c} data-team-card={c} ref={el=>{teamRefs.current[c]=el}} style={{...style,scrollMarginTop:20,borderTop:'4px solid '+teamColors[c]}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div onClick={()=>setExpanded(v=>({...v,[c]:v[c]===false}))} style={{cursor:'pointer'}}><h2 style={{fontSize:19,margin:0,color:teamColors[c]}}>{teamTitle(c)} team {expanded[c]!==false?'⌃':'⌄'}</h2><span style={{fontSize:12,color:'#a9bfd0'}}>{active.filter(p=>teams[p.id]===c).length} players · {format(teamTotals[c])} power</span></div><button style={{...btn,padding:'8px'}} onClick={()=>{navigator.clipboard?.writeText(active.filter(p=>teams[p.id]===c).map(p=>p.name).join('\n'));setNotice(c+' team copied')}}>Copy</button></div>
-    <label style={{display:'block',fontSize:12,color:'#a9bfd0',marginBottom:8}}>Team name<input aria-label={'Name for '+c+' team'} value={teamNames[c]??c} onChange={e=>setTeamNames(v=>({...v,[c]:e.target.value}))} onBlur={e=>saveTeamName(c,e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',marginTop:4}}/></label>{expanded[c]!==false&&active.filter(p=>teams[p.id]===c).map(p=><div key={p.id} style={{borderTop:'1px solid #30465a',padding:'12px 0'}}><div style={{display:'flex',alignItems:'center',gap:8}}><PlayerAvatar player={avatarFor(p)} size={38}/><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:p.power>0?'#a9bfd0':'#f5bd5b'}}>{p.power>0?format(p.power)+' '+metric.toLowerCase():'Missing troop power'}</div>{p.tierScore!==null&&<div style={{fontSize:12,color:'#83B5CE'}}>Tier strength score · {p.tierScore}</div>}{p.language&&<span style={{display:'inline-block',marginTop:4,padding:'2px 6px',borderRadius:6,background:'#263b50',color:'#c8d7e4',fontSize:11}}>{languageLabel(p.language)}</span>}{teammateNames(p).length>0&&<div title={'Preferred teammates: '+teammateNames(p).join(', ')} style={{fontSize:11,color:'#83d3ac',marginTop:4}}>✓ Works well with {teammateNames(p).join(', ')}</div>}</div><button aria-label={'Move '+p.name+' to another team'} style={{...btn,padding:'8px 10px'}} onClick={()=>setMoving(moving===p.id?null:p.id)}>⇄</button></div>{moving===p.id&&<div role="group" aria-label={'Move '+p.name+' to'} style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{colours.filter(x=>x!==c).map(x=><button key={x} style={{...btn,padding:'8px',borderColor:teamColors[x]}} onClick={()=>{assign(p.id,x);setMoving(null);jumpToTeam(x)}}>{x}</button>)}</div>}</div>)}
+    <label style={{display:'block',fontSize:12,color:'#a9bfd0',marginBottom:8}}>Team name<input aria-label={'Name for '+c+' team'} value={teamNames[c]??c} onChange={e=>setTeamNames(v=>({...v,[c]:e.target.value}))} onBlur={e=>saveTeamName(c,e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',marginTop:4}}/></label>{expanded[c]!==false&&active.filter(p=>teams[p.id]===c).map(p=><div key={p.id} style={{borderTop:'1px solid #30465a',padding:'12px 0'}}><div style={{display:'flex',alignItems:'center',gap:8}}><PlayerAvatar player={avatarFor(p)} size={38}/><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:p.power>0?'#a9bfd0':'#f5bd5b'}}>{p.power>0?format(p.power)+' '+metric.toLowerCase():'Missing troop power'}</div>{p.tierScore!==null&&<div style={{fontSize:12,color:'#83B5CE'}}>Tier strength score · {p.tierScore}</div>}<PlayerChips languages={p.languages} teammates={teammateNames(p,active.filter(other=>teams[other.id]===teams[p.id]))}/></div><button aria-label={'Move '+p.name+' to another team'} style={{...btn,padding:'8px 10px'}} onClick={()=>setMoving(moving===p.id?null:p.id)}>⇄</button></div>{moving===p.id&&<div role="group" aria-label={'Move '+p.name+' to'} style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{colours.filter(x=>x!==c).map(x=><button key={x} style={{...btn,padding:'8px',borderColor:teamColors[x]}} onClick={()=>{assign(p.id,x);setMoving(null);jumpToTeam(x)}}>{x}</button>)}</div>}</div>)}
     {expanded[c]!==false&&!active.some(p=>teams[p.id]===c)&&<p style={{fontSize:13,color:'#a9bfd0'}}>No players assigned to this team.</p>}</div>)}
     <div style={{...style,padding:14}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap'}}>

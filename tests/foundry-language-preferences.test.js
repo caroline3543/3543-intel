@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {gameLanguageCode,gameLanguageName,withGameLanguage} from '../src/services/gameLanguageService.js';
+import {addRecordedLanguage,gameLanguageCode,gameLanguageName,recordedLanguageNames,withGameLanguage} from '../src/services/gameLanguageService.js';
 
 test('language display uses full names including Chinese script variants',()=>{
  assert.equal(gameLanguageName('ko'),'Korean');
@@ -29,4 +29,13 @@ test('new provider language replaces an older imported language',()=>{
  const result=withGameLanguage(player);
  assert.equal(result.gameLanguage,'ru');
  assert.deepEqual(result.languages,['Russian','Portuguese']);
+});
+
+test('planner additions preserve other languages and the primary game language',()=>{
+ const player={gameLanguage:'ko',gameLanguageSource:'provider',languages:['ko','Japanese']};
+ const next=addRecordedLanguage(player,'en');
+ assert.deepEqual(recordedLanguageNames(next),['Korean','Japanese','English']);
+ assert.equal(next.gameLanguage,'ko');
+ assert.equal(next.gameLanguageSource,'provider');
+ assert.strictEqual(addRecordedLanguage(next,'English'),next);
 });
