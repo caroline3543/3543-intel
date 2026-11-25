@@ -183,7 +183,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const pastedList=value=>/\\r|\\n/.test(value)||value.split(/\\s*[,;]\\s*/).filter(Boolean).length>=3;
  const onSearchInput=value=>{if(pastedList(value)){setPaste(value.replace(/\\s*;\\s*/g,'\\n'));setShowPaste(true);setQuery('');setNotice('Multiple players detected. Review the pasted list below.')}else setQuery(value)};
  const matchesRoster=p=>!rosterSearch.trim()||fields(p).some(field=>norm(field).includes(norm(rosterSearch)));
- const roster=entries.filter(p=>activeRole(p.id)||elsewhereFor(p.id).length||p.alliance===chosen);
+ const roster=entries.filter(p=>activeRole(p.id)||p.alliance===chosen);
  const sortedRoster=roster.filter(p=>matchesRoster(p)&&(
    roleFilter!=='all'?activeRole(p.id)===roleFilter:
    !participantsOnly||isParticipant(activeRole(p.id))
