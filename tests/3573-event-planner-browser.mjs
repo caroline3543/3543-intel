@@ -32,8 +32,8 @@ try {
     const northvale=roster.filter({has:page.getByRole('button',{name:/^Northvale .*Open profile$/})});
     assert.equal(await northvale.locator('.legion-player-context .legion-language').innerText(),'English');
     assert.equal(await roster.locator('.legion-row-status').count(),0);
-    const column=page.getByRole('group',{name:'Roster column'});
-    await column.getByRole('button',{name:'Status',exact:true}).click();
+    const column=page.getByRole('group',{name:'Show in roster'});
+    await column.getByRole('button',{name:'Event status',exact:true}).click();
     assert.equal(await roster.locator('.legion-player-power').count(),0);
     assert.equal(await roster.locator('.legion-row-status').count(),10);
     assert.equal(await northvale.locator('.legion-row-status').innerText(),'Combatant');

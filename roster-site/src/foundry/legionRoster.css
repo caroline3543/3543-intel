@@ -169,7 +169,7 @@
   font: 700 1.25rem/1 system-ui,sans-serif;
 }
 .legion-role[aria-expanded=true] { background: var(--planner-control); }
-.legion-language { background: var(--planner-control); border-radius: 6px; padding: 1px 4px; box-decoration-break: clone; }
+.legion-language { background: var(--planner-surface); border-radius: 4px; padding: 1px 4px; font-size: .75em; box-decoration-break: clone; }
 .legion-row-status { display: block; color: var(--planner-muted); font-size: .75rem; overflow-wrap: anywhere; }
 .legion-row-status[data-role=join] { color: #b4e2c8; }
 .legion-row-status[data-role=sub] { color: #c0ddff; }
@@ -260,21 +260,28 @@
 .legion-row-status[data-role=sub] { background: #203750; }
 .legion-row-status[data-role=other] { background: #363047; }
 .legion-teammates { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 4px 0; }
-.legion-teammates .legion-language, .legion-teammates summary { font-size: .75rem; overflow-wrap: anywhere; color: var(--planner-muted); }
+.legion-teammate, .legion-teammates summary { font-size: .75rem; overflow-wrap: anywhere; color: var(--planner-muted); }
+.legion-teammate { border: 1px solid var(--planner-line); border-radius: 4px; padding: 0 4px; }
 .legion-teammates summary { cursor: pointer; min-block-size: 44px; min-inline-size: 44px; align-content: center; }
 .legion-teammates details[open] { flex-basis: 100%; }
-.legion-teammates details .legion-language { display: inline-block; margin-inline-end: 4px; }
+.legion-teammates details .legion-teammate { display: inline-block; margin-inline-end: 4px; }
 
-.legion-metric-switch {
-  display: flex;
-  gap: 4px;
-  margin-top: 10px;
-  padding: 3px;
-  border-radius: 14px;
-  background: var(--planner-surface);
+.legion-metric-picker { min-inline-size: 0; border: 0; padding: 0; margin: 2px 0 8px; max-inline-size: 19rem; }
+.legion-metric-picker legend { padding: 0; margin-bottom: 4px; font-size: .75rem; color: var(--planner-muted); }
+.legion-metric-switch { display: flex; flex-wrap: wrap; gap: 6px; }
+.legion-metric-switch button {
+  flex: 1 1 7em;
+  background: transparent;
+  border: 1px solid var(--planner-field-edge);
+  border-radius: 10px;
+  color: var(--planner-muted);
 }
-.legion-metric-switch button { flex: 1; background: transparent; border-radius: 11px; color: var(--planner-muted); }
-.legion-metric-switch button[aria-pressed=true] { background: var(--planner-control); border-color: var(--planner-gold); color: var(--planner-gold); }
+.legion-metric-switch button[aria-pressed=true] {
+  background: var(--planner-control);
+  border-color: var(--planner-gold);
+  color: var(--planner-ink);
+  font-weight: 650;
+}
 .legion-player-metric { align-items: center; min-block-size: var(--planner-target); }
 
 /* Keep WebKit's intrinsic date and time controls within the sheet gutters. */
@@ -326,7 +333,5 @@
 .legion-capacity strong, .legion-capacity[data-role=join] strong { color: var(--planner-ink); font-size: .875rem; }
 .legion-capacity[aria-pressed=true] { background: var(--planner-surface); }
 .legion-power-total { margin: 0; font-size: .8125rem; }
-.legion-metric-switch { max-inline-size: 19rem; margin: 2px 0 6px; padding: 0; background: transparent; }
-.legion-metric-switch button[aria-pressed=true] { border-color: transparent; color: var(--planner-ink); }
 .legion-rank-heading { background: var(--planner-surface); }
 .legion-rank-heading strong { color: var(--planner-muted); }

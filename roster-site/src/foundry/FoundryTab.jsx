@@ -277,9 +277,9 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
             <span className="planner-sr-only"> · Open profile</span>
           </button>
           {teammates.length>0&&<div className="legion-teammates" role="group" aria-label={'Works well with '+p.name}>
-            {teammates.slice(0,2).map((teammate,index)=><span key={index} className="legion-language">{teammate}</span>)}
+            {teammates.slice(0,2).map((teammate,index)=><span key={index} className="legion-teammate">{teammate}</span>)}
             {teammates.length>2&&<details><summary aria-label={'Show '+(teammates.length-2)+' more teammates'}>+{teammates.length-2}</summary>
-              {teammates.slice(2).map((teammate,index)=><span key={index} className="legion-language">{teammate}</span>)}
+              {teammates.slice(2).map((teammate,index)=><span key={index} className="legion-teammate">{teammate}</span>)}
             </details>}
           </div>}
           {p.recentNoShow&&<NoShow/>}
@@ -354,9 +354,12 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
        <label><input type="checkbox" checked={participantsOnly} onChange={e=>{setParticipantsOnly(e.target.checked);setRoleFilter('all');setBulkSelected([])}}/> Participants only</label>
        <button type="button" className="planner-plain" aria-pressed={bulkMode} onClick={()=>{setBulkMode(v=>!v);setBulkSelected([]);closeEditor()}}>{bulkMode?'Done':'Manage'}</button>
      </div>
-     <div className="legion-metric-switch" role="group" aria-label="Roster column">
-       {[['power','Troop power'],['status','Status']].map(([value,label])=><button key={value} type="button" className="planner-button" aria-pressed={rosterMetric===value} onClick={()=>{setRosterMetric(value);setEditingPower(null)}}>{label}</button>)}
-     </div>
+     <fieldset className="legion-metric-picker">
+       <legend>Show in roster</legend>
+       <div className="legion-metric-switch">
+       {[['power','Troop power'],['status','Event status']].map(([value,label])=><button key={value} type="button" className="planner-button" aria-pressed={rosterMetric===value} onClick={()=>{setRosterMetric(value);setEditingPower(null)}}>{label}</button>)}
+       </div>
+     </fieldset>
      {roleFilter!=='all'&&<div className="legion-filter-callout"><span>Showing {sortedRoster.length} {roleFilter==='join'?'combatant':'substitute'}{sortedRoster.length===1?'':'s'}</span><button type="button" className="planner-plain" onClick={()=>{setRoleFilter('all');setBulkSelected([])}}>Clear role filter</button></div>}
      {bulkMode&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',fontSize:12,color:'#b9cad9'}}><span>{bulkSelected.length} selected</span><button style={btn} onClick={()=>setBulkSelected(filteredRegistrations.map(p=>p.id))}>Select all</button></div>}
      {sortedRoster.length===0&&<p style={{color:'#adc2d6'}}>{rosterSearch?'No matching players.':'No players in this view.'}</p>}
