@@ -26,7 +26,12 @@ try {
     assert.equal(await roster.count(),10);
     const northvale=roster.filter({has:page.getByRole('button',{name:/^Northvale .*Open profile$/})});
     assert.equal(await northvale.locator('.legion-player-context .legion-language').innerText(),'English');
-    assert.equal(await northvale.locator('.legion-player-metric .legion-row-status').innerText(),'Combatant');
+    assert.equal(await roster.locator('.legion-row-status').count(),0);
+    const column=page.getByRole('group',{name:'Roster column'});
+    await column.getByRole('button',{name:'Status',exact:true}).click();
+    assert.equal(await roster.locator('.legion-player-power').count(),0);
+    assert.equal(await roster.locator('.legion-row-status').count(),10);
+    assert.equal(await northvale.locator('.legion-row-status').innerText(),'Combatant');
     const teammates=northvale.getByRole('group',{name:'Works well with Northvale'});
     assert.equal(await teammates.getByText('Ember',{exact:true}).isVisible(),false);
     await teammates.locator('summary').click();
@@ -37,6 +42,9 @@ try {
     await page.getByRole('button',{name:/1\/10 Substitutes/}).click();
     assert.equal(await roster.count(),1);
     assert.equal(await roster.locator('.legion-row-status').innerText(),'Substitute');
+    await column.getByRole('button',{name:'Troop power',exact:true}).click();
+    assert.equal(await roster.locator('.legion-player-power').count(),1);
+    assert.equal(await roster.locator('.legion-row-status').count(),0);
     assert.equal(await page.getByText(/^Combatant power/).innerText(),total);
     await page.getByRole('button',{name:'Clear role filter'}).click();
     const sort=page.getByRole('combobox',{name:'Sort roster'});

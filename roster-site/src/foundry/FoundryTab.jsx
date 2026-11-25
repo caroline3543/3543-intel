@@ -80,6 +80,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const [addRole,setAddRole]=useState('join');
  const [managing,setManaging]=useState(null);
  const [participantsOnly,setParticipantsOnly]=useState(false),[rosterSearch,setRosterSearch]=useState('');
+ const [rosterMetric,setRosterMetric]=useState('power');
  const [rosterSort,setRosterSort]=useState('rank'),[editingPower,setEditingPower]=useState(null),[confirmMove,setConfirmMove]=useState(null);
  const [roleFilter,setRoleFilter]=useState('all'),[bulkMode,setBulkMode]=useState(false),[bulkSelected,setBulkSelected]=useState([]),[rankExpanded,setRankExpanded]=useState({R5:true,R4:true,R3:true,R2:true,R1:true});
  const [editIds,setEditIds]=useState(null);
@@ -284,9 +285,10 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
           {p.recentNoShow&&<NoShow/>}
         </div>
       </div>
-      <div className="legion-player-metric">{editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
+      <div className="legion-player-metric">{rosterMetric==='status'?
+        <span className="legion-row-status" data-role={elsewhere?'other':role}>{visibleRole}</span>:editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
         <button type="button" className="legion-player-power" aria-label={powerLabel} onClick={()=>setEditingPower(p.id)}>{powerValue===null?'Add power':<>{powerValue}<span className="planner-sr-only"> · Edit</span></>}</button>}
-      <span className="legion-row-status" data-role={elsewhere?'other':role}>{visibleRole}</span></div>
+      </div>
       {!bulkMode&&<button type="button" className="legion-role" aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}><span aria-hidden="true">⋯</span></button>}
     </div>
     {!bulkMode&&managing===p.id&&<div style={{display:'grid',gap:8,marginTop:10}}>
@@ -341,6 +343,9 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      <div className="planner-title-row">
        <h2>{roleFilter==='join'?'Combatants':roleFilter==='sub'?'Substitutes':participantsOnly?'Participants':'All players'}</h2>
        <button type="button" className="planner-button planner-primary" onClick={()=>setAddPanel('menu')}>Add players</button>
+     </div>
+     <div className="legion-metric-switch" role="group" aria-label="Roster column">
+       {[['power','Troop power'],['status','Status']].map(([value,label])=><button key={value} type="button" className="planner-button" aria-pressed={rosterMetric===value} onClick={()=>{setRosterMetric(value);setEditingPower(null)}}>{label}</button>)}
      </div>
      <div className="legion-roster-tools">
        <input className="planner-search" type="search" aria-label="Search roster" placeholder="Search roster" value={rosterSearch} onChange={e=>{setRosterSearch(e.target.value);setBulkSelected([])}}/>

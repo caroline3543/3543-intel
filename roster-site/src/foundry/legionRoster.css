@@ -262,3 +262,15 @@
 .legion-teammates summary { cursor: pointer; min-block-size: 44px; min-inline-size: 44px; align-content: center; }
 .legion-teammates details[open] { flex-basis: 100%; }
 .legion-teammates details .legion-language { display: inline-block; margin-inline-end: 4px; }
+
+.legion-metric-switch {
+  display: flex;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--planner-surface);
+}
+.legion-metric-switch button { flex: 1; background: transparent; border-radius: 11px; color: var(--planner-muted); }
+.legion-metric-switch button[aria-pressed=true] { background: var(--planner-control); border-color: var(--planner-gold); color: var(--planner-gold); }
+.legion-player-metric { align-items: center; min-block-size: var(--planner-target); }
