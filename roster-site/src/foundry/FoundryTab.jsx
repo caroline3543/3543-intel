@@ -287,7 +287,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
       </div>
       <div className="legion-player-metric">{rosterMetric==='status'?
         <span className="legion-row-status" data-role={elsewhere?'other':role}>{visibleRole}</span>:editingPower===p.id?<InlinePower player={p} metric={metric} onClose={()=>setEditingPower(null)} onSave={(id,value)=>{onSaveTroopPower?.(id,value);setNotice('Troop power updated for '+p.name)}}/>:
-        <button type="button" className="legion-player-power" aria-label={powerLabel} onClick={()=>setEditingPower(p.id)}>{powerValue===null?'Add power':<>{powerValue}<span className="planner-sr-only"> · Edit</span></>}</button>}
+        <button type="button" className="legion-player-power" aria-label={powerLabel} onClick={()=>setEditingPower(p.id)}>{powerValue===null?<span className="legion-power-blank" aria-hidden="true"/>:<>{powerValue}<span className="planner-sr-only"> · Edit</span></>}</button>}
       </div>
       {!bulkMode&&<button type="button" className="legion-role" aria-label={p.name+' · '+label} aria-expanded={managing===p.id} onClick={()=>{setManaging(managing===p.id?null:p.id);setConfirmMove(null)}}><span aria-hidden="true">⋯</span></button>}
     </div>

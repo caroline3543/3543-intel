@@ -149,12 +149,14 @@
 .legion-player-power {
   inline-size: 100%;
   color: var(--planner-ink);
-  background: var(--planner-control);
-  border: 1px solid var(--planner-field-edge);
-  border-radius: 999px;
   padding: 4px;
-  font-weight: 650;
+  font-weight: 550;
   text-align: center;
+}
+.legion-power-blank {
+  display: inline-block;
+  inline-size: 2.75em;
+  border-block-end: 1px solid var(--planner-field-edge);
 }
 .legion-role {
   min-block-size: var(--planner-target);

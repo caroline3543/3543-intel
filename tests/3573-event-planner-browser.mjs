@@ -24,6 +24,11 @@ try {
     assert.ok(await page.getByRole('button',{name:'Buildings',exact:true}).isVisible());
     const roster=page.locator('.legion-player');
     assert.equal(await roster.count(),10);
+    const missingPower=page.getByRole('button',{name:'Add power for Wren',exact:true});
+    assert.equal(await missingPower.locator('.legion-power-blank').isVisible(),true);
+    await missingPower.click();
+    await page.getByRole('textbox',{name:'Troop power for Wren',exact:true}).press('Escape');
+    assert.equal(await missingPower.isVisible(),true);
     const northvale=roster.filter({has:page.getByRole('button',{name:/^Northvale .*Open profile$/})});
     assert.equal(await northvale.locator('.legion-player-context .legion-language').innerText(),'English');
     assert.equal(await roster.locator('.legion-row-status').count(),0);
