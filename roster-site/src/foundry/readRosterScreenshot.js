@@ -4,7 +4,7 @@ import { createWorker, OEM, PSM } from 'tesseract.js';
 import workerPath from 'tesseract.js/dist/worker.min.js?url';
 import { ROSTER_OCR_LANGUAGES } from './rosterOcrLanguages.js';
 import corePath from 'tesseract.js-core/tesseract-core-lstm.wasm.js?url';
-import { pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from './rosterScreenshotModel.js';
+import { classifyRosterCheckboxes, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from './rosterScreenshotModel.js';
 
 function canvas(width, height) {
   return Object.assign(document.createElement('canvas'), { width, height });
@@ -68,6 +68,7 @@ async function completeCanyonRow(worker, screen, region, row) {
       if (!row.name && top <= screen.height * .334) return null;
       await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
     }
+    if (row.power !== null) return row;
     const powerLeft = Math.round(screen.width * .265);
     const powerTop = top + Math.floor(rowHeight * .49);
     const powerCrop = textCrop(screen, powerLeft, powerTop, Math.round(screen.width * .32), top + rowHeight - powerTop);
@@ -101,7 +102,8 @@ export async function readRosterScreenshot(worker, file, kind) {
     const screen = canvas(width, height);
     const context = screen.getContext('2d', { willReadFrequently: true });
     context.drawImage(source, 0, 0, width, height);
-    const regions = pickScreenshotRows(context.getImageData(0, 0, width, height).data, width, height);
+    const pixels = context.getImageData(0, 0, width, height).data;
+    const regions = pickScreenshotRows(pixels, width, height);
     const left = Math.round(width * .223);
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
     const header = textCrop(screen, Math.round(width * .24), Math.round(height * .17),
@@ -127,7 +129,10 @@ export async function readRosterScreenshot(worker, file, kind) {
       if (!row) continue;
       const completed = await completeCanyonRow(worker, screen, { left, top, textWidth, rowHeight }, row);
       if (completed && otherLegionMarker) completed.otherLegionMarker = true;
-      if (completed) rows.push(completed);
+      if (completed) {
+        completed.registration = completed.otherLegion || otherLegionMarker ? 'other-legion' : classifyRosterCheckboxes(pixels,width,height,top,bottom);
+        rows.push(completed);
+      }
     }
     return { legion, rows };
   } finally {
