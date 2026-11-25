@@ -16,12 +16,13 @@ export function readScreenshotPower(text) {
 
 export function readScreenshotRow(text) {
   const [name = '', ...rest] = String(text).split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  if (rest.some(line => /\bLegion\s*[12]\s+dispatched\b/i.test(line))) return null;
+  const otherLegion = Number(rest.join(' ').match(/\bLegion\s*([12])\s+dispatched\b/i)?.[1]) || null;
   const candidate = rest[0] ?? '';
   // The crossed-swords icon sometimes produces a leading OCR glyph.
   const powerText = candidate.match(/^(?:[^\d\s]{1,2}\s+)?(\d[\d,.]*(?:\s*[KMB])?)\s*[|]?$/i)?.[1];
   return {
     name: /^[\d,.]+$/.test(name) && !rest.length ? '' : name.replace(/\s+\|$/, ''),
+    otherLegion,
     power: powerText !== undefined ? readScreenshotPower(powerText) : null,
   };
 }
