@@ -31,7 +31,7 @@ import {DeleteConfirmModal} from '../../src/components/common/DeleteConfirmModal
 import {loadFromStorage,saveToStorage} from '../../src/services/exportImportService.js';
 import {mergeAllianceProfiles,reconcileAllianceMembership} from '../../src/services/allianceImportService.js';
 import {withBuiltinRole} from '../../src/utils/roles.js';
-import {withGameLanguage} from '../../src/services/gameLanguageService.js';
+import {addRecordedLanguage,withGameLanguage} from '../../src/services/gameLanguageService.js';
 const button={minHeight:44,padding:'10px 14px',fontSize:14,fontWeight:600,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,cursor:'pointer'};
 const eventCards=[
   {id:'canyon',label:'Canyon Clash',description:'Team planning and attendance',available:true,
@@ -432,7 +432,14 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
       <EventPlanner kind={kind} players={activePlayers} attendancePlayers={players} storage={data.foundry}
         onUpdate={action=>setData(prev=>updateEventPlanner(prev,action))} teamworkPreferences={data.talTeamPreferences||{}}
         onSaveTeamworkPreferences={prefs=>setData(prev=>({...prev,talTeamPreferences:prefs}))}
-        onUpdatePlayerLanguage={(ids,language)=>{const selected=new Set(ids.map(String));setData(prev=>({...prev,players:prev.players.map(p=>selected.has(String(p.id??p.fid))?withGameLanguage({...p,gameLanguage:language,gameLanguageSource:'manual',language,profileLastUpdated:new Date().toISOString()}):p)}))}}
+        onUpdatePlayerLanguage={(ids,language)=>{
+          const selected=new Set(ids.map(String)),at=new Date().toISOString();
+          setData(prev=>({...prev,players:prev.players.map(p=>{
+            if(!selected.has(String(p.id??p.fid)))return p;
+            const next=addRecordedLanguage(p,language);
+            return next===p?p:{...next,profileLastUpdated:at};
+          })}));
+        }}
         onOpenPlayerProfile={id=>openPlannerProfile(kind,id)}/>
     </div>)}
     {tab==='battle'&&<BattlePlanner onOpenMemberProfile={id=>{setInitialPlayerId(id);navigate('members');}} events={data.events||[]} players={activePlayers} plan={data.talPlan||newPlan()} sharedTeamPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('Reusable TAL teamwork preferences saved.');}} onMessage={setMessage} onUpdate={action=>{try{setData(prev=>({...prev,events:applyBattleAction(prev.events||[],action)}));return {ok:true};}catch(e){setMessage(e.message);return {ok:false,error:e.message};}}}/>}

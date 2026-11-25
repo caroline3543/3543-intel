@@ -37,7 +37,7 @@ function ScreenshotResult({ reading, locked, onLegion }) {
   </li>;
 }
 
-export function RosterScreenshotImport({ kind, title, alliance, players, occurrenceIds, onSave }) {
+export function RosterScreenshotImport({ kind, title, alliance, players, occurrenceIds, onSave, children }) {
   const [files, setFiles] = useState([]);
   const [batch, setBatch] = useState(null);
   const [job, setJob] = useState('');
@@ -45,6 +45,7 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
   const [review, setReview] = useState(null);
   const [saved, setSaved] = useState([]);
   const run = useRef(null);
+  const picker = useRef(null);
 
   useEffect(() => () => {
     if (run.current) {
@@ -121,16 +122,25 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
   }
 
   return <section className="screenshot-import" aria-label="Troop power upload">
-    <p>Select full in-game screenshots with the legion heading visible. Images stay on this device.</p>
-    <label>Upload troop power
-      <input type="file" multiple accept="image/png,image/jpeg,image/webp" disabled={!!job || !!review} onChange={chooseFiles}/>
-    </label>
-    <p>Reads mixed names in Latin characters, Korean, Japanese and Chinese in the same batch.</p>
+    <input ref={picker} type="file" hidden multiple accept="image/png,image/jpeg,image/webp" aria-label="Troop power screenshots"
+      disabled={!!job || !!review} onChange={chooseFiles}/>
+    {!files.length && <>
+      <button type="button" className="screenshot-primary" onClick={() => picker.current?.click()}>
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><path d="m3 17 5-4 4 3 4-5 5 5"/>
+        </svg>Upload troop power
+      </button>
+      <p>Select up to 20 screenshots. Include the legion heading.</p>
+    </>}
     {files.length > 0 && <>
       <p>{files.length} {files.length === 1 ? 'screenshot' : 'screenshots'} selected</p>
-      <button type="button" disabled={!!job || !!review} onClick={() => { setFiles([]); clearResults(); }}>Clear screenshots</button>
+      {!batch && <button type="button" className="screenshot-primary" disabled={!!job} onClick={scan}>Scan screenshots</button>}
+      <div className="screenshot-secondary">
+        <button type="button" disabled={!!job || !!review} onClick={() => picker.current?.click()}>Add screenshots</button>
+        <button type="button" disabled={!!job || !!review} onClick={() => { setFiles([]); clearResults(); }}>Clear screenshots</button>
+        {batch && <button type="button" disabled={!!review || !!saved.length} onClick={scan}>Scan again</button>}
+      </div>
     </>}
-    <button type="button" disabled={!files.length || !!job || !!review} onClick={scan}>Scan screenshots</button>
     {job && <p role="status">{job}</p>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {batch && <>
@@ -143,12 +153,12 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
       {pendingLegion && <p>Choose a legion for each screenshot with an unreadable heading.</p>}
       {groups.map(group => saved.includes(group.legion)
         ? <p key={group.legion} role="status">Legion {group.legion} readings saved</p>
-        : <button type="button" key={group.legion} disabled={!!review || pendingLegion} onClick={() => beginReview(group)}>
-          Review Legion {group.legion} · {group.rows.length} {group.rows.length === 1 ? 'row' : 'rows'}
+        : <button type="button" className="screenshot-primary" key={group.legion} disabled={!!review || pendingLegion} onClick={() => beginReview(group)}>
+          Review Legion {group.legion} · {group.rows.length} {group.rows.length === 1 ? 'reading' : 'readings'}
         </button>)}
     </>}
     {review && <BulkPlayerImport title="Review screenshot readings" players={players} alliance={alliance}
-      context={title} roleLabel={'Legion ' + review.legion} initialText={review.source} requirePower verifyReadings parsePower={readScreenshotPower}
+      context={title} roleLabel={'Legion ' + review.legion} initialText={review.source} requirePower verifyReadings startWithMatches parsePower={readScreenshotPower}
       onConfirm={rows => {
         const result = onSave(review.legion, review.occurrenceId, rows);
         if (!result?.error) setSaved(current => [...current, review.legion]);
@@ -156,5 +166,6 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
       }}
       onClose={() => setReview(null)}/>}
     {review && !saved.includes(review.legion) && <button type="button" onClick={() => setReview(null)}>Back to screenshots</button>}
+    {children}
   </section>;
 }

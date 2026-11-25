@@ -26,3 +26,16 @@ export function withGameLanguage(player,previousCode=player.gameLanguage){
  if(code===player.gameLanguage && JSON.stringify(languages)===JSON.stringify(player.languages))return player;
  return {...player,gameLanguage:code,languages};
 }
+
+export function recordedLanguageNames(player) {
+ const values=[player.gameLanguage,player.language,...(Array.isArray(player.languages)?player.languages:[])];
+ const names=values.filter(value=>typeof value==='string'&&value.trim()).map(value=>gameLanguageName(value)||value.trim());
+ return [...new Map(names.map(name=>[name.toLocaleLowerCase(),name])).values()];
+}
+
+export function addRecordedLanguage(player,language) {
+ const name=gameLanguageName(language);
+ const existing=recordedLanguageNames(player);
+ if(!name||existing.some(value=>value.toLocaleLowerCase()===name.toLocaleLowerCase()))return player;
+ return {...player,languages:[...existing,name]};
+}

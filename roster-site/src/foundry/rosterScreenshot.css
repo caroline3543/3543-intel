@@ -31,3 +31,26 @@
 .screenshot-results img { display: block; width: min(100%, 480px); margin-top: 8px; }
 .screenshot-results label { display: grid; gap: 5px; margin-top: 8px; }
 .screenshot-results .screenshot-error { color: #f1b0b0; }
+.screenshot-import { margin: 0 0 10px; }
+.screenshot-import > .screenshot-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  background: #f5ad38;
+  color: #101b28;
+  border-color: #f5ad38;
+}
+.screenshot-more-options { border-top: 1px solid #40546a; padding-top: 10px; }
+.screenshot-secondary { display: flex; flex-wrap: wrap; gap: 8px; }
+.screenshot-secondary button {
+  min-height: 44px;
+  border: 1px solid #496077;
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: #21354b;
+  color: #eef5fc;
+  font: inherit;
+}
+.screenshot-secondary button:disabled { opacity: .55; }
