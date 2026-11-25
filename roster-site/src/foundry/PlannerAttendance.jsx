@@ -1,11 +1,12 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {PlannerSheet} from './PlannerSheet.jsx';
 import {ATTENDANCE_RESULTS,EVENT_NAMES,attendanceOpen,eventStart} from '../../../src/services/eventPlanner.js';
 
 const utc = value => new Date(value).toISOString().slice(0,16).replace('T',' ')+' UTC';
 
-export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendance,onSchedule,onNewEvent,card,button,scheduleTarget}) {
+export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendance,onSchedule,onNewEvent,card,button,scheduleTarget,showAttendanceShortcut=true}) {
+  const attendanceDetails=useRef(null);
   const [scheduleOpen,setScheduleOpen] = useState(false);
   const [clock,setClock] = useState(Date.now);
   const [date,setDate] = useState(plan.date||'');
@@ -26,9 +27,18 @@ export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendanc
   const selected = choices.has(occurrence) ? occurrence : currentStart ? plan.occurrenceId : [...choices.keys()].at(-1);
   const start = choices.get(selected);
   const unlocked = attendanceOpen(start,clock);
-  const scheduleTrigger=<button className="planner-button" type="button" onClick={()=>{setDate(plan.date||'');setTime(plan.time||'');setScheduleOpen(true);}}>{currentStart?plan.time+' UTC':'Set UTC start'}</button>;
+  const scheduleTrigger=<button className="planner-button" type="button" onClick={()=>{setDate(plan.date||'');setTime(plan.time||'');setScheduleOpen(true);}}>{currentStart?plan.time+' UTC':'Set event time'}</button>;
   return <>
-    {scheduleTarget&&createPortal(scheduleTrigger,scheduleTarget)}
+    {scheduleTarget&&createPortal(<div className="legion-event-actions">
+      {scheduleTrigger}
+      {showAttendanceShortcut&&unlocked&&<button type="button" className="planner-plain" onClick={()=>{
+        const details=attendanceDetails.current;
+        if(!details)return;
+        details.open=true;
+        details.querySelector('summary').focus();
+        details.scrollIntoView({block:'start'});
+      }}>Record attendance</button>}
+    </div>,scheduleTarget)}
     <PlannerSheet open={scheduleOpen} onClose={()=>setScheduleOpen(false)} title="Event schedule" context={EVENT_NAMES[kind]+' · '+alliance+' · Legion '+legion} footer={!started&&<button type="button" className="planner-button planner-primary" disabled={!eventStart(date,time)||(date===plan.date&&time===plan.time)} onClick={()=>{onSchedule(date,time);setScheduleOpen(false);}}>Save schedule</button>}>
       <label className="planner-field">Date
         <span className="planner-native-field" data-empty={!date}>
@@ -47,7 +57,7 @@ export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendanc
         if(window.confirm('Start a new event for this legion? The previous attendance and power history are kept.')){setOccurrence('');setScheduleOpen(false);onNewEvent();}
       }}>Start a new event</button>}
     </PlannerSheet>
-    {choices.size>0&&<details style={card}>
+    {choices.size>0&&<details ref={attendanceDetails} style={card}>
       <summary style={{cursor:'pointer',fontWeight:650,minHeight:32}}>Attendance</summary>
       {choices.size>1&&<label style={{display:'block',marginBottom:8}}>Attendance event<select aria-label="Attendance event" value={selected} style={{...button,width:'100%',marginTop:4}} onChange={e=>setOccurrence(e.target.value)}>
         {[...choices].sort((a,b)=>b[1].localeCompare(a[1])).map(([id,time])=><option key={id} value={id}>{utc(time)}{id===plan.occurrenceId?' · Current':''}</option>)}

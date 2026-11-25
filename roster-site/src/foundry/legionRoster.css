@@ -357,3 +357,15 @@
 }
 .legion-filter-options label { display: flex; align-items: center; gap: 6px; min-block-size: var(--planner-target); }
 .legion-roster-filters { justify-content: flex-end; }
+
+.legion-event-actions, .legion-summary-footer, .legion-team-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.legion-summary-footer, .legion-team-actions { justify-content: space-between; }
+.legion-summary-footer .planner-plain { font-size: .8125rem; }
+.legion-team-actions { margin-block: 12px; }
+.legion-team-count { display: flex; align-items: center; gap: 8px; font-size: .875rem; }
+.legion-attendance details { scroll-margin-block-start: 12px; }

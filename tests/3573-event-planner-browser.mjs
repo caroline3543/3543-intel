@@ -56,7 +56,7 @@ try {
     assert.equal(await roster.locator('.legion-player-power').count(),1);
     assert.equal(await roster.locator('.legion-row-status').count(),0);
     assert.equal(await page.getByText(/^Combatant power/).innerText(),total);
-    await page.getByRole('button',{name:'Clear role filter'}).click();
+    await page.getByRole('button',{name:'Show all players'}).click();
     const sort=page.getByRole('combobox',{name:'Sort roster'});
     await sort.selectOption('rank');
     const rank=page.getByRole('button',{name:/^R5 /});
@@ -108,13 +108,16 @@ try {
     assert.equal(await optIn.isChecked(),false);
     await optIn.check();
     await page.getByRole('button',{name:'Kite · Combatant',exact:true}).waitFor();
-    await page.getByRole('button',{name:'Teams',exact:true}).click();
+    await page.getByRole('button',{name:/Go to Teams/}).click();
     const count=page.getByRole('combobox',{name:'Teams per legion'});
     for(const size of [3,4,5,6])await count.selectOption(String(size));
     await page.getByRole('button',{name:/Generate teams/}).click();
     await page.getByRole('button',{name:/Regenerate all teams/}).click();
     const purple=page.getByRole('heading',{name:/^Purple team/});
     await purple.waitFor();
+    await page.getByRole('button',{name:/Review buildings/}).click();
+    await page.getByRole('heading',{name:'Share assignments'}).waitFor();
+    await page.getByRole('button',{name:'Teams',exact:true}).click();
     await page.getByRole('button',{name:/Move Northvale to another team/}).click();
     await page.getByRole('group',{name:'Move Northvale to',exact:true}).getByRole('button',{name:'Purple',exact:true}).click();
     await page.locator('[data-team-card="Purple"]').getByText('Northvale',{exact:true}).waitFor();
@@ -122,11 +125,11 @@ try {
     await page.getByRole('combobox',{name:'Assign Northvale to team',exact:true}).waitFor();
 
     await page.getByRole('button',{name:'Players',exact:true}).click();
-    await page.getByRole('button',{name:'Set UTC start'}).click();
+    await page.getByRole('button',{name:'Set event time'}).click();
     const schedule=page.getByRole('dialog',{name:'Event schedule'});
     await schedule.getByRole('heading',{name:'Event schedule'}).press('Escape');
-    assert.equal(await page.getByRole('button',{name:'Set UTC start'}).evaluate(el=>el===document.activeElement),true);
-    await page.getByRole('button',{name:'Set UTC start'}).click();
+    assert.equal(await page.getByRole('button',{name:'Set event time'}).evaluate(el=>el===document.activeElement),true);
+    await page.getByRole('button',{name:'Set event time'}).click();
     const scheduleFit=await schedule.evaluate(dialog=>{
       const body=dialog.querySelector('.planner-sheet-body');
       const bounds=body.getBoundingClientRect();
@@ -142,7 +145,7 @@ try {
     await page.getByLabel('Event date (UTC)',{exact:true}).fill('2026-11-25');
     await page.getByLabel('Event start time (UTC)',{exact:true}).fill('23:30');
     await page.getByRole('button',{name:'Save schedule'}).click();
-    await page.getByText('Attendance',{exact:true}).click();
+    await page.getByRole('button',{name:'Record attendance',exact:true}).click();
     await page.getByRole('combobox',{name:'Attendance for Northvale'}).selectOption('no-show');
     const substitute=page.getByRole('combobox',{name:'Attendance for Lumen'});
     assert.equal(await substitute.locator('option[value="no-show"]').isDisabled(),true);

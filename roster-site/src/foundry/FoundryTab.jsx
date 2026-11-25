@@ -350,7 +350,9 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
        <strong>{count}/{limits[role]}</strong>{' '}<span>{label}</span>
      </button>)}
    </div>
-   <p className="legion-power-total">Combatant power <strong>{joined.length>0&&joined.length===missingPower.length?'—':format(total(joined))}</strong>{missingPower.length>0&&<span> · {missingPower.length} missing</span>}</p></div>
+   <div className="legion-summary-footer"><p className="legion-power-total">Combatant power <strong>{joined.length>0&&joined.length===missingPower.length?'—':format(total(joined))}</strong>{missingPower.length>0&&<span> · {missingPower.length} missing</span>}</p>
+     {joined.length>0&&<button type="button" className="planner-plain" onClick={()=>setView('teams')}>Go to Teams <span aria-hidden="true">›</span></button>}
+   </div></div>
    <div className="legion-roster">
      <div className="planner-title-row">
        <h2>{roleFilter==='join'?'Combatants':roleFilter==='sub'?'Substitutes':participantsOnly?'Participants':'All players'}</h2>
@@ -375,7 +377,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
        {[['power','Troop power'],['status','Event status']].map(([value,label])=><button key={value} type="button" className="planner-button" aria-pressed={rosterMetric===value} onClick={()=>{setRosterMetric(value);setEditingPower(null)}}>{label}</button>)}
        </div>
      </fieldset>
-     {roleFilter!=='all'&&<div className="legion-filter-callout"><span>Showing {sortedRoster.length} {roleFilter==='join'?'combatant':'substitute'}{sortedRoster.length===1?'':'s'}</span><button type="button" className="planner-plain" onClick={()=>{setRoleFilter('all');setBulkSelected([])}}>Clear role filter</button></div>}
+     {roleFilter!=='all'&&<div className="legion-filter-callout"><span>Showing {sortedRoster.length} {roleFilter==='join'?'combatant':'substitute'}{sortedRoster.length===1?'':'s'}</span><button type="button" className="planner-plain" onClick={()=>{setRoleFilter('all');setParticipantsOnly(false);setBulkSelected([])}}>Show all players</button></div>}
      {bulkMode&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',fontSize:12,color:'#b9cad9'}}><span>{bulkSelected.length} selected</span><button style={btn} onClick={()=>setBulkSelected(filteredRegistrations.map(p=>p.id))}>Select all</button></div>}
      {sortedRoster.length===0&&<p style={{color:'#adc2d6'}}>{rosterSearch?'No matching players.':'No players in this view.'}</p>}
      {(rosterSort==='rank'?groupedRanks:[null]).map(group=>{
@@ -408,7 +410,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   </>}
   <div className={view==='players'?'legion-attendance':'legion-attendance-hidden'}>
     <PlannerAttendance kind={kind} alliance={chosen} legion={legion} plan={saved} players={attendancePlayers}
-      scheduleTarget={scheduleTarget}
+      scheduleTarget={scheduleTarget} showAttendanceShortcut={view==='players'}
       onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
   </div>
   <PlannerSheet open={!!addPanel} onClose={closeAdd}
@@ -446,9 +448,10 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     <div style={{fontSize:12,color:'#a9bfd0',marginTop:10}}>{!assignedCount?'Generate teams to see balance':missingPower.length?'Missing troop power for '+missingPower.length+' player(s). Balance is provisional.':balanceSpread+'% spread between strongest and weakest team'}</div>
    </div>
    {view==='teams'&&<>
-    <label style={{display:'block',marginBottom:10}}>Teams per legion <select aria-label="Teams per legion" value={colours.length} style={btn} onChange={e=>{const count=Number(e.target.value);update(resizePlannerTeams(saved,count),'Team count updated');if(!TEAM_NAMES.slice(0,count).includes(focusTeam))setFocusTeam('Blue');}}>{[3,4,5,6].map(n=><option key={n}>{n}</option>)}</select></label>
-    <div style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}><button style={{...btn,padding:'8px 12px',background:'#263b50'}} onClick={()=>setConfirmGenerate(v=>!v)}>⚙ Generate teams</button></div>
-    <p style={{fontSize:12,color:'#9ab1c3',margin:'0 0 14px'}}>Balances troop power while considering language and preferred teammates.</p>
+    <div className="legion-team-actions"><label className="legion-team-count">Teams per legion <select aria-label="Teams per legion" value={colours.length} style={btn} onChange={e=>{const count=Number(e.target.value);update(resizePlannerTeams(saved,count),'Team count updated');if(!TEAM_NAMES.slice(0,count).includes(focusTeam))setFocusTeam('Blue');}}>{[3,4,5,6].map(n=><option key={n}>{n}</option>)}</select></label>
+      <button type="button" className="planner-button planner-primary" disabled={!joined.length} aria-expanded={confirmGenerate} onClick={()=>setConfirmGenerate(v=>!v)}>Generate teams</button>
+      {isFoundry&&joined.length>0&&assignedCount===joined.length&&<button type="button" className="planner-plain" onClick={()=>setView('buildings')}>Review buildings <span aria-hidden="true">›</span></button>}
+    </div>
     {confirmGenerate&&<div style={style}><strong>Team generation</strong><p style={{fontSize:13,color:'#a9bfd0'}}>{isFoundry&&'The strongest three combatants anchor the first three colour zones. '}Adding unassigned players keeps existing assignments.</p>{missingPower.length>0&&<p style={{fontSize:12,color:'#f5bd5b'}}>{missingPower.length} player(s) have missing troop power.</p>}<div style={{display:'grid',gap:8}}><button style={{...btn,background:'#32694d'}} onClick={()=>autoTeams('add')}>Add unassigned players only</button><button style={{...btn,background:'#70521f'}} onClick={()=>{autoTeams('all')}}>Regenerate all teams{isFoundry?' and buildings':''}</button><button style={btn} onClick={()=>setConfirmGenerate(false)}>Cancel</button></div></div>}
     {joined.some(p=>!teams[p.id])&&<div style={{...style,borderColor:'#B78B45'}}><h3 style={{margin:'0 0 12px'}}>Unallocated players <span style={{fontSize:13,color:'#a9bfd0'}}>({joined.filter(p=>!teams[p.id]).length})</span></h3>{joined.filter(p=>!teams[p.id]).map(p=><div key={p.id} style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}><div style={{flex:1,minWidth:0}}><div style={{display:'flex',gap:9,alignItems:'center'}}><PlayerAvatar player={avatarFor(p)} size={36}/><div><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:'#a9bfd0'}}>{p.power?format(p.power)+' '+metric.toLowerCase():'Missing troop power'}{p.tierScore!==null?' · Tier score '+p.tierScore:''}</div></div></div></div><select aria-label={'Assign '+p.name+' to team'} defaultValue="" onChange={e=>{if(e.target.value)assign(p.id,e.target.value)}} style={{...btn,maxWidth:130}}><option value="" disabled>Assign</option>{colours.map(c=><option key={c} value={c}>{c}</option>)}</select></div>)}</div>}
     {colours.map(c=><div key={c} data-team-card={c} ref={el=>{teamRefs.current[c]=el}} style={{...style,scrollMarginTop:20,borderTop:'4px solid '+teamColors[c]}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div onClick={()=>setExpanded(v=>({...v,[c]:v[c]===false}))} style={{cursor:'pointer'}}><h2 style={{fontSize:19,margin:0,color:teamColors[c]}}>{teamTitle(c)} team {expanded[c]!==false?'⌃':'⌄'}</h2><span style={{fontSize:12,color:'#a9bfd0'}}>{active.filter(p=>teams[p.id]===c).length} players · {format(teamTotals[c])} power</span></div><button style={{...btn,padding:'8px'}} onClick={()=>{navigator.clipboard?.writeText(active.filter(p=>teams[p.id]===c).map(p=>p.name).join('\n'));setNotice(c+' team copied')}}>Copy</button></div>
