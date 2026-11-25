@@ -78,6 +78,10 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const jumpToTeam=c=>{setFocusTeam(c);teamRefs.current[c]?.scrollIntoView({behavior:'smooth',block:'start'});};
  const [focusTeam,setFocusTeam]=useState('Blue'),[moving,setMoving]=useState(null),[confirmGenerate,setConfirmGenerate]=useState(false);
  const [addRole,setAddRole]=useState('join');
+ const [singleRole,setSingleRole]=useState('join');
+ const [addPlayerId,setAddPlayerId]=useState(null);
+ const [addError,setAddError]=useState('');
+ const [filtersOpen,setFiltersOpen]=useState(false);
  const [managing,setManaging]=useState(null);
  const [participantsOnly,setParticipantsOnly]=useState(false),[rosterSearch,setRosterSearch]=useState('');
  const [rosterMetric,setRosterMetric]=useState('power');
@@ -110,14 +114,14 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
 
  const validAssignments=isFoundry?Object.fromEntries(active.map(p=>[p.id,buildings[teams[p.id]].includes(assignments[p.id])?assignments[p.id]:buildings[teams[p.id]][0]])):{};
  const update=(patch,msg,powers,expectedRegistrations)=>{setUndo(saved);onSaveFoundry?.({...saved,...patch},powers,expectedRegistrations);setNotice(msg||'Updated · syncing across devices');};
- const setStatus=(id,status)=>{const current=registeredUnder[id]===chosen?registrations[id]:'';const next=status===current?'':status;
+ const setStatus=(id,status,message)=>{const current=registeredUnder[id]===chosen?registrations[id]:'';const next=status===current?'':status;
   if(isParticipant(next)&&otherRole(id)){setNotice('Already assigned to Legion '+otherLegion+'. Open the player’s role to move them.');return}
   if(next==='join'&&joined.length>=limits.join){setNotice(limits.join+' combatant slots are full');return}
   if(next==='sub'&&subs.length>=limits.sub){setNotice(limits.sub+' substitute slots are full');return}
   if(registrations[id]&&registeredUnder[id]!==chosen){setNotice('Already registered under '+registeredUnder[id]+'. Remove that registration before moving.');return}
   const nextRegs={...registrations,[id]:next},nextUnder={...registeredUnder,[id]:chosen},nextTeams={...teams},nextAssignments={...assignments};
   if(next!=='join'){delete nextTeams[id];delete nextAssignments[id]}
-  update({registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments},'Registration updated');
+  update({registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments},message||'Registration updated');
  };
  const autoTeams=(mode='all')=>{
   setConfirmGenerate(false);
@@ -190,16 +194,20 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const relatedTo=id=>[...new Set((teamworkPreferences.pairs||[]).filter(pair=>Array.isArray(pair)&&pair.map(String).includes(String(id))).flatMap(pair=>pair.map(String).filter(other=>other!==String(id))))];
  const teammateMatches=teammateQuery.trim()?entries.filter(p=>p.matched&&!selectedIds().includes(p.id)&&!teammateIds.includes(p.id)&&fields(p).some(field=>norm(field).includes(norm(teammateQuery)))).sort((a,b)=>{const score=p=>p.id===teammateQuery.trim()?0:norm(p.name)===norm(teammateQuery)?1:fields(p).some(v=>norm(v).startsWith(norm(teammateQuery)))?2:3;return score(a)-score(b)||a.name.localeCompare(b.name)}).slice(0,6):[];
  const bulkRemove=()=>{const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};ids.forEach(id=>{delete nextRegs[id];delete nextTeams[id];delete nextAssignments[id]});update({registrations:nextRegs,teams:nextTeams,assignments:nextAssignments},ids.length+' removed from registration');setBulkSelected([]);setBulkMode(false)};
- const add=(id,role=addRole)=>{
+ const add=(id,role)=>{
   const p=entries.find(x=>x.id===id);
-  if(!p||!p.matched){setNotice('Select a matched player profile');return}
-  if(registrations[id]&&registeredUnder[id]!==chosen){setNotice('Already registered under '+registeredUnder[id]);return}
-  if(registrations[id]===role&&registeredUnder[id]===chosen){setNotice(p.name+' is already registered');return}
+  if(!p||!p.matched){setAddError('Select a matched player profile');return}
+  if(registrations[id]&&registeredUnder[id]!==chosen){setAddError('Already registered under '+registeredUnder[id]);return}
+  if(registrations[id]===role&&registeredUnder[id]===chosen){setAddError(p.name+' already has this role.');return}
   if(otherRole(id)){
    setRoleFilter('all');setParticipantsOnly(false);setRosterSearch(p.name);setManaging(id);setQuery('');setAddPanel('');
    return;
   }
-  setStatus(id,role);setQuery('');setAddPanel('');
+  if((role==='join'&&joined.length>=limits.join)||(role==='sub'&&subs.length>=limits.sub)){
+   setAddError('This role is full. Choose another role or free a slot.');return;
+  }
+  const roleName=REGISTRATION_ROLES.find(([value])=>value===role)[1];
+  setStatus(id,role,p.name+' registered as '+roleName+' · '+chosen+' · Legion '+legion);setQuery('');setAddPanel('');
  };
  const registrationForImport=id=>importRegistrationState(saved,otherPlan,id);
  const confirmBulkImport=(rows,expected)=>{
@@ -316,7 +324,11 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   </div>;
  };
  const closeAdd=()=>{setAddPanel('');setDiscardDraft(false);setQuery('');if(!draftSummary){setShowPaste(false);setPaste('');}};
- const clearDraft=()=>{setPaste('');setShowPaste(false);setDraftSummary(null);setDiscardDraft(false);};
+ const clearDraft=()=>{setAddRole('join');setPaste('');setShowPaste(false);setDraftSummary(null);setDiscardDraft(false);};
+ const pendingPlayer=entries.find(player=>player.id===addPlayerId);
+ const roleInput=(value,onChange)=><label className="planner-field">Registration role<select value={value} onChange={e=>onChange(e.target.value)}>
+   {REGISTRATION_ROLES.map(([role,label])=><option value={role} key={role}>{label}</option>)}
+ </select></label>;
  const addFooter=addPanel==='menu'&&draftSummary&&<>
    <button type="button" className="planner-button planner-primary" onClick={()=>setAddPanel('import')}>Resume bulk import</button>
    <button type="button" className="planner-plain" onClick={()=>setDiscardDraft(true)}>Discard draft</button>
@@ -346,12 +358,15 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      </div>
      <div className="legion-roster-tools">
        <input className="planner-search" type="search" aria-label="Search roster" placeholder="Search roster" value={rosterSearch} onChange={e=>{setRosterSearch(e.target.value);setBulkSelected([])}}/>
+       <button type="button" className="planner-button" aria-expanded={filtersOpen} onClick={()=>setFiltersOpen(open=>!open)}>Filters{participantsOnly||rosterSort!=='rank'?' •':''}</button>
+     </div>
+     {filtersOpen&&<div className="legion-filter-options">
        <select aria-label="Sort roster" value={rosterSort} onChange={e=>setRosterSort(e.target.value)}>
          <option value="power">Power</option><option value="name">Name A–Z</option><option value="rank">Rank</option>
        </select>
-     </div>
-     <div className="legion-roster-filters">
        <label><input type="checkbox" checked={participantsOnly} onChange={e=>{setParticipantsOnly(e.target.checked);setRoleFilter('all');setBulkSelected([])}}/> Participants only</label>
+     </div>}
+     <div className="legion-roster-filters">
        <button type="button" className="planner-plain" aria-pressed={bulkMode} onClick={()=>{setBulkMode(v=>!v);setBulkSelected([]);closeEditor()}}>{bulkMode?'Done':'Manage'}</button>
      </div>
      <fieldset className="legion-metric-picker">
@@ -397,12 +412,9 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
       onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
   </div>
   <PlannerSheet open={!!addPanel} onClose={closeAdd}
-    title={discardDraft?'Discard import draft?':addPanel==='find'?'Find a player to add':addPanel==='import'?'Bulk import':'Add players'}
+    title={discardDraft?'Discard import draft?':addPanel==='find'?'Find a player to add':addPanel==='confirm'?'Confirm player':addPanel==='import'?'Bulk import':'Add players'}
     context={contextLabel} footer={discardDraft?<><button type="button" className="planner-button" onClick={()=>{clearDraft();}}>Discard draft</button><button type="button" className="planner-plain" onClick={()=>setDiscardDraft(false)}>Keep draft</button></>:addFooter}>
     {discardDraft?<p className="planner-muted">The pasted names and import choices will be removed.</p>:addPanel==='menu'&&<>
-      {!draftSummary&&<label className="planner-field">Registration role<select value={addRole} onChange={e=>setAddRole(e.target.value)}>
-        {REGISTRATION_ROLES.map(([role,label])=><option value={role} key={role}>{label}</option>)}
-      </select></label>}
       <button className="planner-button planner-sheet-link" type="button" onClick={()=>setAddPanel('find')}>Find a player to add <span aria-hidden="true">›</span></button>
       {draftSummary?<div className="planner-draft"><h3>Unfinished bulk import</h3><p>{draftSummary.matched} matched · {draftSummary.pending} need review{draftSummary.stage==='paste'?' · '+draftSummary.total+' pasted':''}</p></div>:
         <button className="planner-button planner-sheet-link" type="button" onClick={()=>{setShowPaste(true);setAddPanel('import')}}>Paste multiple players <span aria-hidden="true">›</span></button>}
@@ -413,11 +425,18 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
        <input aria-label="Search and add player by name or ID" value={query} onChange={e=>onSearchInput(e.target.value)} placeholder="Search name or Player ID to add" className="planner-search"/>
        {query&&<button type="button" aria-label="Clear search" onClick={()=>setQuery('')} style={{...btn,padding:'4px 8px',minHeight:32}}>×</button>}
      </div>
-   {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} · {metric}</small>{p.recentNoShow&&<NoShow/>}</span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
+   {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>{setAddError('');setAddPlayerId(p.id);setSingleRole(activeRole(p.id)||'join');setAddPanel('confirm')}} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} · {metric}</small>{p.recentNoShow&&<NoShow/>}</span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
+    </>}
+    {addPanel==='confirm'&&pendingPlayer&&<>
+      <div className="planner-draft"><h3>{pendingPlayer.name}</h3><p>{pendingPlayer.alliance}</p></div>
+      {roleInput(singleRole,role=>{setSingleRole(role);setAddError('')})}
+      {addError&&<p role="alert" className="planner-error">{addError}</p>}
+      <button type="button" className="planner-button planner-primary" onClick={()=>add(pendingPlayer.id,singleRole)}>Save registration</button>
+      <button type="button" className="planner-plain" onClick={()=>setAddPanel('find')}>Back to search</button>
     </>}
     {showPaste&&<div hidden={addPanel!=='import'}>
       <BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title+' · '+chosen+' · Legion '+legion} initialText={paste}
-        reviewRegistration={registrationForImport} active={addPanel==='import'} onDraftChange={setDraftSummary} onConfirm={confirmBulkImport} onClose={()=>{clearDraft();closeAdd()}}/>
+        confirmationControls={roleInput(addRole,setAddRole)} reviewRegistration={registrationForImport} active={addPanel==='import'} onDraftChange={setDraftSummary} onConfirm={confirmBulkImport} onClose={()=>{clearDraft();closeAdd()}}/>
     </div>}
   </PlannerSheet>
   {(view==='teams'||view==='buildings')&&<>

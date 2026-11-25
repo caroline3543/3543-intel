@@ -5,8 +5,9 @@ const card={border:'1px solid '+palette.border,borderRadius:16,padding:12,backgr
 const control={background:palette.elevated,border:'1px solid '+palette.border,borderRadius:12,color:palette.text,minHeight:44,padding:'9px 12px',fontSize:14,boxSizing:'border-box'};
 const button={...control,fontWeight:650,cursor:'pointer'};
 const secondary={fontSize:12,color:palette.secondary};
-export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',onConfirm,onClose,initialText='',title='Import players',context='Foundry',requirePower=false,reviewRegistration,onDraftChange,active=true}){
+export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',onConfirm,onClose,initialText='',title='Import players',context='Foundry',requirePower=false,reviewRegistration,onDraftChange,active=true,confirmationControls}){
  const [expanded,setExpanded]=useState(null),[searching,setSearching]=useState({}),[source,setSource]=useState(initialText),[stage,setStage]=useState('paste'),[choices,setChoices]=useState({}),[powers,setPowers]=useState({}),[filter,setFilter]=useState('review'),[search,setSearch]=useState({}),[status,setStatus]=useState('');
+ useEffect(()=>{if(confirmationControls)setStatus('');},[roleLabel,Boolean(confirmationControls)]);
  const stageHeading=useRef(null);
  const usesConfirmation=Boolean(reviewRegistration);
  useEffect(()=>{if(usesConfirmation&&active)stageHeading.current?.focus();},[stage,active,usesConfirmation]);
@@ -38,7 +39,7 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
  const submit=()=>{if(!ready)return;const result=onConfirm?.(selected.map(r=>({id:r.player.id,name:r.player.name,power:r.power,source:r.raw})),reviewRegistration?Object.fromEntries(selected.map(row=>[row.player.id,reviewed[row.player.id]])):undefined);if(result?.error){setStatus(result.error);return;}setStage('done');setStatus(result?.message||'Import prepared');};
  return <section aria-label={title} className={reviewRegistration?'planner-bulk-import':undefined} style={{...card,...(reviewRegistration?{border:0,background:'transparent',padding:0}:{padding:14}),display:'grid',gap:12,color:palette.text}}>
   <header style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:8}}>
-   <div>{reviewRegistration?<h3 ref={stageHeading} tabIndex={-1}>{stageLabel[stage]}</h3>:<h2 style={{fontSize:18,margin:0}}>{title}</h2>}<div style={secondary}>{reviewRegistration?roleLabel:context+' · '+(alliance||'All alliances')+' · '+roleLabel}</div></div>
+   <div>{reviewRegistration?<h3 ref={stageHeading} tabIndex={-1}>{stageLabel[stage]}</h3>:<h2 style={{fontSize:18,margin:0}}>{title}</h2>}<div style={secondary}>{reviewRegistration?(confirmationControls?'':roleLabel):context+' · '+(alliance||'All alliances')+' · '+roleLabel}</div></div>
    <button type="button" onClick={reset} style={{...button,fontSize:12,minHeight:44}}>↻ Reset</button>
   </header>
   <div role="group" aria-label="Import progress" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
@@ -98,6 +99,7 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
    <div style={{display:'grid',gap:8}}><button type="button" disabled={!ready||stale} onClick={reviewRegistration?beginConfirmation:submit} style={{...button,background:palette.accent,color:'#0B1525',opacity:ready?1:.45}}>{reviewRegistration?'Continue to confirmation':'Confirm '+selected.length+' matched players'}</button>{!ready&&<span style={secondary}>Resolve {pending.length} entries and any missing power or duplicate identities first.</span>}<button type="button" onClick={()=>setStage('paste')} style={{...button,background:'transparent',minHeight:38}}>Edit pasted text</button></div>
   </>}
   {stage==='confirm'&&<>
+   {confirmationControls}
    <h3>{selected.length} {selected.length===1?'player':'players'} to add</h3>
    <p className="planner-muted">{evaluated.length-selected.length-pending.length} excluded · {pending.length} unresolved</p>
    {selected.map(row=><div className="planner-draft" key={row.key}><h4>{row.player.name}</h4><p>{roleLabel}{row.power!==null?' · '+Number(row.power).toLocaleString():''}</p></div>)}

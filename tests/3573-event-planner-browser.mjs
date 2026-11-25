@@ -23,6 +23,11 @@ try {
     assert.deepEqual((await foundry.locator('option').allTextContents()).slice(0,4),['Alliance · ARC','Alliance · HOT','Alliance · RKG','Alliance · WAR']);
     assert.ok(await page.getByRole('button',{name:'Buildings',exact:true}).isVisible());
     const roster=page.locator('.legion-player');
+    const filters=page.getByRole('button',{name:/^Filters/});
+    const openFilters=async()=>{if(await filters.getAttribute('aria-expanded')==='false')await filters.click();};
+    assert.equal(await page.getByRole('combobox',{name:'Sort roster'}).count(),0);
+    await openFilters();
+
     assert.equal(await roster.count(),10);
     const missingPower=page.getByRole('button',{name:'Add power for Wren',exact:true});
     assert.equal(await missingPower.locator('.legion-power-blank').isVisible(),true);
@@ -65,6 +70,7 @@ try {
     await rosterSearch.fill('Northvale');
     await page.getByRole('button',{name:'Northvale · Legion 1 · Combatant',exact:true}).click();
     await page.getByRole('button',{name:'Switch to Legion 1',exact:true}).click();
+    await openFilters();
     await page.getByRole('checkbox',{name:'Participants only'}).uncheck();
     await page.getByRole('button',{name:'Cypress · Not participating',exact:true}).waitFor();
     await rosterSearch.fill('Aster');
@@ -88,11 +94,13 @@ try {
     await eventPower.getByText('1.52B',{exact:true}).waitFor();
     await profile.getByRole('button',{name:'Close profile'}).click();
 
+    await openFilters();
     await page.getByRole('checkbox',{name:'Participants only'}).check();
     await page.getByRole('button',{name:'Kite · Combatant',exact:true}).click();
     const optIn=page.getByRole('checkbox',{name:'Opted in: Kite'});
     await optIn.click();
     assert.equal(await page.getByRole('button',{name:'Kite · Not participating',exact:true}).count(),0);
+    await openFilters();
     await page.getByRole('checkbox',{name:'Participants only'}).uncheck();
     const optedOut=page.getByRole('button',{name:'Kite · Not participating',exact:true});
     await optedOut.waitFor();
@@ -149,6 +157,7 @@ try {
     await search.fill('Northvale');
     const candidate=page.getByRole('button',{name:/Northvale.*Recent no-show/});
     await candidate.click();
+    await page.getByRole('button',{name:'Save registration'}).click();
     await page.getByRole('button',{name:'Edit canyon clash power for Northvale'}).click();
     const canyon=page.getByRole('textbox',{name:'Canyon Clash power for Northvale',exact:true});
     await canyon.fill('1251234567');await canyon.press('Enter');
@@ -170,6 +179,7 @@ try {
     await page.getByRole('button',{name:'Resume bulk import'}).click();
     await page.getByRole('button',{name:'Continue to confirmation'}).click();
     const confirmHeading=page.getByRole('heading',{name:'Confirm import'});
+    assert.equal(await page.getByRole('combobox',{name:'Registration role'}).isVisible(),true);
     assert.equal(await confirmHeading.evaluate(el=>el===document.activeElement),true);
     await page.getByRole('button',{name:'Add 1 player',exact:true}).click();
     await page.getByRole('button',{name:'Done',exact:true}).click();
@@ -181,6 +191,8 @@ try {
     await page.getByRole('button',{name:'Find a player to add'}).click();
     await page.getByRole('textbox',{name:'Search and add player by name or ID'}).fill('Harbour');
     await page.getByRole('button',{name:/Harbour HOT/}).click();
+    await page.getByRole('button',{name:'Save registration'}).click();
+    await page.getByRole('status').filter({hasText:'Harbour registered as Combatant · ARC · Legion 1'}).waitFor();
     await page.getByRole('button',{name:'Harbour · Combatant',exact:true}).click();
     await page.getByRole('button',{name:'Remove from event',exact:true}).click();
     assert.equal(await page.getByRole('button',{name:/Harbour/}).count(),0);
