@@ -194,16 +194,16 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     setRosterRefreshing(true);
     setMessage('');
     try{
-      const response=await fetch('/api/priority-roster-refresh',{method:'POST',credentials:'same-origin',signal:AbortSignal.timeout(35000)});
+      const response=await fetch('/api/priority-roster-refresh',{method:'POST',credentials:'same-origin',signal:AbortSignal.timeout(125000)});
       const result=await response.json();
       if(!response.ok)throw Error(result.error||'Could not refresh the alliance lists.');
       const verification=result.missing===0?'No missing players to verify.':
         result.queued===result.missing?`${result.queued} queued for verification.`:
         `${result.missing} missing · ${result.queued} newly queued for verification.`;
       setMessage(`${result.succeeded.length} of 5 alliance lists refreshed · ${result.found} players found. ${verification}`+
-        (result.unavailable.length?` Unavailable: ${result.unavailable.join(', ')}.`:''));
+        (result.unavailable.length?` Still using saved rosters for ${result.unavailable.join(', ')}.`:''));
       await retry();
-    }catch(error){setMessage(error.message||'Could not refresh the alliance lists.');}
+    }catch(error){setMessage(error.name==='TimeoutError'?'Alliance refresh timed out. Check sync before trying again.':error.message||'Could not refresh the alliance lists.');}
     finally{rosterRefreshLock.current=false;setRosterRefreshing(false);}
   }
   const refreshAction=<button style={button} onClick={refreshPriorityRosters} disabled={rosterRefreshing||!!legionRefresh||nameRefresh.status==='running'||!sync.joined||sync.dirty||sync.mode==='join'||!!sync.conflicts?.length}>{rosterRefreshing?'Loading alliance lists…':'Refresh priority alliances'}</button>;

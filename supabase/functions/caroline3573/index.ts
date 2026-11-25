@@ -72,7 +72,12 @@ Deno.serve(async req => {
   if (action === "rankings") path = rankingsPath(input.state, input.board, input.limit ?? 100) || "";
   if (action === "kingdom" && validState) path = `/states/${state}`;
   if (action === "alliance" && /^[\p{L}\p{N}_-]{1,16}$/u.test(tag)) {
+    const wait = input.wait ?? 0;
+    if (typeof wait !== "number" || !Number.isInteger(wait) || wait < 0 || wait > 60) {
+      return respond({ error: "Invalid alliance refresh wait" }, 400, origin);
+    }
     path = `/alliances/${state}/${encodeURIComponent(tag)}?include=info,roster`;
+    if (wait > 0) path += `&wait=${wait}`;
   }
   if (action === "player" && /^\d{4,15}$/.test(fid)) {
     path = `/players/${fid}?include=base`;
