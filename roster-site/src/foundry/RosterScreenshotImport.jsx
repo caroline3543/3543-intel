@@ -44,6 +44,7 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
   const [error, setError] = useState('');
   const [review, setReview] = useState(null);
   const [saved, setSaved] = useState([]);
+  const [warningsAccepted, setWarningsAccepted] = useState(false);
   const run = useRef(null);
   const picker = useRef(null);
 
@@ -114,6 +115,7 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
   const pendingLegion = readings.some(item => item.rows.length && !(item.legion || item.destination));
 
   function beginReview(group) {
+    setWarningsAccepted(false);
     const source = group.rows.map(({ name, power }) => {
       const player = name || 'Unread player name';
       return power === null ? player : player + '\t' + power;
@@ -166,9 +168,14 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
         {row.powerConflict && <p role="alert">Power readings disagree: {row.powerConflict.join(' / ')}. Verify against screenshot.</p>}
       </li>)}</ul>
     </details>}
+    {review && review.rows.some(row=>row.conflict||row.powerConflict) && <label>
+      <input type="checkbox" checked={warningsAccepted} onChange={event=>setWarningsAccepted(event.target.checked)}/>
+      I have checked conflicting readings against the original screenshots.
+    </label>}
     {review && <BulkPlayerImport title="Review screenshot readings" players={players} alliance={alliance}
       context={title} roleLabel={'Legion ' + review.legion} initialText={review.source} requirePower verifyReadings startWithMatches parsePower={readScreenshotPower}
       onConfirm={rows => {
+        if (review.rows.some(row=>row.conflict||row.powerConflict) && !warningsAccepted) return {error:'Check conflicting OCR readings and acknowledge the warning before saving.'};
         const result = onSave(review.legion, review.occurrenceId, rows);
         if (!result?.error) setSaved(current => [...current, review.legion]);
         return result;
