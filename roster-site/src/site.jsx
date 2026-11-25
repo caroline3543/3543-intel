@@ -33,6 +33,16 @@ import {mergeAllianceProfiles,reconcileAllianceMembership} from '../../src/servi
 import {withBuiltinRole} from '../../src/utils/roles.js';
 import {withGameLanguage} from '../../src/services/gameLanguageService.js';
 const button={minHeight:44,padding:'10px 14px',fontSize:14,fontWeight:600,borderRadius:10,border:`1px solid ${C.border}`,background:C.section,color:C.icy,cursor:'pointer'};
+const eventCards=[
+  {id:'canyon',label:'Canyon Clash',description:'Team planning and attendance',available:true,
+    icon:'m2 19 6-10 4 6 4-11 6 15H2Zm4-6 2 2 2-2m4-4 2 2 2-2'},
+  {id:'castle',label:'Castle Battle',description:'Coming soon',available:false,
+    icon:'M4 21V9H2V4h3v3h3V4h3v5H9v3h6V9h-2V4h3v3h3V4h3v5h-2v12H4Zm6 0v-4h4v4'},
+  {id:'foundry',label:'Foundry',description:'Team planning and assignments',available:true,
+    icon:'M3 21V11l6-4v5l6-4v5l6-4v12H3Zm4-4h2m3 0h2m3 0h2M4 9V3h3v4'},
+  {id:'tal',label:'Tundra Arms League',description:'Under development',available:true,
+    icon:'M8 21h8m-4-4v4M7 4h10v7a5 5 0 0 1-10 0V4Zm0 2H3v2a4 4 0 0 0 4 4m10-6h4v2a4 4 0 0 1-4 4'},
+].sort((a,b)=>a.label.localeCompare(b.label));
 const empty={players:[],events:[],customRoles:[],settings:{stateId:'3573'}};
 export function relativeRefreshAge(timestamp,now=Date.now()){
   const ms=Date.parse(timestamp||'');
@@ -407,7 +417,14 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='members'&&!DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag))&&<AllianceSetup players={players} onLoad={importRoster}/>}
     {returnToPlanner&&tab==='members'&&<div style={{position:'sticky',top:0,zIndex:10,padding:'10px 16px',background:'#142438',borderBottom:'1px solid #40546a'}}><button type="button" style={button} onClick={backToPlanner}>← Back to {EVENT_NAMES[returnToPlanner]}</button></div>}
     {tab==='members'&&players.length>0&&<RosterTab enable3573Tracking transferEvents={transferEvents} teamworkPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamworkPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('TAL teamwork preferences saved.');}} initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} legionPlan={data.talPlan||newPlan()} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
-    {tab==='events'&&<section aria-label="Events" style={{padding:'12px 16px',display:'grid',gap:8}}>{[['foundry','Foundry','Team planning and assignments',true],['tal','Tundra Arms League','Under development',true],['castle','Castle Battle','Coming soon',false],['canyon','Canyon Clash','Team planning and attendance',true]].map(([id,label,description,available])=><button key={id} type="button" disabled={!available} aria-disabled={!available} onClick={()=>available&&navigate(id)} style={{...button,textAlign:'left',padding:'13px 14px',minHeight:64,display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,opacity:available?1:.56,cursor:available?'pointer':'not-allowed',background:available?'#203449':'#172739',borderColor:available?'#40546a':'#293b4d'}}><span style={{display:'grid',gap:3}}><strong style={{fontSize:15,fontWeight:700}}>{label}</strong><span style={{fontSize:12,color:C.icy}}>{description}</span></span><span aria-hidden="true" style={{fontSize:available?20:14,color:C.icy}}>{available?'›':'Locked'}</span></button>)}</section>}
+    {tab==='events'&&<section aria-label="Events" style={{padding:'12px 16px',display:'grid',gap:8}}>
+      {eventCards.map(({id,label,description,available,icon})=><button key={id} type="button" disabled={!available} onClick={()=>navigate(id)}
+        style={{...button,textAlign:'left',padding:'13px 14px',minHeight:64,display:'grid',gridTemplateColumns:'22px minmax(0,1fr) auto',alignItems:'center',gap:12,opacity:available?1:.56,cursor:available?'pointer':'not-allowed',background:available?'#203449':'#172739',borderColor:available?'#40546a':'#293b4d'}}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={icon}/></svg>
+        <span style={{display:'grid',gap:3}}><strong style={{fontSize:15,fontWeight:700}}>{label}</strong><span style={{fontSize:12,color:C.icy}}>{description}</span></span>
+        <span aria-hidden={available||undefined} style={{fontSize:available?20:14,color:C.icy}}>{available?'›':'Locked'}</span>
+      </button>)}
+    </section>}
     {['foundry','castle','canyon','tal'].includes(tab)&&<button type="button" onClick={()=>navigate('events')} style={{...button,margin:'12px 16px'}}>‹ Back to Events</button>}
     {tab==='svs'&&<SvsComparison players={players} lastLabSummary={data.settings?.compareLabTop100||null} onLabSummary={summary=>setData(prev=>({...prev,settings:{...prev.settings,compareLabTop100:summary}}))}/>}
     {tab==='castle'&&<section aria-label="Castle Battle coming soon" style={{minHeight:'60vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'32px 20px',textAlign:'center'}}><div style={{maxWidth:320}}><div style={{width:64,height:64,display:'grid',placeItems:'center',borderRadius:20,background:'#203449',margin:'0 auto 18px',color:C.icy}}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h2 style={{fontSize:22,margin:'0 0 8px'}}>Castle Battle</h2><p style={{color:C.icy,fontSize:14,margin:'0 0 8px'}}>Coming soon</p><p style={{color:'#B8C8D5',fontSize:14,lineHeight:1.5,margin:0}}>Castle Battle team planning will be available in a future update.</p></div></section>}
