@@ -30,8 +30,18 @@ export function PlannerAttendance({kind,alliance,legion,plan,players,onAttendanc
   return <>
     {scheduleTarget&&createPortal(scheduleTrigger,scheduleTarget)}
     <PlannerSheet open={scheduleOpen} onClose={()=>setScheduleOpen(false)} title="Event schedule" context={EVENT_NAMES[kind]+' · '+alliance+' · Legion '+legion} footer={!started&&<button type="button" className="planner-button planner-primary" disabled={!eventStart(date,time)||(date===plan.date&&time===plan.time)} onClick={()=>{onSchedule(date,time);setScheduleOpen(false);}}>Save schedule</button>}>
-      <label className="planner-field">Date<input aria-label="Event date (UTC)" type="date" value={date} disabled={started} onChange={e=>setDate(e.target.value)}/></label>
-      <label className="planner-field">Start time (UTC)<input aria-label="Event start time (UTC)" type="time" value={time} disabled={started} onChange={e=>setTime(e.target.value)}/></label>
+      <label className="planner-field">Date
+        <span className="planner-native-field" data-empty={!date}>
+          <input aria-label="Event date (UTC)" type="date" value={date} disabled={started} onChange={e=>setDate(e.target.value)}/>
+          {!date&&<span aria-hidden="true">Choose a date</span>}
+        </span>
+      </label>
+      <label className="planner-field">Start time (UTC)
+        <span className="planner-native-field" data-empty={!time}>
+          <input aria-label="Event start time (UTC)" type="time" value={time} disabled={started} onChange={e=>setTime(e.target.value)}/>
+          {!time&&<span aria-hidden="true">Choose a time</span>}
+        </span>
+      </label>
       <p className="planner-muted">Attendance opens one hour after the start.</p>
       {started&&<button type="button" className="planner-button" disabled={!attendanceOpen(currentStart,clock)} onClick={()=>{
         if(window.confirm('Start a new event for this legion? The previous attendance and power history are kept.')){setOccurrence('');setScheduleOpen(false);onNewEvent();}

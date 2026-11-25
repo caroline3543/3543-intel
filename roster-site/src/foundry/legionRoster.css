@@ -274,3 +274,57 @@
 .legion-metric-switch button { flex: 1; background: transparent; border-radius: 11px; color: var(--planner-muted); }
 .legion-metric-switch button[aria-pressed=true] { background: var(--planner-control); border-color: var(--planner-gold); color: var(--planner-gold); }
 .legion-player-metric { align-items: center; min-block-size: var(--planner-target); }
+
+/* Keep WebKit's intrinsic date and time controls within the sheet gutters. */
+.planner-sheet-body, .planner-field { grid-template-columns: minmax(0, 1fr); }
+.planner-native-field { position: relative; display: block; min-inline-size: 0; }
+.planner-native-field input {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  font-size: max(16px, 1rem);
+}
+.planner-native-field input::-webkit-date-and-time-value { min-inline-size: 0; text-align: start; }
+.planner-native-field[data-empty="true"]:not(:focus-within) input::-webkit-datetime-edit { opacity: 0; }
+.planner-native-field > span {
+  position: absolute;
+  inset-inline-start: 13px;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--planner-muted);
+}
+.planner-native-field:focus-within > span { display: none; }
+
+.legion-context select, .legion-roster-tools select {
+  border-radius: 12px;
+  background-color: var(--planner-surface);
+}
+.legion-tabs {
+  background: transparent;
+  border-radius: 0;
+  border-bottom: 1px solid var(--planner-line);
+  padding: 0;
+}
+.legion-tabs button { border-radius: 0; border-width: 0 0 2px; }
+.legion-tabs button[aria-current] {
+  background: transparent;
+  border-color: var(--planner-gold);
+  color: var(--planner-gold);
+  font-weight: 650;
+}
+.legion-summary { display: grid; gap: 2px; margin-bottom: 18px; }
+.legion-capacities { gap: 6px; }
+.legion-capacity {
+  justify-content: flex-start;
+  column-gap: 6px;
+  border-radius: 8px;
+  background: transparent;
+  padding-inline: 7px;
+}
+.legion-capacity strong, .legion-capacity[data-role=join] strong { color: var(--planner-ink); font-size: .875rem; }
+.legion-capacity[aria-pressed=true] { background: var(--planner-surface); }
+.legion-power-total { margin: 0; font-size: .8125rem; }
+.legion-metric-switch { max-inline-size: 19rem; margin: 2px 0 6px; padding: 0; background: transparent; }
+.legion-metric-switch button[aria-pressed=true] { border-color: transparent; color: var(--planner-ink); }
+.legion-rank-heading { background: var(--planner-surface); }
+.legion-rank-heading strong { color: var(--planner-muted); }

@@ -333,29 +333,29 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     {undo&&<button type="button" className="planner-plain" onClick={()=>{onSaveFoundry?.(undo);setUndo(null);setNotice('Last change undone')}}>Undo</button>}
   </div>}
   {view==='players'&&<>
-   <div className="legion-capacities">
+   <div className="legion-summary"><div className="legion-capacities">
      {[['join','Combatants',joined.length],['sub','Substitutes',subs.length]].map(([role,label,count])=><button key={role} type="button" aria-pressed={roleFilter===role} onClick={()=>{setRoleFilter(roleFilter===role?'all':role);setBulkSelected([])}} className="legion-capacity" data-role={role}>
        <strong>{count}/{limits[role]}</strong>{' '}<span>{label}</span>
      </button>)}
    </div>
-   <p className="legion-power-total">Combatant power <strong>{joined.length>0&&joined.length===missingPower.length?'—':format(total(joined))}</strong>{missingPower.length>0&&<span> · {missingPower.length} missing</span>}</p>
+   <p className="legion-power-total">Combatant power <strong>{joined.length>0&&joined.length===missingPower.length?'—':format(total(joined))}</strong>{missingPower.length>0&&<span> · {missingPower.length} missing</span>}</p></div>
    <div className="legion-roster">
      <div className="planner-title-row">
        <h2>{roleFilter==='join'?'Combatants':roleFilter==='sub'?'Substitutes':participantsOnly?'Participants':'All players'}</h2>
        <button type="button" className="planner-button planner-primary" onClick={()=>setAddPanel('menu')}>Add players</button>
      </div>
-     <div className="legion-metric-switch" role="group" aria-label="Roster column">
-       {[['power','Troop power'],['status','Status']].map(([value,label])=><button key={value} type="button" className="planner-button" aria-pressed={rosterMetric===value} onClick={()=>{setRosterMetric(value);setEditingPower(null)}}>{label}</button>)}
-     </div>
      <div className="legion-roster-tools">
        <input className="planner-search" type="search" aria-label="Search roster" placeholder="Search roster" value={rosterSearch} onChange={e=>{setRosterSearch(e.target.value);setBulkSelected([])}}/>
        <select aria-label="Sort roster" value={rosterSort} onChange={e=>setRosterSort(e.target.value)}>
-         <option value="power">Power</option><option value="name">Name A–Z</option><option value="rank">Alliance rank</option>
+         <option value="power">Power</option><option value="name">Name A–Z</option><option value="rank">Rank</option>
        </select>
      </div>
      <div className="legion-roster-filters">
        <label><input type="checkbox" checked={participantsOnly} onChange={e=>{setParticipantsOnly(e.target.checked);setRoleFilter('all');setBulkSelected([])}}/> Participants only</label>
        <button type="button" className="planner-plain" aria-pressed={bulkMode} onClick={()=>{setBulkMode(v=>!v);setBulkSelected([]);closeEditor()}}>{bulkMode?'Done':'Manage'}</button>
+     </div>
+     <div className="legion-metric-switch" role="group" aria-label="Roster column">
+       {[['power','Troop power'],['status','Status']].map(([value,label])=><button key={value} type="button" className="planner-button" aria-pressed={rosterMetric===value} onClick={()=>{setRosterMetric(value);setEditingPower(null)}}>{label}</button>)}
      </div>
      {roleFilter!=='all'&&<div className="legion-filter-callout"><span>Showing {sortedRoster.length} {roleFilter==='join'?'combatant':'substitute'}{sortedRoster.length===1?'':'s'}</span><button type="button" className="planner-plain" onClick={()=>{setRoleFilter('all');setBulkSelected([])}}>Clear role filter</button></div>}
      {bulkMode&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',fontSize:12,color:'#b9cad9'}}><span>{bulkSelected.length} selected</span><button style={btn} onClick={()=>setBulkSelected(filteredRegistrations.map(p=>p.id))}>Select all</button></div>}

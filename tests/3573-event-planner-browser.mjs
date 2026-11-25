@@ -114,6 +114,18 @@ try {
     await schedule.getByRole('heading',{name:'Event schedule'}).press('Escape');
     assert.equal(await page.getByRole('button',{name:'Set UTC start'}).evaluate(el=>el===document.activeElement),true);
     await page.getByRole('button',{name:'Set UTC start'}).click();
+    const scheduleFit=await schedule.evaluate(dialog=>{
+      const body=dialog.querySelector('.planner-sheet-body');
+      const bounds=body.getBoundingClientRect();
+      const style=getComputedStyle(body);
+      const left=bounds.left+parseFloat(style.paddingLeft);
+      const right=bounds.right-parseFloat(style.paddingRight);
+      return [...body.querySelectorAll('input')].every(input=>{
+        const box=input.getBoundingClientRect();
+        return box.left>=left-1&&box.right<=right+1;
+      })&&body.scrollWidth<=body.clientWidth;
+    });
+    assert.equal(scheduleFit,true);
     await page.getByLabel('Event date (UTC)',{exact:true}).fill('2026-11-25');
     await page.getByLabel('Event start time (UTC)',{exact:true}).fill('23:30');
     await page.getByRole('button',{name:'Save schedule'}).click();
