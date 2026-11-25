@@ -4,7 +4,7 @@ import { combineScreenshotRows, readScreenshotPower } from './rosterScreenshotMo
 import './rosterScreenshot.css';
 
 const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
-const maxFiles = 20;
+const maxFiles = 25;
 const fileKey = file => JSON.stringify([file.name, file.size, file.lastModified]);
 
 function ScreenshotImage({ file }) {
@@ -130,7 +130,7 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
           <rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><path d="m3 17 5-4 4 3 4-5 5 5"/>
         </svg>Upload troop power
       </button>
-      <p>Select up to 20 screenshots. Include the legion heading.</p>
+      <p>Select up to 25 screenshots. Include the legion heading.</p>
     </>}
     {files.length > 0 && <>
       <p>{files.length} {files.length === 1 ? 'screenshot' : 'screenshots'} selected</p>
