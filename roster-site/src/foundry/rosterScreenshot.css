@@ -8,12 +8,11 @@
   background: #172739;
 }
 
-.screenshot-import > :is(h3, p) { margin: 0; }
-.screenshot-import > h3 { font-size: 16px; }
+.screenshot-import > p { margin: 0; }
 .screenshot-import > p { font-size: 13px; color: #adc2d6; }
 .screenshot-import > .screenshot-error { color: #f1b0b0; }
 .screenshot-import > label { display: grid; gap: 5px; font-size: 13px; }
-.screenshot-import > button, .screenshot-import > label > :is(input, select) {
+.screenshot-import > button, .screenshot-import > label > input, .screenshot-results select {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -27,4 +26,8 @@
 }
 .screenshot-import > button { cursor: pointer; font-weight: 650; }
 .screenshot-import > button:disabled { opacity: .55; cursor: default; }
-.screenshot-import > details img { display: block; width: min(100%, 480px); margin-top: 8px; }
+.screenshot-results { display: grid; gap: 8px; margin: 0; padding-inline-start: 18px; }
+.screenshot-results li { overflow-wrap: anywhere; }
+.screenshot-results img { display: block; width: min(100%, 480px); margin-top: 8px; }
+.screenshot-results label { display: grid; gap: 5px; margin-top: 8px; }
+.screenshot-results .screenshot-error { color: #f1b0b0; }

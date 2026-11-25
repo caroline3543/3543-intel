@@ -1,13 +1,16 @@
+import { simd } from 'wasm-feature-detect';
+import simdCorePath from 'tesseract.js-core/tesseract-core-simd-lstm.wasm.js?url';
 import { createWorker, OEM, PSM } from 'tesseract.js';
 import workerPath from 'tesseract.js/dist/worker.min.js?url';
+import { ROSTER_OCR_LANGUAGES } from './rosterOcrLanguages.js';
 import corePath from 'tesseract.js-core/tesseract-core-lstm.wasm.js?url';
-import { pickScreenshotRows, readScreenshotLegion, readScreenshotRow } from './rosterScreenshotModel.js';
+import { pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from './rosterScreenshotModel.js';
 
 function canvas(width, height) {
   return Object.assign(document.createElement('canvas'), { width, height });
 }
 
-function textCrop(source, left, top, width, height, { invert = false, powerIconWidth = 0 } = {}) {
+function textCrop(source, left, top, width, height, { invert = false } = {}) {
   const border = 12;
   const output = canvas(width + 2 * border, height + 2 * border);
   const context = output.getContext('2d', { willReadFrequently: true });
@@ -19,22 +22,19 @@ function textCrop(source, left, top, width, height, { invert = false, powerIconW
     const light = .213 * pixels.data[i] + .715 * pixels.data[i + 1] + .072 * pixels.data[i + 2];
     const red = pixels.data[i], green = pixels.data[i + 1], blue = pixels.data[i + 2];
     const blueText = light < 148 && blue - red > 50 && blue - green > 20;
-    const pixel = i / 4;
-    const powerIcon = powerIconWidth && pixel % width < powerIconWidth && pixel >= width * height * .53;
-    const ink = invert ? light > 183 : blueText && !powerIcon;
+    const ink = invert ? light > 183 : blueText;
     pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = ink ? 0 : 255;
   }
   context.putImageData(pixels, border, border);
   return output;
 }
 
-export async function createRosterReader(language, onProgress) {
+export async function createRosterReader() {
   let rejectWorker;
   const failure = new Promise((_, reject) => { rejectWorker = reject; });
-  const worker = createWorker(language === 'kor' ? ['eng', 'kor'] : ['eng'], OEM.LSTM_ONLY, {
-    workerPath, corePath, workerBlobURL: false,
+  const worker = createWorker(ROSTER_OCR_LANGUAGES, OEM.LSTM_ONLY, {
+    workerPath, corePath: await simd() ? simdCorePath : corePath, workerBlobURL: false,
     langPath: new URL('ocr-data/', new URL(import.meta.env.BASE_URL, window.location.href)).href,
-    logger: message => onProgress(message.status),
     errorHandler: () => rejectWorker(new Error('Screenshot reader unavailable')),
   });
   const timer = setTimeout(() => rejectWorker(new Error('Screenshot reader timed out')), 30000);
@@ -45,6 +45,42 @@ export async function createRosterReader(language, onProgress) {
     throw error;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// A cut-off row may contain only a formatted power and part of its icon.
+const isPowerLine = value => /(?:^|\D)\d{1,3}(?:[.,]\d{3}){2,}\s*$/.test(value);
+
+async function completeCanyonRow(worker, screen, region, row) {
+  const { left, top, textWidth, rowHeight } = region;
+  const needsName = !row.name || isPowerLine(row.name);
+  if (!needsName && row.power !== null) return row;
+  await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
+  try {
+    if (needsName) {
+      const nameCrop = textCrop(screen, left, top, textWidth, Math.floor(rowHeight * .54));
+      await worker.setParameters({ tessedit_pageseg_mode: PSM.RAW_LINE });
+      const { data } = await worker.recognize(nameCrop);
+      const name = data.text.trim();
+      row.name = !isPowerLine(name) && /[\p{L}\p{N}]/u.test(name) ? name : '';
+      // If the scroll area starts inside a row, the visible number alone
+      // cannot identify a player. Keep unread names from fully visible rows.
+      if (!row.name && top <= screen.height * .334) return null;
+      await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
+    }
+    const powerLeft = Math.round(screen.width * .265);
+    const powerTop = top + Math.floor(rowHeight * .49);
+    const powerCrop = textCrop(screen, powerLeft, powerTop, Math.round(screen.width * .32), top + rowHeight - powerTop);
+    await worker.setParameters({ tessedit_char_whitelist: '0123456789,.KMBkmb' });
+    const { data } = await worker.recognize(powerCrop);
+    const text = data.text.trim();
+    // The game prints full integers with groups of three. OCR can mistake
+    // a comma for a dot. Leave compact decimals such as 1.25B alone.
+    const value = /^\d{1,3}(?:[.,]\d{3}){2,}$/.test(text) ? text.replace(/\./g, ',') : text;
+    row.power = readScreenshotPower(value);
+    return row;
+  } finally {
+    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK, tessedit_char_whitelist: '' });
   }
 }
 
@@ -89,15 +125,9 @@ export async function readRosterScreenshot(worker, file, kind) {
       const reading = await worker.recognize(crop);
       const row = readScreenshotRow(reading.data.text);
       if (!row) continue;
-      if (kind === 'canyon' && row.power === null) {
-        // The blue fist sometimes reads as a character beside Canyon power.
-        // Retry with the icon masked and keep the original name reading.
-        const powerIconWidth = Math.round(width * .265) - left;
-        const retry = textCrop(screen, left, top, textWidth, rowHeight, { powerIconWidth });
-        const revised = await worker.recognize(retry);
-        row.power = readScreenshotRow(revised.data.text)?.power ?? null;
-      }
-      rows.push(row);
+      const completed = kind === 'canyon'
+        ? await completeCanyonRow(worker, screen, { left, top, textWidth, rowHeight }, row) : row;
+      if (completed) rows.push(completed);
     }
     return { legion, rows };
   } finally {

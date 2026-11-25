@@ -1,26 +1,51 @@
 import { useEffect, useRef, useState } from 'react';
 import { BulkPlayerImport } from '../components/BulkPlayerImport.jsx';
-import { readScreenshotPower } from './rosterScreenshotModel.js';
+import { combineScreenshotRows, readScreenshotPower } from './rosterScreenshotModel.js';
 import './rosterScreenshot.css';
 
 const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const maxFiles = 20;
+const fileKey = file => JSON.stringify([file.name, file.size, file.lastModified]);
+
+function ScreenshotImage({ file }) {
+  const [url, setUrl] = useState('');
+  useEffect(() => {
+    const preview = URL.createObjectURL(file);
+    setUrl(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [file]);
+  return url && <img src={url} alt={'Roster screenshot ' + file.name}/>;
+}
+
+function ScreenshotResult({ reading, locked, onLegion }) {
+  const [open, setOpen] = useState(false);
+  return <li>
+    <details onToggle={event => setOpen(event.currentTarget.open)}>
+      <summary>{reading.file.name} · {reading.rows.length} player rows
+        {reading.legion ? ' · Legion ' + reading.legion : ''}</summary>
+      {open && <ScreenshotImage file={reading.file}/>}
+    </details>
+    {reading.error && <p className="screenshot-error">{reading.error}</p>}
+    {!reading.legion && reading.rows.length > 0 && <label>
+      Legion for {reading.file.name}
+      <select value={reading.destination ?? ''} disabled={locked} onChange={event => onLegion(Number(event.target.value))}>
+        <option value="">Choose a legion</option>
+        <option value="1">Legion 1</option>
+        <option value="2">Legion 2</option>
+      </select>
+    </label>}
+  </li>;
+}
 
 export function RosterScreenshotImport({ kind, title, alliance, players, occurrenceIds, onSave }) {
-  const [file, setFile] = useState(null);
-  const [imageUrl, setImageUrl] = useState('');
-  const [language, setLanguage] = useState('eng');
-  const [result, setResult] = useState(null);
-  const [destination, setDestination] = useState('');
+  const [files, setFiles] = useState([]);
+  const [batch, setBatch] = useState(null);
   const [job, setJob] = useState('');
   const [error, setError] = useState('');
   const [review, setReview] = useState(null);
+  const [saved, setSaved] = useState([]);
   const run = useRef(null);
-  useEffect(() => {
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setImageUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+
   useEffect(() => () => {
     if (run.current) {
       run.current.cancelled = true;
@@ -28,44 +53,52 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
     }
   }, []);
 
-  function chooseFile(event) {
-    const next = event.target.files?.[0];
-    setResult(null);
-    setDestination('');
+  function clearResults() {
+    setBatch(null);
     setReview(null);
-    setImageUrl('');
-    if (next && (!allowedTypes.has(next.type) || next.size > 15 * 1024 * 1024)) {
-      setError('Choose a PNG, JPEG or WebP screenshot under 15 MB.');
-      setFile(null);
-      event.target.value = '';
-      return;
-    }
+    setSaved([]);
     setError('');
-    setFile(next ?? null);
+  }
+
+  function chooseFiles(event) {
+    const incoming = [...event.target.files];
+    event.target.value = '';
+    if (!incoming.length) return;
+    clearResults();
+    const valid = incoming.filter(file => allowedTypes.has(file.type) && file.size <= 15 * 1024 * 1024);
+    const unique = [...new Map([...files, ...valid].map(file => [fileKey(file), file])).values()];
+    setFiles(unique.slice(0, maxFiles));
+    const warnings = [];
+    if (incoming.length !== valid.length) warnings.push('Some files were skipped. Choose PNG, JPEG or WebP screenshots up to 15 MB each.');
+    if (unique.length > maxFiles) warnings.push('A batch can contain up to ' + maxFiles + ' screenshots.');
+    setError(warnings.join(' '));
   }
 
   async function scan() {
     const task = { cancelled: false, worker: null };
     run.current = task;
-    setJob('Loading screenshot reader…');
-    setResult(null);
-    setDestination('');
-    setError('');
+    clearResults();
+    setJob('Loading multilingual screenshot reader…');
     try {
       const { createRosterReader, readRosterScreenshot } = await import('./readRosterScreenshot.js');
       if (task.cancelled) return;
-      task.worker = await createRosterReader(language, status => {
-        if (!task.cancelled && status === 'recognizing text') setJob('Reading legion and player rows…');
-      });
-      if (task.cancelled) return;
-      const reading = await readRosterScreenshot(task.worker, file, kind);
-      if (task.cancelled) return;
-      const rows = reading.rows.filter(row => row.name || row.power !== null);
-      setResult({ ...reading, rows, occurrenceIds });
-      if (!rows.length) setError('No player rows found. Try a full screenshot of the in-game roster with names and power visible.');
-    } catch (failure) {
-      if (!task.cancelled) setError(failure.message?.startsWith('Use ')
-        ? failure.message : 'Could not read this screenshot. Try again or paste the player names and power.');
+      task.worker = await createRosterReader();
+      const readings = [];
+      for (const [index, file] of files.entries()) {
+        if (task.cancelled) return;
+        setJob('Scanning screenshot ' + (index + 1) + ' of ' + files.length + '…');
+        try {
+          const reading = await readRosterScreenshot(task.worker, file, kind);
+          const rows = reading.rows.filter(row => row.name || row.power !== null);
+          readings.push({ file, ...reading, rows, error: rows.length ? '' : 'No readable player rows found.' });
+        } catch (failure) {
+          readings.push({ file, rows: [], error: failure.message?.startsWith('Use ')
+            ? failure.message : 'Could not read this screenshot.' });
+        }
+      }
+      if (!task.cancelled) setBatch({ readings, occurrenceIds });
+    } catch {
+      if (!task.cancelled) setError('Could not load the screenshot reader. Try scanning again.');
     } finally {
       if (task.worker) await task.worker.terminate();
       if (run.current === task) run.current = null;
@@ -73,50 +106,55 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
     }
   }
 
-  function beginReview() {
-    const legion = Number(destination);
-    const source = result.rows.map(row => {
-      const player = row.name || 'Unread player name';
-      return row.power === null ? player : player + '\t' + row.power;
+  const readings = batch?.readings ?? [];
+  const groups = [1, 2].map(legion => ({
+    legion, rows: combineScreenshotRows(readings.filter(item => (item.legion ?? item.destination) === legion)),
+  })).filter(group => group.rows.length);
+  const pendingLegion = readings.some(item => item.rows.length && !(item.legion || item.destination));
+
+  function beginReview(group) {
+    const source = group.rows.map(({ name, power }) => {
+      const player = name || 'Unread player name';
+      return power === null ? player : player + '\t' + power;
     }).join('\n');
-    setReview({ legion, source, occurrenceId: result.occurrenceIds[legion] });
+    setReview({ legion: group.legion, source, occurrenceId: batch.occurrenceIds[group.legion] });
   }
 
-  return <section className="screenshot-import" aria-label="Screenshot import">
-    <h3>Read roster screenshot</h3>
-    <p>Choose the full in-game roster with its legion heading visible. The image stays on this device.</p>
-    <label>Roster screenshot
-      <input type="file" accept="image/png,image/jpeg,image/webp" disabled={!!job} onChange={chooseFile}/>
+  return <section className="screenshot-import" aria-label="Troop power upload">
+    <p>Select full in-game screenshots with the legion heading visible. Images stay on this device.</p>
+    <label>Upload troop power
+      <input type="file" multiple accept="image/png,image/jpeg,image/webp" disabled={!!job || !!review} onChange={chooseFiles}/>
     </label>
-    <label>Player name language
-      <select value={language} disabled={!!job || !!review} onChange={event => setLanguage(event.target.value)}>
-        <option value="eng">English / Latin characters</option>
-        <option value="kor">English and Korean</option>
-      </select>
-    </label>
-    <button type="button" disabled={!file || !!job || !!review} onClick={scan}>Scan screenshot</button>
+    <p>Reads mixed names in Latin characters, Korean, Japanese and Chinese in the same batch.</p>
+    {files.length > 0 && <>
+      <p>{files.length} {files.length === 1 ? 'screenshot' : 'screenshots'} selected</p>
+      <button type="button" disabled={!!job || !!review} onClick={() => { setFiles([]); clearResults(); }}>Clear screenshots</button>
+    </>}
+    <button type="button" disabled={!files.length || !!job || !!review} onClick={scan}>Scan screenshots</button>
     {job && <p role="status">{job}</p>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
-    {result && <>
-      <p role="status">{result.legion ? 'Legion ' + result.legion + ' detected' : 'Legion could not be read'} · {result.rows.length} player {result.rows.length === 1 ? 'row' : 'rows'}</p>
-      {imageUrl && <details><summary>View source screenshot</summary>
-        <img src={imageUrl} alt="Selected in-game roster screenshot" />
-      </details>}
-    </>}
-    {result?.rows.length > 0 && !review && <>
-      <label>Confirm the legion shown in the screenshot
-        <select value={destination} onChange={event => setDestination(event.target.value)}>
-          <option value="">Choose a legion</option>
-          {[1, 2].filter(legion => !result.legion || result.legion === legion).map(legion =>
-            <option key={legion} value={legion}>Legion {legion}</option>)}
-        </select>
-      </label>
-      <button type="button" disabled={!destination} onClick={beginReview}>Review names and power</button>
+    {batch && <>
+      <p role="status">{readings.filter(item => item.rows.length).length} of {readings.length} screenshots read</p>
+      <ul className="screenshot-results">{readings.map((reading, index) =>
+        <ScreenshotResult key={fileKey(reading.file)} reading={reading} locked={!!review || !!saved.length}
+          onLegion={destination => setBatch(current => ({ ...current, readings: current.readings.map((item, position) =>
+            position === index ? { ...item, destination } : item) }))}/>
+      )}</ul>
+      {pendingLegion && <p>Choose a legion for each screenshot with an unreadable heading.</p>}
+      {groups.map(group => saved.includes(group.legion)
+        ? <p key={group.legion} role="status">Legion {group.legion} readings saved</p>
+        : <button type="button" key={group.legion} disabled={!!review || pendingLegion} onClick={() => beginReview(group)}>
+          Review Legion {group.legion} · {group.rows.length} {group.rows.length === 1 ? 'row' : 'rows'}
+        </button>)}
     </>}
     {review && <BulkPlayerImport title="Review screenshot readings" players={players} alliance={alliance}
       context={title} roleLabel={'Legion ' + review.legion} initialText={review.source} requirePower verifyReadings parsePower={readScreenshotPower}
-      onConfirm={rows => onSave(review.legion, review.occurrenceId, rows)}
-      onClose={() => { setReview(null); setResult(null); setDestination(''); }}/>
-    }
+      onConfirm={rows => {
+        const result = onSave(review.legion, review.occurrenceId, rows);
+        if (!result?.error) setSaved(current => [...current, review.legion]);
+        return result;
+      }}
+      onClose={() => setReview(null)}/>}
+    {review && !saved.includes(review.legion) && <button type="button" onClick={() => setReview(null)}>Back to screenshots</button>}
   </section>;
 }

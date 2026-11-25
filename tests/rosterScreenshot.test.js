@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from '../roster-site/src/foundry/rosterScreenshotModel.js';
+import { combineScreenshotRows, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from '../roster-site/src/foundry/rosterScreenshotModel.js';
 import { parseBulkPlayers } from '../roster-site/src/components/bulkImportModel.js';
 import { plannerSlot, updateEventPlanner } from '../src/services/eventPlanner.js';
 
@@ -50,4 +50,14 @@ test('confirmed screenshot power writes to the selected legion while preserving 
   assert.deepEqual(plannerSlot(next.foundry,'canyon','ARC',2).registrations,{});
   assert.equal(plannerSlot(next.foundry,'foundry','ARC',1).registrations.a,'join');
   assert.equal(updateEventPlanner(existing,{...payload,expectedOccurrenceId:'older-event'}),existing);
+});
+
+test('batch import removes identical overlapping rows and keeps conflicting readings for review', () => {
+  const first = { name: 'Hope_闇', power: 245779411 };
+  const newer = { ...first, power: 245779412 };
+  const partial = { name: '', power: 38 };
+  assert.deepEqual(combineScreenshotRows([
+    { rows: [first, partial] },
+    { rows: [{ ...first }, newer, partial] },
+  ]), [first, partial, newer, partial]);
 });

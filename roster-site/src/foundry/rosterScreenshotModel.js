@@ -50,3 +50,16 @@ export function pickScreenshotRows(results, width, height) {
   if (top !== null && bottom - top >= height * .025) rows.push({ top, bottom });
   return rows;
 }
+
+// Scrolling screenshots often include the same row. Keep differing readings
+// or unread names for review so an apparent duplicate cannot hide a conflict.
+export function combineScreenshotRows(screenshots) {
+  const seen = new Set();
+  return screenshots.flatMap(screenshot => screenshot.rows.filter(row => {
+    if (!row.name || row.power === null) return true;
+    const key = JSON.stringify([row.name.normalize('NFC'), row.power]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }));
+}

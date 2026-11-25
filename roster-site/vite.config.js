@@ -3,7 +3,7 @@ import {resolve} from 'node:path';
 import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
 
-const languages = ['eng', 'kor'];
+import {ROSTER_OCR_LANGUAGES as languages} from './src/foundry/rosterOcrLanguages.js';
 const modelPath = language => resolve('../node_modules', '@tesseract.js-data', language, '4.0.0_best_int', language + '.traineddata.gz');
 const models = {
   name: 'roster-ocr-models',
