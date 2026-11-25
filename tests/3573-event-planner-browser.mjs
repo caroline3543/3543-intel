@@ -200,6 +200,15 @@ try {
     await page.getByRole('button',{name:'Remove from event',exact:true}).click();
     assert.equal(await page.getByRole('button',{name:/Harbour/}).count(),0);
 
+    await page.getByRole('combobox',{name:'Canyon Clash registration alliance'}).selectOption('HOT');
+    await page.getByRole('button',{name:'Add players',exact:true}).click();
+    await page.getByRole('button',{name:'Find a player to add'}).click();
+    await page.getByRole('textbox',{name:'Search and add player by name or ID'}).fill('Northvale');
+    await page.getByRole('button',{name:/Northvale ARC/}).click();
+    await page.getByRole('button',{name:'Save registration'}).click();
+    await page.getByRole('alert').filter({hasText:/ARC · Legion 1.*HOT · Legion 1/}).waitFor();
+    await page.getByRole('button',{name:'Close',exact:true}).click();
+    assert.equal(await page.getByRole('button',{name:'Northvale · Combatant'}).count(),0);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     assert.deepEqual(errors,[]);
     console.log(engine.name()+': Foundry and Canyon Clash verified at '+width+'px');

@@ -58,7 +58,7 @@ function InlinePower({player,onSave,metric,onClose}){
  </div>;
 }
 export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',chosen,legion,changeSelection,sharedFoundry={},
-  otherPlan,otherLegion,onMoveLegion,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
+  otherPlan,otherLegion,findOtherAllianceRegistration,onMoveLegion,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
  const title=EVENT_NAMES[kind],isFoundry=kind==='foundry',metric=isFoundry?'Troop power':'Canyon Clash power';
  const limits=EVENT_LIMITS[kind];
  const colours=TEAM_NAMES.slice(0,sharedFoundry.teamCount||4);
@@ -114,7 +114,18 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
 
  const validAssignments=isFoundry?Object.fromEntries(active.map(p=>[p.id,buildings[teams[p.id]].includes(assignments[p.id])?assignments[p.id]:buildings[teams[p.id]][0]])):{};
  const update=(patch,msg,powers,expectedRegistrations)=>{setUndo(saved);onSaveFoundry?.({...saved,...patch},powers,expectedRegistrations);setNotice(msg||'Updated · syncing across devices');};
+ const crossAllianceError=(id,role)=>{
+  if(!isParticipant(role)||isParticipant(activeRole(id)))return '';
+  const conflict=findOtherAllianceRegistration?.(id);
+  if(!conflict)return '';
+  const playerName=entries.find(player=>player.id===id)?.name||id;
+  const roleName=REGISTRATION_ROLES.find(([value])=>value===conflict.role)[1];
+  return playerName+' is already registered as '+roleName+' with '+conflict.alliance+' · Legion '+conflict.legion+
+   '. To register them with '+chosen+' · Legion '+legion+', remove the existing registration first.';
+ };
  const setStatus=(id,status,message)=>{const current=registeredUnder[id]===chosen?registrations[id]:'';const next=status===current?'':status;
+  const conflict=crossAllianceError(id,next);
+  if(conflict){setNotice(conflict);return}
   if(isParticipant(next)&&otherRole(id)){setNotice('Already assigned to Legion '+otherLegion+'. Open the player’s role to move them.');return}
   if(next==='join'&&joined.length>=limits.join){setNotice(limits.join+' combatant slots are full');return}
   if(next==='sub'&&subs.length>=limits.sub){setNotice(limits.sub+' substitute slots are full');return}
@@ -173,6 +184,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const rankLabels={R5:'Alliance leader',R4:'Officers',R3:'Members',R2:'Members',R1:'Members'};
  const bulkUpdate=(role)=>{
   const ids=bulkSelected.filter(id=>filteredRegistrations.some(p=>p.id===id));
+  const conflict=ids.map(id=>crossAllianceError(id,role)).find(Boolean);
+  if(conflict){setNotice(conflict);return}
   if(isParticipant(role)&&ids.some(otherRole)){setNotice('Move players assigned to the other legion individually.');return}
   const nextRegs={...registrations},nextTeams={...teams},nextAssignments={...assignments};
   for(const id of ids){
@@ -206,6 +219,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   if((role==='join'&&joined.length>=limits.join)||(role==='sub'&&subs.length>=limits.sub)){
    setAddError('This role is full. Choose another role or free a slot.');return;
   }
+  const conflict=crossAllianceError(id,role);
+  if(conflict){setAddError(conflict);return}
   const roleName=REGISTRATION_ROLES.find(([value])=>value===role)[1];
   setStatus(id,role,p.name+' registered as '+roleName+' · '+chosen+' · Legion '+legion);setQuery('');setAddPanel('');
  };
@@ -219,6 +234,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    const id=String(row.id),p=entries.find(x=>x.id===id&&x.matched);
    if(!p)return {error:'A selected player is no longer in the roster. Review the import.'};
    if(ids.has(id))return {error:'Duplicate Player ID. Review the import.'};ids.add(id);
+   const conflict=crossAllianceError(id,addRole);
+   if(conflict)return {error:conflict};
    if(isParticipant(addRole)&&otherRole(id))return {error:p.name+' is assigned to Legion '+otherLegion+'. Move them from the roster first.'};
    const current=nextRegs[id],under=nextUnder[id];
    if(current&&under!==chosen)return {error:p.name+' is registered under '+under+'. Review before importing.'};

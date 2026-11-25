@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   attendanceOpen, eventStart, plannerAlliances, plannerSlot, recentNoShow, resizePlannerTeams,
-  updateEventPlanner, formatPlannerPower, EVENT_LIMITS, importRegistrationState,
+  updateEventPlanner, formatPlannerPower, EVENT_LIMITS, importRegistrationState, otherAllianceRegistration,
 } from '../src/services/eventPlanner.js';
 import {validateEventPlannerData} from '../roster-site/server/eventPlannerValidation.js';
 
@@ -24,6 +24,18 @@ test('event alliance priority and independent legion plans preserve legacy Found
   assert.equal(read(next,second).registrations.c,'join');
   assert.equal(read(next).registrations.b,'sub');
   assert.deepEqual(next.foundry.teams,data.foundry.teams);
+});
+test('cross-alliance duplicate IDs are blocked while different IDs can use the same legion',()=>{
+  const data=initial(), hot={...slot,alliance:'HOT',legion:2};
+  const empty=read(data,hot);
+  assert.deepEqual(otherAllianceRegistration(data.foundry,'foundry','HOT','a'),{alliance:'ARC',legion:1,role:'join'});
+  const plan={...empty,registrations:{a:'sub',c:'join'},registeredUnder:{a:'HOT',c:'HOT'}};
+  assert.equal(updateEventPlanner(data,{...hot,plan,powers:[{id:'a',value:10968},{id:'c',value:1711}]},early),data);
+  const updated=updateEventPlanner(data,{...hot,plan:{...plan,registrations:{c:'join'},registeredUnder:{c:'HOT'}},powers:[{id:'c',value:1711}]},early);
+  assert.deepEqual(read(updated,hot).registrations,{c:'join'});
+  assert.equal(read(updated).registrations.a,'join');
+  assert.equal(otherAllianceRegistration(updated.foundry,'canyon','ARC','c'),null);
+  assert.deepEqual(otherAllianceRegistration(updated.foundry,'foundry','ARC','c'),{alliance:'HOT',legion:2,role:'join'});
 });
 test('an import cannot commit after its reviewed player changes role or power',()=>{
   const data=initial(), other={...slot,legion:2};

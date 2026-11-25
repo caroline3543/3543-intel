@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {FoundryTab} from './FoundryTab.jsx';
-import {plannerKey,plannerSlot} from '../../../src/services/eventPlanner.js';
+import {otherAllianceRegistration,plannerKey,plannerSlot} from '../../../src/services/eventPlanner.js';
 
 export function EventPlanner({kind,players,storage,onUpdate,...props}) {
   const storageKey='caroline3573_'+kind+'_alliance';
@@ -12,7 +12,7 @@ export function EventPlanner({kind,players,storage,onUpdate,...props}) {
   const update=fields=>onUpdate({kind,alliance,legion,expectedOccurrenceId:plan.occurrenceId,...fields});
   return <FoundryTab key={plan.occurrenceId} {...props} kind={kind} chosen={alliance} legion={legion} players={players}
     changeSelection={(tag,number)=>{setAlliance(tag);setLegion(tag===alliance?number:1);localStorage.setItem(storageKey,tag);}}
-    otherLegion={otherLegion} otherPlan={otherPlan}
+    otherLegion={otherLegion} otherPlan={otherPlan} findOtherAllianceRegistration={id=>otherAllianceRegistration(storage,kind,alliance,id)}
     onMoveLegion={(id,role)=>update({move:{id,role,sourceOccurrenceId:otherPlan.occurrenceId}})}
     sharedFoundry={plan} onSaveFoundry={(next,powers,expectedRegistrations)=>update({plan:next,powers,expectedRegistrations})}
     onSaveTroopPower={(id,value)=>update({powers:[{id,value}]})}
