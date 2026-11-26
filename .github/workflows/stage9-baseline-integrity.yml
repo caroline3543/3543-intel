@@ -1,0 +1,19 @@
+name: Stage 9 baseline integrity
+on:
+  pull_request:
+    paths:
+      - 'docs/design-baselines/state-3573/ocr-import-v1/**'
+      - 'roster-site/**'
+      - 'src/services/eventPlanner.js'
+      - '.github/workflows/stage9-baseline-integrity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-reference-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify immutable visual references
+        working-directory: docs/design-baselines/state-3573/ocr-import-v1
+        run: sha256sum --strict -c SHA256SUMS
