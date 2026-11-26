@@ -96,3 +96,15 @@ export function classifyRosterCheckboxes(pixels,width,height,top,bottom){
  if(!a.visible||!b.visible||a.checked&&b.checked)return 'unknown';
  return a.checked?'combatant':b.checked?'substitute':'unassigned';
 }
+
+export function readRegistrationTotals(text){
+ const read=label=>{const m=String(text).match(new RegExp('(?:'+label+')\\s*[:：]?\\s*(\\d+)\\s*/\\s*(\\d+)','i'));return m&&Number(m[1])<=Number(m[2])?{count:Number(m[1]),limit:Number(m[2])}:null;};
+ return {combatant:read('Join|Combatants?'),substitute:read('Substitutes?')};
+}
+export function registrationCountReview(screenshots,rows){
+ return ['combatant','substitute'].map(role=>{
+  const values=[...new Set(screenshots.map(s=>s.totals?.[role]?.count).filter(Number.isInteger))];
+  const detected=rows.filter(r=>r.registration===role&&!r.conflict).length;
+  return {role,detected,expected:values.length===1?values[0]:null,conflict:values.length>1};
+ });
+}
