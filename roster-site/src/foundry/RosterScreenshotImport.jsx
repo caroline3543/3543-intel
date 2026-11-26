@@ -78,19 +78,22 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
     setError(warnings.join(' '));
   }
 
-  async function scan() {
+  async function scan(resume = false) {
+    if (run.current) return;
+    const readings = resume ? [...(batch?.readings || [])].filter(item=>item.rows.length) : [];
+    const remaining = files.filter(file=>!readings.some(item=>fileKey(item.file)===fileKey(file)));
+    const eventIds = resume ? batch.occurrenceIds : occurrenceIds;
     const task = { cancelled: false, worker: null };
     run.current = task;
-    clearResults();
+    if (!resume) clearResults();
     setJob('Loading multilingual screenshot reader…');
     try {
       const { createRosterReader, readRosterScreenshot } = await import('./readRosterScreenshot.js');
       if (task.cancelled) return;
       task.worker = await createRosterReader();
-      const readings = [];
-      for (const [index, file] of files.entries()) {
-        if (task.cancelled) return;
-        setJob('Scanning screenshot ' + (index + 1) + ' of ' + files.length + '…');
+      for (const [index, file] of remaining.entries()) {
+        if (task.cancelled) break;
+        setJob('Scanning screenshot ' + (index + 1) + ' of ' + remaining.length + '…');
         try {
           const reading = await readRosterScreenshot(task.worker, file, kind);
           const rows = reading.rows.filter(row => row.name || row.power !== null);
@@ -100,13 +103,13 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
             ? failure.message : 'Could not read this screenshot.' });
         }
       }
-      if (!task.cancelled) setBatch({ readings, occurrenceIds });
+      setBatch({ readings, occurrenceIds: eventIds });
     } catch {
       if (!task.cancelled) setError('Could not load the screenshot reader. Try scanning again.');
     } finally {
-      if (task.worker) await task.worker.terminate();
-      if (run.current === task) run.current = null;
-      if (!task.cancelled) setJob('');
+      if (task.worker) { try { await task.worker.terminate(); } catch {} }
+      if (run.current === task) { run.current = null; setJob(''); }
+      if (task.cancelled && readings.length) setBatch({readings, occurrenceIds:eventIds});
     }
   }
 
@@ -140,14 +143,15 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
     </>}
     {files.length > 0 && <>
       <p>{files.length} {files.length === 1 ? 'screenshot' : 'screenshots'} selected</p>
-      {!batch && <button type="button" className="screenshot-primary" disabled={!!job} onClick={scan}>Scan screenshots</button>}
+      {!batch && <button type="button" className="screenshot-primary" disabled={!!job} onClick={()=>scan(false)}>Scan screenshots</button>}
       <div className="screenshot-secondary">
         <button type="button" disabled={!!job || !!review} onClick={() => picker.current?.click()}>Add screenshots</button>
         <button type="button" disabled={!!job || !!review} onClick={() => { setFiles([]); clearResults(); }}>Clear screenshots</button>
-        {batch && <button type="button" disabled={!!review || !!saved.length} onClick={scan}>Scan again</button>}
+        {batch && readings.filter(item=>item.rows.length).length<files.length && <button type="button" disabled={!!job || !!review || !!saved.length} onClick={()=>scan(true)}>Resume unread screenshots</button>}
+        {batch && <button type="button" disabled={!!job || !!review || !!saved.length} onClick={scan}>Scan again</button>}
       </div>
     </>}
-    {job && <p role="status">{job}</p>}
+    {job && <><p role="status">{job}</p><button type="button" onClick={()=>{if(run.current){run.current.cancelled=true;setJob('Stopping after current screenshot…');}}}>Stop scan</button></>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {batch && <>
       <p role="status">{readings.filter(item => item.rows.length).length} of {readings.length} screenshots read</p>
@@ -159,7 +163,7 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
       {pendingLegion && <p>Choose a legion for each screenshot with an unreadable heading.</p>}
       {groups.map(group => saved.includes(group.legion)
         ? <p key={group.legion} role="status">Legion {group.legion} readings saved</p>
-        : <button type="button" className="screenshot-primary" key={group.legion} disabled={!!review || pendingLegion} onClick={() => beginReview(group)}>
+        : <button type="button" className="screenshot-primary" key={group.legion} disabled={!!job || !!review || pendingLegion} onClick={() => beginReview(group)}>
           Review Legion {group.legion} · {group.rows.length} {group.rows.length === 1 ? 'reading' : 'readings'}
         </button>)}
     </>}
