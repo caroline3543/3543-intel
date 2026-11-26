@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BulkPlayerImport } from '../components/BulkPlayerImport.jsx';
-import { combineScreenshotRows, readScreenshotPower } from './rosterScreenshotModel.js';
+import { registrationCountReview, combineScreenshotRows, readScreenshotPower } from './rosterScreenshotModel.js';
 import './rosterScreenshot.css';
 
 const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -124,7 +124,7 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
       const player = name || 'Unread player name';
       return power === null ? player : player + '\t' + power;
     }).join('\n');
-    setReview({ legion: group.legion, source, rows: group.rows, occurrenceId: batch.occurrenceIds[group.legion] });
+    setReview({ legion: group.legion, source, rows: group.rows, counts: registrationCountReview(readings.filter(item=>(item.legion??item.destination)===group.legion),group.rows), occurrenceId: batch.occurrenceIds[group.legion] });
   }
 
   return <section className="screenshot-import" aria-label="Troop power upload">
@@ -168,6 +168,11 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
         <option value="powers">Troop powers only</option><option value="roles">Registrations only</option><option value="both">Troop powers and registrations</option>
       </select>
     </label>}
+    {review && <div aria-label="Registration count validation">
+      {review.counts.map(count=><p key={count.role}>{count.role}: {count.detected} detected / {count.expected??'unreadable'} expected
+        {count.conflict?' · Conflicting screenshot totals':count.expected===null?' · Verify game total manually':count.detected!==count.expected?' · Incomplete or inconsistent readings':' · Counts agree'}</p>)}
+      <p>Counts are advisory and do not establish player identity or authorise assignments.</p>
+    </div>}
     {review && <details open>
       <summary>Detected registration and OCR warnings · Legion {review.legion}</summary>
       <p>Choose which data to import. Registration changes require individual confirmation.</p>
