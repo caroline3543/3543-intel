@@ -4,7 +4,7 @@ import { createWorker, OEM, PSM } from 'tesseract.js';
 import workerPath from 'tesseract.js/dist/worker.min.js?url';
 import { ROSTER_OCR_LANGUAGES } from './rosterOcrLanguages.js';
 import corePath from 'tesseract.js-core/tesseract-core-lstm.wasm.js?url';
-import { classifyRosterCheckboxes, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from './rosterScreenshotModel.js';
+import { readRegistrationTotals, classifyRosterCheckboxes, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from './rosterScreenshotModel.js';
 
 function canvas(width, height) {
   return Object.assign(document.createElement('canvas'), { width, height });
@@ -114,6 +114,9 @@ export async function readRosterScreenshot(worker, file, kind) {
     const result = await worker.recognize(header);
     const legion = readScreenshotLegion(result.data.text);
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
+    const totalsCrop = textCrop(screen, Math.round(width*.08), Math.round(height*.22), Math.round(width*.84), Math.round(height*.11));
+    const totalsReading = await worker.recognize(totalsCrop);
+    const totals = readRegistrationTotals(totalsReading.data.text);
     const rows = [];
     for (const { top, bottom } of regions) {
       // The game places the green other-legion indicator under the power,
@@ -137,7 +140,7 @@ export async function readRosterScreenshot(worker, file, kind) {
         rows.push(completed);
       }
     }
-    return { legion, rows };
+    return { legion, rows, totals };
   } finally {
     URL.revokeObjectURL(url);
   }
