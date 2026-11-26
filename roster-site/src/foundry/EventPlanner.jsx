@@ -15,12 +15,18 @@ export function EventPlanner({kind,players,storage,onUpdate,...props}) {
   return <FoundryTab key={plannerKey(kind,alliance,legion)} {...props} kind={kind} chosen={alliance} legion={legion} players={players}
     changeSelection={(tag,number)=>{setAlliance(tag);setLegion(number);localStorage.setItem(storageKey,tag);}}
     otherLegion={otherLegion} otherPlan={otherPlan}
-    onSaveScreenshotPowers={(targetLegion,expectedOccurrenceId,rows)=>{
+    onSaveScreenshotPowers={(targetLegion,expectedOccurrenceId,rows,mode='powers')=>{
       const target=plannerSlot(storage,kind,alliance,targetLegion);
       if(target.occurrenceId!==expectedOccurrenceId)return {error:'This legion changed events. Scan the screenshot again for the current event.'};
-      onUpdate({kind,alliance,legion:targetLegion,expectedOccurrenceId,
-        powers:rows.map(row=>({id:row.id,value:row.power}))});
-      return {message:rows.length+(rows.length===1?' power reading saved for Legion ':' power readings saved for Legion ')+targetLegion};
+      const powers=mode==='roles'?[]:rows.map(row=>({id:row.id,value:row.power}));
+      const roleChanges=mode==='powers'?[]:rows.filter(row=>['join','sub'].includes(row.role)).map(row=>({id:row.id,role:row.role,expectedRole:target.registrations[row.id]||''}));
+      if(roleChanges.length){
+        const {error}=prepareEventRoles(storage,{kind,alliance,legion:targetLegion,expectedOccurrenceId},roleChanges);
+        if(error)return {error};
+      }
+      if(!powers.length&&!roleChanges.length)return {error:'No confirmed changes to save.'};
+      onUpdate({kind,alliance,legion:targetLegion,expectedOccurrenceId,powers,...(roleChanges.length?{roleChanges}:{})});
+      return {message:powers.length+' power readings and '+roleChanges.length+' registration changes saved for Legion '+targetLegion};
     }}
     eventRegistrations={assignments}
     onChangeRoles={roleChanges=>{
