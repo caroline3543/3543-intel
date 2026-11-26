@@ -179,7 +179,8 @@ export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[
     const affected=new Set(roleChanges.map(change=>change.id));
     const players=workspace.players.map(p=>affected.has(String(p.id))?slots.reduce((player,slot)=>
       reconcileSchedule(player,slot.plan,{kind,alliance:slot.alliance,legion:slot.legion},now),p):p);
-    return {...workspace,players,foundry:{...workspace.foundry,eventPlans}};
+    const updated={...workspace,players,foundry:{...workspace.foundry,eventPlans}};
+    return powers.length ? updateEventPlanner(updated,{kind,alliance,legion,expectedOccurrenceId,powers},now) : updated;
   }
   if(move)return moveLegion(workspace,{kind,alliance,legion,expectedOccurrenceId,move},now);
   const storage = workspace.foundry||{};
