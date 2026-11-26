@@ -121,7 +121,9 @@ export async function readRosterScreenshot(worker, file, kind) {
       const rowY = ratio => Math.round(start + nominalHeight * ratio);
       const otherLegionMarker = greenDensity(context, x(.22), rowY(.69), x(.63), bottom) > .035;
       const voted = greenDensity(context, x(.78), Math.max(top, rowY(-.03)), x(.92), rowY(.22)) > .13;
-      const battleRequest = greenDensity(context, x(.07), rowY(.74), x(.20), bottom) > .22;
+      // The badge uses small green letters on a dark strip near the avatar
+      // base. Sample that strip rather than the brighter avatar artwork.
+      const battleRequest = greenDensity(context, x(.066), rowY(.67), x(.207), Math.min(bottom, rowY(.94))) > .13;
       const crop = textCrop(screen, x(.223), top, x(.49), h);
       const row = readScreenshotRow(await recognize(worker, crop, PSM.SINGLE_BLOCK));
       row.name = stripPowerLine(row.name);
