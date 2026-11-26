@@ -45,6 +45,8 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
   const [review, setReview] = useState(null);
   const [saved, setSaved] = useState([]);
   const [warningsAccepted, setWarningsAccepted] = useState(false);
+  const [mode,setMode]=useState('powers');
+  const [roles,setRoles]=useState({});
   const run = useRef(null);
   const picker = useRef(null);
 
@@ -116,6 +118,8 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
 
   function beginReview(group) {
     setWarningsAccepted(false);
+    setMode('powers');
+    setRoles({});
     const source = group.rows.map(({ name, power }) => {
       const player = name || 'Unread player name';
       return power === null ? player : player + '\t' + power;
@@ -159,11 +163,21 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
           Review Legion {group.legion} · {group.rows.length} {group.rows.length === 1 ? 'reading' : 'readings'}
         </button>)}
     </>}
+    {review && <label>Import mode
+      <select value={mode} onChange={event=>setMode(event.target.value)}>
+        <option value="powers">Troop powers only</option><option value="roles">Registrations only</option><option value="both">Troop powers and registrations</option>
+      </select>
+    </label>}
     {review && <details open>
       <summary>Detected registration and OCR warnings · Legion {review.legion}</summary>
-      <p>Registration readings are advisory only. Saving below updates troop power, not assignments.</p>
+      <p>Choose which data to import. Registration changes require individual confirmation.</p>
       <ul className="screenshot-results">{review.rows.map((row,index)=><li key={index}>
         <strong>{row.name || 'Unread player name'}</strong> · {row.power ?? 'Power missing'} · {row.registration === 'other-legion' ? (row.otherLegion ? 'Legion '+row.otherLegion+' dispatched' : 'Other legion, unconfirmed') : row.registration || 'Unknown'}
+        {mode!=='powers' && <label>Confirmed role
+          <select value={roles[index]||''} onChange={event=>setRoles(current=>({...current,[index]:event.target.value}))}>
+            <option value="">Keep existing</option><option value="join">Combatant</option><option value="sub">Substitute</option>
+          </select>
+        </label>}
         {row.conflict && <p role="alert">Conflicting screenshot readings. Verify before saving.</p>}
         {row.powerConflict && <p role="alert">Power readings disagree: {row.powerConflict.join(' / ')}. Verify against screenshot.</p>}
       </li>)}</ul>
@@ -173,10 +187,14 @@ export function RosterScreenshotImport({ kind, title, alliance, players, occurre
       I have checked conflicting readings against the original screenshots.
     </label>}
     {review && <BulkPlayerImport title="Review screenshot readings" players={players} alliance={alliance}
-      context={title} roleLabel={'Legion ' + review.legion} initialText={review.source} requirePower verifyReadings startWithMatches parsePower={readScreenshotPower}
+      context={title} roleLabel={'Legion ' + review.legion} initialText={review.source} requirePower={mode!=='roles'} verifyReadings startWithMatches parsePower={readScreenshotPower}
       onConfirm={rows => {
         if (review.rows.some(row=>row.conflict||row.powerConflict) && !warningsAccepted) return {error:'Check conflicting OCR readings and acknowledge the warning before saving.'};
-        const result = onSave(review.legion, review.occurrenceId, rows);
+        const confirmed=rows.map(row=>{
+          const matches=review.rows.map((reading,index)=>({reading,index})).filter(({reading})=>(reading.name||'Unread player name')+(reading.power===null?'':'\t'+reading.power)===row.source);
+          return {...row,role:matches.length===1?roles[matches[0].index]:undefined};
+        });
+        const result = onSave(review.legion, review.occurrenceId, confirmed, mode);
         if (!result?.error) setSaved(current => [...current, review.legion]);
         return result;
       }}
