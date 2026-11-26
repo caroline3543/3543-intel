@@ -17,7 +17,7 @@ export function readScreenshotPower(text) {
 export function readScreenshotRow(text) {
   const [name = '', ...rest] = String(text).split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const otherLegion = Number(rest.join(' ').match(/\bLegion\s*([12])\s+dispatched\b/i)?.[1]) || null;
-  const candidate = rest[0] ?? '';
+  const candidate = rest.find(line=>/^(?:[^\d\s]{1,2}\s+)?\d[\d,.]*(?:\s*[KMB])?\s*[|]?$/i.test(line)) ?? '';
   // The crossed-swords icon sometimes produces a leading OCR glyph.
   const powerText = candidate.match(/^(?:[^\d\s]{1,2}\s+)?(\d[\d,.]*(?:\s*[KMB])?)\s*[|]?$/i)?.[1];
   return {
@@ -70,6 +70,8 @@ export function combineScreenshotRows(screenshots) {
     compatible.power=compatible.power??row.power;
     if(!compatible.registration||compatible.registration==='unknown')compatible.registration=row.registration;
     compatible.otherLegion=compatible.otherLegion||row.otherLegion;
+    const alternatives=[...new Set([...(compatible.powerConflict||[]),...(row.powerConflict||[])])];
+    if(alternatives.length>1)compatible.powerConflict=alternatives;
     compatible.sources.push(sourceIndex);
    }else list.push(record);
    groups.set(key,list);
