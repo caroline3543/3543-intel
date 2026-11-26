@@ -132,6 +132,14 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const localInitial=useRef(null);if(!localInitial.current)localInitial.current=loadFromStorage(empty);
   const {data,setData:setSharedData,sync,publish,join,retry,resolve}=useSharedWorkspace(localInitial.current);
   function setData(value){setSharedData(prev=>{const next=withAutomaticRoles(typeof value==='function'?value(prev):value);latest.current=next;return next;});}
+  async function saveScreenshotImport(action){
+    if(!sync.ready||!sync.joined||sync.conflicts?.length)return {error:'Connect to the shared workspace and resolve sync conflicts before importing.'};
+    const result=await setSharedData(prev=>updateEventPlanner(prev,action));
+    if(result?.error)return {error:result.error};
+    if(!result?.changed)return {error:'The roster or event changed. Review the import again.'};
+    return {message:'Saved on this device. Check workspace sync for shared confirmation.'};
+  }
+
   useEffect(()=>{if(sync.ready&&sync.joined&&!sync.conflicts?.length){const normalized=withAutomaticRoles(data);if(normalized!==data)setSharedData(normalized);}},[data,sync.ready,sync.joined,sync.conflicts?.length]);
   const membership=useMembershipRefresh(sync.ready&&sync.joined);
   const [nameRefresh,setNameRefresh]=useState({status:'idle',done:0,total:0,changes:[],failed:0,error:''});
@@ -430,7 +438,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='castle'&&<section aria-label="Castle Battle coming soon" style={{minHeight:'60vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'32px 20px',textAlign:'center'}}><div style={{maxWidth:320}}><div style={{width:64,height:64,display:'grid',placeItems:'center',borderRadius:20,background:'#203449',margin:'0 auto 18px',color:C.icy}}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h2 style={{fontSize:22,margin:'0 0 8px'}}>Castle Battle</h2><p style={{color:C.icy,fontSize:14,margin:'0 0 8px'}}>Coming soon</p><p style={{color:'#B8C8D5',fontSize:14,lineHeight:1.5,margin:0}}>Castle Battle team planning will be available in a future update.</p></div></section>}
     {['foundry','canyon'].filter(kind=>tab===kind||returnToPlanner===kind).map(kind=><div key={kind} style={{display:tab===kind?'block':'none'}}>
       <EventPlanner kind={kind} players={activePlayers} attendancePlayers={players} storage={data.foundry}
-        onUpdate={action=>setData(prev=>updateEventPlanner(prev,action))} teamworkPreferences={data.talTeamPreferences||{}}
+        onUpdate={action=>setData(prev=>updateEventPlanner(prev,action))} onScreenshotUpdate={saveScreenshotImport} teamworkPreferences={data.talTeamPreferences||{}}
         onRoleFeedback={()=>tapFeedback(preferences.haptics,navigator,14)}
         onSaveTeamworkPreferences={prefs=>setData(prev=>({...prev,talTeamPreferences:prefs}))}
         onUpdatePlayerLanguage={(ids,language)=>{

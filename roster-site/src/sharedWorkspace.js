@@ -63,7 +63,26 @@ export function createSharedWorkspace({initial,cache,request,onChange=()=>{},onS
   }catch(e){error(e);}
   finally{running=false;state.syncing=false;if(!state.issue){state.checkedAt=new Date().toISOString();recovered();}emit();}
  }
- function update(value){state.local=sharedData(typeof value==='function'?value(state.local):value);const snapshot=state.local;state.status='Saving on this device…';emit();persist().then(()=>{if(disposed)return;if(state.local===snapshot&&!state.issue&&(!state.joined||!equal(state.local,state.base)))state.status=state.joined?'Saved on this device · waiting to sync':'Saved on this device · not shared yet';emit();if(state.joined)schedule();}).catch(()=>error(Error('Device storage is full. Download a backup before closing.')));}
+ function update(value){
+  const next=typeof value==='function'?value(state.local):value;
+  if(next===state.local)return Promise.resolve({changed:false});
+  state.local=sharedData(next);
+  const snapshot=state.local;
+  state.status='Saving on this device…';
+  emit();
+  return persist().then(()=>{
+   if(!disposed){
+    if(state.local===snapshot&&!state.issue&&(!state.joined||!equal(state.local,state.base)))state.status=state.joined?'Saved on this device · waiting to sync':'Saved on this device · not shared yet';
+    emit();
+    if(state.joined)schedule();
+   }
+   return {changed:true};
+  }).catch(()=>{
+   const failure=Error('Device storage is full. Download a backup before closing.');
+   error(failure);
+   return {changed:true,error:failure.message};
+  });
+ }
  async function publish(){
   if(running||state.joined||state.mode!=='unpublished')return;
   state.joined=true;state.base=null;state.revision=0;state.mode='active';state.status='Starting shared workspace…';

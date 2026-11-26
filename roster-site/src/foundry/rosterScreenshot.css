@@ -12,7 +12,7 @@
 .screenshot-import > p { font-size: 13px; color: #adc2d6; }
 .screenshot-import > .screenshot-error { color: #f1b0b0; }
 .screenshot-import > label { display: grid; gap: 5px; font-size: 13px; }
-.screenshot-import > button, .screenshot-import > label > input, .screenshot-results select {
+.screenshot-import > button, .screenshot-results select, .ocr-review input:not([type="checkbox"]), .ocr-review select, .ocr-review button {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -32,7 +32,7 @@
 .screenshot-results label { display: grid; gap: 5px; margin-top: 8px; }
 .screenshot-results .screenshot-error { color: #f1b0b0; }
 .screenshot-import { margin: 0 0 10px; }
-.screenshot-import > .screenshot-primary {
+.screenshot-import .screenshot-primary {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -54,3 +54,20 @@
   font: inherit;
 }
 .screenshot-secondary button:disabled { opacity: .55; }
+
+.ocr-review, .ocr-reading-fields { display: grid; gap: .65rem; min-width: 0; }
+.ocr-review h3, .ocr-review h4, .ocr-review p { margin: 0; }
+.ocr-review label { display: grid; gap: .25rem; }
+.ocr-review label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: .5rem; min-height: 44px; }
+.ocr-review input:not([type="checkbox"]), .ocr-review select { width: 100%; box-sizing: border-box; min-height: 44px; font-size: 16px; }
+.ocr-review fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.ocr-review button, .ocr-review summary { min-height: 44px; overflow-wrap: anywhere; }
+.ocr-reading { padding: .45rem 0; border-top: 1px solid #364b62; }
+.ocr-reading summary { cursor: pointer; }
+.ocr-reading summary small { display: block; color: #a8b8ca; }
+.ocr-review [aria-pressed="true"] { border-color: #8fa8d8; }
+.ocr-review [aria-label="Confirm screenshot import"] button { margin: 0 .5rem .5rem 0; }
+.screenshot-evidence { position: relative; margin: 0; width: fit-content; max-width: 100%; }
+.screenshot-evidence img { display: block; width: min(100%, 480px); }
+.screenshot-evidence span { position: absolute; inset-inline: 6%; border: 2px solid #f5ad38; pointer-events: none; }
+.ocr-power-choices { display: flex; flex-wrap: wrap; gap: .5rem; }

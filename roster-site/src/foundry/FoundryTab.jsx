@@ -69,7 +69,7 @@ function InlinePower({player,onSave,metric,onClose}){
  </div>;
 }
 export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',chosen,legion,changeSelection,sharedFoundry={},
-  otherPlan,otherLegion,eventRegistrations,onChangeRoles,onRoleFeedback,onSaveScreenshotPowers,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
+  otherPlan,otherLegion,eventRegistrations,onChangeRoles,onRoleFeedback,onSaveScreenshotPowers,screenshotStorage,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
  const title=EVENT_NAMES[kind],isFoundry=kind==='foundry',metric=isFoundry?'Troop power':'Canyon Clash power';
  const limits=EVENT_LIMITS[kind];
  const colours=TEAM_NAMES.slice(0,sharedFoundry.teamCount||4);
@@ -336,7 +336,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    </div>
    <PlannerAttendance kind={kind} alliance={chosen} legion={legion} plan={saved} players={attendancePlayers}
     onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
-   <RosterScreenshotImport kind={kind} title={title} alliance={chosen} players={entries.filter(p=>p.matched)}
+   <RosterScreenshotImport kind={kind} title={title} alliance={chosen} activeLegion={legion} storage={screenshotStorage} players={entries.filter(p=>p.matched)}
      occurrenceIds={{[legion]:saved.occurrenceId,[otherLegion]:otherPlan.occurrenceId}} onSave={onSaveScreenshotPowers}>
    <details className="screenshot-more-options">
      <summary style={{cursor:'pointer',fontWeight:650}}>More options</summary>

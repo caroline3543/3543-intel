@@ -4,13 +4,13 @@ import { createWorker, OEM, PSM } from 'tesseract.js';
 import workerPath from 'tesseract.js/dist/worker.min.js?url';
 import { ROSTER_OCR_LANGUAGES } from './rosterOcrLanguages.js';
 import corePath from 'tesseract.js-core/tesseract-core-lstm.wasm.js?url';
-import { readRegistrationTotals, classifyRosterCheckboxes, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from './rosterScreenshotModel.js';
+import { classifyRosterCheckboxes, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from './rosterScreenshotModel.js';
 
 function canvas(width, height) {
   return Object.assign(document.createElement('canvas'), { width, height });
 }
 
-function textCrop(source, left, top, width, height, { invert = false } = {}) {
+function textCrop(source, left, top, width, height, { invert = false, green: greenOnly = false, dark = false, tight = false } = {}) {
   const border = 12;
   const output = canvas(width + 2 * border, height + 2 * border);
   const context = output.getContext('2d', { willReadFrequently: true });
@@ -18,15 +18,27 @@ function textCrop(source, left, top, width, height, { invert = false } = {}) {
   context.fillRect(0, 0, output.width, output.height);
   context.drawImage(source, left, top, width, height, border, border, width, height);
   const pixels = context.getImageData(border, border, width, height);
+  let first = width, last = -1;
   for (let i = 0; i < pixels.data.length; i += 4) {
     const light = .213 * pixels.data[i] + .715 * pixels.data[i + 1] + .072 * pixels.data[i + 2];
     const red = pixels.data[i], green = pixels.data[i + 1], blue = pixels.data[i + 2];
     const blueText = light < 148 && blue - red > 50 && blue - green > 20;
-    const ink = invert ? light > 183 : blueText;
+    const ink = greenOnly ? pixels.data[i + 1] - red > 40 && pixels.data[i + 1] - blue > 38
+      : invert ? light > 183 : dark ? light < 153 : blueText;
+    if (tight && ink) {
+      const column = i / 4 % width;
+      first = Math.min(first, column);
+      last = Math.max(last, column);
+    }
     pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = ink ? 0 : 255;
   }
   context.putImageData(pixels, border, border);
-  return output;
+  if (!tight || last < first) return output;
+  const trimmed = canvas((last - first + 1 + 2 * border) * 2, output.height * 2);
+  const target = trimmed.getContext('2d');
+  target.imageSmoothingEnabled = false;
+  target.drawImage(output, first, 0, last - first + 1 + 2 * border, output.height, 0, 0, trimmed.width, trimmed.height);
+  return trimmed;
 }
 
 export async function createRosterReader() {
@@ -48,44 +60,22 @@ export async function createRosterReader() {
   }
 }
 
-// A cut-off row may contain only a formatted power and part of its icon.
-const isPowerLine = value => /(?:^|\D)\d{1,3}(?:[.,]\d{3}){2,}\s*$/.test(value);
+const isPowerLine = value => /^(?:[^\d\s]{1,2}\s+)?\d{1,3}(?:[.,]\d{3})+$/u.test(value);
+const stripPowerLine = value => isPowerLine(value) ? '' : value;
 
-async function completeRosterRow(worker, screen, region, row) {
-  const { left, top, textWidth, rowHeight } = region;
-  const needsName = !row.name || isPowerLine(row.name);
-  const originalPower = row.power;
-  await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
-  try {
-    if (needsName) {
-      const nameCrop = textCrop(screen, left, top, textWidth, Math.floor(rowHeight * .54));
-      await worker.setParameters({ tessedit_pageseg_mode: PSM.RAW_LINE });
-      const { data } = await worker.recognize(nameCrop);
-      const name = data.text.trim();
-      row.name = !isPowerLine(name) && /[\p{L}\p{N}]/u.test(name) ? name : '';
-      // If the scroll area starts inside a row, the visible number alone
-      // cannot identify a player. Keep unread names from fully visible rows.
-      if (!row.name && top <= screen.height * .334) return null;
-      await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
-    }
-    const powerLeft = Math.round(screen.width * .265);
-    const powerTop = top + Math.floor(rowHeight * .49);
-    const powerCrop = textCrop(screen, powerLeft, powerTop, Math.round(screen.width * .32), top + rowHeight - powerTop);
-    await worker.setParameters({ tessedit_char_whitelist: '0123456789,.KMBkmb' });
-    const { data } = await worker.recognize(powerCrop);
-    const text = data.text.trim();
-    // The game prints full integers with groups of three. OCR can mistake
-    // a comma for a dot. Leave compact decimals such as 1.25B alone.
-    const value = /^\d{1,3}(?:[.,]\d{3})+$/.test(text) ? text.replace(/\./g, ',') : text;
-    const independentPower = readScreenshotPower(value);
-    row.power = originalPower ?? independentPower;
-    if (originalPower !== null && independentPower !== null && originalPower !== independentPower) {
-      row.powerConflict = [originalPower, independentPower];
-    }
-    return row;
-  } finally {
-    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK, tessedit_char_whitelist: '' });
+async function recognize(worker, crop, mode, whitelist = '') {
+  await worker.setParameters({ tessedit_pageseg_mode: mode, tessedit_char_whitelist: whitelist });
+  const { data } = await worker.recognize(crop);
+  return data.text.trim();
+}
+
+function greenDensity(context, left, top, right, bottom) {
+  const { data } = context.getImageData(left, top, right - left, bottom - top);
+  let green = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 1] - data[i] > 40 && data[i + 1] - data[i + 2] > 38) green++;
   }
+  return green * 4 / data.length;
 }
 
 export async function readRosterScreenshot(worker, file, kind) {
@@ -107,40 +97,67 @@ export async function readRosterScreenshot(worker, file, kind) {
     context.drawImage(source, 0, 0, width, height);
     const pixels = context.getImageData(0, 0, width, height).data;
     const regions = pickScreenshotRows(pixels, width, height);
-    const left = Math.round(width * .223);
-    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
-    const header = textCrop(screen, Math.round(width * .24), Math.round(height * .17),
-      Math.round(width * .55), Math.round(height * .048), { invert: true });
-    const result = await worker.recognize(header);
-    const legion = readScreenshotLegion(result.data.text);
-    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
-    const totalsCrop = textCrop(screen, Math.round(width*.08), Math.round(height*.22), Math.round(width*.84), Math.round(height*.11));
-    const totalsReading = await worker.recognize(totalsCrop);
-    const totals = readRegistrationTotals(totalsReading.data.text);
-    const rows = [];
-    for (const { top, bottom } of regions) {
-      // The game places the green other-legion indicator under the power,
-      // within the text column, even when the selected legion has no players.
-      const marker = context.getImageData(Math.round(width * .24), top, Math.round(width * .28), bottom - top).data;
-      let greenInk = 0;
-      for (let i = 0; i < marker.length; i += 4) {
-        if (marker[i + 1] - marker[i] > 40 && marker[i + 1] - marker[i + 2] > 38) greenInk++;
-      }
-      const otherLegionMarker = greenInk > width * (bottom - top) * .002;
-      const textWidth = Math.round(width * .49);
-      const rowHeight = bottom - top;
-      const crop = textCrop(screen, left, top, textWidth, rowHeight);
-      const reading = await worker.recognize(crop);
-      const row = readScreenshotRow(reading.data.text);
-      if (!row) continue;
-      const completed = await completeRosterRow(worker, screen, { left, top, textWidth, rowHeight }, row);
-      if (completed && otherLegionMarker) completed.otherLegionMarker = true;
-      if (completed) {
-        completed.registration = completed.otherLegion || otherLegionMarker ? 'other-legion' : classifyRosterCheckboxes(pixels,width,height,top,bottom);
-        rows.push(completed);
-      }
+    const x = value => Math.round(width * value);
+    const y = value => Math.round(height * value);
+    const header = textCrop(screen, x(.24), y(.17), x(.55), y(.048), { invert: true });
+    const legion = readScreenshotLegion(await recognize(worker, header, PSM.SINGLE_LINE));
+    if (!legion && !regions.length) throw new Error('Use a full screenshot of the legion registration roster.');
+    async function readTotal(left, right) {
+      const text = await recognize(worker, textCrop(screen, x(left), y(.262), x(right - left), y(.026), { dark: true }),
+        PSM.SINGLE_LINE, '0123456789/');
+      const [count, limit] = text.replace(/\s/g, '').match(/^\d{1,2}\/\d{1,2}$/)?.[0].split('/').map(Number) ?? [];
+      return limit > 0 && count <= limit ? { count, limit } : null;
     }
-    return { legion, rows, totals };
+    const totals = { combatant: await readTotal(.22, .39), substitute: await readTotal(.62, .79) };
+    const rows = [], partial = [];
+    for (const { top, bottom, partial: clipped } of regions) {
+      if (clipped) {
+        partial.push({ top: top / height, bottom: bottom / height });
+        continue;
+      }
+      const h = bottom - top;
+      const nominalHeight = y(.077);
+      const start = top <= y(.336) ? bottom - nominalHeight : top;
+      const rowY = ratio => Math.round(start + nominalHeight * ratio);
+      const otherLegionMarker = greenDensity(context, x(.22), rowY(.69), x(.63), bottom) > .035;
+      const voted = greenDensity(context, x(.78), Math.max(top, rowY(-.03)), x(.92), rowY(.22)) > .13;
+      const battleRequest = greenDensity(context, x(.07), rowY(.74), x(.20), bottom) > .22;
+      const crop = textCrop(screen, x(.223), top, x(.49), h);
+      const row = readScreenshotRow(await recognize(worker, crop, PSM.SINGLE_BLOCK));
+      row.name = stripPowerLine(row.name);
+      if (!row.name) {
+        const nameBottom = rowY(otherLegionMarker ? .40 : .54);
+        const nameCrop = textCrop(screen, x(.219), top, x(.50), nameBottom - top);
+        row.name = stripPowerLine(await recognize(worker, nameCrop, PSM.RAW_LINE));
+      }
+      const powerTop = rowY(otherLegionMarker ? .42 : .55);
+      const powerBottom = Math.min(bottom, rowY(otherLegionMarker ? .66 : .81));
+      const powerCrop = textCrop(screen, x(.267), powerTop, x(.42), powerBottom - powerTop);
+      const digits = '0123456789,.KMBkmb';
+      const powerRaw = await recognize(worker, powerCrop, PSM.SINGLE_LINE, digits);
+      const independentPower = readScreenshotPower(powerRaw);
+      let alternative = null;
+      if (otherLegionMarker || independentPower === null) {
+        const retry = textCrop(screen, x(.267), powerTop, x(.42), powerBottom - powerTop, { tight: true });
+        alternative = readScreenshotPower(await recognize(worker, retry, PSM.RAW_LINE, digits));
+      }
+      let broadPower = null;
+      if (otherLegionMarker) {
+        const broadTop = top + Math.floor(h * .49);
+        const broad = textCrop(screen, x(.265), broadTop, x(.32), bottom - broadTop);
+        broadPower = readScreenshotPower(await recognize(worker, broad, PSM.SINGLE_LINE, digits));
+      }
+      const readings = [...new Set([independentPower, alternative, broadPower, row.power].filter(value => value !== null))];
+      if (otherLegionMarker && !row.otherLegion) {
+        const dispatchCrop = textCrop(screen, x(.22), rowY(.67), x(.40), bottom - rowY(.67), { green: true });
+        const dispatch = await recognize(worker, dispatchCrop, PSM.SINGLE_LINE);
+        row.otherLegion = Number(dispatch.match(/\bLegion\s*([12])\s+dispatched\b/i)?.[1]) || null;
+      }
+      const registration = row.otherLegion || otherLegionMarker ? 'other-legion' : classifyRosterCheckboxes(pixels,width,height,top,bottom);
+      rows.push({ ...row, power: readings[0] ?? null, ...(readings.length > 1 ? { powerConflict: readings } : {}),
+        registration, voted, battleRequest, bounds: { top: top / height, bottom: bottom / height } });
+    }
+    return { legion, rows, totals, partial };
   } finally {
     URL.revokeObjectURL(url);
   }

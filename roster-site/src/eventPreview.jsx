@@ -26,14 +26,31 @@ const foundry={
     [plannerKey('canyon','WAR',2)]:{...plannerSlot(null,'canyon','WAR',2),
       registrations:{'sample-9':'sub'},registeredUnder:{'sample-9':'WAR'}}},
 };
+const previewStorageKey = '3573-event-preview-fixture-v1';
+function previewWorkspace() {
+  try { return JSON.parse(sessionStorage.getItem(previewStorageKey)) || { players, foundry }; }
+  catch { return { players, foundry }; }
+}
+
 function Preview(){
   const [kind,setKind]=useState('foundry');
   const [opened,open]=useState(null);
   const [teamwork,setTeamwork]=useState({pairs:[['sample-7','sample-9']]});
-  const [workspace,save]=useState({players,foundry});
+  const [workspace,save]=useState(previewWorkspace);
+  const saveScreenshot = action => {
+    const next = updateEventPlanner(workspace, action);
+    if (next === workspace) return { error: 'The sample roster or event changed. Review the import again.' };
+    try {
+      sessionStorage.setItem(previewStorageKey, JSON.stringify(next));
+    } catch {
+      return { error: 'The sample roster could not be saved in this tab.' };
+    }
+    save(next);
+    return { message: 'Saved to the sample roster in this tab.' };
+  };
   const profile=workspace.players.find(p=>p.id===opened);
   return <main>
-    <p style={{padding:'4px 16px',color:'#afc1d3'}}>Sample roster · Changes last until reload</p>
+    <p style={{padding:'4px 16px',color:'#afc1d3'}}>Sample roster · Screenshot imports are saved in this tab</p>
     <nav aria-label="Choose event planner">
       <button aria-pressed={kind==='foundry'} onClick={()=>setKind('foundry')}>Foundry</button>
       <button aria-pressed={kind==='canyon'} onClick={()=>setKind('canyon')}>Canyon Clash</button>
@@ -41,7 +58,7 @@ function Preview(){
     </nav>
     {kind==='changes'?<NameChanges players={workspace.players} plan={{}} onOpen={open}/>:<EventPlanner key={kind} kind={kind} players={workspace.players} storage={workspace.foundry}
       onRoleFeedback={()=>tapFeedback(readPreferences().haptics,navigator,14)}
-      onUpdate={action=>save(prev=>updateEventPlanner(prev,action))} onOpenPlayerProfile={open}
+      onUpdate={action=>save(prev=>updateEventPlanner(prev,action))} onScreenshotUpdate={saveScreenshot} onOpenPlayerProfile={open}
       teamworkPreferences={teamwork} onSaveTeamworkPreferences={setTeamwork}
       onUpdatePlayerLanguage={(ids,language)=>save(prev=>({...prev,players:prev.players.map(player=>
         ids.includes(player.id)?addRecordedLanguage(player,language):player)}))}/>}

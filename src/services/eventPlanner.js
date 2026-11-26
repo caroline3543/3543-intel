@@ -167,8 +167,15 @@ export function prepareEventRoles(storage,{kind,alliance,legion,expectedOccurren
   return {slots:[...from.values(),{alliance,legion,plan:to}]};
 }
 
-export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId,move,roleChanges},now=Date.now()) {
+export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId,move,roleChanges,screenshotImport},now=Date.now()) {
   if(!Object.hasOwn(EVENT_NAMES,kind)||![1,2].includes(legion))return workspace;
+  if(screenshotImport){
+    const current=plannerSlot(workspace.foundry,kind,alliance,legion);
+    const validIds=new Set(workspace.players.filter(player=>player.membershipStatus!=='transferred_out').map(player=>String(player.id)));
+    if(current.occurrenceId!==expectedOccurrenceId||new Set(powers.map(row=>row.id)).size!==powers.length||
+      powers.some(row=>!validIds.has(row.id)||!Number.isSafeInteger(row.value)||row.value<0))return workspace;
+  }
+
   if(roleChanges){
     const ids=new Set(workspace.players.filter(p=>p.membershipStatus!=='transferred_out').map(p=>String(p.id)));
     if(!roleChanges.length||roleChanges.some(change=>!ids.has(change.id)))return workspace;

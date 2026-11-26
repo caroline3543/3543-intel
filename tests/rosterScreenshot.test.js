@@ -12,13 +12,13 @@ test('the header must identify exactly one supported legion', () => {
 });
 
 test('power readings preserve exact figures and omit ambiguous numbers', () => {
-  assert.deepEqual(readScreenshotRow('안개\n15,630'), { name: '안개', power: 15630 });
-  assert.deepEqual(readScreenshotRow('Northvale\n946,105,130'), { name: 'Northvale', power: 946105130 });
-  assert.deepEqual(readScreenshotRow('Wren\n1.25 B'), { name: 'Wren', power: 1250000000 });
-  assert.deepEqual(readScreenshotRow('Wren\n1,20'), { name: 'Wren', power: null });
+  assert.deepEqual(readScreenshotRow('안개\n15,630'), { name: '안개', otherLegion: null, power: 15630 });
+  assert.deepEqual(readScreenshotRow('Northvale\n946,105,130'), { name: 'Northvale', otherLegion: null, power: 946105130 });
+  assert.deepEqual(readScreenshotRow('Wren\n1.25 B'), { name: 'Wren', otherLegion: null, power: 1250000000 });
+  assert.deepEqual(readScreenshotRow('Wren\n1,20'), { name: 'Wren', otherLegion: null, power: null });
   assert.equal(readScreenshotPower('5 15,630'), null);
   assert.equal(readScreenshotPower('1.0.0M'), null);
-  assert.equal(readScreenshotRow('Wren\n4381\nLegion 2 dispatched'), null);
+  assert.deepEqual(readScreenshotRow('Wren\n4381\nLegion 2 dispatched'), { name: 'Wren', otherLegion: 2, power: 4381 });
   assert.equal(parseBulkPlayers('Wren\t1.25B', readScreenshotPower)[0].power, 1250000000);
   assert.equal(parseBulkPlayers('Wren\t1,20', readScreenshotPower)[0].power, null);
 });
@@ -56,8 +56,12 @@ test('batch import removes identical overlapping rows and keeps conflicting read
   const first = { name: 'Hope_闇', power: 245779411 };
   const newer = { ...first, power: 245779412 };
   const partial = { name: '', power: 38 };
-  assert.deepEqual(combineScreenshotRows([
+  const combined = combineScreenshotRows([
     { rows: [first, partial] },
     { rows: [{ ...first }, newer, partial] },
-  ]), [first, partial, newer, partial]);
+  ]);
+  assert.deepEqual(combined.map(({ name, power }) => ({ name, power })), [first, partial, newer, partial]);
+  assert.deepEqual(combined.map(row => row.sources), [[0,1],[0],[1],[1]]);
+  assert.ok(combined[0].conflict && combined[2].conflict);
+  assert.equal(new Set(combined.map(row => row.rowId)).size, combined.length);
 });

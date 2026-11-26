@@ -5,7 +5,8 @@ export function readScreenshotLegion(text) {
 }
 
 export function readScreenshotPower(text) {
-  const value = String(text).trim().replace(/\s+([KMB])$/i, '$1');
+  let value = String(text).trim().replace(/\s+([KMB])$/i, '$1');
+  if (/^\d{1,3}(?:[.,]\d{3})+$/.test(value)) value = value.replace(/\./g, ',');
   if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+[KMB]|[KMB])?$/i.test(value)) return null;
   const multiplier = { K: 1e3, M: 1e6, B: 1e9 }[value.at(-1)?.toUpperCase()] ?? 1;
   const amount = Number(value.replace(/[,KMB]/gi, '')) * multiplier;
@@ -27,76 +28,103 @@ export function readScreenshotRow(text) {
   };
 }
 
-export function pickScreenshotRows(results, width, height) {
-  // Look for the common blue row fill at several columns. Requiring agreement
-  // rejects rank headers, empty space, and most text and decorations.
+export function pickScreenshotRows(pixels, width, height) {
   const columns = [.43, .56, .69, .89].map(ratio => Math.floor(width * ratio));
   const hasFill = y => columns.filter(x => {
     const offset = (y * width + x) * 4;
-    const [r, g, b] = [results[offset], results[offset + 1], results[offset + 2]];
+    const [r, g, b] = [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
     return Math.abs(r - 167) < 16 && Math.abs(g - 194) < 13 && Math.abs(b - 236) < 13;
   }).length >= 2;
-  const end = Math.round(height * .8);
+  const start = Math.round(height * .335);
+  const end = Math.round(height * .747);
   const rows = [];
   let top = null, bottom = 0;
-  for (let y = Math.round(height * .33); y < end; y++) {
+  function finish() {
+    const span = bottom - top;
+    if (span >= height * .007) {
+      const partial = span < height * .065;
+      rows.push({ top, bottom, ...(partial ? { partial } : {}) });
+    }
+    top = null;
+  }
+  for (let y = start; y < end; y++) {
     if (hasFill(y)) {
       top ??= y;
       bottom = y + 1;
     } else if (top !== null && y - bottom > height * .003) {
-      if (bottom - top >= height * .025) rows.push({ top, bottom });
-      top = null;
+      finish();
     }
   }
-  if (top !== null && bottom - top >= height * .025) rows.push({ top, bottom });
+  if (top !== null) finish();
   return rows;
 }
 
-// Scrolling screenshots often include the same row. Keep differing readings
-// or unread names for review so an apparent duplicate cannot hide a conflict.
+// Cross-screenshot duplicates require compatible evidence and exact NFC
+// spelling. A repeated name in one screenshot remains two independent rows.
 export function combineScreenshotRows(screenshots) {
- const groups=new Map(), unread=[];
- for(const [sourceIndex,screenshot] of screenshots.entries()){
-  for(const row of screenshot.rows){
-   const record={...row,sources:[sourceIndex]};
-   if(!row.name){unread.push(record);continue;}
-   const key=row.name.normalize('NFC');
-   const list=groups.get(key)||[];
-   const compatible=list.find(existing=>
-    (existing.power===null||row.power===null||existing.power===row.power)&&
-    (!existing.registration||existing.registration==='unknown'||!row.registration||row.registration==='unknown'||existing.registration===row.registration)&&
-    (!existing.otherLegion||!row.otherLegion||existing.otherLegion===row.otherLegion));
-   if(compatible){
-    compatible.power=compatible.power??row.power;
-    if(!compatible.registration||compatible.registration==='unknown')compatible.registration=row.registration;
-    compatible.otherLegion=compatible.otherLegion||row.otherLegion;
-    const alternatives=[...new Set([...(compatible.powerConflict||[]),...(row.powerConflict||[])])];
-    if(alternatives.length>1)compatible.powerConflict=alternatives;
-    compatible.sources.push(sourceIndex);
-   }else list.push(record);
-   groups.set(key,list);
+  const groups = new Map(), records = [];
+  for (const [sourceIndex, screenshot] of screenshots.entries()) {
+    for (const [rowIndex, row] of screenshot.rows.entries()) {
+      const evidence = { sourceIndex, bounds: row.bounds };
+      const rowId = sourceIndex + ':' + rowIndex;
+      const key = row.name.normalize('NFC');
+      const list = groups.get(key) ?? [];
+      const compatible = key && list.find(existing =>
+        !existing.sources.includes(sourceIndex) &&
+        row.power !== null && existing.power === row.power &&
+        (!existing.registration || existing.registration === 'unknown' || !row.registration ||
+          row.registration === 'unknown' || existing.registration === row.registration) &&
+        (!existing.otherLegion || !row.otherLegion || existing.otherLegion === row.otherLegion));
+      if (compatible) {
+        compatible.power ??= row.power;
+        if (!compatible.registration || compatible.registration === 'unknown') compatible.registration = row.registration;
+        if (row.otherLegion) compatible.otherLegion = row.otherLegion;
+        const alternatives = [...new Set([...(compatible.powerConflict ?? []), ...(row.powerConflict ?? [])])];
+        if (alternatives.length > 1) compatible.powerConflict = alternatives;
+        compatible.sources.push(sourceIndex);
+        compatible.evidence.push(evidence);
+        compatible.voted ||= row.voted;
+        compatible.battleRequest ||= row.battleRequest;
+      } else {
+        const record = { ...row, rowId, sources: [sourceIndex], evidence: [evidence] };
+        list.push(record);
+        records.push(record);
+      }
+      groups.set(key, list);
+    }
   }
- }
- return [...groups.values()].flatMap(list=>list.map(row=>({...row,conflict:list.length>1}))).concat(unread);
+  for (const [key, list] of groups) {
+    if (key && list.length > 1) list.forEach(row => { row.conflict = true; });
+  }
+  return records;
 }
 
- // Bright tick pixels are distinct from the muted empty checkbox fill.
-export function classifyRosterCheckboxes(pixels,width,height,top,bottom){
- const h=bottom-top;
- if(h<height*.065)return 'unknown';
- function inspect(cx,blue){
-  let bright=0,fill=0,total=0;
-  for(let y=Math.max(top,Math.round(top+h*.23));y<Math.min(bottom,Math.round(top+h*.76));y++)
-   for(let x=Math.round(width*(cx-.019));x<Math.round(width*(cx+.019));x++){
-    const i=(y*width+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2];total++;
-    if(blue?b>r+35&&g>r+15&&b>g+10:g>r+15&&g>b+20)fill++;
-    if(blue?b>190&&g>145&&b-r>65&&g-r>45:g>155&&g-r>45&&g-b>65)bright++;
-   }
-  return {checked:bright>total*.045,visible:fill>total*.13};
- }
- const a=inspect(.755,false),b=inspect(.877,true);
- if(!a.visible||!b.visible||a.checked&&b.checked)return 'unknown';
- return a.checked?'combatant':b.checked?'substitute':'unassigned';
+// Read tick ink against the underlying button fill in the centre of each
+// checkbox. A blue or green background establishes presence only.
+export function classifyRosterCheckboxes(pixels, width, height, top, bottom) {
+  function inspect(cx, blue) {
+    const centre = (top + bottom) / 2;
+    let tick = 0, fill = 0, total = 0;
+    for (let y = Math.round(centre - height * .014); y < Math.round(centre + height * .014); y++) {
+      for (let x = Math.round(width * (cx - .022)); x < Math.round(width * (cx + .022)); x++) {
+        const i = (y * width + x) * 4;
+        const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+        total++;
+        if (blue ? Math.abs(r - 108) < 21 && Math.abs(g - 139) < 20 && Math.abs(b - 185) < 18
+          : Math.abs(r - 93) < 21 && Math.abs(g - 147) < 20 && Math.abs(b - 85) < 20) fill++;
+        if (blue ? b > 207 && g > 147 && b - r > 80 && g - r > 60
+          : g > 168 && g - r > 75 && g - b > 85) tick++;
+      }
+    }
+    if (fill / total < .22) return null;
+    if (tick / total >= .10) return true;
+    return tick / total < .025 && fill / total > .48 ? false : null;
+  }
+  if (bottom - top < height * .065) return 'unknown';
+  const combatant = inspect(.753, false);
+  const substitute = inspect(.875, true);
+  if (combatant === null || substitute === null || combatant && substitute) return 'unknown';
+  return combatant ? 'combatant' : substitute ? 'substitute' : 'unassigned';
 }
 
 export function readRegistrationTotals(text){
