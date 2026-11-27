@@ -62,6 +62,17 @@ try {
     await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
     await checkResponsive('04-identity');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-04-identity.png',animations:'disabled'});
+    const reread=review.getByRole('button',{name:'Reread username',exact:true});
+    await reread.click();
+    await review.getByRole('button',{name:'Rereading username…',exact:true}).waitFor({state:'hidden',timeout:90000});
+    await review.getByRole('status').filter({hasText:/Additional reading:|No additional username found/}).waitFor();
+    await page.waitForFunction(async kind=>{
+      const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+      try{
+        const session=await new Promise((resolve,reject)=>{const req=db.transaction('sessions','readonly').objectStore('sessions').get(kind+':ARC');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+        return Object.values(session?.drafts?.[1]?.edits??{}).some(edit=>edit.retryNote&&!edit.playerId);
+      }finally{db.close();}
+    },kind);
     await review.getByText('Review options',{exact:true}).click();
     await review.getByRole('button',{name:'Review troop powers changes'}).click();
     await review.getByRole('alert').filter({hasText:'Resolve or skip'}).waitFor();
