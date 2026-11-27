@@ -193,3 +193,11 @@ for(const kind of ['foundry','canyon']) for(const [registration,role,limit] of [
  }
  assert.equal(createScreenshotMatcher([a,{id:'b',name:'Other Name',searchFields:['Plain Name'],alliance:'ARC'}],'HOT')('Plain Name').player?.id,'a');
  });
+
+ test('remembered OCR aliases resolve repeated imports and preserve collision protection',()=>{
+ const a={id:'a',name:'HΞRMΞS',alliance:'HOT',nickname:'Hermes',ocrAliases:['HER MES','HERMΞS']};
+ for(const reading of ['HERMES','HER MES','HERMΞS'])assert.equal(createScreenshotMatcher([a],'HOT')(reading).player?.id,'a');
+ const b={id:'b',name:'Other',alliance:'ARC',ocrAliases:['HERMES']};
+ assert.equal(createScreenshotMatcher([a,b],'HOT')('HERMES').player,null);
+ assert.equal(createScreenshotMatcher([{...a,name:'New username'}],'HOT')('HER MES').player?.id,'a');
+ });
