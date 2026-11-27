@@ -11,9 +11,10 @@ const playerFields = player => [player.name, player.playerId, player.fid, player
 
 const spacingKey=value=>exactName(value).normalize('NFKC').toLowerCase().replace(/\s/gu,'');
 const visualKey=value=>normaliseBulkName(value).replace(/0/g,'o').replace(/[1l]/g,'i');
-export function createScreenshotMatcher(players,alliance,preferredIds=[]){
-  const preferred=new Set(preferredIds);
+export function createScreenshotMatcher(players,alliance,preferredIds=[],registeredIds=[]){
+  const preferred=new Set(preferredIds),registered=new Set(registeredIds);
   const local=players.filter(p=>preferred.has(p.id)||p.alliance===alliance);
+  const rank=p=>registered.has(p.id)?0:preferred.has(p.id)?1:p.alliance===alliance?2:3;
   const indexes=[new Map(),new Map(),new Map(),new Map()];
   const add=(map,key,p)=>{if(!key)return; if(!map.has(key))map.set(key,new Map());map.get(key).set(p.id,p);};
   for(const p of players){
@@ -28,8 +29,8 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[]){
     const exact=get(0,exactName(name)),equivalent=get(1,normaliseBulkName(name)),lookalikes=get(2,visualKey(name)),strict=get(3,spacingKey(name));
     const selected=exact.length===1?exact[0]:exact.length===0&&strict.length===1?strict[0]:null;
     const safe=selected&&equivalent.length===1&&equivalent[0].id===selected.id&&lookalikes.length===1;
-    const localSuggestions=safe?[]:bulkCandidates(name,local,alliance);
-    const wider=safe||localSuggestions.length>=8?[]:bulkCandidates(name,players,alliance);
+    const localSuggestions=safe?[]:bulkCandidates(name,local,alliance).sort((a,b)=>rank(a)-rank(b));
+    const wider=safe?[]:bulkCandidates(name,players,alliance);
     const candidates=[...new Map([...exact,...strict,...(safe?[selected]:[]),...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);
     const result={candidates,player:safe?selected:null};cache.set(name,result);return result;
   };
