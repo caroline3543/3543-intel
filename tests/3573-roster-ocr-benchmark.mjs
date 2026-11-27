@@ -136,6 +136,28 @@ try {
     return {withoutAliases,withNicknames,withAliases,reductionPercent,targetMet:reductionPercent!==null&&reductionPercent>=30&&withAliases.wrong===0&&withAliases.missing===0};
   },{screenshots,labels,roster,benchmarkAlliance}):null;
   if(aliasComparison)console.log('Paired alias comparison:',JSON.stringify(aliasComparison));
+  const repeatUpload=labels?await page.evaluate(async ({screenshots,labels,roster,benchmarkAlliance})=>{
+    const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
+    const original=createScreenshotMatcher(roster,benchmarkAlliance);
+    const learned=new Map();
+    const samples=[];
+    for(const screenshot of screenshots)for(const row of screenshot.rows??[]){
+      const label=labels[screenshot.filename].rows.find(l=>Math.abs(l.center-(row.bounds.top+row.bounds.bottom)/2)<=.035);
+      if(!label)continue;
+      const expected=roster.find(p=>label.playerId?p.id===label.playerId:p.name===label.name);
+      if(!expected)continue;
+      samples.push({reading:row.name,id:expected.id});
+      if(!original(row.name).player&&row.name?.trim()){
+        if(!learned.has(expected.id))learned.set(expected.id,new Set());
+        learned.get(expected.id).add(row.name);
+      }
+    }
+    const augmented=roster.map(p=>({...p,ocrAliases:[...new Set([...(p.ocrAliases??[]),...(learned.get(p.id)??[])])]}));
+    const score=matcher=>samples.reduce((acc,s)=>{const p=matcher(s.reading).player;acc[!p?'manual':p.id===s.id?'correct':'wrong']++;return acc;},{manual:0,correct:0,wrong:0});
+    const before=score(original),after=score(createScreenshotMatcher(augmented,benchmarkAlliance));
+    return {scope:'same-image replay with ground-truth simulated confirmations; not independent validation',before,after,reductionPercent:before.manual?100*(before.manual-after.manual)/before.manual:null};
+  },{screenshots,labels,roster,benchmarkAlliance}):null;
+  if(repeatUpload)console.log('Repeat upload simulation:',JSON.stringify(repeatUpload));
   if(rosterPath&&reviewMetrics)delete reviewMetrics.unresolved;
   console.log('Identity review metrics:',JSON.stringify(reviewMetrics));
   const fingerprints=cards.filter(r=>r.avatarEvidence);
@@ -153,7 +175,7 @@ try {
     identicalFingerprintGroups:[...groups.values()].filter(g=>g.length>1).map(g=>({count:g.length,names:[...new Set(g)]}))};
   // Only aggregate diagnostics leave the benchmark process; no avatar fingerprints in artifacts.
   for(const row of cards)delete row.avatarEvidence;
-  await writeFile(output, JSON.stringify({identityScope,retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots:rosterPath?undefined:screenshots,scores:rosterPath?undefined:scores,negative:rosterPath?undefined:negative,avatarMetrics:rosterPath?undefined:avatarMetrics,retryMetrics,reviewMetrics,aliasComparison},null,2)+'\n');
+  await writeFile(output, JSON.stringify({identityScope,retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots:rosterPath?undefined:screenshots,scores:rosterPath?undefined:scores,negative:rosterPath?undefined:negative,avatarMetrics:rosterPath?undefined:avatarMetrics,retryMetrics,reviewMetrics,aliasComparison,repeatUpload},null,2)+'\n');
   if(scores){
     const sum=key=>scores.reduce((total,s)=>total+s[key],0);
     const expected=sum('expected');
