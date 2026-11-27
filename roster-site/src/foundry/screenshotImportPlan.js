@@ -81,3 +81,11 @@ export function prepareScreenshotImport(storage, context, rows, mode) {
   if (!powers.length && !roleChanges.length) return { error: 'Choose at least one change to import.' };
   return { changes, action: { ...context, powers, ...(roleChanges.length ? { roleChanges } : {}), screenshotImport: true } };
 }
+
+export function proposeScreenshotRegistration({row,player,here,elsewhere,alliance,edit={},mode}){
+  const detectedRole={combatant:'join',substitute:'sub'}[row.registration];
+  const safeNew=player&&player.alliance===alliance&&detectedRole&&!here&&!elsewhere&&!row.conflict;
+  const safeUnchanged=player&&!row.conflict&&((detectedRole&&here===detectedRole&&!elsewhere)||(row.registration==='other-legion'&&!here)||(row.registration==='unassigned'&&!here));
+  const proposedRole=edit.registrationReviewed||edit.role!=null ? (edit.role==='remove'?'':edit.role||null) : safeNew?detectedRole:null;
+  return {proposedRole,registrationPending:mode!=='powers'&&!edit.registrationReviewed&&(!safeNew&&!safeUnchanged||!!edit.role)};
+}

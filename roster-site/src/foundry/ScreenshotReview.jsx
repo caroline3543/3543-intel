@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { normaliseBulkName } from '../components/bulkImportModel.js';
 import { eventAssignments, plannerSlot, EVENT_LIMITS } from '../../../src/services/eventPlanner.js';
 import { readScreenshotPower } from './rosterScreenshotModel.js';
-import { assignmentLabel, prepareScreenshotImport, roleName, createScreenshotMatcher, suspiciousPowerChange } from './screenshotImportPlan.js';
+import { assignmentLabel, proposeScreenshotRegistration, prepareScreenshotImport, roleName, createScreenshotMatcher, suspiciousPowerChange } from './screenshotImportPlan.js';
 
 import {createCurrentAvatarEvidence} from './currentAvatarEvidence.js';
 import {screenshotAvatarEvidence} from './screenshotAvatarEvidence.js';
@@ -65,13 +65,9 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
     const previousPower = target.powerByPlayer?.[player?.id] ?? (player?.hasPower ? player.power : null);
     const unusualPower = mode !== 'roles' && suspiciousPowerChange(previousPower,power);
     const powerPending = mode !== 'roles' && (edit.power !== undefined && !edit.powerConfirmed || unusualPower && (edit.powerApproval?.previous !== previousPower || edit.powerApproval?.next !== power));
-    const detectedRole={combatant:'join',substitute:'sub'}[row.registration];
     const here=target.registrations[player?.id];
     const elsewhere=(assignments.get(player?.id)??[]).some(a=>a.alliance!==alliance||a.legion!==legion);
-    const safeNew=player&&player.alliance===alliance&&detectedRole&&!here&&!elsewhere&&!row.conflict;
-    const safeUnchanged=player&&!row.conflict&&((detectedRole&&here===detectedRole&&!elsewhere)||(row.registration==='other-legion'&&!here)||(row.registration==='unassigned'&&!here));
-    const proposedRole=edit.registrationReviewed||edit.role!=null ? (edit.role==='remove'?'':edit.role||null) : safeNew?detectedRole:null;
-    const registrationPending=mode!=='powers'&&!edit.registrationReviewed&&(!safeNew&&!safeUnchanged||!!edit.role);
+    const {proposedRole,registrationPending}=proposeScreenshotRegistration({row,player,here,elsewhere,alliance,edit,mode});
     const needsReview = powerPending || !player || conflict && !edit.checked || mode !== 'roles' && power === null || registrationPending;
     return { row, edit, match, player, powerText, power, conflict, needsReview, powerPending, previousPower, unusualPower, registrationPending, proposedRole };
   }),[rows,edits,matches,playerById,target.powerByPlayer,target.registrations,mode,assignments,alliance,legion]);
