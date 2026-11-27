@@ -116,6 +116,25 @@ try {
     }
     return metrics;
   },{screenshots,labels,roster}):null;
+  const aliasComparison=rosterPath?await page.evaluate(async ({screenshots,labels,roster})=>{
+    const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
+    const variants=[roster.map(({nickname,...p})=>p),roster];
+    const results=variants.map(players=>{
+      const match=createScreenshotMatcher(players,'HOT');
+      const counts={correct:0,wrong:0,manual:0,missing:0};
+      for(const screenshot of screenshots)for(const label of labels[screenshot.filename].rows){
+        const row=(screenshot.rows??[]).find(r=>Math.abs(label.center-(r.bounds.top+r.bounds.bottom)/2)<=.035);
+        if(!row){counts.missing++;continue;}
+        const p=match(row.name).player;
+        counts[!p?'manual':p.id===label.playerId?'correct':'wrong']++;
+      }
+      return counts;
+    });
+    const [withoutAliases,withAliases]=results;
+    const reductionPercent=withoutAliases.manual?100*(withoutAliases.manual-withAliases.manual)/withoutAliases.manual:null;
+    return {withoutAliases,withAliases,reductionPercent,targetMet:reductionPercent!==null&&reductionPercent>=30&&withAliases.wrong===0&&withAliases.missing===0};
+  },{screenshots,labels,roster}):null;
+  if(aliasComparison)console.log('Paired alias comparison:',JSON.stringify(aliasComparison));
   if(rosterPath&&reviewMetrics)delete reviewMetrics.unresolved;
   console.log('Identity review metrics:',JSON.stringify(reviewMetrics));
   const fingerprints=cards.filter(r=>r.avatarEvidence);
@@ -133,7 +152,7 @@ try {
     identicalFingerprintGroups:[...groups.values()].filter(g=>g.length>1).map(g=>({count:g.length,names:[...new Set(g)]}))};
   // Only aggregate diagnostics leave the benchmark process; no avatar fingerprints in artifacts.
   for(const row of cards)delete row.avatarEvidence;
-  await writeFile(output, JSON.stringify({identityScope,retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots:rosterPath?undefined:screenshots,scores:rosterPath?undefined:scores,negative:rosterPath?undefined:negative,avatarMetrics:rosterPath?undefined:avatarMetrics,retryMetrics,reviewMetrics},null,2)+'\n');
+  await writeFile(output, JSON.stringify({identityScope,retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots:rosterPath?undefined:screenshots,scores:rosterPath?undefined:scores,negative:rosterPath?undefined:negative,avatarMetrics:rosterPath?undefined:avatarMetrics,retryMetrics,reviewMetrics,aliasComparison},null,2)+'\n');
   if(scores){
     const sum=key=>scores.reduce((total,s)=>total+s[key],0);
     const expected=sum('expected');
