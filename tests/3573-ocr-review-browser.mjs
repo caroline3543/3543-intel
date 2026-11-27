@@ -17,6 +17,7 @@ try {
   await mkdir('ocr-review-captures',{recursive:true});
   const evidenceImage=(await readFile('tests/fixtures/3573-ocr/screenshots/IMG_9840.jpeg')).toString('base64');
   for(const kind of ['foundry','canyon']){
+    const enteredPower=kind==='foundry'?3638:1390000000;
     const page=await browser.newPage({viewport:{width:428,height:926},deviceScaleFactor:1,isMobile:true,hasTouch:true});
     async function checkResponsive(stage){
       for(const width of [320,390,428]){
@@ -45,10 +46,10 @@ try {
       }
       sessionStorage.setItem('3573-event-preview-fixture-v1',JSON.stringify(workspace));
       const rows=[
-        {name:'Northvale',power:3647,registration:'unknown'},
-        {name:'Northva1e',power:3100,registration:'substitute'},
+        {name:'Northvale',power:kind==='foundry'?3647:1530000000,registration:'unknown'},
+        {name:'Northva1e',power:kind==='foundry'?3100:1200000000,registration:'substitute'},
         {name:'Juniper',power:null,registration:'combatant'},
-        {name:'Aster',power:4200,registration:'other-legion',otherLegion:2}
+        {name:'Aster',power:kind==='foundry'?4200:445000000,registration:'other-legion',otherLegion:2}
       ].map((row,i)=>({...row,bounds:{top:.30+i*.077,bottom:.377+i*.077}}));
       const file=new File([Uint8Array.from(atob(evidenceImage),c=>c.charCodeAt(0))],'IMG_9840.jpeg',{type:'image/jpeg'});
       await new Promise((resolve,reject)=>{
@@ -133,7 +134,7 @@ try {
     await checkResponsive('05-power');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-05-power.png',animations:'disabled'});
     const powerInput=row('Juniper').getByRole('textbox',{name:'Troop power for Juniper'});
-    for(const value of ['3','36','363','3638']){
+    for(const value of [1,2,3,String(enteredPower).length].map(n=>String(enteredPower).slice(0,n))){
       await powerInput.fill(value);
       assert.equal(await powerInput.inputValue(),value);
       await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Resolve troop power',exact:true}).waitFor();
@@ -144,12 +145,12 @@ try {
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
     await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Resolve troop power',exact:true}).waitFor();
-    assert.equal(await powerInput.inputValue(),'3638');
-    await page.waitForFunction(async kind=>{
+    assert.equal(await powerInput.inputValue(),String(enteredPower));
+    await page.waitForFunction(async ({kind,enteredPower})=>{
       const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
       try {
         const session=await new Promise((resolve,reject)=>{const req=db.transaction('sessions','readonly').objectStore('sessions').get(kind+':ARC');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
-        return Object.values(session?.drafts?.[1]?.edits??{}).some(edit=>edit.power==='3638'&&!edit.powerConfirmed);
+        return Object.values(session?.drafts?.[1]?.edits??{}).some(edit=>edit.power===String(enteredPower)&&!edit.powerConfirmed);
       } finally {db.close();}
     },kind);
     await page.reload();
@@ -158,7 +159,7 @@ try {
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
     await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Resolve troop power',exact:true}).waitFor();
-    assert.equal(await powerInput.inputValue(),'3638');
+    assert.equal(await powerInput.inputValue(),String(enteredPower));
     await review.locator('.stage9-action-footer').getByRole('button',{name:'Confirm troop power',exact:true}).click();
     for(let i=0;i<4;i++){
       const warning=review.getByRole('alert').filter({hasText:'Unusually large change'});
@@ -197,17 +198,17 @@ try {
     await checkResponsive('current-completion');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-completion.png'});
     const saved=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1')));
-    assert.equal(saved.foundry.eventPlans[JSON.stringify([kind,'ARC',1])].powerByPlayer['sample-1'],3638);
+    assert.equal(saved.foundry.eventPlans[JSON.stringify([kind,'ARC',1])].powerByPlayer['sample-1'],enteredPower);
     assert.equal(saved.foundry.eventPlans[JSON.stringify([kind,'ARC',1])].registrations['sample-1'],'join');
     // Simulate a persisted pending receipt after a successful submission.
-    await page.evaluate(async kind=>{
+    await page.evaluate(async ({kind,enteredPower})=>{
       const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
       await new Promise((resolve,reject)=>{
         const tx=db.transaction('sessions','readwrite'),store=tx.objectStore('sessions'),key=kind+':ARC',req=store.get(key);
-        req.onsuccess=()=>{const session=req.result;store.put({...session,pendingImport:{kind,alliance:'ARC',legion:1,expectedOccurrenceId:JSON.stringify([kind,'ARC',1]),powers:[{id:'sample-1',value:3638}],roleChanges:[]}},key);};
+        req.onsuccess=()=>{const session=req.result;store.put({...session,pendingImport:{kind,alliance:'ARC',legion:1,expectedOccurrenceId:JSON.stringify([kind,'ARC',1]),powers:[{id:'sample-1',value:enteredPower}],roleChanges:[]}},key);};
         tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
       });db.close();
-    },kind);
+    },{kind,enteredPower});
     await page.reload();
     if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
     await page.getByRole('button',{name:'Open screenshot import'}).click();
@@ -230,7 +231,7 @@ try {
         req.onsuccess=()=>store.put({...req.result,pendingImport:{kind,alliance:'ARC',legion:1,expectedOccurrenceId:JSON.stringify([kind,'ARC',1]),powers:[{id:'sample-1',value:9999}],roleChanges:[]}},key);
         tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
       });db.close();
-    },kind);
+    },{kind,enteredPower});
     await page.reload();
     if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
     await page.getByRole('button',{name:'Open screenshot import'}).click();
