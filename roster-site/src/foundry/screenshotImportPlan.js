@@ -32,7 +32,8 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
     const localSuggestions=safe?[]:bulkCandidates(name,local,alliance).sort((a,b)=>rank(a)-rank(b));
     const wider=safe?[]:bulkCandidates(name,players,alliance);
     const candidates=[...new Map([...exact,...strict,...(safe?[selected]:[]),...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);
-    const result={candidates,player:safe?selected:null};cache.set(name,result);return result;
+    const suggested=!safe&&equivalent.length===1&&lookalikes.length===1&&equivalent[0].id===lookalikes[0].id&&preferred.has(equivalent[0].id)&&normaliseBulkName(name).length>=4?equivalent[0]:null;
+    const result={candidates,player:safe?selected:null,suggested};cache.set(name,result);return result;
   };
 }
 export function screenshotMatches(name,players,alliance){return createScreenshotMatcher(players,alliance)(name);}
