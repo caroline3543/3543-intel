@@ -4,6 +4,34 @@ import {chromium} from 'playwright';
 
 const origin=process.env.EVENT_PREVIEW_ORIGIN || 'http://127.0.0.1:4184';
 const server=process.env.EVENT_PREVIEW_ORIGIN ? null : spawn('./node_modules/.bin/vite',['preview','roster-site','--host','127.0.0.1','--port','4184','--strictPort'],{stdio:'inherit'});
+async function verifySwap(page){
+  const snapshot=()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1')));
+  const before=await snapshot();
+  await page.getByRole('button',{name:/Swap teams/}).click();
+  const panel=page.getByRole('region',{name:'Swap teams'});
+  const first=panel.getByRole('combobox',{name:'First team'}),second=panel.getByRole('combobox',{name:'Second team'});
+  const a=await first.inputValue(),b=await second.inputValue();
+  await second.selectOption(a);
+  assert.ok(await panel.getByRole('button',{name:/^Swap /}).isDisabled());
+  await second.selectOption(b);
+  await panel.getByRole('button',{name:'Cancel'}).click();
+  assert.deepEqual(await snapshot(),before);
+  await page.getByRole('button',{name:/Swap teams/}).click();
+  await panel.getByRole('button',{name:'Swap '+a+' and '+b}).click();
+  const after=await snapshot();
+  const changed=Object.keys(after.foundry.eventPlans).filter(k=>JSON.stringify(after.foundry.eventPlans[k])!==JSON.stringify(before.foundry.eventPlans[k]));
+  assert.equal(changed.length,1);
+  const old=before.foundry.eventPlans[changed[0]],next=after.foundry.eventPlans[changed[0]];
+  assert.ok(Object.values(old.teams).some(c=>c===a||c===b));
+  assert.deepEqual(next.teams,Object.fromEntries(Object.entries(old.teams).map(([id,c])=>[id,c===a?b:c===b?a:c])));
+  for(const field of ['registrations','registeredUnder','powerByPlayer','teamNames','shareInstructions'])assert.deepEqual(next[field],old[field]);
+  assert.deepEqual(after.players,before.players);
+  await page.getByRole('button',{name:'Undo',exact:true}).click();
+  const undone=await snapshot();
+  assert.deepEqual(undone.foundry.eventPlans[changed[0]].teams,old.teams);
+  assert.deepEqual(undone.foundry.eventPlans[changed[0]].assignments,old.assignments);
+}
+
 let browser;
 try {
   for(let i=0;i<45;i++){
@@ -103,6 +131,7 @@ try {
     for(const size of [3,4,5,6])await count.selectOption(String(size));
     await page.getByRole('button',{name:/Generate teams/}).click();
     await page.getByRole('button',{name:/Regenerate all teams/}).click();
+    await verifySwap(page);
     const purple=page.getByRole('heading',{name:/^Purple team/});
     await purple.waitFor();
     await page.getByRole('button',{name:/Move Northvale to another team/}).click();
@@ -175,6 +204,10 @@ try {
     assert.match(await attendanceHistory.innerText(),/Combatant\s*No-show/);
     await profile.getByRole('button',{name:'Close profile'}).click();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await page.getByRole('button',{name:'Teams',exact:true}).click();
+    await page.getByRole('button',{name:/Generate teams/}).click();
+    await page.getByRole('button',{name:/Regenerate all teams/}).click();
+    await verifySwap(page);
     await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Changes'}).click();
     const changes=page.getByRole('article');
     await changes.getByText('Aurora',{exact:true}).waitFor();
