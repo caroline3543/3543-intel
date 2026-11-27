@@ -171,8 +171,20 @@ export function suspiciousPowerChange(previous,next){
   return Number.isFinite(previous)&&previous>0&&Number.isFinite(next)&&next>=0&&(next>=previous*10||next<=previous/10);
 }
 
-export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId,move,roleChanges,screenshotImport},now=Date.now()) {
+export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId,move,roleChanges,screenshotImport,resetPlanner},now=Date.now()) {
   if(!Object.hasOwn(EVENT_NAMES,kind)||![1,2].includes(legion))return workspace;
+  if(resetPlanner){
+    const storage=workspace.foundry||{}, slots=resetPlanner.slots;
+    if(!Array.isArray(slots)||!slots.length||slots.length>2||new Set(slots.map(x=>x.legion)).size!==slots.length)return workspace;
+    if(slots.some(x=>![1,2].includes(x.legion)||typeof x.occurrenceId!=='string'||!x.occurrenceId.startsWith(plannerKey(kind,alliance,x.legion)+':')||plannerSlot(storage,kind,alliance,x.legion).occurrenceId!==x.expectedOccurrenceId))return workspace;
+    const eventPlans={...storage.eventPlans},eventArchives={...storage.eventArchives};
+    for(const slot of slots){
+      const key=plannerKey(kind,alliance,slot.legion), prior=plannerSlot(storage,kind,alliance,slot.legion);
+      eventArchives[prior.occurrenceId]={kind,alliance,legion:slot.legion,archivedAt:new Date(now).toISOString(),plan:prior};
+      eventPlans[key]={occurrenceId:slot.occurrenceId,teamCount:prior.teamCount||4,teamNames:prior.teamNames,shareInstructions:prior.shareInstructions,powerByPlayer:prior.powerByPlayer,registrations:{},registeredUnder:{},teams:{},assignments:{}};
+    }
+    return {...workspace,foundry:{...storage,eventPlans,eventArchives}};
+  }
   if(screenshotImport){
     const current=plannerSlot(workspace.foundry,kind,alliance,legion);
     const validIds=new Set(workspace.players.filter(player=>player.membershipStatus!=='transferred_out').map(player=>String(player.id)));
