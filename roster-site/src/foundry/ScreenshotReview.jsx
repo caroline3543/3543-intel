@@ -11,7 +11,7 @@ import {reviewAvatarSuggestions} from './reviewAvatarSuggestions.js';
 const roles = { combatant: 'Combatant', substitute: 'Substitute', unassigned: 'Unassigned', 'other-legion': 'Other legion', unknown: 'Unknown' };
 const modeLabels = { powers: 'troop powers', roles: 'registrations', both: 'troop powers and registrations' };
 
-export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false, onRetryUsername }) {
+export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false, onRetryUsername, onStageHeading }) {
   const [mode, setMode] = useState(initialMode);
   const [edits, setEdits] = useState(initialEdits);
   const [filter, setFilter] = useState('review');
@@ -147,6 +147,8 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
   }
 
   const stage = done ? 8 : summary ? 3 : preview ? 7 : focusedStage;
+  const stageHeading=done?'Roster updated':summary?'Your import is ready':preview?'Review changes':filter!=='review'||!focused?'Review readings':stage===4?'Confirm player':stage===5?'Resolve troop power':'Check registration';
+  useLayoutEffect(()=>{onStageHeading?.(stageHeading);},[stageHeading,onStageHeading]);
   return <section ref={reviewRef} className="ocr-review" aria-label="Review screenshot readings">
     {PreloadEvidence && !done && !preview && <PreloadEvidence files={upcomingFiles}/>}
     <div className="stage9-step-strip" aria-label={`Step ${stage} of 8`}>{Array.from({length:8},(_,i)=><span key={i} className={i+1===stage?"current":i+1<stage?"complete":""}/>)}</div>

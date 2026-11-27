@@ -85,6 +85,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   const [error, setError] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
   const [review, setReview] = useState(null);
+  const [reviewHeading,setReviewHeading]=useState('Your import is ready');
   const [evidenceCache,setEvidenceCache]=useState(null);
   useEffect(()=>{
     if(!review){setEvidenceCache(null);return;}
@@ -337,7 +338,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   return <section className="screenshot-import" aria-label="Troop power upload">
     <button ref={launchRef} type="button" className="screenshot-primary" onClick={() => setWorkspaceOpen(true)}>Open screenshot import</button>
     {workspaceOpen && createPortal(<section ref={workspaceRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Screenshot import workspace" className="stage9-import-workspace">
-      <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {review?.legion ?? activeLegion}</small><h2>Import roster</h2></div><button type="button" disabled={!!job} onClick={() => { setSession(latest.current); setReview(null); setWorkspaceOpen(false); }}>Close</button></header>
+      <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {review?.legion ?? activeLegion}</small><h2>{review ? reviewHeading : job ? 'Reading screenshots' : session?.pendingImport ? 'Awaiting confirmation' : 'Import roster'}</h2></div><button type="button" disabled={!!job} onClick={() => { setSession(latest.current); setReview(null); setWorkspaceOpen(false); }}>Close</button></header>
       <div className="stage9-import-content">
     {session?.pendingImport && !review ? <div className="stage9-summary"><h4>Awaiting confirmation</h4><p>Import changes retained. Check the shared save before submitting another import.</p><p>{title} · {alliance} · Legion {session.pendingImport.legion}</p><div role="status">{pendingStatus}</div><div className="stage9-action-footer"><button type="button" className="screenshot-primary" disabled={checkingPending} onClick={checkPending}>{checkingPending?'Checking shared save…':'Check save status'}</button><button type="button" disabled={checkingPending} onClick={returnToReview}>Return to review</button></div></div> : <>
     <input ref={picker} type="file" hidden multiple accept="image/png,image/jpeg,image/webp" aria-label="Troop power screenshots"
@@ -363,7 +364,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       <details className="stage9-source-list"><summary>Screenshot details · {items.length} files</summary><ul className="screenshot-results">{items.map(item => <ScreenshotResult key={item.id} item={item} locked={!!review || !!job || stale}
         onLegion={destination => checkpoint({ ...session, items: items.map(candidate => candidate.id === item.id ? { ...candidate, destination } : candidate) })}/>)}</ul></details>
       {groups.map(group => <button key={group.legion} type="button" className="screenshot-primary" disabled={!!job || !!review || stale}
-        onClick={() => setReview({ ...group, context: { kind, alliance, legion: group.legion, expectedOccurrenceId: session.occurrenceIds[group.legion] } })}>
+        onClick={() => {setReviewHeading('Your import is ready');setReview({ ...group, context: { kind, alliance, legion: group.legion, expectedOccurrenceId: session.occurrenceIds[group.legion] } });}}>
         Review Legion {group.legion} · {group.rows.length} readings
       </button>)}
     </>}
@@ -373,7 +374,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     </div>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
-    {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview {...review} players={players} preferredIds={preferredIds} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage} PreloadEvidence={ReviewEvidence} onRetryUsername={rereadUsername}
+    {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview onStageHeading={setReviewHeading} {...review} players={players} preferredIds={preferredIds} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage} PreloadEvidence={ReviewEvidence} onRetryUsername={rereadUsername}
       initialMode={latest.current?.drafts?.[review.legion]?.mode ?? mode}
       initialEdits={latest.current?.drafts?.[review.legion]?.edits ?? {}}
       onDraftChange={draft => {
