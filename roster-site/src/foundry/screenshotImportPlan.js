@@ -16,7 +16,10 @@ export function screenshotMatches(name, players, alliance) {
   const candidates = [...new Map([...exact, ...suggestions].map(player => [player.id, player])).values()].slice(0, 8);
   const key=normaliseBulkName(name);
   const equivalent=key ? players.filter(player=>playerFields(player).some(field=>normaliseBulkName(field)===key)) : [];
-  const safe=exact.length===1 && equivalent.length===1 && equivalent[0].id===exact[0].id;
+  const visualKey=value=>normaliseBulkName(value).replace(/0/g,'o').replace(/[1l]/g,'i');
+  const visual=visualKey(name);
+  const lookalikes=visual ? players.filter(player=>playerFields(player).some(field=>visualKey(field)===visual)) : [];
+  const safe=exact.length===1 && equivalent.length===1 && equivalent[0].id===exact[0].id && lookalikes.length===1;
   return { candidates, player: safe ? exact[0] : null };
 }
 
