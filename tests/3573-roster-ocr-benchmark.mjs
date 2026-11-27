@@ -83,8 +83,8 @@ try {
   }));
   const recognitionBatchMs=Math.round(performance.now()-batchStarted);
   // Exercise both production event modes on identical source images.
-  // Opt-in because this requires two additional OCR passes per image.
-  if(process.env.ROSTER_EVENT_PARITY==='1'){
+  // Enabled by default; explicit opt-out for local exploratory runs.
+  if(process.env.ROSTER_EVENT_PARITY!=='0'){
     const parity=[];
     for(const filename of files){
       const content=(await readFile(resolve(directory,filename))).toString('base64');
