@@ -26,9 +26,15 @@ jobs:
           ROSTER_SCREENSHOTS_DIR: tests/fixtures/3573-ocr/screenshots
           ROSTER_NEGATIVE_SCREENSHOT: tests/fixtures/3573-ocr/negative/IMG_9839.jpeg
           ROSTER_GROUND_TRUTH: tests/fixtures/3573-ocr/ground-truth.json
-        run: node tests/3573-roster-ocr-benchmark.mjs "$GITHUB_WORKSPACE/ocr-results.json"
+        run: |
+          for workers in 1 2 3 4; do
+            for trial in 1 2 3; do
+              ROSTER_OCR_WORKERS=$workers node tests/3573-roster-ocr-benchmark.mjs "$GITHUB_WORKSPACE/ocr-results-$workers-$trial.json"
+            done
+          done
+          node tests/3573-ocr-performance-compare.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: real-image-ocr-results
-          path: ocr-results.json
+          path: ocr-results*.json
