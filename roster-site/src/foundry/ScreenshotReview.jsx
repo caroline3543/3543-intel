@@ -24,6 +24,19 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
   const [summary, setSummary] = useState(true);
   const [focusedId, setFocusedId] = useState(null);
   const [identityChoice,setIdentityChoice]=useState(null);
+  const [retrying,setRetrying]=useState(null);
+  const [retryNotes,setRetryNotes]=useState({});
+  async function retryUsername(row){
+    if(retrying)return;
+    const evidence=row.evidence?.[0];if(!evidence)return;
+    setRetrying(row.rowId);
+    try{
+      const {retryRosterUsername}=await import('./readRosterScreenshot.js');
+      const name=await retryRosterUsername(sources[evidence.sourceIndex]?.file,evidence.bounds);
+      setRetryNotes(prev=>({...prev,[row.rowId]:name?{name}:{message:'No additional username found.'}}));
+    }catch{setRetryNotes(prev=>({...prev,[row.rowId]:{message:'Could not reread username. Search the roster manually.'}}));}
+    finally{setRetrying(null);}
+  }
   const reviewRef=useRef(null);
   const { alliance, legion, kind } = context;
   const target = plannerSlot(storage, kind, alliance, legion);
@@ -35,12 +48,13 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
   const matcher=useMemo(()=>createScreenshotMatcher(players,alliance,preferredIds,registeredIds),[players,alliance,preferredIds,registeredIds]);
   const matches=useMemo(()=>rows.map(row=>{
     const original=matcher(row.name);
-    if(original.player || !row.nameAlternatives?.length) return original;
-    const alternatives=row.nameAlternatives.map(name=>matcher(name));
+    const names=[...new Set([...(row.nameAlternatives??[]),retryNotes[row.rowId]?.name].filter(Boolean))];
+    if(original.player || !names.length) return original;
+    const alternatives=names.map(name=>matcher(name));
     const exactAlternatives=alternatives.flatMap(match=>match.player?[match.player]:[]);
     const candidates=[...new Map([...exactAlternatives,...original.candidates,...alternatives.flatMap(match=>match.candidates)].map(p=>[p.id,p])).values()].slice(0,8);
     return {...original,candidates,suggested:null};
-  }),[rows,matcher]);
+  }),[rows,matcher,retryNotes]);
   const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players]);
   const evaluated = useMemo(()=>rows.map((row, index) => {
     const edit = edits[row.rowId] ?? {};
@@ -186,7 +200,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
               </details>)}
               {filter !== "review" && <label><input type="checkbox" checked={!!edit.skip} onChange={event => update(row.rowId, { skip: event.target.checked })}/> Skip this reading</label>}
               {!edit.skip && <>
-                {(filter !== "review" || stage === 4) && <><>{row.nameAlternatives?.length>0 && <p>Alternative OCR readings: {row.nameAlternatives.join(" · ")}. Check the screenshot before choosing a player.</p>}</><label>Search roster for {title}<input type="search" value={edit.search ?? ''} onChange={event => update(row.rowId, { search: event.target.value })}/></label>
+                {(filter !== "review" || stage === 4) && <><>{row.nameAlternatives?.length>0 && <p>Alternative OCR readings: {row.nameAlternatives.join(" · ")}. Check the screenshot before choosing a player.</p>}</>{!match.player && row.evidence?.length>0 && <><button type="button" disabled={!!retrying||working} onClick={()=>retryUsername(row)}>{retrying===row.rowId?'Rereading username…':'Reread username'}</button>{retryNotes[row.rowId] && <p role="status">{retryNotes[row.rowId].name?'Additional reading: '+retryNotes[row.rowId].name:retryNotes[row.rowId].message}</p>}</>}<label>Search roster for {title}<input type="search" value={edit.search ?? ''} onChange={event => update(row.rowId, { search: event.target.value })}/></label>
                 {filter==='review' && stage===4 && match.suggested && !query && <p>Suggested match selected. Check the screenshot before confirming.</p>}
                 {candidates.map(candidate => <button key={candidate.id} type="button" style={candidate.id === (filter === 'review' ? selectedIdentity ?? player?.id : player?.id)?{borderColor:'#4ade80',background:'#172e29'}:undefined} aria-pressed={candidate.id === (filter === 'review' ? selectedIdentity ?? player?.id : player?.id)}
                   onClick={() => filter === 'review' ? setIdentityChoice({rowId:row.rowId,id:candidate.id}) : update(row.rowId, { playerId: candidate.id, ...(candidate.id !== player?.id ? { role: null, registrationReviewed: false, checked: false } : {}) })}>

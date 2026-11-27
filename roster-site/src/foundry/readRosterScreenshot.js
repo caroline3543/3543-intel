@@ -189,3 +189,22 @@ export async function readRosterScreenshot(worker, file, kind, { matchName } = {
     URL.revokeObjectURL(url);
   }
 }
+
+export async function retryRosterUsername(file,bounds) {
+  if(!file || !bounds || !Number.isFinite(bounds.top) || !Number.isFinite(bounds.bottom) || bounds.top<0 || bounds.bottom>1 || bounds.bottom<=bounds.top) throw new Error('Screenshot evidence unavailable');
+  const url=URL.createObjectURL(file);
+  let worker;
+  try {
+    const source=new Image();source.src=url;await source.decode();
+    const width=Math.min(1284,Math.max(950,source.naturalWidth)),height=Math.round(width*source.naturalHeight/source.naturalWidth);
+    const screen=canvas(width,height),context=screen.getContext('2d',{willReadFrequently:true});
+    context.drawImage(source,0,0,width,height);
+    const top=Math.round(bounds.top*height),bottom=Math.round(bounds.bottom*height),nominal=Math.round(height*.077);
+    const start=top<=Math.round(height*.336)?bottom-nominal:top;
+    const other=greenDensity(context,Math.round(width*.22),Math.round(start+nominal*.69),Math.round(width*.63),bottom)>.035;
+    const end=Math.min(bottom,Math.round(start+nominal*(other ? .40 : .54)));
+    if(end<=top)return '';
+    worker=await createRosterReader();
+    return stripPowerLine(await recognize(worker,textCrop(screen,Math.round(width*.219),top,Math.round(width*.50),end-top,{tight:true,dark:true}),PSM.SINGLE_LINE));
+  } finally {URL.revokeObjectURL(url);if(worker)await worker.terminate();}
+}
