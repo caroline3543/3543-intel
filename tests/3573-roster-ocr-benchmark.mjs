@@ -16,6 +16,11 @@ const files = (await readdir(directory)).filter(name => /\.(?:png|jpe?g|webp)$/i
 assert.ok(files.length >= 1 && files.length <= 25, 'Put 1–25 original screenshots in ROSTER_SCREENSHOTS_DIR.');
 const labels=groundTruthPath ? JSON.parse(await readFile(groundTruthPath,'utf8')) : null;
 const rosterNames=[...new Set(Object.values(labels??{}).flatMap(s=>s.rows.map(r=>r.name)))];
+const rosterPath=process.env.ROSTER_IDENTITY_SNAPSHOT;
+const roster=rosterPath?JSON.parse(await readFile(resolve(rosterPath),'utf8')):rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'}));
+assert.ok(Array.isArray(roster)&&roster.every(p=>typeof p.id==='string'&&typeof p.name==='string'&&typeof p.alliance==='string'),'Invalid identity snapshot');
+assert.equal(new Set(roster.map(p=>p.id)).size,roster.length,'Duplicate snapshot identity');
+const identityScope=rosterPath?'external roster snapshot':'label-derived roster';
 process.chdir('roster-site');
 const server = await createServer({ server:{ host:'127.0.0.1', port:5177, strictPort:true } });
 await server.listen();
@@ -27,14 +32,14 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:5177/event-preview.html');
   const workerStarted = performance.now();
-  await page.evaluate(async ({workerCount,rosterNames,retriesEnabled}) => {
+  await page.evaluate(async ({workerCount,roster,retriesEnabled}) => {
     const reader = await import('/src/foundry/readRosterScreenshot.js');
     window.rosterReaders = await Promise.all(Array.from({length:workerCount},()=>reader.createRosterReader()));
     window.rosterReader=window.rosterReaders[0];
     window.scanRoster = reader.readRosterScreenshot;
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
-    window.matchName=retriesEnabled ? createScreenshotMatcher(rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'})),'HOT') : undefined;
-  },{workerCount,rosterNames,retriesEnabled});
+    window.matchName=retriesEnabled ? createScreenshotMatcher(roster,'HOT') : undefined;
+  },{workerCount,roster,retriesEnabled});
   const startupMs = Math.round(performance.now() - workerStarted);
   const batchStarted = performance.now();
   const screenshots = new Array(files.length);
@@ -88,9 +93,8 @@ try {
     const label=labels[screenshot.filename].rows.find(l=>Math.abs(l.center-(row.bounds.top+row.bounds.bottom)/2)<=.035);
     if(label&&row.name!==label.name&&row.nameAlternatives?.includes(label.name))retryMetrics.alternativeExactRecoveries++;
   }
-  const reviewMetrics=labels?await page.evaluate(async ({screenshots,labels,rosterNames})=>{
+  const reviewMetrics=labels?await page.evaluate(async ({screenshots,labels,roster})=>{
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
-    const roster=rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'}));
     const matcher=createScreenshotMatcher(roster,'HOT');
     const metrics={labelled:0,automaticCorrect:0,automaticWrong:0,manual:0,originalTop1:0,improvedTop1:0,originalTop8:0,improvedTop8:0,unresolved:[]};
     for(const screenshot of screenshots)for(const row of screenshot.rows??[]){
@@ -109,7 +113,7 @@ try {
       metrics.unresolved.push({filename:screenshot.filename,expected:label.name,reading:row.name,alternatives:row.nameAlternatives??[],candidates:original.candidates.map(p=>p.name),correctCandidateRank:candidates.findIndex(p=>p.name===label.name)+1,decorativeOrSpacingAmbiguity:!!label.decorativeOrSpacingAmbiguity});
     }
     return metrics;
-  },{screenshots,labels,rosterNames}):null;
+  },{screenshots,labels,roster}):null;
   console.log('Identity review metrics:',JSON.stringify(reviewMetrics));
   const fingerprints=cards.filter(r=>r.avatarEvidence);
   const groups=new Map();
@@ -126,7 +130,7 @@ try {
     identicalFingerprintGroups:[...groups.values()].filter(g=>g.length>1).map(g=>({count:g.length,names:[...new Set(g)]}))};
   // Only aggregate diagnostics leave the benchmark process; no avatar fingerprints in artifacts.
   for(const row of cards)delete row.avatarEvidence;
-  await writeFile(output, JSON.stringify({retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots,scores,negative,avatarMetrics,retryMetrics,reviewMetrics},null,2)+'\n');
+  await writeFile(output, JSON.stringify({identityScope,retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots,scores,negative,avatarMetrics,retryMetrics,reviewMetrics},null,2)+'\n');
   if(scores){
     const sum=key=>scores.reduce((total,s)=>total+s[key],0);
     const expected=sum('expected');
