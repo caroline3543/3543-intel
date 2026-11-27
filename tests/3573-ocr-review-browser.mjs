@@ -73,6 +73,17 @@ try {
         return Object.values(session?.drafts?.[1]?.edits??{}).some(edit=>edit.retryNote&&!edit.playerId);
       }finally{db.close();}
     },kind);
+    const retryStatus=review.getByRole('status').filter({hasText:/Additional reading:|No additional username found/});
+    const firstReading=await retryStatus.innerText();
+    await reread.click();
+    await review.getByRole('button',{name:'Rereading username…',exact:true}).waitFor({state:'hidden',timeout:90000});
+    assert.equal(await retryStatus.innerText(),firstReading,'Repeated recognition must remain stable');
+    await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('button',{name:'Close',exact:true}).click();
+    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
+    await review.getByRole('button',{name:/Resolve .* readings/}).click();
+    await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
+    assert.equal(await retryStatus.innerText(),firstReading,'Additional OCR evidence must survive reopening');
     await review.getByText('Review options',{exact:true}).click();
     await review.getByRole('button',{name:'Review troop powers changes'}).click();
     await review.getByRole('alert').filter({hasText:'Resolve or skip'}).waitFor();
