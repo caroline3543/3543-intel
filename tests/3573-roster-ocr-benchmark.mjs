@@ -18,7 +18,7 @@ const labels=groundTruthPath ? JSON.parse(await readFile(groundTruthPath,'utf8')
 const rosterNames=[...new Set(Object.values(labels??{}).flatMap(s=>s.rows.map(r=>r.name)))];
 const rosterPath=process.env.ROSTER_IDENTITY_SNAPSHOT;
 const benchmarkAlliance=process.env.ROSTER_BENCHMARK_ALLIANCE??'HOT';
-const roster=rosterPath?JSON.parse(await readFile(resolve(rosterPath),'utf8')):rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'}));
+const roster=rosterPath?JSON.parse(await readFile(resolve(rosterPath),'utf8')).map(p=>({...p,nickname:p.alias||p.nickname,ocrAliases:Array.isArray(p.ocrAliases)?p.ocrAliases:[]})):rosterNames.map((name,i)=>({name,id:String(i+1),alliance:benchmarkAlliance}));
 assert.ok(Array.isArray(roster)&&roster.every(p=>typeof p.id==='string'&&typeof p.name==='string'&&typeof p.alliance==='string'),'Invalid identity snapshot');
 assert.equal(new Set(roster.map(p=>p.id)).size,roster.length,'Duplicate snapshot identity');
 if(rosterPath){assert.ok(labels,'External snapshot requires ID-labelled ground truth');const ids=new Set(roster.map(p=>p.id));for(const screenshot of Object.values(labels))for(const row of screenshot.rows)assert.ok(typeof row.playerId==='string'&&ids.has(row.playerId),'External ground truth must identify every row by a valid player ID');}
