@@ -30,6 +30,7 @@ try {
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     await page.goto(origin+'/event-preview.html');
+    await page.waitForFunction(()=>{try{return Array.isArray(JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1'))?.players);}catch{return false;}},null,{timeout:30000});
     await page.evaluate(async ({kind,evidenceImage})=>{
       const db=await new Promise((resolve,reject)=>{
         const req=indexedDB.open('3573-screenshot-import',1);
@@ -152,7 +153,7 @@ try {
         const session=await new Promise((resolve,reject)=>{const req=db.transaction('sessions','readonly').objectStore('sessions').get(kind+':ARC');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
         return Object.values(session?.drafts?.[1]?.edits??{}).some(edit=>edit.power===String(enteredPower)&&!edit.powerConfirmed);
       } finally {db.close();}
-    },kind);
+    },{kind,enteredPower});
     await page.reload();
     if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
     await page.getByRole('button',{name:'Open screenshot import'}).click();
