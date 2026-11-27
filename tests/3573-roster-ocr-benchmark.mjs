@@ -82,6 +82,28 @@ try {
   }
   }));
   const recognitionBatchMs=Math.round(performance.now()-batchStarted);
+  // Exercise both production event modes on identical source images.
+  // Opt-in because this requires two additional OCR passes per image.
+  if(process.env.ROSTER_EVENT_PARITY==='1'){
+    const parity=[];
+    for(const filename of files){
+      const content=(await readFile(resolve(directory,filename))).toString('base64');
+      const result=await page.evaluate(async ({filename,content,roster,benchmarkAlliance})=>{
+        const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
+        const matcher=createScreenshotMatcher(roster,benchmarkAlliance);
+        const scan=async kind=>{
+          const file=new File([Uint8Array.from(atob(content),c=>c.charCodeAt(0))],filename);
+          const data=await window.scanRoster(window.rosterReader,file,kind,{matchName:matcher});
+          return data.rows.map(row=>({name:row.name,alternatives:row.nameAlternatives??[],identity:matcher(row.name).player?.id??null,power:row.power??null}));
+        };
+        const foundry=await scan('foundry'),canyon=await scan('canyon');
+        return {equal:JSON.stringify(foundry)===JSON.stringify(canyon),foundryRows:foundry.length,canyonRows:canyon.length};
+      },{filename,content,roster,benchmarkAlliance});
+      parity.push(result);
+    }
+    console.log('Production event mode parity:',JSON.stringify({images:parity.length,equal:parity.filter(p=>p.equal).length,divergent:parity.filter(p=>!p.equal).length}));
+    assert.ok(parity.every(p=>p.equal),'Foundry/Canyon production mode OCR divergence');
+  }
   let negative=null;
   if(negativePath){
     const content=(await readFile(negativePath)).toString('base64');
