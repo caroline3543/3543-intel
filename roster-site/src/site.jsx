@@ -136,7 +136,15 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     const alias=String(reading??'').trim().normalize('NFC');
     if(!alias||alias.length>128)return {error:'Enter a valid OCR spelling.'};
     if(!sync.ready||!sync.joined||sync.conflicts?.length)return {error:'Connect to the shared workspace before saving a spelling.'};
-    await setSharedData(prev=>({...prev,players:prev.players.map(p=>String(p.id)===String(id)?{...p,ocrAliases:[...new Set([...(Array.isArray(p.ocrAliases)?p.ocrAliases:[]),alias])]}:p)}));
+    const key=value=>String(value??'').normalize('NFKC').toLowerCase().replace(/[Ξξ=]/gu,'e').replace(/ı/gu,'i').replace(/¥/gu,'y').normalize('NFD').replace(/[\p{P}\p{S}\p{M}\s]/gu,'').replace(/0/g,'o').replace(/[1l]/g,'i');
+    if(!key(alias))return {error:'Enter a spelling containing letters or numbers.'};
+    let rejected='';
+    await setSharedData(prev=>{
+      if(!prev.players.some(p=>String(p.id)===String(id))){rejected='Player no longer exists.';return prev;}
+      if(prev.players.some(p=>String(p.id)!==String(id)&&[p.username,p.name,p.alias,p.nickname,p.fid,p.id,...(Array.isArray(p.ocrAliases)?p.ocrAliases:[]),...(Array.isArray(p.pastUsernames)?p.pastUsernames:[])].some(value=>key(value)===key(alias)))){rejected='This spelling conflicts with another player. Uncheck Remember to confirm this reading only.';return prev;}
+      return {...prev,players:prev.players.map(p=>String(p.id)===String(id)?{...p,ocrAliases:[...new Set([...(Array.isArray(p.ocrAliases)?p.ocrAliases:[]),alias])]}:p)};
+    });
+    if(rejected)return {error:rejected};
     const deadline=Date.now()+35000;
     while(Date.now()<deadline){
       const state=await retry();
