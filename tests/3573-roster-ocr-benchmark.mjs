@@ -22,6 +22,16 @@ const roster=rosterPath?JSON.parse(await readFile(resolve(rosterPath),'utf8')):r
 assert.ok(Array.isArray(roster)&&roster.every(p=>typeof p.id==='string'&&typeof p.name==='string'&&typeof p.alliance==='string'),'Invalid identity snapshot');
 assert.equal(new Set(roster.map(p=>p.id)).size,roster.length,'Duplicate snapshot identity');
 if(rosterPath){assert.ok(labels,'External snapshot requires ID-labelled ground truth');const ids=new Set(roster.map(p=>p.id));for(const screenshot of Object.values(labels))for(const row of screenshot.rows)assert.ok(typeof row.playerId==='string'&&ids.has(row.playerId),'External ground truth must identify every row by a valid player ID');}
+if(process.env.ROSTER_REQUIRE_INDEPENDENT_GATE==='1'){
+  assert.ok(rosterPath&&labels,'Independent gate requires external roster and verified labels');
+  assert.deepEqual(Object.keys(labels).sort(),files,'Every evaluation image must have labels, with no extra labelled images');
+  for(const filename of files){
+    const rows=labels[filename].rows;
+    assert.ok(Array.isArray(rows)&&rows.length>0,'Empty evaluation labels: '+filename);
+    assert.ok(rows.every(r=>Number.isFinite(r.center)&&r.center>=0&&r.center<=1),'Invalid row center: '+filename);
+    assert.equal(new Set(rows.map(r=>r.center)).size,rows.length,'Duplicate row centers: '+filename);
+  }
+}
 const identityScope=rosterPath?'external roster snapshot':'label-derived roster';
 process.chdir('roster-site');
 const server = await createServer({ server:{ host:'127.0.0.1', port:5177, strictPort:true } });
@@ -123,11 +133,15 @@ try {
     const results=variants.map(players=>{
       const match=createScreenshotMatcher(players,benchmarkAlliance);
       const counts={correct:0,wrong:0,manual:0,missing:0};
-      for(const screenshot of screenshots)for(const label of labels[screenshot.filename].rows){
-        const row=(screenshot.rows??[]).find(r=>Math.abs(label.center-(r.bounds.top+r.bounds.bottom)/2)<=.035);
+      for(const screenshot of screenshots){
+        const used=new Set();
+        for(const label of labels[screenshot.filename].rows){
+        const row=(screenshot.rows??[]).filter(r=>!used.has(r)&&Math.abs(label.center-(r.bounds.top+r.bounds.bottom)/2)<=.035).sort((a,b)=>Math.abs(label.center-(a.bounds.top+a.bounds.bottom)/2)-Math.abs(label.center-(b.bounds.top+b.bounds.bottom)/2))[0];
+        if(row)used.add(row);
         if(!row){counts.missing++;continue;}
         const p=match(row.name).player;
         counts[!p?'manual':p.id===label.playerId?'correct':'wrong']++;
+        }
       }
       return counts;
     });
