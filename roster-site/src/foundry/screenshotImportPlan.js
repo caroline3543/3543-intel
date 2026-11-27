@@ -16,7 +16,7 @@ export function screenshotMatches(name, players, alliance) {
   const candidates = [...new Map([...exact, ...suggestions].map(player => [player.id, player])).values()].slice(0, 8);
   const key=normaliseBulkName(name);
   const equivalent=key ? players.filter(player=>playerFields(player).some(field=>normaliseBulkName(field)===key)) : [];
-  const safe=exact.length===1 && equivalent.length===1 && equivalent[0].id===exact[0].id && exact[0].alliance===alliance;
+  const safe=exact.length===1 && equivalent.length===1 && equivalent[0].id===exact[0].id;
   return { candidates, player: safe ? exact[0] : null };
 }
 
