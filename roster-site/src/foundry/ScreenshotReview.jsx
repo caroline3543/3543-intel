@@ -44,7 +44,8 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   useEffect(() => { onDraftChange?.({ mode, edits }); }, [mode, edits]);
   const active = evaluated.filter(item => !item.edit.skip);
   const confirmed = active.filter(item => item.player);
-  const exceptions = active.filter(item => item.needsReview);
+  const priority = item => !item.player ? 0 : mode !== 'roles' && (item.powerPending || item.power === null || item.conflict && !item.edit.checked) ? 1 : 2;
+  const exceptions = active.filter(item => item.needsReview).sort((a,b)=>priority(a)-priority(b));
   const issueCounts = [
     ['Identity matches', exceptions.filter(item=>!item.player).length],
     ['Troop power checks', exceptions.filter(item=>mode!=='roles'&&(item.powerPending||item.power===null||item.row.powerConflict?.length>1&&!item.edit.checked)).length],
