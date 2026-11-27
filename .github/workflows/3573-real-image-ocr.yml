@@ -33,6 +33,19 @@ jobs:
             done
           done
           node tests/3573-ocr-performance-compare.mjs
+          for trial in 1 2 3; do
+            ROSTER_OCR_RETRIES=0 ROSTER_OCR_WORKERS=2 node tests/3573-roster-ocr-benchmark.mjs "$GITHUB_WORKSPACE/ocr-results-baseline-$trial.json"
+          done
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          const load=p=>JSON.parse(readFileSync(p,'utf8'));
+          const median=a=>a.sort((a,b)=>a-b)[1];
+          const baseline=[1,2,3].map(i=>load('ocr-results-baseline-'+i+'.json'));
+          const improved=[1,2,3].map(i=>load('ocr-results-2-'+i+'.json'));
+          const summarize=a=>({medianMs:median(a.map(x=>x.recognitionBatchMs)),rawNameCorrect:a[0].scores.reduce((n,s)=>n+s.nameCorrect,0),expected:a[0].scores.reduce((n,s)=>n+s.expected,0),retryMetrics:a[0].retryMetrics});
+          const b=summarize(baseline),n=summarize(improved);
+          console.log(JSON.stringify({baseline:b,improved:n,overheadPercent:100*(n.medianMs/b.medianMs-1)},null,2));
+          JS
       - uses: actions/upload-artifact@v4
         if: always()
         with:
