@@ -37,7 +37,14 @@ function Preview(){
   const [opened,open]=useState(null);
   const [teamwork,setTeamwork]=useState({pairs:[['sample-7','sample-9']]});
   const [workspace,save]=useState(previewWorkspace);
-  const saveScreenshot = action => {
+  const saveScreenshot = (action,{verifyOnly=false}={}) => {
+    if(verifyOnly){
+      const persisted=previewWorkspace();
+      const slot=plannerSlot(persisted.foundry,action.kind,action.alliance,action.legion);
+      const field=action.kind==='foundry'?'lastFoundryTroopPower':'lastCanyonClashTroopPower';
+      const matches=slot.occurrenceId===action.expectedOccurrenceId&&(action.powers??[]).every(row=>slot.powerByPlayer?.[row.id]===row.value&&persisted.players.find(p=>p.id===row.id)?.[field]===row.value)&&(action.roleChanges??[]).every(row=>(slot.registrations[row.id]||'')===row.role&&(!row.moveFrom||!plannerSlot(persisted.foundry,action.kind,row.moveFrom.alliance,row.moveFrom.legion).registrations[row.id]));
+      return matches?{message:'Sample roster save verified.'}:{error:'Sample save not confirmed.',pending:true};
+    }
     const next = updateEventPlanner(workspace, action);
     if (next === workspace) return { error: 'The sample roster or event changed. Review the import again.' };
     try {
