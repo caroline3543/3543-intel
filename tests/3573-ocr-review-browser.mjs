@@ -157,7 +157,8 @@ try {
     await page.screenshot({path:'ocr-review-captures/'+kind+'-pending-recovery.png'});
     const beforeVerify=await page.evaluate(()=>sessionStorage.getItem('3573-event-preview-fixture-v1'));
     await pending.getByRole('button',{name:'Check save status'}).click();
-    await pending.getByRole('heading',{name:'Awaiting confirmation'}).waitFor({state:'hidden'});
+    await pending.getByRole('button',{name:'Checking shared save…'}).waitFor({state:'hidden'});
+    try { await pending.getByRole('heading',{name:'Awaiting confirmation'}).waitFor({state:'hidden',timeout:5000}); } catch(error) { throw new Error(kind+' recovery: '+await pending.innerText(),{cause:error}); }
     assert.equal(await page.evaluate(()=>sessionStorage.getItem('3573-event-preview-fixture-v1')),beforeVerify,'Verification must not mutate the roster');
     assert.deepEqual(errors,[]);
     await page.close();
