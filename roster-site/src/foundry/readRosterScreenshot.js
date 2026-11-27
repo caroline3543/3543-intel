@@ -1,3 +1,4 @@
+import {avatarCropGeometry} from './avatarCropGeometry.js';
 import { avatarFingerprint } from './avatarFingerprint.js';
 import { simd } from 'wasm-feature-detect';
 import simdCorePath from 'tesseract.js-core/tesseract-core-simd-lstm.wasm.js?url';
@@ -160,9 +161,9 @@ export async function readRosterScreenshot(worker, file, kind) {
       // Experimental, opt-in only: never persist this evidence in ordinary import sessions.
       let avatarEvidence;
       if (kind && typeof kind === 'object' && kind.avatarBenchmark === true) {
-        const left=x(.075), right=x(.195), upper=rowY(.04), lower=rowY(.65);
-        if (upper>=top && lower<=bottom && right>left && lower>upper) {
-          const image=context.getImageData(left,upper,right-left,lower-upper);
+        const crop=avatarCropGeometry(width,height,top,bottom);
+        if (crop) {
+          const image=context.getImageData(crop.left,crop.upper,crop.width,crop.height);
           avatarEvidence=avatarFingerprint(image.data,image.width,image.height);
         }
       }
