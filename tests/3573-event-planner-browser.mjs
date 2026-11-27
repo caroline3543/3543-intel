@@ -26,6 +26,16 @@ async function verifySwap(page){
   assert.deepEqual(next.teams,Object.fromEntries(Object.entries(old.teams).map(([id,c])=>[id,c===a?b:c===b?a:c])));
   for(const field of ['registrations','registeredUnder','powerByPlayer','teamNames','shareInstructions'])assert.deepEqual(next[field],old[field]);
   assert.deepEqual(after.players,before.players);
+  if(await page.getByRole('button',{name:'Buildings',exact:true}).count()){
+    const positions={Blue:['Prototype Site I','Boiler Room'],Yellow:['Prototype Site II','Central Transit Station']};
+    assert.ok(positions[a]&&positions[b]);
+    for(const [id,c] of Object.entries(old.teams)){
+      if(c!==a&&c!==b){assert.equal(next.assignments[id],old.assignments[id]);continue;}
+      const destination=c===a?b:a;
+      const index=Math.max(0,positions[c].indexOf(old.assignments[id]));
+      assert.equal(next.assignments[id],positions[destination][index]);
+    }
+  }else assert.deepEqual(next.assignments,old.assignments);
   await page.getByRole('button',{name:'Undo',exact:true}).click();
   const undone=await snapshot();
   assert.deepEqual(undone.foundry.eventPlans[changed[0]].teams,old.teams);
