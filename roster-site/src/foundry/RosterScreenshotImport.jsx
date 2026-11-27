@@ -198,6 +198,15 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   }
 
   const saving = useRef(false);
+  const [checkingPending,setCheckingPending]=useState(false);
+  const [pendingStatus,setPendingStatus]=useState('');
+  async function checkPending(){
+    if(checkingPending||!latest.current?.pendingImport)return;
+    setCheckingPending(true);
+    try{const result=await saveOnce(latest.current.pendingImport);setPendingStatus(result?.error||result?.message||'Shared confirmation unavailable.');}
+    catch{setPendingStatus('Could not verify the shared save. Check again later.');}
+    finally{setCheckingPending(false);}
+  }
   async function saveOnce(action) {
     const pending=latest.current?.pendingImport;
     if(pending&&JSON.stringify(pending)!==JSON.stringify(action))return {error:'A previous import is awaiting verification. Check its save status first.',pending:true};
@@ -236,6 +245,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     {workspaceOpen && createPortal(<section ref={workspaceRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Screenshot import workspace" className="stage9-import-workspace">
       <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {review?.legion ?? activeLegion}</small><h2>Import roster</h2></div><button type="button" disabled={!!job} onClick={() => { setReview(null); setWorkspaceOpen(false); }}>Close</button></header>
       <div className="stage9-import-content">
+    {session?.pendingImport && !review ? <div className="stage9-summary"><h4>Awaiting confirmation</h4><p>Import changes retained. Check the shared save before submitting another import.</p><p>{title} · {alliance} · Legion {session.pendingImport.legion}</p><div role="status">{pendingStatus}</div><div className="stage9-action-footer"><button type="button" className="screenshot-primary" disabled={checkingPending} onClick={checkPending}>{checkingPending?'Checking shared save…':'Check save status'}</button></div></div> : <>
     <input ref={picker} type="file" hidden multiple accept="image/png,image/jpeg,image/webp" aria-label="Troop power screenshots"
       disabled={loading || !!job || !!review} onChange={chooseFiles}/>
     {!review && <div className="stage9-step-strip" aria-label={`Step ${run.current ? 2 : 1} of 8`}>{Array.from({length:8},(_,i)=><span key={i} className={i===(run.current?1:0)?"current":run.current&&i===0?"complete":""}/>)}</div>}
@@ -282,6 +292,8 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       }}
       onContinueTeams={review.legion === activeLegion && onContinueTeams ? () => { setReview(null); setWorkspaceOpen(false); onContinueTeams(); } : undefined}
       onClose={() => setReview(null)}/>}
+    </>}
+      {!session?.pendingImport && pendingStatus && !review && <p role="status">{pendingStatus}</p>}
       </div>
     </section>, document.body)}
     {children}
