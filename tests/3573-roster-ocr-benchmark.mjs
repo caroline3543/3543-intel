@@ -63,6 +63,17 @@ try {
     return {filename:actual.filename,...scoreScreenshot(expected,actual)};
   }) : null;
   await writeFile(output, JSON.stringify({startupMs,batchMs,errors,screenshots,scores,negative},null,2)+'\n');
+  if(scores){
+    const sum=key=>scores.reduce((total,s)=>total+s[key],0);
+    const expected=sum('expected');
+    assert.ok(expected>0,'Ground truth must contain labelled cards');
+    assert.ok(sum('detected')/expected>=.99,'Card detection below 99%');
+    assert.ok(sum('powerCorrect')/expected>=.99,'Exact power recognition below 99%');
+    assert.equal(sum('registrationCorrect'),expected,'Registration recognition must be exact');
+    assert.equal(sum('otherLegionCorrect'),expected,'Other-legion recognition must be exact');
+    assert.ok(scores.every(s=>s.legionCorrect),'Incorrect screenshot legion');
+    assert.equal(sum('extra'),0,'Unexpected player cards detected');
+  }
   assert.deepEqual(errors, []);
   if(negative)assert.equal(negative.rejected,true,'Unsupported screenshot must be rejected');
   assert.ok(screenshots.every(result => !result.error));
