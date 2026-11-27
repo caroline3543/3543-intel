@@ -225,7 +225,7 @@ try {
     try { await pending.getByRole('heading',{name:'Awaiting confirmation'}).waitFor({state:'hidden',timeout:5000}); } catch(error) { throw new Error(kind+' recovery: '+await pending.innerText(),{cause:error}); }
     assert.equal(await page.evaluate(()=>sessionStorage.getItem('3573-event-preview-fixture-v1')),beforeVerify,'Verification must not mutate the roster');
     // A receipt for a change that never reached storage must not replay automatically.
-    await page.evaluate(async kind=>{
+    await page.evaluate(async ({kind})=>{
       const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
       await new Promise((resolve,reject)=>{
         const tx=db.transaction('sessions','readwrite'),store=tx.objectStore('sessions'),key=kind+':ARC',req=store.get(key);
