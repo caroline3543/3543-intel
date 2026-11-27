@@ -131,9 +131,9 @@ try {
       }
       return counts;
     });
-    const [withoutAliases,withAliases]=results;
-    const reductionPercent=withoutAliases.manual?100*(withoutAliases.manual-withAliases.manual)/withoutAliases.manual:null;
-    return {withoutAliases,withAliases,reductionPercent,targetMet:reductionPercent!==null&&reductionPercent>=30&&withAliases.wrong===0&&withAliases.missing===0};
+    const [withoutAliases,withNicknames,withAliases]=results;
+    const reductionPercent=withNicknames.manual?100*(withNicknames.manual-withAliases.manual)/withNicknames.manual:null;
+    return {withoutAliases,withNicknames,withAliases,reductionPercent,targetMet:reductionPercent!==null&&reductionPercent>=30&&withAliases.wrong===0&&withAliases.missing===0};
   },{screenshots,labels,roster,benchmarkAlliance}):null;
   if(aliasComparison)console.log('Paired alias comparison:',JSON.stringify(aliasComparison));
   if(rosterPath&&reviewMetrics)delete reviewMetrics.unresolved;
