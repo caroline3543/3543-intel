@@ -242,8 +242,8 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       <p>Select up to 25 screenshots. Include the legion heading.</p>
     </>}
     {!!items.length && !review && <>
-      <p>{title} · {alliance} · Legion {activeLegion}</p>
-      <div className="stage9-progress-panel"><h3>{job ? 'Processing screenshots' : read === items.length ? 'Screenshots ready' : 'Ready to scan'}</h3><p role="status">{read} of {items.length} screenshots read</p><progress aria-label="Screenshot processing progress" value={read} max={items.length}/></div>
+      
+      <div className="stage9-progress-panel"><h3>{job ? 'Processing screenshots' : read === items.length ? 'Screenshots ready' : 'Ready to scan'}</h3><p role="status">{read} of {items.length} screenshots read</p><progress aria-label="Screenshot processing progress" value={read} max={items.length}/>{job&&<p role="status">{job.startsWith("Scanning ")?"Reading player information…":job}</p>}</div>
 
       <div className="screenshot-secondary">
         <button type="button" disabled={!!job || !!review || stale || items.length >= maxFiles} onClick={() => picker.current?.click()}>Add screenshots</button>
@@ -258,7 +258,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
         Review Legion {group.legion} · {group.rows.length} readings
       </button>)}
     </>}
-    {job && !review && <p role="status">{job}</p>}
+    {job && !review && !items.length && <p role="status">{job}</p>}
     {!loading && !review && (!items.length || run.current || read < items.length && !stale) && <div className="stage9-action-footer">
       {run.current ? <button type="button" className="screenshot-primary" disabled={run.current.stopped} onClick={() => { run.current.stopped = true; setJob('Stopping after current screenshot…'); }}>Stop scan</button> : !items.length ? <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => picker.current?.click()}>Upload troop power</button> : <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => scan()}>{read || items.some(item => item.error) ? 'Resume or retry unread screenshots' : 'Scan screenshots'}</button>}
     </div>}
