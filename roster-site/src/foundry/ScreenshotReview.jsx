@@ -87,7 +87,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   return <section className="ocr-review" aria-label="Review screenshot readings">
     <div className="stage9-step-strip" aria-label={`Step ${stage} of 8`}>{Array.from({length:8},(_,i)=><span key={i} className={i+1===stage?"current":i+1<stage?"complete":""}/>)}</div>
 
-    {summary && !done ? <div className="stage9-summary"><h4>Import summary</h4><div className="stage9-summary-grid"><div><strong>{rows.length}</strong><span>Readings</span></div><div><strong>{new Set(confirmed.map(item => item.player.id)).size}</strong><span>Matched</span></div><div><strong>{active.length-confirmed.length}</strong><span>Unresolved</span></div><div><strong>{active.filter(item => item.conflict && !item.edit.checked).length}</strong><span>Conflicting</span></div></div><p>{exceptions.length ? exceptions.length + ' readings need your attention before saving.' : 'No outstanding reading exceptions.'}</p><button type="button" className="screenshot-primary" onClick={() => { setSummary(false); if (!exceptions.length) prepare(); }}>{exceptions.length ? 'Resolve ' + exceptions.length + ' readings' : 'Review changes'}</button><button type="button" onClick={onClose}>Back to screenshots</button></div> : done ? <div className="stage9-completion"><div className="stage9-completion-mark" aria-hidden="true">✓</div><h4>Import complete</h4><p role="status">{status}</p><div className="stage9-summary-grid"><div><strong>{receipt?.powers ?? 0}</strong><span>Troop power updates</span></div><div><strong>{receipt?.roles ?? 0}</strong><span>Registration updates</span></div></div><div className="stage9-action-footer">{onContinueTeams && <button type="button" className="screenshot-primary" onClick={onContinueTeams}>Continue to Teams</button>}<button type="button" className={!onContinueTeams?"screenshot-primary":undefined} onClick={onClose}>Done</button></div></div> : preview ? <>
+    {summary && !done ? <div className="stage9-summary"><h4>Import summary</h4><div className="stage9-summary-grid"><div><strong>{rows.length}</strong><span>Readings</span></div><div><strong>{new Set(confirmed.map(item => item.player.id)).size}</strong><span>Matched</span></div><div><strong>{active.length-confirmed.length}</strong><span>Unresolved</span></div><div><strong>{active.filter(item => item.conflict && !item.edit.checked).length}</strong><span>Conflicting</span></div></div><p>{exceptions.length ? exceptions.length + ' readings need your attention before saving.' : 'No outstanding reading exceptions.'}</p><div className="stage9-action-footer"><button type="button" className="screenshot-primary" onClick={() => { setSummary(false); if (!exceptions.length) prepare(); }}>{exceptions.length ? 'Resolve ' + exceptions.length + ' readings' : 'Review changes'}</button><button type="button" onClick={onClose}>Back to screenshots</button></div></div> : done ? <div className="stage9-completion"><div className="stage9-completion-mark" aria-hidden="true">✓</div><h4>Import complete</h4><p role="status">{status}</p><div className="stage9-summary-grid"><div><strong>{receipt?.powers ?? 0}</strong><span>Troop power updates</span></div><div><strong>{receipt?.roles ?? 0}</strong><span>Registration updates</span></div></div><div className="stage9-action-footer">{onContinueTeams && <button type="button" className="screenshot-primary" onClick={onContinueTeams}>Continue to Teams</button>}<button type="button" className={!onContinueTeams?"screenshot-primary":undefined} onClick={onClose}>Done</button></div></div> : preview ? <>
       <section aria-label="Confirm screenshot import">
         <h4>Review proposed changes</h4>
         <p>{preview.action.powers.length} power updates · {preview.action.roleChanges?.length ?? 0} registration changes · {evaluated.length-active.length} excluded</p>
@@ -106,28 +106,8 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
       </section>
       {status && <p role="alert">{status}</p>}
     </> : <>
-      <p>{rows.length} readings · {new Set(confirmed.map(item => item.player.id)).size} matched · {active.length - confirmed.length} unresolved · {active.filter(item => item.conflict && !item.edit.checked).length} conflicting</p>
+      <p className="stage9-review-counts">{rows.length} readings · {new Set(confirmed.map(item => item.player.id)).size} matched · {active.length - confirmed.length} unresolved · {active.filter(item => item.conflict && !item.edit.checked).length} conflicting</p>
       {filter === "review" && focused && <h4 className="stage9-exception-title">{stage===4?"Confirm player identity":stage===5?"Confirm troop power":"Review registration"}</h4>}
-      <details className="stage9-review-options"><summary>Review options</summary><label>Import mode
-        <select value={mode} disabled={working} onChange={event => { setMode(event.target.value); setPreview(null); }}>
-          <option value="powers">Troop powers only</option>
-          <option value="roles">Registrations only</option>
-          <option value="both">Troop powers and registrations</option>
-        </select>
-      </label>
-      <details>
-        <summary>Registration totals and coverage</summary>
-        {counts.map(count => <p key={count.role}>{roles[count.role]} · Game {count.conflict ? 'totals conflict' : count.expected ?? 'unreadable'} · OCR {count.detected} · Matched {new Set(confirmed.filter(item => item.row.registration === count.role && (!item.conflict || item.edit.checked)).map(item => item.player.id)).size}</p>)}
-        <p>Counts reflect the screenshots supplied. Missing, clipped or conflicting rows can affect coverage.</p>
-      </details>
-      <label>Filter readings
-        <select value={filter} onChange={event => setFilter(event.target.value)}>
-          <option value="all">All readings</option><option value="review">Needs review</option>
-          {Object.entries(roles).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select>
-      </label>
-      </details>
-      {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFilter('all'); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Review earlier readings</button><span>{exceptions.length} remaining</span><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
       <fieldset disabled={working}>
         {visible.map(({ row, edit, match, player, powerText, power, powerPending, conflict, needsReview }) => {
           const current = assignments.get(player?.id) ?? [];
@@ -182,6 +162,26 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
           </details>;
         })}
       </fieldset>
+      <details className="stage9-review-options"><summary>Review options</summary><label>Import mode
+        <select value={mode} disabled={working} onChange={event => { setMode(event.target.value); setPreview(null); }}>
+          <option value="powers">Troop powers only</option>
+          <option value="roles">Registrations only</option>
+          <option value="both">Troop powers and registrations</option>
+        </select>
+      </label>
+      <details>
+        <summary>Registration totals and coverage</summary>
+        {counts.map(count => <p key={count.role}>{roles[count.role]} · Game {count.conflict ? 'totals conflict' : count.expected ?? 'unreadable'} · OCR {count.detected} · Matched {new Set(confirmed.filter(item => item.row.registration === count.role && (!item.conflict || item.edit.checked)).map(item => item.player.id)).size}</p>)}
+        <p>Counts reflect the screenshots supplied. Missing, clipped or conflicting rows can affect coverage.</p>
+      </details>
+      <label>Filter readings
+        <select value={filter} onChange={event => setFilter(event.target.value)}>
+          <option value="all">All readings</option><option value="review">Needs review</option>
+          {Object.entries(roles).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
+      </label>
+      </details>
+      {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFilter('all'); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Review earlier readings</button><span>{exceptions.length} remaining</span><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
       <div className="stage9-action-footer">{filter === 'review' && focused && <p role="status">{exceptions.length} readings remaining</p>}<button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button></div>
       {status && <p role="alert">{status}</p>}
       <button type="button" disabled={working} onClick={onClose}>Back to screenshots</button>
