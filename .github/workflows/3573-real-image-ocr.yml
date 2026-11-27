@@ -55,9 +55,11 @@ jobs:
           const median=a=>a.sort((a,b)=>a-b)[1];
           const baseline=[1,2,3].map(i=>load('ocr-results-baseline-'+i+'.json'));
           const improved=[1,2,3].map(i=>load('ocr-results-2-'+i+'.json'));
-          const summarize=a=>({medianMs:median(a.map(x=>x.recognitionBatchMs)),rawNameCorrect:a[0].scores.reduce((n,s)=>n+s.nameCorrect,0),expected:a[0].scores.reduce((n,s)=>n+s.expected,0),retryMetrics:a[0].retryMetrics});
+          const summarize=a=>({medianMs:median(a.map(x=>x.recognitionBatchMs)),rawNameCorrect:a[0].scores.reduce((n,s)=>n+s.nameCorrect,0),expected:a[0].scores.reduce((n,s)=>n+s.expected,0),retryMetrics:a[0].retryMetrics,identityReview:a[0].reviewMetrics});
           const b=summarize(baseline),n=summarize(improved);
-          console.log(JSON.stringify({baseline:b,improved:n,overheadPercent:100*(n.medianMs/b.medianMs-1)},null,2));
+          const reduction=b.identityReview.manual?100*(1-n.identityReview.manual/b.identityReview.manual):null;
+          const safe=n.identityReview.automaticWrong===0;
+          console.log(JSON.stringify({baseline:b,improved:n,overheadPercent:100*(n.medianMs/b.medianMs-1),manualIdentityReviewReductionPercent:reduction,zeroWrongAutomaticMatches:safe,targetMet:safe&&reduction!==null&&reduction>=30,scope:'label-derived roster; identity reviews only'},null,2));
           JS
       - uses: actions/upload-artifact@v4
         if: always()
