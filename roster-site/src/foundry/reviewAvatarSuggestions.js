@@ -8,7 +8,7 @@ export async function reviewAvatarSuggestions({fingerprint,candidates,referenceC
  const references=[];
  for(let i=0;i<unique.length;i+=2){
   if(signal?.aborted)return null;
-  const pair=await Promise.all(unique.slice(i,i+2).map(async p=>({id:p.id,fingerprint:await referenceCache.get(p)})));
+  const pair=await Promise.all(unique.slice(i,i+2).map(async p=>({id:p.id,fingerprint:await Promise.resolve().then(()=>referenceCache.get(p)).catch(()=>null)})));
   references.push(...pair);
  }
  if(signal?.aborted||references.some(r=>!r.fingerprint))return null;
