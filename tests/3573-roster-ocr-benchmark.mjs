@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
+const workerCount=Number(process.env.ROSTER_OCR_WORKERS??1);
+assert.ok(Number.isInteger(workerCount)&&workerCount>=1&&workerCount<=4);
 const directory = resolve(process.env.ROSTER_SCREENSHOTS_DIR ?? '../screenshots');
 const output = resolve(process.argv[2] ?? '../3573-ocr-results.json');
 const negativePath=process.env.ROSTER_NEGATIVE_SCREENSHOT ? resolve(process.env.ROSTER_NEGATIVE_SCREENSHOT) : null;
@@ -22,28 +24,33 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:5177/event-preview.html');
   const workerStarted = performance.now();
-  await page.evaluate(async () => {
+  await page.evaluate(async (workerCount) => {
     const reader = await import('/src/foundry/readRosterScreenshot.js');
-    window.rosterReader = await reader.createRosterReader();
+    window.rosterReaders = await Promise.all(Array.from({length:workerCount},()=>reader.createRosterReader()));
+    window.rosterReader=window.rosterReaders[0];
     window.scanRoster = reader.readRosterScreenshot;
-  });
+  },workerCount);
   const startupMs = Math.round(performance.now() - workerStarted);
   const batchStarted = performance.now();
-  const screenshots = [];
-  for (const filename of files) {
+  const screenshots = new Array(files.length);
+  await Promise.all(Array.from({length:workerCount},async (_,workerIndex)=>{
+  for(let index=workerIndex;index<files.length;index+=workerCount){
+    const filename=files[index];
     const content = (await readFile(resolve(directory, filename))).toString('base64');
-    const reading = await page.evaluate(async ({ filename, content }) => {
+    const reading = await page.evaluate(async ({ filename, content, workerIndex }) => {
       const file = new File([Uint8Array.from(atob(content), char => char.charCodeAt(0))], filename);
       const started = performance.now();
       try {
-        const data = await window.scanRoster(window.rosterReader, file, {avatarBenchmark:true});
+        const data = await window.scanRoster(window.rosterReaders[workerIndex], file, {avatarBenchmark:true});
         return { filename, ms:Math.round(performance.now()-started), ...data };
       } catch (error) {
         return { filename, error:error.message };
       }
-    }, { filename, content });
-    screenshots.push(reading);
+    }, { filename, content, workerIndex });
+    screenshots[index]=reading;
   }
+  }));
+  const recognitionBatchMs=Math.round(performance.now()-batchStarted);
   let negative=null;
   if(negativePath){
     const content=(await readFile(negativePath)).toString('base64');
@@ -74,7 +81,7 @@ try {
     identicalFingerprintGroups:[...groups.values()].filter(g=>g.length>1).map(g=>({count:g.length,names:[...new Set(g)]}))};
   // Only aggregate diagnostics leave the benchmark process; no avatar fingerprints in artifacts.
   for(const row of cards)delete row.avatarEvidence;
-  await writeFile(output, JSON.stringify({startupMs,batchMs,errors,screenshots,scores,negative,avatarMetrics},null,2)+'\n');
+  await writeFile(output, JSON.stringify({workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots,scores,negative,avatarMetrics},null,2)+'\n');
   if(scores){
     const sum=key=>scores.reduce((total,s)=>total+s[key],0);
     const expected=sum('expected');
