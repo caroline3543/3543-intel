@@ -351,7 +351,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    </div>}
    <PlannerAttendance kind={kind} alliance={chosen} legion={legion} plan={saved} players={attendancePlayers}
     onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
-   <RosterScreenshotImport kind={kind} title={title} alliance={chosen} activeLegion={legion} storage={screenshotStorage} players={entries.filter(p=>p.matched)}
+   <RosterScreenshotImport kind={kind} title={title} alliance={chosen} activeLegion={legion} storage={screenshotStorage} players={entries.filter(p=>p.matched)} preferredIds={allianceEntries.filter(p=>p.matched).map(p=>p.id)}
      occurrenceIds={{[legion]:saved.occurrenceId,[otherLegion]:otherPlan.occurrenceId}} onSave={onSaveScreenshotPowers} onContinueTeams={()=>setView('teams')}>
    <details className="screenshot-more-options">
      <summary style={{cursor:'pointer',fontWeight:650}}>More options</summary>
