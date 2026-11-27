@@ -119,6 +119,9 @@ try {
       }
     }
     await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Resolve troop power',exact:true}).waitFor();
+    const comparison=review.locator('.stage9-registration-comparison');
+    const expectedPrevious=kind==='foundry'?3630:1385000000;
+    assert.ok((await comparison.innerText()).includes(expectedPrevious.toLocaleString('en-US')),'Power comparison must show the correct event-specific recorded value');
     await checkResponsive('05-power');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-05-power.png',animations:'disabled'});
     const powerInput=row('Juniper').getByRole('textbox',{name:'Troop power for Juniper'});
