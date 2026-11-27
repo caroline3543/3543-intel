@@ -21,7 +21,8 @@ try {
     page.on('pageerror',e=>errors.push(e.message));
     await page.goto(origin+'/event-preview.html');
     if(event==='Canyon Clash') await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
-    const upload=page.getByRole('region',{name:'Troop power upload'});
+    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    const upload=page.getByRole('dialog',{name:'Screenshot import workspace'});
     await upload.getByRole('button',{name:'Upload troop power'}).waitFor();
     const key=event==='Foundry'?'foundry':'canyon';
     await page.screenshot({path:'ocr-review-captures/'+key+'-01-current-upload.png'});
@@ -32,6 +33,7 @@ try {
     await upload.getByText('Duplicate screenshots were skipped.',{exact:true}).waitFor();
     await page.reload();
     if(event==='Canyon Clash') await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
+    await page.getByRole('button',{name:'Open screenshot import'}).click();
     await upload.getByText('0 of 1 screenshots read',{exact:true}).waitFor();
     await upload.getByRole('button',{name:'Clear screenshots'}).click();
     await upload.getByRole('button',{name:'Upload troop power'}).waitFor();
