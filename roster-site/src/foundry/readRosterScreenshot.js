@@ -190,7 +190,7 @@ export async function readRosterScreenshot(worker, file, kind, { matchName } = {
   }
 }
 
-export async function retryRosterUsername(file,bounds) {
+export async function retryRosterUsername(file,bounds,existingWorker) {
   if(!file || !bounds || !Number.isFinite(bounds.top) || !Number.isFinite(bounds.bottom) || bounds.top<0 || bounds.bottom>1 || bounds.bottom<=bounds.top) throw new Error('Screenshot evidence unavailable');
   const url=URL.createObjectURL(file);
   let worker;
@@ -204,7 +204,7 @@ export async function retryRosterUsername(file,bounds) {
     const other=greenDensity(context,Math.round(width*.22),Math.round(start+nominal*.69),Math.round(width*.63),bottom)>.035;
     const end=Math.min(bottom,Math.round(start+nominal*(other ? .40 : .54)));
     if(end<=top)return '';
-    worker=await createRosterReader();
+    worker=existingWorker??await createRosterReader();
     return stripPowerLine(await recognize(worker,textCrop(screen,Math.round(width*.219),top,Math.round(width*.50),end-top,{tight:true,dark:true}),PSM.SINGLE_LINE));
-  } finally {URL.revokeObjectURL(url);if(worker)await worker.terminate();}
+  } finally {URL.revokeObjectURL(url);if(worker&&!existingWorker)await worker.terminate();}
 }

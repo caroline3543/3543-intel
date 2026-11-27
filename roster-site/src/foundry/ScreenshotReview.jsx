@@ -11,7 +11,7 @@ import {reviewAvatarSuggestions} from './reviewAvatarSuggestions.js';
 const roles = { combatant: 'Combatant', substitute: 'Substitute', unassigned: 'Unassigned', 'other-legion': 'Other legion', unknown: 'Unknown' };
 const modeLabels = { powers: 'troop powers', roles: 'registrations', both: 'troop powers and registrations' };
 
-export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false }) {
+export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false, onRetryUsername }) {
   const [mode, setMode] = useState(initialMode);
   const [edits, setEdits] = useState(initialEdits);
   const [filter, setFilter] = useState('review');
@@ -30,8 +30,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
     const evidence=row.evidence?.[0];if(!evidence)return;
     setRetrying(row.rowId);
     try{
-      const {retryRosterUsername}=await import('./readRosterScreenshot.js');
-      const name=await retryRosterUsername(sources[evidence.sourceIndex]?.file,evidence.bounds);
+      const name=await onRetryUsername(sources[evidence.sourceIndex]?.file,evidence.bounds);
       update(row.rowId,{retryNote:name?{name}:{message:'No additional username found.'}});
     }catch{update(row.rowId,{retryNote:{message:'Could not reread username. Search the roster manually.'}});}
     finally{setRetrying(null);}
@@ -199,7 +198,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
               </details>)}
               {filter !== "review" && <label><input type="checkbox" checked={!!edit.skip} onChange={event => update(row.rowId, { skip: event.target.checked })}/> Skip this reading</label>}
               {!edit.skip && <>
-                {(filter !== "review" || stage === 4) && <><>{row.nameAlternatives?.length>0 && <p>Alternative OCR readings: {row.nameAlternatives.join(" · ")}. Check the screenshot before choosing a player.</p>}</>{!match.player && row.evidence?.length>0 && <><button type="button" disabled={!!retrying||working} onClick={()=>retryUsername(row)}>{retrying===row.rowId?'Rereading username…':'Reread username'}</button>{edits[row.rowId]?.retryNote && <p role="status">{edits[row.rowId]?.retryNote.name?'Additional reading: '+edits[row.rowId]?.retryNote.name:edits[row.rowId]?.retryNote.message}</p>}</>}<label>Search roster for {title}<input type="search" value={edit.search ?? ''} onChange={event => update(row.rowId, { search: event.target.value })}/></label>
+                {(filter !== "review" || stage === 4) && <><>{row.nameAlternatives?.length>0 && <p>Alternative OCR readings: {row.nameAlternatives.join(" · ")}. Check the screenshot before choosing a player.</p>}</>{onRetryUsername && !match.player && row.evidence?.length>0 && <><button type="button" disabled={!!retrying||working} onClick={()=>retryUsername(row)}>{retrying===row.rowId?'Rereading username…':'Reread username'}</button>{edits[row.rowId]?.retryNote && <p role="status">{edits[row.rowId]?.retryNote.name?'Additional reading: '+edits[row.rowId]?.retryNote.name:edits[row.rowId]?.retryNote.message}</p>}</>}<label>Search roster for {title}<input type="search" value={edit.search ?? ''} onChange={event => update(row.rowId, { search: event.target.value })}/></label>
                 {filter==='review' && stage===4 && match.suggested && !query && <p>Suggested match selected. Check the screenshot before confirming.</p>}
                 {candidates.map(candidate => <button key={candidate.id} type="button" style={candidate.id === (filter === 'review' ? selectedIdentity ?? player?.id : player?.id)?{borderColor:'#4ade80',background:'#172e29'}:undefined} aria-pressed={candidate.id === (filter === 'review' ? selectedIdentity ?? player?.id : player?.id)}
                   onClick={() => filter === 'review' ? setIdentityChoice({rowId:row.rowId,id:candidate.id}) : update(row.rowId, { playerId: candidate.id, ...(candidate.id !== player?.id ? { role: null, registrationReviewed: false, checked: false } : {}) })}>

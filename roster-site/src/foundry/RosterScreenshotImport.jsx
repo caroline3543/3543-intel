@@ -206,8 +206,27 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     }
   }
 
+  const retryBusy=useRef(false);
+  async function rereadUsername(file,bounds){
+    if(retryBusy.current||run.current)throw new Error('Reader busy');
+    retryBusy.current=true;
+    const pending=warmReader.current;
+    warmReader.current=null;
+    let worker,healthy=false;
+    try{
+      const {createRosterReader,retryRosterUsername}=await import('./readRosterScreenshot.js');
+      worker=(pending?await pending:null)||await createRosterReader();
+      const name=await retryRosterUsername(file,bounds,worker);
+      healthy=true;
+      return name;
+    }finally{
+      retryBusy.current=false;
+      if(worker&&healthy&&mounted.current&&!warmReader.current&&!run.current)warmReader.current=Promise.resolve(worker);
+      else if(worker)await worker.terminate();
+    }
+  }
   async function scan(restart = false) {
-    if (run.current || !latest.current) return;
+    if (run.current || retryBusy.current || !latest.current) return;
     const task = { stopped: false };
     run.current = task;
     let batch = latest.current;
@@ -354,7 +373,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     </div>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
-    {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview {...review} players={players} preferredIds={preferredIds} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage} PreloadEvidence={ReviewEvidence}
+    {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview {...review} players={players} preferredIds={preferredIds} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage} PreloadEvidence={ReviewEvidence} onRetryUsername={rereadUsername}
       initialMode={latest.current?.drafts?.[review.legion]?.mode ?? mode}
       initialEdits={latest.current?.drafts?.[review.legion]?.edits ?? {}}
       onDraftChange={draft => {
