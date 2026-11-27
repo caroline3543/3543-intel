@@ -1,5 +1,5 @@
 import { bulkCandidates } from '../components/bulkImportModel.js';
-import { eventAssignments, isParticipant, plannerSlot, prepareEventRoles } from '../../../src/services/eventPlanner.js';
+import { eventAssignments, isParticipant, plannerSlot, prepareEventRoles, suspiciousPowerChange } from '../../../src/services/eventPlanner.js';
 
 export const roleName = role => ({ join: 'Combatant', sub: 'Substitute', out: 'Not participating', '': 'Unassigned' })[role] ?? 'Unassigned';
 export const assignmentLabel = assignment => assignment
@@ -17,9 +17,7 @@ export function screenshotMatches(name, players, alliance) {
   return { candidates, player: exact.length === 1 && exact[0].alliance === alliance ? exact[0] : null };
 }
 
-export function suspiciousPowerChange(previous, next) {
-  return Number.isFinite(previous) && previous > 0 && Number.isFinite(next) && next >= 0 && (next >= previous * 10 || next <= previous / 10);
-}
+export { suspiciousPowerChange };
 
 export function prepareScreenshotImport(storage, context, rows, mode) {
   const { kind, alliance, legion, expectedOccurrenceId } = context;
@@ -35,7 +33,7 @@ export function prepareScreenshotImport(storage, context, rows, mode) {
       const previousPower = target.powerByPlayer?.[row.id] ?? row.previousPower;
       if (suspiciousPowerChange(previousPower, row.power) && (row.powerApproval?.previous !== previousPower || row.powerApproval?.next !== row.power)) return { error: 'Confirm the unusually large troop power change before importing.' };
       if (previousPower !== row.power) {
-        powers.push({ id: row.id, value: row.power });
+        powers.push({ id: row.id, value: row.power, ...(row.powerApproval ? {powerApproval:row.powerApproval} : {}) });
         changes.push({ id: row.id, name: row.name, power: row.power, previousPower });
       }
     }
