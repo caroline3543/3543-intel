@@ -132,11 +132,13 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const localInitial=useRef(null);if(!localInitial.current)localInitial.current=loadFromStorage(empty);
   const {data,setData:setSharedData,sync,publish,join,retry,resolve}=useSharedWorkspace(localInitial.current);
   function setData(value){setSharedData(prev=>{const next=withAutomaticRoles(typeof value==='function'?value(prev):value);latest.current=next;return next;});}
-  async function saveScreenshotImport(action){
+  async function saveScreenshotImport(action,{verifyOnly=false}={}){
     if(!sync.ready||!sync.joined||sync.conflicts?.length)return {error:'Connect to the shared workspace and resolve sync conflicts before importing.'};
+    if(!verifyOnly){
     const result=await setSharedData(prev=>updateEventPlanner(prev,action));
     if(result?.error)return {error:result.error};
     if(!result?.changed)return {error:'The roster or event changed. Review the import again.'};
+    }
     const deadline=Date.now()+35000;
     while(Date.now()<deadline){
       const state=await retry();
