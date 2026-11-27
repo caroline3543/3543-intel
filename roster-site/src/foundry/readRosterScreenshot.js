@@ -139,7 +139,7 @@ export async function readRosterScreenshot(worker, file, kind, { matchName } = {
         const nameBottom = Math.min(bottom, rowY(otherLegionMarker ? .40 : .54));
         if (nameBottom > top) {
           const alternatives = [];
-          for (const [options, mode] of [[{tight:true}, PSM.RAW_LINE], [{tight:true,dark:true}, PSM.SINGLE_LINE]]) {
+          for (const [options, mode] of [[{tight:true}, PSM.RAW_LINE]]) {
             try {
               const candidate = stripPowerLine(await recognize(worker, textCrop(screen, x(.219), top, x(.50), nameBottom-top, options), mode));
               if (candidate && candidate !== row.name && !alternatives.includes(candidate)) alternatives.push(candidate);
