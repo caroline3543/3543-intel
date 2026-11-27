@@ -13,6 +13,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   const [filter, setFilter] = useState('review');
   const [preview, setPreview] = useState(null);
   const [working, setWorking] = useState(false);
+  const [pendingSave,setPendingSave]=useState(false);
   const [status, setStatus] = useState('');
   const [done, setDone] = useState(false);
   const [receipt, setReceipt] = useState(null);
@@ -63,7 +64,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
     setEdits(previous => ({ ...previous, [id]: { ...previous[id], ...patch } }));
     setPreview(null);
   };
-  useEffect(() => setPreview(null), [storage]);
+  useEffect(() => { if(!working&&!pendingSave&&!done)setPreview(null); }, [storage]);
 
   function prepare() {
     if (exceptions.length || active.some(item => !item.player || item.conflict && !item.edit.checked ||
@@ -83,6 +84,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
     setWorking(true);
     try {
       const result = await onSave(preview.action);
+      setPendingSave(!!result?.pending);
       setStatus(result?.error || result?.message || 'Import applied.');
       if (!result?.error && result?.message) { setReceipt({ powers: preview.action.powers.length, roles: preview.action.roleChanges?.length ?? 0, excluded: evaluated.length-active.length }); setDone(true); }
       else if (!result?.error) setStatus('Save outcome could not be verified. Check roster before retrying.');
@@ -112,8 +114,8 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
             <button type="button" disabled={working} onClick={()=>{const item=confirmed.find(entry=>entry.player.id===id);if(item){update(item.row.rowId,{skip:true});setFilter('all');}}}>Exclude player</button>
           </article>;
         })}</div>
-        <div className="stage9-action-footer"><button type="button" className="screenshot-primary" disabled={working} onClick={confirm}>{working ? 'Applying changes…' : preview.changes.some(change => change.destructive) ? 'Confirm registration moves or removals and save' : 'Save ' + modeLabels[mode]}</button>
-        <button type="button" disabled={working} onClick={() => setPreview(null)}>Keep reviewing</button></div>
+        <div className="stage9-action-footer"><button type="button" className="screenshot-primary" disabled={working} onClick={confirm}>{working ? 'Verifying shared save…' : pendingSave ? 'Check save status' : preview.changes.some(change => change.destructive) ? 'Confirm registration moves or removals and save' : 'Save ' + modeLabels[mode]}</button>
+        <button type="button" disabled={working||pendingSave} onClick={() => setPreview(null)}>Keep reviewing</button></div>
       </section>
       {status && <p role="alert">{status}</p>}
     </> : <>
