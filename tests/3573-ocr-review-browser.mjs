@@ -139,15 +139,16 @@ try {
     await review.getByLabel('Filter readings').selectOption('all');
     await review.getByLabel('Import mode').selectOption('both');
     await review.getByLabel('Filter readings').selectOption('review');
-    await review.getByRole('heading',{name:'Review registration'}).waitFor();
-    await checkResponsive('06-registration');
-    await page.screenshot({path:'ocr-review-captures/'+kind+'-06-registration.png',animations:'disabled'});
     await review.getByLabel('Filter readings').selectOption('all');
     for(const name of ['Northvale','Juniper','Aster']){
       if(await row(name).getAttribute('open')===null) await row(name).locator('summary').first().click();
-      await row(name).getByRole('button',{name:'Keep existing registration'}).click();
     }
     assert.equal(await row('Aster').getByLabel('Registration for Aster').inputValue(),'');
+    assert.equal(await row('Juniper').getByLabel('Registration for Juniper').inputValue(),'join');
+    await checkResponsive('06-registration');
+    await page.screenshot({path:'ocr-review-captures/'+kind+'-06-registration.png',animations:'disabled'});
+    await row('Northvale').getByRole('button',{name:'Keep existing registration'}).click();
+    await row('Aster').getByRole('button',{name:'Keep existing registration'}).click();
     await review.getByRole('button',{name:'Review troop powers and registrations changes'}).click();
     const confirm=review.getByRole('region',{name:'Confirm screenshot import'});
     await confirm.waitFor();
@@ -159,6 +160,7 @@ try {
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-completion.png'});
     const saved=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1')));
     assert.equal(saved.foundry.eventPlans[JSON.stringify([kind,'ARC',1])].powerByPlayer['sample-1'],3638);
+    assert.equal(saved.foundry.eventPlans[JSON.stringify([kind,'ARC',1])].registrations['sample-1'],'join');
     // Simulate a persisted pending receipt after a successful submission.
     await page.evaluate(async kind=>{
       const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
