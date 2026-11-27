@@ -35,6 +35,22 @@ try {
     if(event==='Canyon Clash') await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
     await page.getByRole('button',{name:'Open screenshot import'}).click();
     await upload.getByText('0 of 1 screenshots read',{exact:true}).waitFor();
+    // Hold the lazy OCR module request to capture the genuine loading UI without external OCR assets.
+    let releaseReader;
+    const readerGate=new Promise(resolve=>{releaseReader=resolve;});
+    await page.route(/\/assets\/readRosterScreenshot[^/]*\.js(?:\?.*)?$/,async route=>{await readerGate;await route.abort();});
+    await upload.getByRole('button',{name:'Scan screenshots',exact:true}).click();
+    await upload.getByRole('heading',{name:'Processing screenshots'}).waitFor();
+    await upload.getByRole('button',{name:'Stop scan'}).waitFor();
+    for(const width of [320,390,428]){
+      await page.setViewportSize({width,height:width===428?926:844});
+      assert.ok(await upload.locator('.stage9-import-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+    }
+    await page.screenshot({path:'ocr-review-captures/'+key+'-02-processing.png',animations:'disabled'});
+    await upload.getByRole('button',{name:'Stop scan'}).click();
+    releaseReader();
+    await upload.getByRole('button',{name:'Scan screenshots',exact:true}).waitFor();
+    await upload.getByText('0 of 1 screenshots read',{exact:true}).waitFor();
     await upload.getByRole('button',{name:'Clear screenshots'}).click();
     await upload.getByRole('button',{name:'Upload troop power'}).waitFor();
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
