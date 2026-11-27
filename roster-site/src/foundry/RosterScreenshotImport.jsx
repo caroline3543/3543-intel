@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { registrationCountReview, combineScreenshotRows } from './rosterScreenshotModel.js';
 import { readScreenshotSession, writeScreenshotSession } from './screenshotSession.js';
 import { ScreenshotReview } from './ScreenshotReview.jsx';
@@ -57,6 +58,16 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   const [error, setError] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
   const [review, setReview] = useState(null);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const workspaceRef = useRef(null);
+  const launchRef = useRef(null);
+  useEffect(() => {
+    if (!workspaceOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    workspaceRef.current?.focus();
+    return () => { document.body.style.overflow = previous; launchRef.current?.focus(); };
+  }, [workspaceOpen]);
   const [mode, setMode] = useState(() => {
     try { const value = localStorage.getItem('3573-ocr-import-mode'); return ['powers','roles','both'].includes(value) ? value : 'powers'; }
     catch { return 'powers'; }
@@ -196,6 +207,10 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   const read = items.filter(item => item.reading).length;
 
   return <section className="screenshot-import" aria-label="Troop power upload">
+    <button ref={launchRef} type="button" className="screenshot-primary" onClick={() => setWorkspaceOpen(true)}>Open screenshot import</button>
+    {workspaceOpen && createPortal(<section ref={workspaceRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Screenshot import workspace" className="stage9-import-workspace">
+      <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {activeLegion}</small><h2>Import roster</h2></div><button type="button" disabled={!!job} onClick={() => { setReview(null); setWorkspaceOpen(false); }}>Close</button></header>
+      <div className="stage9-import-content">
     <input ref={picker} type="file" hidden multiple accept="image/png,image/jpeg,image/webp" aria-label="Troop power screenshots"
       disabled={loading || !!job || !!review} onChange={chooseFiles}/>
     {!loading && !review && <label>Import mode<select value={mode} disabled={!!job} onChange={event => chooseMode(event.target.value)}><option value="powers">Troop powers only</option><option value="roles">Registrations only</option><option value="both">Troop powers and registrations</option></select></label>}
@@ -237,6 +252,8 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
         try { localStorage.setItem('3573-ocr-import-mode', draft.mode); } catch {}
       }}
       onClose={() => setReview(null)}/>}
+      </div>
+    </section>, document.body)}
     {children}
   </section>;
 }
