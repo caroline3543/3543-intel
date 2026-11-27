@@ -7,7 +7,7 @@ export const assignmentLabel = assignment => assignment
   : 'Unassigned';
 
 const exactName = value => String(value ?? '').trim().normalize('NFC');
-const nicknamesOf = player => [player.nickname, ...(Array.isArray(player.ocrAliases) ? player.ocrAliases.filter(value => typeof value === 'string') : [])];
+const nicknamesOf = player => [...new Set([player.nickname, player.alias, ...(Array.isArray(player.ocrAliases) ? player.ocrAliases : [])].filter(value => typeof value === 'string' && value.trim()))];
 const playerFields = player => [player.name, ...nicknamesOf(player), player.playerId, player.fid, player.id, ...(player.searchFields ?? [])];
 
 const spacingKey=value=>exactName(value).normalize('NFKC').toLowerCase().replace(/\s/gu,'');
