@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
+const retriesEnabled=process.env.ROSTER_OCR_RETRIES!=='0';
 const workerCount=Number(process.env.ROSTER_OCR_WORKERS??1);
 assert.ok(Number.isInteger(workerCount)&&workerCount>=1&&workerCount<=4);
 const directory = resolve(process.env.ROSTER_SCREENSHOTS_DIR ?? '../screenshots');
@@ -26,14 +27,14 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:5177/event-preview.html');
   const workerStarted = performance.now();
-  await page.evaluate(async ({workerCount,rosterNames}) => {
+  await page.evaluate(async ({workerCount,rosterNames,retriesEnabled}) => {
     const reader = await import('/src/foundry/readRosterScreenshot.js');
     window.rosterReaders = await Promise.all(Array.from({length:workerCount},()=>reader.createRosterReader()));
     window.rosterReader=window.rosterReaders[0];
     window.scanRoster = reader.readRosterScreenshot;
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
-    window.matchName=createScreenshotMatcher(rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'})),'HOT');
-  },{workerCount,rosterNames});
+    window.matchName=retriesEnabled ? createScreenshotMatcher(rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'})),'HOT') : undefined;
+  },{workerCount,rosterNames,retriesEnabled});
   const startupMs = Math.round(performance.now() - workerStarted);
   const batchStarted = performance.now();
   const screenshots = new Array(files.length);
@@ -102,7 +103,7 @@ try {
     identicalFingerprintGroups:[...groups.values()].filter(g=>g.length>1).map(g=>({count:g.length,names:[...new Set(g)]}))};
   // Only aggregate diagnostics leave the benchmark process; no avatar fingerprints in artifacts.
   for(const row of cards)delete row.avatarEvidence;
-  await writeFile(output, JSON.stringify({workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots,scores,negative,avatarMetrics,retryMetrics},null,2)+'\n');
+  await writeFile(output, JSON.stringify({retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots,scores,negative,avatarMetrics,retryMetrics},null,2)+'\n');
   if(scores){
     const sum=key=>scores.reduce((total,s)=>total+s[key],0);
     const expected=sum('expected');
