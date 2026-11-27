@@ -117,3 +117,23 @@ test('screenshot import preserves other event powers and city power',()=>{
  assert.equal(saved.players[0].lastFoundryTroopPower,3647);
  for(const field of ['lastCanyonClashTroopPower','lastTALTroopPower','cityPower'])assert.equal(saved.players[0][field],data.players[0][field]);
 });
+
+test('stale suspicious power approval rejects combined import atomically',()=>{
+ const {data,context}=setup('foundry',1);
+ const slot=data.foundry.eventPlans[plannerKey('foundry','ARC',1)];
+ slot.powerByPlayer={a:3647};
+ const {action}=prepareScreenshotImport(data.foundry,context,[{id:'a',power:40000,powerApproval:{previous:3647,next:40000},role:'sub'}],'both');
+ assert.ok(action);
+ assert.equal(updateEventPlanner(data,{...action,powers:[{id:'a',value:40000}]}),data);
+ slot.powerByPlayer.a=3800;
+ assert.equal(updateEventPlanner(data,action),data);
+ assert.equal(slot.registrations.a,'join');
+});
+test('Canyon import preserves Foundry, TAL and city power',()=>{
+ const {data,context}=setup('canyon',2);
+ Object.assign(data.players[0],{lastFoundryTroopPower:3630,lastCanyonClashTroopPower:946105130,lastTALTroopPower:12345,cityPower:987654321});
+ const {action}=prepareScreenshotImport(data.foundry,context,[{id:'a',power:950000000,previousPower:946105130}],'powers');
+ const saved=updateEventPlanner(data,action);
+ assert.equal(saved.players[0].lastCanyonClashTroopPower,950000000);
+ for(const field of ['lastFoundryTroopPower','lastTALTroopPower','cityPower'])assert.equal(saved.players[0][field],data.players[0][field]);
+});
