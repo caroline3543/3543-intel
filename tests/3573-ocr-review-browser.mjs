@@ -100,7 +100,7 @@ try {
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
     await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
     assert.equal(await powerInput.inputValue(),'3638');
-    await row('Juniper').getByRole('button',{name:'Confirm troop power',exact:true}).click();
+    await review.locator('.stage9-action-footer').getByRole('button',{name:'Confirm troop power',exact:true}).click();
     await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('all');
     await review.getByLabel('Import mode').selectOption('both');
