@@ -82,6 +82,31 @@ try {
   }
   }));
   const recognitionBatchMs=Math.round(performance.now()-batchStarted);
+  // Report event-specific accuracy when the independently labelled fixtures identify their event.
+  if(labels){
+    const eventMetrics=await page.evaluate(async ({screenshots,labels,roster,benchmarkAlliance})=>{
+      const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
+      const matcher=createScreenshotMatcher(roster,benchmarkAlliance);
+      const groups={foundry:{labelled:0,correct:0,wrong:0,manual:0,missing:0,exactName:0},canyon:{labelled:0,correct:0,wrong:0,manual:0,missing:0,exactName:0},unknown:{labelled:0,correct:0,wrong:0,manual:0,missing:0,exactName:0}};
+      for(const screenshot of screenshots){
+        const fixture=labels[screenshot.filename];
+        const kind=String(fixture.kind??fixture.event??'').toLowerCase();
+        const m=groups[kind==='foundry'?'foundry':kind.includes('canyon')?'canyon':'unknown'];
+        const used=new Set();
+        for(const label of fixture.rows){
+          m.labelled++;
+          const candidates=(screenshot.rows??[]).map((row,i)=>({row,i,d:Math.abs(label.center-(row.bounds.top+row.bounds.bottom)/2)})).filter(x=>x.d<=.035&&!used.has(x.i)).sort((a,b)=>a.d-b.d);
+          if(!candidates.length){m.missing++;continue;}
+          const {row,i}=candidates[0];used.add(i);
+          if(row.name===label.name)m.exactName++;
+          const p=matcher(row.name).player;
+          m[!p?'manual':(label.playerId?p.id===label.playerId:p.name===label.name)?'correct':'wrong']++;
+        }
+      }
+      return groups;
+    },{screenshots,labels,roster,benchmarkAlliance});
+    console.log('Event-specific identity metrics:',JSON.stringify(eventMetrics));
+  }
   // Exercise both production event modes on identical source images.
   // Enabled by default; explicit opt-out for local exploratory runs.
   if(process.env.ROSTER_EVENT_PARITY!=='0'){
