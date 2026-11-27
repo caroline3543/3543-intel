@@ -243,7 +243,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     if (saving.current) return { error: 'An import is already being saved.' };
     if (!sameEvent(latest.current?.occurrenceIds, eventIds.current)) return { error: 'The event changed. Re-scan before importing.' };
     const ids = [...new Set([...action.powers, ...(action.roleChanges ?? [])].map(row => row.id))];
-    if (ids.some(id => latest.current?.savedIds?.includes(id))) {
+    if (!pending && ids.some(id => latest.current?.savedIds?.includes(id))) {
       return { error: 'A selected player was already imported from this batch. Skip the duplicate reading.' };
     }
     saving.current = true;
@@ -252,7 +252,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     await writes.current;
     const result = await onSave(action,{verifyOnly:!!pending});
     if (!result?.error && result?.message && latest.current && mounted.current) {
-      checkpoint({ ...latest.current, pendingImport:null, savedIds: [...(latest.current.savedIds ?? []), ...ids] });
+      checkpoint({ ...latest.current, pendingImport:null, savedIds: [...new Set([...(latest.current.savedIds ?? []), ...ids])] });
       await writes.current.catch(() => {});
     }
     if(result?.error&&!result.pending&&!pending){checkpoint({...latest.current,pendingImport:null});await writes.current;}
