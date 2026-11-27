@@ -4,6 +4,7 @@ import {BulkPlayerImport} from '../components/BulkPlayerImport.jsx';
 import {foundryShareMessages,foundryMessageStats,FOUNDRY_DEFAULT_INSTRUCTIONS} from './foundryShare.js';
 import {useMemo,useState,useRef,useEffect} from 'react';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
+import {playerAvatarUrl} from '../../../src/services/playerAvatarService.js';
 import {playerSearchFields} from '../../../src/services/playerNames.js';
 import {PlannerAttendance} from './PlannerAttendance.jsx';
 import {EVENT_NAMES,EVENT_LIMITS,REGISTRATION_ROLES,isParticipant,TEAM_NAMES,plannerAlliances,eventStart,recentNoShow,resizePlannerTeams,formatPlannerPower} from '../../../src/services/eventPlanner.js';
@@ -101,7 +102,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  useEffect(()=>setInstructions(saved.shareInstructions||FOUNDRY_DEFAULT_INSTRUCTIONS),[saved.shareInstructions]);
  const avatarFor=p=>players.find(x=>String(x.id??x.fid??name(x))===p.id)||{username:p.name};
  const entries=useMemo(()=>{
-  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));const reading=saved.powerByPlayer?.[id]??power(p,kind);return [id,{id,name:name(p),power:Number(reading)||0,hasPower:reading!=null&&reading!==''&&Number.isFinite(Number(reading)),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),furnaceLevel:p.furnaceLevel??p.furnace??p.furnace_level??null,cityPower:p.cityPower??p.powerLevel??p.power??null,languages:recordedLanguageNames(p),playerId:p.fid,searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String),recentNoShow:recentNoShow(p.plannerAttendance,eventStart(saved.date,saved.time))}]}));
+  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));const reading=saved.powerByPlayer?.[id]??power(p,kind);return [id,{id,name:name(p),power:Number(reading)||0,hasPower:reading!=null&&reading!==''&&Number.isFinite(Number(reading)),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),furnaceLevel:p.furnaceLevel??p.furnace??p.furnace_level??null,cityPower:p.cityPower??p.powerLevel??p.power??null,languages:recordedLanguageNames(p),playerId:p.fid,avatarUrl:playerAvatarUrl(p),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String),recentNoShow:recentNoShow(p.plannerAttendance,eventStart(saved.date,saved.time))}]}));
   for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:saved.powerByPlayer?.[p.id]??p.power??current.power,hasPower:(saved.powerByPlayer?.[p.id]??p.power)!=null||current.hasPower}:{...p,hasPower:p.power!=null,alliance:p.alliance||'Unassigned',matched:false});}
   return [...map.values()].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
  },[players,kind,saved.imports,saved.powerByPlayer,saved.date,saved.time]);
