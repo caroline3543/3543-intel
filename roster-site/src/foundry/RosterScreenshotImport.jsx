@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { registrationCountReview, combineScreenshotRows } from './rosterScreenshotModel.js';
 import { readScreenshotSession, writeScreenshotSession } from './screenshotSession.js';
+import { createScreenshotMatcher } from './screenshotImportPlan.js';
 import { ScreenshotReview } from './ScreenshotReview.jsx';
 import './rosterScreenshot.css';
 
@@ -305,12 +306,13 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
 
   const items = session?.items ?? [];
   const stale = session && !sameEvent(session.occurrenceIds, occurrenceIds);
-  const groups = [activeLegion, activeLegion === 1 ? 2 : 1].map(legion => {
+  const matcher=useMemo(()=>createScreenshotMatcher(players,alliance,preferredIds),[players,alliance,preferredIds]);
+  const groups = useMemo(()=>[activeLegion, activeLegion === 1 ? 2 : 1].map(legion => {
     const sources = items.filter(item => (item.reading?.legion ?? item.destination) === legion && item.reading);
     const readings = sources.map(item => item.reading);
-    const rows = combineScreenshotRows(readings);
+    const rows = combineScreenshotRows(readings,name=>matcher(name).player?.id);
     return { legion, sources, rows, counts: registrationCountReview(readings, rows) };
-  }).filter(group => group.rows.length);
+  }).filter(group => group.rows.length),[activeLegion,items,matcher]);
   const read = items.filter(item => item.reading).length;
 
   return <section className="screenshot-import" aria-label="Troop power upload">
