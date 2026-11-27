@@ -36,6 +36,13 @@ try {
         req.onsuccess=()=>resolve(req.result);
         req.onerror=()=>reject(req.error);
       });
+      // Juniper must be genuinely unassigned to exercise a new registration.
+      const workspace=JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1'));
+      for(const slot of [workspace.foundry,...Object.values(workspace.foundry.eventPlans??{})]){
+        if(slot.registrations)delete slot.registrations['sample-1'];
+        if(slot.registeredUnder)delete slot.registeredUnder['sample-1'];
+      }
+      sessionStorage.setItem('3573-event-preview-fixture-v1',JSON.stringify(workspace));
       const rows=[
         {name:'Northvale',power:3647,registration:'combatant'},
         {name:'Unrecognised fixture',power:3100,registration:'substitute'},
