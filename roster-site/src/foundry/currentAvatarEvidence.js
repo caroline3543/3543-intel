@@ -2,7 +2,7 @@ import {avatarFingerprint} from './avatarFingerprint.js';
 import {playerAvatarUrl} from '../../../src/services/playerAvatarService.js';
 
 // In-memory only, one current reference per FID. No historical or screenshot cache.
-export function createCurrentAvatarEvidence(){
+export function createCurrentAvatarEvidence({loadFingerprint}={}){
  const cache=new Map();
  async function load(url){
   const controller=new AbortController();
@@ -29,7 +29,7 @@ export function createCurrentAvatarEvidence(){
    if(!url){cache.delete(fid);return null;}
    let entry=cache.get(fid);
    if(entry?.url!==url){
-    entry={url,promise:load(url)};cache.set(fid,entry);
+    entry={url,promise:Promise.resolve().then(()=> (loadFingerprint??load)(url)).catch(()=>null)};cache.set(fid,entry);
    }
    const value=await entry.promise;
    if(cache.get(fid)!==entry)return null;
