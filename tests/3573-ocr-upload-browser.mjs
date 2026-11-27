@@ -58,6 +58,15 @@ try {
     await page.close();
     const real=await browser.newPage({viewport:{width:428,height:926},isMobile:true,hasTouch:true});
     const realErrors=[];real.on('pageerror',e=>realErrors.push(e.message));
+    await real.addInitScript(()=>{
+      Object.defineProperty(navigator,'hardwareConcurrency',{get:()=>4});
+      const Original=window.Worker;
+      window.__ocrWorkerCounts={created:0,terminated:0};
+      window.Worker=class extends Original{
+        constructor(...args){super(...args);window.__ocrWorkerCounts.created++;}
+        terminate(){window.__ocrWorkerCounts.terminated++;return super.terminate();}
+      };
+    });
     await real.goto(origin+'/event-preview.html');
     if(event==='Canyon Clash')await real.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
     await real.getByRole('button',{name:'Open screenshot import'}).click();
@@ -69,10 +78,18 @@ try {
     await dialog.getByText('0 of 2 screenshots read',{exact:true}).waitFor();
     await dialog.getByRole('button',{name:'Scan screenshots',exact:true}).click();
     await dialog.getByText('2 of 2 screenshots read',{exact:true}).waitFor({timeout:120000});
+    const counts=()=>real.evaluate(()=>({...window.__ocrWorkerCounts}));
+    await dialog.getByRole('button',{name:'Add screenshots'}).waitFor();
+    await real.waitForFunction(()=>window.__ocrWorkerCounts.created===2&&window.__ocrWorkerCounts.terminated===1);
+    const start=await counts();
     await dialog.locator('input[type=file]').setInputFiles(files.slice(2));
     await dialog.getByText('2 of 3 screenshots read',{exact:true}).waitFor();
     await dialog.getByRole('button',{name:'Scan new screenshots',exact:true}).click();
     await dialog.getByText('3 of 3 screenshots read',{exact:true}).waitFor({timeout:120000});
+    await real.waitForFunction(()=>window.__ocrWorkerCounts.created===2&&window.__ocrWorkerCounts.terminated===1);
+    assert.deepEqual(await counts(),start,'Incremental scan should reuse the retained worker');
+    await dialog.getByRole('button',{name:'Close',exact:true}).click();
+    await real.waitForFunction(()=>window.__ocrWorkerCounts.created===window.__ocrWorkerCounts.terminated);
     await real.reload();
     if(event==='Canyon Clash')await real.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
     await real.getByRole('button',{name:'Open screenshot import'}).click();
