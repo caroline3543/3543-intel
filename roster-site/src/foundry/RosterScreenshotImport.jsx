@@ -219,9 +219,9 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => picker.current?.click()}>Upload troop power</button>
       <p>Select up to 25 screenshots. Include the legion heading.</p>
     </>}
-    {!!items.length && <>
+    {!!items.length && !review && <>
       <p>{title} · {alliance} · Legion {activeLegion}</p>
-      <p role="status">{read} of {items.length} screenshots read</p>
+      <div className="stage9-progress-panel"><h3>{job ? 'Processing screenshots' : read === items.length ? 'Screenshots ready' : 'Ready to scan'}</h3><p role="status">{read} of {items.length} screenshots read</p><progress aria-label="Screenshot processing progress" value={read} max={items.length}/></div>
       {read < items.length && !stale && <button type="button" className="screenshot-primary" disabled={!!job || !!review}
         onClick={() => scan()}>{read || items.some(item => item.error) ? 'Resume or retry unread screenshots' : 'Scan screenshots'}</button>}
       <div className="screenshot-secondary">
@@ -230,14 +230,14 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
         {stale && <button type="button" disabled={!!job || !!review} onClick={() => scan(true)}>Scan for current event</button>}
       </div>
       {stale && <p role="alert">An event changed. Scan this batch again before importing.</p>}
-      <ul className="screenshot-results">{items.map(item => <ScreenshotResult key={item.id} item={item} locked={!!review || !!job || stale}
-        onLegion={destination => checkpoint({ ...session, items: items.map(candidate => candidate.id === item.id ? { ...candidate, destination } : candidate) })}/>)}</ul>
+      <details className="stage9-source-list"><summary>Screenshot details · {items.length} files</summary><ul className="screenshot-results">{items.map(item => <ScreenshotResult key={item.id} item={item} locked={!!review || !!job || stale}
+        onLegion={destination => checkpoint({ ...session, items: items.map(candidate => candidate.id === item.id ? { ...candidate, destination } : candidate) })}/>)}</ul></details>
       {groups.map(group => <button key={group.legion} type="button" className="screenshot-primary" disabled={!!job || !!review || stale}
         onClick={() => setReview({ ...group, context: { kind, alliance, legion: group.legion, expectedOccurrenceId: session.occurrenceIds[group.legion] } })}>
         Review Legion {group.legion} · {group.rows.length} readings
       </button>)}
     </>}
-    {job && <><p role="status">{job}</p>{run.current && <button type="button" onClick={() => { run.current.stopped = true; setJob('Stopping after current screenshot…'); }}>Stop scan</button>}</>}
+    {job && !review && <><p role="status">{job}</p>{run.current && <button type="button" onClick={() => { run.current.stopped = true; setJob('Stopping after current screenshot…'); }}>Stop scan</button>}</>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
     {review && <ScreenshotReview {...review} players={players} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage}
