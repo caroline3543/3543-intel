@@ -4,19 +4,21 @@ import {chromium} from 'playwright';
 
 const origin=process.env.EVENT_PREVIEW_ORIGIN || 'http://127.0.0.1:4184';
 const server=process.env.EVENT_PREVIEW_ORIGIN ? null : spawn('./node_modules/.bin/vite',['preview','roster-site','--host','127.0.0.1','--port','4184','--strictPort'],{stdio:'inherit'});
-async function verifySwap(page){
+async function verifySwap(page, requestedA, requestedB){
   const snapshot=()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1')));
   const before=await snapshot();
   await page.getByRole('button',{name:/Swap teams/}).click();
   const panel=page.getByRole('region',{name:'Swap teams'});
   const first=panel.getByRole('combobox',{name:'First team'}),second=panel.getByRole('combobox',{name:'Second team'});
-  const a=await first.inputValue(),b=await second.inputValue();
+  const a=requestedA||await first.inputValue(),b=requestedB||await second.inputValue();
+  await first.selectOption(a);await second.selectOption(b);
   await second.selectOption(a);
   assert.ok(await panel.getByRole('button',{name:/^Swap /}).isDisabled());
   await second.selectOption(b);
   await panel.getByRole('button',{name:'Cancel'}).click();
   assert.deepEqual(await snapshot(),before);
   await page.getByRole('button',{name:/Swap teams/}).click();
+  await first.selectOption(a);await second.selectOption(b);
   await panel.getByRole('button',{name:'Swap '+a+' and '+b}).click();
   const after=await snapshot();
   const changed=Object.keys(after.foundry.eventPlans).filter(k=>JSON.stringify(after.foundry.eventPlans[k])!==JSON.stringify(before.foundry.eventPlans[k]));
@@ -27,13 +29,14 @@ async function verifySwap(page){
   for(const field of ['registrations','registeredUnder','powerByPlayer','teamNames','shareInstructions'])assert.deepEqual(next[field],old[field]);
   assert.deepEqual(after.players,before.players);
   if(await page.getByRole('button',{name:'Buildings',exact:true}).count()){
-    const positions={Blue:['Prototype Site I','Boiler Room'],Yellow:['Prototype Site II','Central Transit Station']};
+    const positions={Blue:['Prototype Site I','Boiler Room'],Yellow:['Prototype Site II','Central Transit Station'],Green:['Repair Facility I','Repair Facility III'],Pink:['Repair Facility II','Repair Facility IV']};
+    positions.Purple=positions.Teal=Object.values(positions).flat();
     assert.ok(positions[a]&&positions[b]);
     for(const [id,c] of Object.entries(old.teams)){
       if(c!==a&&c!==b){assert.equal(next.assignments[id],old.assignments[id]);continue;}
       const destination=c===a?b:a;
       const index=Math.max(0,positions[c].indexOf(old.assignments[id]));
-      assert.equal(next.assignments[id],positions[destination][index]);
+      assert.equal(next.assignments[id],positions[destination][index]||positions[destination][0]);
     }
   }else assert.deepEqual(next.assignments,old.assignments);
   await page.getByRole('button',{name:'Undo',exact:true}).click();
@@ -142,6 +145,9 @@ try {
     await page.getByRole('button',{name:/Generate teams/}).click();
     await page.getByRole('button',{name:/Regenerate all teams/}).click();
     await verifySwap(page);
+    await verifySwap(page,'Blue','Purple');
+    await verifySwap(page,'Yellow','Teal');
+    await verifySwap(page,'Blue','Purple');
     const purple=page.getByRole('heading',{name:/^Purple team/});
     await purple.waitFor();
     await page.getByRole('button',{name:/Move Northvale to another team/}).click();
