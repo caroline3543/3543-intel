@@ -15,6 +15,24 @@ async function screenshotId(file) {
 }
 
 const EvidenceCache=createContext(null);
+function warmEvidence(cache,file){
+  const entry=cache?.get(file);
+  if(!entry||entry.image)return;
+  const image=new Image();
+  entry.image=image;
+  image.src=entry.url;
+  image.decode().then(()=>{if(image.naturalHeight)entry.ratio=image.naturalWidth/image.naturalHeight;}).catch(()=>{});
+}
+function ReviewEvidence({files}){
+  const cache=useContext(EvidenceCache);
+  useEffect(()=>{
+    if(!cache)return;
+    const keep=new Set(files);
+    for(const [file,entry] of cache)if(!keep.has(file)&&entry.image){entry.image.src='';entry.image=null;}
+    for(const file of keep)warmEvidence(cache,file);
+  },[cache,files]);
+  return null;
+}
 function ScreenshotImage({ file, bounds }) {
   const cache=useContext(EvidenceCache);
   const cached=cache?.get(file);
@@ -73,11 +91,12 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     for(const source of review.sources??[]){
       if(!source.file||cache.has(source.file))continue;
       const url=URL.createObjectURL(source.file);
-      const entry={url,ratio:null};
+      const entry={url,ratio:null,image:null};
       cache.set(source.file,entry);
     }
     setEvidenceCache(cache);
-    return ()=>{for(const entry of cache.values())URL.revokeObjectURL(entry.url);};
+    return ()=>{for(const entry of cache.values()){if(entry.image)entry.image.src='';URL.revokeObjectURL(entry.url);}};
+
   },[review]);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const workspaceRef = useRef(null);
@@ -333,7 +352,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     </div>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
-    {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview {...review} players={players} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage}
+    {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview {...review} players={players} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage} PreloadEvidence={ReviewEvidence}
       initialMode={session?.drafts?.[review.legion]?.mode ?? mode}
       initialEdits={session?.drafts?.[review.legion]?.edits ?? {}}
       onDraftChange={draft => {
