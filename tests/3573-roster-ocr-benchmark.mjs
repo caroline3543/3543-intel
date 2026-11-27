@@ -36,7 +36,7 @@ try {
       const file = new File([Uint8Array.from(atob(content), char => char.charCodeAt(0))], filename);
       const started = performance.now();
       try {
-        const data = await window.scanRoster(window.rosterReader, file);
+        const data = await window.scanRoster(window.rosterReader, file, {avatarBenchmark:true});
         return { filename, ms:Math.round(performance.now()-started), ...data };
       } catch (error) {
         return { filename, error:error.message };
@@ -62,7 +62,19 @@ try {
     assert.ok(expected,'Missing ground truth for '+actual.filename);
     return {filename:actual.filename,...scoreScreenshot(expected,actual)};
   }) : null;
-  await writeFile(output, JSON.stringify({startupMs,batchMs,errors,screenshots,scores,negative},null,2)+'\n');
+  const cards=screenshots.flatMap(s=>s.rows??[]);
+  const fingerprints=cards.filter(r=>r.avatarEvidence);
+  const groups=new Map();
+  for(const r of fingerprints){
+    const key=r.avatarEvidence.difference+':'+r.avatarEvidence.average;
+    const group=groups.get(key)??[];
+    group.push(r.name);groups.set(key,group);
+  }
+  const avatarMetrics={cards:cards.length,usable:fingerprints.length,coverage:cards.length?fingerprints.length/cards.length:0,
+    identicalFingerprintGroups:[...groups.values()].filter(g=>g.length>1).map(g=>({count:g.length,names:[...new Set(g)]}))};
+  // Only aggregate diagnostics leave the benchmark process; no avatar fingerprints in artifacts.
+  for(const row of cards)delete row.avatarEvidence;
+  await writeFile(output, JSON.stringify({startupMs,batchMs,errors,screenshots,scores,negative,avatarMetrics},null,2)+'\n');
   if(scores){
     const sum=key=>scores.reduce((total,s)=>total+s[key],0);
     const expected=sum('expected');
