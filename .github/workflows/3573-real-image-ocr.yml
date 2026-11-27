@@ -2,7 +2,7 @@ name: Real-image OCR benchmark
 on:
   workflow_dispatch:
   push:
-    branches: [fix/3573-ocr-upgrade]
+    branches: [fix/3573-ocr-upgrade, release/3573-ocr-candidate]
     paths: ['tests/fixtures/3573-ocr/**', '.github/workflows/3573-real-image-ocr.yml', 'tests/3573-roster-ocr-benchmark.mjs', 'tests/3573-ocr-score.mjs', 'roster-site/src/foundry/**']
 permissions:
   contents: read
