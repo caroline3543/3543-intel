@@ -136,6 +136,23 @@ try {
     return {withoutAliases,withNicknames,withAliases,reductionPercent,targetMet:reductionPercent!==null&&reductionPercent>=30&&withAliases.wrong===0&&withAliases.missing===0};
   },{screenshots,labels,roster,benchmarkAlliance}):null;
   if(aliasComparison)console.log('Paired alias comparison:',JSON.stringify(aliasComparison));
+  // Release validation must use an externally supplied identity snapshot, not
+  // a roster reconstructed from the evaluation labels. Never treat replay as proof.
+  const requireIndependentGate=process.env.ROSTER_REQUIRE_INDEPENDENT_GATE==='1';
+  if(requireIndependentGate){
+    assert.ok(rosterPath && groundTruthPath,'Release gate requires external roster and ID-labelled evaluation screenshots');
+    assert.ok(process.env.ROSTER_ALIAS_TRAINING_MANIFEST,'Release gate requires a separate alias training manifest');
+    const training=JSON.parse(await readFile(resolve(process.env.ROSTER_ALIAS_TRAINING_MANIFEST),'utf8'));
+    assert.ok(Array.isArray(training)&&training.length>0,'Training manifest must contain SHA-256 image hashes');
+    const {createHash}=await import('node:crypto');
+    const hashes=new Set(training);
+    assert.ok(training.every(h=>typeof h==='string'&&/^[a-f0-9]{64}$/.test(h)),'Invalid training image hash');
+    for(const filename of files){
+      const hash=createHash('sha256').update(await readFile(resolve(directory,filename))).digest('hex');
+      assert.ok(!hashes.has(hash),'Evaluation screenshot overlaps training: '+filename);
+    }
+  }
+
   const repeatUpload=labels?await page.evaluate(async ({screenshots,labels,roster,benchmarkAlliance})=>{
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
     const original=createScreenshotMatcher(roster,benchmarkAlliance);
@@ -187,6 +204,7 @@ try {
     assert.ok(scores.every(s=>s.legionCorrect),'Incorrect screenshot legion');
     assert.equal(sum('extra'),0,'Unexpected player cards detected');
   }
+  if(requireIndependentGate) assert.ok(aliasComparison?.targetMet,'Independent alias release gate failed: require >=30% fewer manual reviews, zero wrong matches and zero missing rows');
   assert.deepEqual(errors, []);
   if(negative)assert.equal(negative.rejected,true,'Unsupported screenshot must be rejected');
   assert.ok(screenshots.every(result => !result.error));
