@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useState,useEffect} from 'react';
 import {createRoot} from 'react-dom/client';
 import {addRecordedLanguage} from '../../src/services/gameLanguageService.js';
 import {NameChanges} from './components/NameChanges.jsx';
@@ -37,6 +37,7 @@ function Preview(){
   const [opened,open]=useState(null);
   const [teamwork,setTeamwork]=useState({pairs:[['sample-7','sample-9']]});
   const [workspace,save]=useState(previewWorkspace);
+  useEffect(()=>{try{sessionStorage.setItem(previewStorageKey,JSON.stringify(workspace));}catch{}},[workspace]);
   const saveScreenshot = (action,{verifyOnly=false}={}) => {
     if(verifyOnly){
       const persisted=previewWorkspace();
