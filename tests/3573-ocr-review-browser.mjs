@@ -86,6 +86,20 @@ try {
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
     await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
     assert.equal(await powerInput.inputValue(),'3638');
+    await page.waitForFunction(async kind=>{
+      const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+      try {
+        const session=await new Promise((resolve,reject)=>{const req=db.transaction('sessions','readonly').objectStore('sessions').get(kind+':ARC');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+        return Object.values(session?.drafts?.[1]?.edits??{}).some(edit=>edit.power==='3638'&&!edit.powerConfirmed);
+      } finally {db.close();}
+    },kind);
+    await page.reload();
+    if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
+    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
+    await review.getByRole('button',{name:/Resolve .* readings/}).click();
+    await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
+    assert.equal(await powerInput.inputValue(),'3638');
     await row('Juniper').getByRole('button',{name:'Confirm troop power',exact:true}).click();
     await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('all');
