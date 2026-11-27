@@ -9,22 +9,32 @@ export const assignmentLabel = assignment => assignment
 const exactName = value => String(value ?? '').trim().normalize('NFC');
 const playerFields = player => [player.name, player.playerId, player.fid, player.id, ...(player.searchFields ?? [])];
 
-export function screenshotMatches(name, players, alliance) {
-  if (!name) return { candidates: [], player: null };
-  const exact = players.filter(player => playerFields(player).some(field => exactName(field) === exactName(name)));
-  const suggestions = bulkCandidates(name, players, alliance);
-  const candidates = [...new Map([...exact, ...suggestions].map(player => [player.id, player])).values()].slice(0, 8);
-  const key=normaliseBulkName(name);
-  const equivalent=key ? players.filter(player=>playerFields(player).some(field=>normaliseBulkName(field)===key)) : [];
-  const visualKey=value=>normaliseBulkName(value).replace(/0/g,'o').replace(/[1l]/g,'i');
-  const visual=visualKey(name);
-  const lookalikes=visual ? players.filter(player=>playerFields(player).some(field=>visualKey(field)===visual)) : [];
-  const spacingKey=value=>exactName(value).normalize('NFKC').toLowerCase().replace(/\s/gu,'');
-  const strict=players.filter(player=>spacingKey(player.name)===spacingKey(name));
-  const selected=exact.length===1?exact[0]:exact.length===0&&strict.length===1?strict[0]:null;
-  const safe=selected && equivalent.length===1 && equivalent[0].id===selected.id && lookalikes.length===1;
-  return { candidates, player: safe ? selected : null };
+const spacingKey=value=>exactName(value).normalize('NFKC').toLowerCase().replace(/\s/gu,'');
+const visualKey=value=>normaliseBulkName(value).replace(/0/g,'o').replace(/[1l]/g,'i');
+export function createScreenshotMatcher(players,alliance,preferredIds=[]){
+  const preferred=new Set(preferredIds);
+  const local=players.filter(p=>preferred.has(p.id)||p.alliance===alliance);
+  const indexes=[new Map(),new Map(),new Map(),new Map()];
+  const add=(map,key,p)=>{if(!key)return; if(!map.has(key))map.set(key,new Map());map.get(key).set(p.id,p);};
+  for(const p of players){
+    for(const field of playerFields(p)){add(indexes[0],exactName(field),p);add(indexes[1],normaliseBulkName(field),p);add(indexes[2],visualKey(field),p);}
+    add(indexes[3],spacingKey(p.name),p);
+  }
+  const get=(i,key)=>[...(indexes[i].get(key)?.values()??[])];
+  const cache=new Map();
+  return name=>{
+    if(!name)return {candidates:[],player:null};
+    if(cache.has(name))return cache.get(name);
+    const exact=get(0,exactName(name)),equivalent=get(1,normaliseBulkName(name)),lookalikes=get(2,visualKey(name)),strict=get(3,spacingKey(name));
+    const selected=exact.length===1?exact[0]:exact.length===0&&strict.length===1?strict[0]:null;
+    const safe=selected&&equivalent.length===1&&equivalent[0].id===selected.id&&lookalikes.length===1;
+    const localSuggestions=safe?[]:bulkCandidates(name,local,alliance);
+    const wider=safe||localSuggestions.length>=8?[]:bulkCandidates(name,players,alliance);
+    const candidates=[...new Map([...exact,...strict,...(safe?[selected]:[]),...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);
+    const result={candidates,player:safe?selected:null};cache.set(name,result);return result;
+  };
 }
+export function screenshotMatches(name,players,alliance){return createScreenshotMatcher(players,alliance)(name);}
 
 export { suspiciousPowerChange };
 
