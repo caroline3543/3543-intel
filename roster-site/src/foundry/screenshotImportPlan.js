@@ -15,11 +15,13 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
   const preferred=new Set(preferredIds),registered=new Set(registeredIds);
   const local=players.filter(p=>preferred.has(p.id)||p.alliance===alliance);
   const rank=p=>registered.has(p.id)?0:preferred.has(p.id)?1:p.alliance===alliance?2:3;
-  const indexes=[new Map(),new Map(),new Map(),new Map()];
+  const indexes=[new Map(),new Map(),new Map(),new Map(),new Map(),new Map()];
   const add=(map,key,p)=>{if(!key)return; if(!map.has(key))map.set(key,new Map());map.get(key).set(p.id,p);};
   for(const p of players){
     for(const field of playerFields(p)){add(indexes[0],exactName(field),p);add(indexes[1],normaliseBulkName(field),p);add(indexes[2],visualKey(field),p);}
     add(indexes[3],spacingKey(p.name),p);
+    add(indexes[4],normaliseBulkName(p.name),p);
+    add(indexes[5],visualKey(p.name),p);
   }
   const get=(i,key)=>[...(indexes[i].get(key)?.values()??[])];
   const cache=new Map();
@@ -28,12 +30,17 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
     if(cache.has(name))return cache.get(name);
     const exact=get(0,exactName(name)),equivalent=get(1,normaliseBulkName(name)),lookalikes=get(2,visualKey(name)),strict=get(3,spacingKey(name));
     const selected=exact.length===1?exact[0]:exact.length===0&&strict.length===1?strict[0]:null;
-    const safe=selected&&(selected.alliance===alliance||preferred.has(selected.id)||registered.has(selected.id))&&equivalent.length===1&&equivalent[0].id===selected.id&&lookalikes.length===1;
+    const eligible=p=>p.alliance===alliance||preferred.has(p.id)||registered.has(p.id);
+    const current=strict.length===1?strict[0]:null;
+    const currentSafe=current&&eligible(current)&&get(4,normaliseBulkName(name)).length===1&&get(5,visualKey(name)).length===1&&[...exact,...equivalent,...lookalikes].every(p=>p.id===current.id||!eligible(p));
+    const legacySafe=selected&&(selected.alliance===alliance||preferred.has(selected.id)||registered.has(selected.id))&&equivalent.length===1&&equivalent[0].id===selected.id&&lookalikes.length===1;
+    const automatic=currentSafe?current:legacySafe?selected:null;
+    const safe=!!automatic;
     const localSuggestions=safe?[]:bulkCandidates(name,local,alliance).sort((a,b)=>rank(a)-rank(b));
     const wider=safe?[]:bulkCandidates(name,players,alliance);
-    const candidates=[...new Map([...exact,...strict,...(safe?[selected]:[]),...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);
+    const candidates=[...new Map([...(automatic?[automatic]:[]),...exact,...strict,...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);
     const suggested=!safe&&equivalent.length===1&&lookalikes.length===1&&equivalent[0].id===lookalikes[0].id&&preferred.has(equivalent[0].id)&&normaliseBulkName(name).length>=4?equivalent[0]:null;
-    const result={candidates,player:safe?selected:null,suggested};cache.set(name,result);return result;
+    const result={candidates,player:automatic,suggested};cache.set(name,result);return result;
   };
 }
 export function screenshotMatches(name,players,alliance){return createScreenshotMatcher(players,alliance)(name);}
