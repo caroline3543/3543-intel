@@ -7,10 +7,10 @@ import { assignmentLabel, prepareScreenshotImport, roleName, screenshotMatches }
 const roles = { combatant: 'Combatant', substitute: 'Substitute', unassigned: 'Unassigned', 'other-legion': 'Other legion', unknown: 'Unknown' };
 const modeLabels = { powers: 'troop powers', roles: 'registrations', both: 'troop powers and registrations' };
 
-export function ScreenshotReview({ context, rows, sources, players, storage, counts, onClose, onSave, Evidence }) {
-  const [mode, setMode] = useState('powers');
-  const [edits, setEdits] = useState({});
-  const [filter, setFilter] = useState('all');
+export function ScreenshotReview({ context, rows, sources, players, storage, counts, onClose, onSave, Evidence, initialMode = 'powers', initialEdits = {}, onDraftChange }) {
+  const [mode, setMode] = useState(initialMode);
+  const [edits, setEdits] = useState(initialEdits);
+  const [filter, setFilter] = useState('review');
   const [preview, setPreview] = useState(null);
   const [working, setWorking] = useState(false);
   const [status, setStatus] = useState('');
@@ -28,9 +28,10 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
     const powerText = edit.power ?? (powerConflict ? '' : String(row.power ?? ''));
     const power = powerText.trim() ? readScreenshotPower(powerText) : null;
     const conflict = row.conflict || mode !== 'roles' && powerConflict;
-    const needsReview = !player || conflict && !edit.checked || mode !== 'roles' && power === null || row.registration === 'unknown';
+    const needsReview = !player || conflict && !edit.checked || mode !== 'roles' && power === null || mode !== 'powers' && row.registration === 'unknown';
     return { row, edit, match, player, powerText, power, conflict, needsReview };
   });
+  useEffect(() => { onDraftChange?.({ mode, edits }); }, [mode, edits]);
   const active = evaluated.filter(item => !item.edit.skip);
   const confirmed = active.filter(item => item.player);
   const visible = evaluated.filter(({ row, edit, needsReview }) =>
