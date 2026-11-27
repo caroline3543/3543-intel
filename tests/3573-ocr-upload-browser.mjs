@@ -49,7 +49,7 @@ try {
     await page.screenshot({path:'ocr-review-captures/'+key+'-02-processing.png',animations:'disabled'});
     await upload.getByRole('button',{name:'Stop scan'}).click();
     releaseReader();
-    await upload.getByRole('button',{name:'Scan screenshots',exact:true}).waitFor();
+    await upload.getByRole('button',{name:'Resume scan',exact:true}).waitFor();
     await upload.getByText('0 of 1 screenshots read',{exact:true}).waitFor();
     await upload.getByRole('button',{name:'Clear screenshots'}).click();
     await upload.getByRole('button',{name:'Upload troop power'}).waitFor();
@@ -71,7 +71,7 @@ try {
     await dialog.getByText('2 of 2 screenshots read',{exact:true}).waitFor({timeout:120000});
     await dialog.locator('input[type=file]').setInputFiles(files.slice(2));
     await dialog.getByText('2 of 3 screenshots read',{exact:true}).waitFor();
-    await dialog.getByRole('button',{name:'Resume or retry unread screenshots',exact:true}).click();
+    await dialog.getByRole('button',{name:'Scan new screenshots',exact:true}).click();
     await dialog.getByText('3 of 3 screenshots read',{exact:true}).waitFor({timeout:120000});
     await real.reload();
     if(event==='Canyon Clash')await real.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
