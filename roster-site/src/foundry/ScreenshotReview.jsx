@@ -34,15 +34,16 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
     const powerText = edit.power ?? (powerConflict ? '' : String(row.power ?? ''));
     const power = powerText.trim() ? readScreenshotPower(powerText) : null;
     const conflict = row.conflict || mode !== 'roles' && powerConflict;
-    const needsReview = !player || conflict && !edit.checked || mode !== 'roles' && power === null || mode !== 'powers' && ['unknown','other-legion','combatant','substitute'].includes(row.registration) && !edit.registrationReviewed;
-    return { row, edit, match, player, powerText, power, conflict, needsReview };
+    const powerPending = mode !== 'roles' && edit.power !== undefined && !edit.powerConfirmed;
+    const needsReview = powerPending || !player || conflict && !edit.checked || mode !== 'roles' && power === null || mode !== 'powers' && ['unknown','other-legion','combatant','substitute'].includes(row.registration) && !edit.registrationReviewed;
+    return { row, edit, match, player, powerText, power, conflict, needsReview, powerPending };
   });
   useEffect(() => { onDraftChange?.({ mode, edits }); }, [mode, edits]);
   const active = evaluated.filter(item => !item.edit.skip);
   const confirmed = active.filter(item => item.player);
   const exceptions = active.filter(item => item.needsReview);
   const focused = evaluated.find(item => item.row.rowId === focusedId) ?? exceptions[0];
-  const focusedStage = !focused?.player ? 4 : mode !== "roles" && (focused.power === null || focused.conflict && !focused.edit.checked) ? 5 : 6;
+  const focusedStage = !focused?.player ? 4 : mode !== "roles" && (focused.powerPending || focused.power === null || focused.conflict && !focused.edit.checked) ? 5 : 6;
   useEffect(() => {
     if (filter === 'review' && focusedId && (!focused || focused.edit.skip || !focused.needsReview)) setFocusedId(null);
   }, [filter, focusedId, focused?.needsReview, focused?.edit.skip]);
@@ -128,7 +129,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
       </details>
       {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFilter('all'); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Review earlier readings</button><span>{exceptions.length} remaining</span><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
       <fieldset disabled={working}>
-        {visible.map(({ row, edit, match, player, powerText, conflict, needsReview }) => {
+        {visible.map(({ row, edit, match, player, powerText, power, powerPending, conflict, needsReview }) => {
           const current = assignments.get(player?.id) ?? [];
           const here = target.registrations[player?.id];
           const query = String(edit.search ?? '').trim().toLocaleLowerCase();
@@ -157,11 +158,12 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
                   onClick={() => update(row.rowId, { playerId: candidate.id, ...(candidate.id !== player?.id ? { role: null, registrationReviewed: false, checked: false } : {}) })}>
                   {candidate.name} · {candidate.alliance || 'Alliance unknown'} · ID {candidate.playerId || candidate.id}
                 </button>)}</>}
-                {mode !== 'roles' && (filter !== "review" || stage === 5) && <label>Troop power for {title}<input inputMode="decimal" value={powerText} onChange={event => update(row.rowId, { power: event.target.value, checked: false })}/></label>}
+                {mode !== 'roles' && (filter !== "review" || stage === 5) && <label>Troop power for {title}<input inputMode="decimal" value={powerText} onChange={event => update(row.rowId, { power: event.target.value, checked: false, powerConfirmed: filter !== 'review' })}/></label>}
                 {mode !== 'roles' && (filter !== "review" || stage === 5) && row.powerConflict?.length > 1 && <div className="ocr-power-choices" aria-label="Competing troop powers">
                   {row.powerConflict.map(value => <button type="button" key={value} aria-pressed={powerText === String(value)}
-                    onClick={() => update(row.rowId, { power: String(value), checked: false })}>{value.toLocaleString()}</button>)}
+                    onClick={() => update(row.rowId, { power: String(value), checked: false, powerConfirmed: filter !== 'review' })}>{value.toLocaleString()}</button>)}
                 </div>}
+                {filter === 'review' && stage === 5 && powerPending && <button type="button" disabled={power === null} onClick={() => update(row.rowId, { powerConfirmed: true })}>Confirm troop power</button>}
                 {mode !== 'powers' && (filter !== "review" || stage === 6) && <>
                   <p>Existing registration: {current.length ? current.map(assignmentLabel).join(' / ') : roleName(here || '')}.</p>
                   <label>Registration for {title}
