@@ -142,18 +142,19 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     const deadline=Date.now()+35000;
     while(Date.now()<deadline){
       const state=await retry();
-      if(state?.conflicts?.length)return {error:'Shared save has a conflict. Resolve workspace conflicts before checking this import again.'};
+      if(state?.conflicts?.length)return {error:'Shared save has a conflict. Resolve workspace conflicts before checking this import again.',pending:true};
       const base=state?.base;
       if(base){
         const slot=plannerSlot(base.foundry,action.kind,action.alliance,action.legion);
-        const powersMatch=(action.powers??[]).every(row=>slot.powerByPlayer?.[row.id]===row.value);
+        const profilePowerField=action.kind==='foundry'?'lastFoundryTroopPower':'lastCanyonClashTroopPower';
+        const powersMatch=(action.powers??[]).every(row=>slot.powerByPlayer?.[row.id]===row.value&&base.players?.find(player=>player.id===row.id)?.[profilePowerField]===row.value);
         const rolesMatch=(action.roleChanges??[]).every(row=>(slot.registrations[row.id]||'')===row.role&&(!row.moveFrom||!plannerSlot(base.foundry,action.kind,row.moveFrom.alliance,row.moveFrom.legion).registrations[row.id]));
         if(slot.occurrenceId===action.expectedOccurrenceId&&powersMatch&&rolesMatch)return {message:'Shared roster changes verified.',verified:true,revision:state.revision};
       }
       if(state?.issue)break;
       await new Promise(resolve=>setTimeout(resolve,500));
     }
-    return {error:'Changes were saved on this device, but shared confirmation is pending. Check workspace sync before importing again.',pending:true};
+    return {error:'Shared confirmation is pending. Check workspace sync before importing again.',pending:true};
   }
 
   useEffect(()=>{if(sync.ready&&sync.joined&&!sync.conflicts?.length){const normalized=withAutomaticRoles(data);if(normalized!==data)setSharedData(normalized);}},[data,sync.ready,sync.joined,sync.conflicts?.length]);
