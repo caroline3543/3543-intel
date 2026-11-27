@@ -43,8 +43,9 @@ jobs:
           node-version: '22'
       - run: npm ci
       - run: npm install --no-save --package-lock=false playwright@1.56.1
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - run: BUILD_PROFILE_FIXTURE=1 npm run build --prefix roster-site
+      - run: test -f roster-site/dist/event-preview.html
       - run: node tests/3573-event-planner-browser.mjs
       - name: Mobile OCR upload acceptance
         if: always()
