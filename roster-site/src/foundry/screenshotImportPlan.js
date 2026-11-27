@@ -28,7 +28,8 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
   }
   const get=(i,key)=>[...(indexes[i].get(key)?.values()??[])];
   const nicknameIndex=new Map();
-  for(const p of players)add(nicknameIndex,spacingKey(p.nickname),p);
+  const decorativeNicknameIndex=new Map();
+  for(const p of players){add(nicknameIndex,spacingKey(p.nickname),p);add(decorativeNicknameIndex,decorativeKey(p.nickname),p);}
   const cache=new Map();
   return name=>{
     if(!name)return {candidates:[],player:null};
@@ -40,7 +41,7 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
     const nicknameCollision=p=>[exactName,normaliseBulkName,visualKey,spacingKey,decorativeKey].some(key=>key(p.nickname)&&key(p.nickname)===key(name));
     const currentSafe=current&&eligible(current)&&get(4,normaliseBulkName(name)).length===1&&get(5,visualKey(name)).length===1&&[...exact,...equivalent,...lookalikes].every(p=>p.id===current.id||(!eligible(p)&&!nicknameCollision(p)));
     const legacySafe=selected&&(selected.alliance===alliance||preferred.has(selected.id)||registered.has(selected.id))&&equivalent.length===1&&equivalent[0].id===selected.id&&lookalikes.length===1;
-    const decorative=get(6,decorativeKey(name));
+    const decorative=[...new Map([...get(6,decorativeKey(name)),...(decorativeNicknameIndex.get(decorativeKey(name))?.values()??[])].map(p=>[p.id,p])).values()];
     const nicknames=[...(nicknameIndex.get(spacingKey(name))?.values()??[])];
     const nickname=nicknames.length===1&&eligible(nicknames[0])&&[...exact,...equivalent,...lookalikes,...strict,...decorative].every(p=>p.id===nicknames[0].id)?nicknames[0]:null;
     const proposed=currentSafe?current:legacySafe?selected:nickname;
