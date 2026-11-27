@@ -15,6 +15,9 @@ async function screenshotId(file) {
 }
 
 function ScreenshotImage({ file, bounds }) {
+  const [expanded, setExpanded] = useState(false);
+  const crop = bounds && Number.isFinite(bounds.top) && Number.isFinite(bounds.bottom) && bounds.top >= 0 && bounds.bottom <= 1 && bounds.bottom > bounds.top;
+  const [ratio,setRatio] = useState(null);
   const [url, setUrl] = useState('');
   useEffect(() => {
     const preview = URL.createObjectURL(file);
@@ -22,8 +25,9 @@ function ScreenshotImage({ file, bounds }) {
     return () => URL.revokeObjectURL(preview);
   }, [file]);
   return url && <figure className="screenshot-evidence">
-    <img src={url} alt={'Roster screenshot ' + file.name}/>
-    {bounds && <span aria-hidden="true" style={{ top: bounds.top * 100 + '%', height: (bounds.bottom - bounds.top) * 100 + '%' }}/>}
+    <div style={crop && !expanded && ratio ? {position:'relative',overflow:'hidden',aspectRatio:ratio/(bounds.bottom-bounds.top),width:'100%'} : undefined}><img src={url} onLoad={e=>{const img=e.currentTarget; if(img.naturalHeight)setRatio(img.naturalWidth/img.naturalHeight);}} style={crop && !expanded && ratio ? {position:'absolute',width:'100%',maxWidth:'none',top:-(bounds.top/(bounds.bottom-bounds.top))*100+'%',left:0} : undefined} alt={'Roster screenshot ' + file.name}/></div>
+    {crop && expanded && <span aria-hidden="true" style={{ top: bounds.top * 100 + '%', height: (bounds.bottom - bounds.top) * 100 + '%' }}/>}
+    {crop && <button type="button" onClick={()=>setExpanded(v=>!v)}>{expanded?'Show player row':'Show full screenshot'}</button>}
   </figure>;
 }
 
