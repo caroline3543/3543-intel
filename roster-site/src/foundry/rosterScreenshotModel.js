@@ -61,13 +61,14 @@ export function pickScreenshotRows(pixels, width, height) {
 
 // Cross-screenshot duplicates require compatible evidence and exact NFC
 // spelling. A repeated name in one screenshot remains two independent rows.
-export function combineScreenshotRows(screenshots) {
+export function combineScreenshotRows(screenshots, resolveIdentity = () => null) {
   const groups = new Map(), records = [];
   for (const [sourceIndex, screenshot] of screenshots.entries()) {
     for (const [rowIndex, row] of screenshot.rows.entries()) {
       const evidence = { sourceIndex, bounds: row.bounds };
       const rowId = sourceIndex + ':' + rowIndex;
-      const key = row.name.normalize('NFC');
+      const identity=resolveIdentity(row.name);
+      const key=identity ? 'id:'+identity : row.name ? 'name:'+row.name.normalize('NFC') : '';
       const list = groups.get(key) ?? [];
       const compatible = key && list.find(existing =>
         !existing.sources.includes(sourceIndex) &&
@@ -83,6 +84,7 @@ export function combineScreenshotRows(screenshots) {
         if (alternatives.length > 1) compatible.powerConflict = alternatives;
         compatible.sources.push(sourceIndex);
         compatible.evidence.push(evidence);
+        compatible.observedNames=[...new Set([...(compatible.observedNames??[compatible.name]),row.name])];
         compatible.voted ||= row.voted;
         compatible.battleRequest ||= row.battleRequest;
       } else {
