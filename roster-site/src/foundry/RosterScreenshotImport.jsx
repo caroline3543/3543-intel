@@ -234,14 +234,13 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     {!loading && !review && !run.current && <p className="stage9-protection">Your roster will not change until you review and confirm the import.</p>}
     {loading && <p role="status">Checking for a previous batch…</p>}
     {!loading && !items.length && <>
-      <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => picker.current?.click()}>Upload troop power</button>
+
       <p>Select up to 25 screenshots. Include the legion heading.</p>
     </>}
     {!!items.length && !review && <>
       <p>{title} · {alliance} · Legion {activeLegion}</p>
       <div className="stage9-progress-panel"><h3>{job ? 'Processing screenshots' : read === items.length ? 'Screenshots ready' : 'Ready to scan'}</h3><p role="status">{read} of {items.length} screenshots read</p><progress aria-label="Screenshot processing progress" value={read} max={items.length}/></div>
-      {read < items.length && !stale && <button type="button" className="screenshot-primary" disabled={!!job || !!review}
-        onClick={() => scan()}>{read || items.some(item => item.error) ? 'Resume or retry unread screenshots' : 'Scan screenshots'}</button>}
+
       <div className="screenshot-secondary">
         <button type="button" disabled={!!job || !!review || stale || items.length >= maxFiles} onClick={() => picker.current?.click()}>Add screenshots</button>
         <button type="button" disabled={!!job || !!review} onClick={() => { checkpoint(null); setError(''); }}>Clear screenshots</button>
@@ -255,7 +254,10 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
         Review Legion {group.legion} · {group.rows.length} readings
       </button>)}
     </>}
-    {job && !review && <><p role="status">{job}</p>{run.current && <button type="button" onClick={() => { run.current.stopped = true; setJob('Stopping after current screenshot…'); }}>Stop scan</button>}</>}
+    {job && !review && <p role="status">{job}</p>}
+    {!loading && !review && (!items.length || run.current || read < items.length && !stale) && <div className="stage9-action-footer">
+      {run.current ? <button type="button" className="screenshot-primary" disabled={run.current.stopped} onClick={() => { run.current.stopped = true; setJob('Stopping after current screenshot…'); }}>Stop scan</button> : !items.length ? <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => picker.current?.click()}>Upload troop power</button> : <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => scan()}>{read || items.some(item => item.error) ? 'Resume or retry unread screenshots' : 'Scan screenshots'}</button>}
+    </div>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
     {review && <ScreenshotReview {...review} players={players} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage}
