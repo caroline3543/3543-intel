@@ -145,7 +145,7 @@ test('OCR exact names cannot bypass roster-wide normalized identity collisions',
  for(const b of [
   {id:'b',name:'ＰＡＮＤＡ',alliance:'ARC'},
   {id:'b',name:'Panda!',alliance:'HOT'},
-  {id:'b',name:'Different',searchFields:['P A N D A'],alliance:'WAR'},
+  {id:'b',name:'Different',searchFields:['P A N D A'],alliance:'HOT'},
   {id:'b',name:'Pánda',alliance:'RKG'}
  ]){
   const match=screenshotMatches('Panda',[a,b],'HOT');
@@ -167,4 +167,16 @@ test('OCR spacing and case equivalence requires a unique collision-free identity
  assert.equal(screenshotMatches('eight',[a,b],'HOT').player?.id,'b');
  assert.equal(screenshotMatches('EIGHT',[a,b,{id:'c',name:'Eight',alliance:'ARC'}],'HOT').player,null);
  assert.equal(screenshotMatches('an',[{id:'x',name:'XAVI',alliance:'HOT'}],'HOT').player,null);
+});
+
+test('real screenshot examples match unique current HOT usernames without unnecessary review',()=>{
+ const examples=[['Crazy Joe','Crazy Joe'],['Black Jack','Black Jack'],['Armenia_2025','Armenia_2025'],['강 인 ㅇ _ ㅇ','강인ㅇ_ㅇ'],['나 다 나 다','나다나다'],['abd ツ','abdツ']];
+ const roster=examples.map(([,name],i)=>({id:String(i),name,alliance:'HOT'}));
+ roster.push({id:'davy',name:'Davy',alliance:'ARC',searchFields:['Armenia_2025','Crazy Joe','Black Jack']});
+ const match=createScreenshotMatcher(roster,'HOT');
+ for(const [i,[reading]] of examples.entries())assert.equal(match(reading).player?.id,String(i),reading);
+ assert.equal(createScreenshotMatcher([...roster,{id:'duplicate',name:'Crazy Joe',alliance:'ARC'}],'HOT')('Crazy Joe').player,null);
+ assert.equal(createScreenshotMatcher(roster,'HOT',['davy'])('Armenia_2025').player,null);
+ assert.equal(createScreenshotMatcher([...roster,{id:'similar',name:'Black Jack!',alliance:'ARC'}],'HOT')('Black Jack').player,null);
+ assert.equal(match('Crazy J0e').player,null);
 });
