@@ -65,10 +65,11 @@ try {
     await review.getByRole('button',{name:'Review troop powers changes'}).click();
     await review.getByRole('alert').filter({hasText:'Resolve or skip'}).waitFor();
     const row=name=>review.locator('.ocr-reading').filter({has:page.locator('summary > strong',{hasText:name})});
+    await review.locator('.stage9-action-footer').getByRole('button',{name:'Skip this reading',exact:true}).click();
     await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('all');
-    if(!(await row('Unrecognised fixture').getAttribute('open')!==null)) await row('Unrecognised fixture').locator('summary').first().click();
-    await row('Unrecognised fixture').getByRole('checkbox',{name:'Skip this reading'}).check();
+    if(await row('Unrecognised fixture').getAttribute('open')===null) await row('Unrecognised fixture').locator('summary').first().click();
+    assert.equal(await row('Unrecognised fixture').getByRole('checkbox',{name:'Skip this reading'}).isChecked(),true);
     await review.getByLabel('Filter readings').selectOption('review');
     await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
     await checkResponsive('05-power');
