@@ -46,3 +46,13 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: BUILD_PROFILE_FIXTURE=1 npm run build --prefix roster-site
       - run: node tests/3573-event-planner-browser.mjs
+      - name: Mobile OCR upload acceptance
+        if: always()
+        run: node tests/3573-ocr-upload-browser.mjs
+      - name: Retain current implementation captures for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage9-current-ocr-captures
+          path: ocr-review-captures/
+          if-no-files-found: warn
