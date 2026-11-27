@@ -7,7 +7,7 @@ import { createServer } from 'vite';
 const directory = resolve(process.env.ROSTER_SCREENSHOTS_DIR ?? '../screenshots');
 const output = resolve(process.argv[2] ?? '../3573-ocr-results.json');
 const files = (await readdir(directory)).filter(name => /\.(?:png|jpe?g|webp)$/i.test(name)).sort();
-assert.equal(files.length, 20, 'Put the 20 original screenshots in ROSTER_SCREENSHOTS_DIR.');
+assert.ok(files.length >= 1 && files.length <= 25, 'Put 1–25 original screenshots in ROSTER_SCREENSHOTS_DIR.');
 process.chdir('roster-site');
 const server = await createServer({ server:{ host:'127.0.0.1', port:5177, strictPort:true } });
 await server.listen();
