@@ -1,0 +1,1461 @@
+{
+  "IMG_9840.jpeg": {
+    "filename": "IMG_9840.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 4,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Frankie's Pet",
+        "power": 6094,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.418
+      },
+      {
+        "row": 2,
+        "name": "Caroline ᴴᴼᵀ",
+        "power": 3647,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.535
+      },
+      {
+        "row": 3,
+        "name": "Mr Humberfloob",
+        "power": 15630,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.617
+      },
+      {
+        "row": 4,
+        "name": "P A N D Aᴴᴼ",
+        "power": 6872,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.7
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9841.jpeg": {
+    "filename": "IMG_9841.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Mr Because",
+        "power": 6639,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.38
+      },
+      {
+        "row": 2,
+        "name": "chaz",
+        "power": 5574,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.46
+      },
+      {
+        "row": 3,
+        "name": "Spammers",
+        "power": 3646,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.545
+      },
+      {
+        "row": 4,
+        "name": "JAK",
+        "power": 3628,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.627
+      },
+      {
+        "row": 5,
+        "name": "Stryker",
+        "power": 3483,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.71
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9842.png": {
+    "filename": "IMG_9842.png",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 4,
+    "rows": [
+      {
+        "row": 1,
+        "name": "CatLe ᵀᴿʸ",
+        "power": 3462,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.386
+      },
+      {
+        "row": 2,
+        "name": "Mike,",
+        "power": 2387,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.475
+      },
+      {
+        "row": 3,
+        "name": "Kaiba",
+        "power": 13275,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.595
+      },
+      {
+        "row": 4,
+        "name": "DopaMin",
+        "power": 11137,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.675
+      }
+    ],
+    "partialNotes": [
+      "Bottom edge of preceding card at top",
+      "Top edge of following card at bottom"
+    ]
+  },
+  "IMG_9843.jpeg": {
+    "filename": "IMG_9843.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Bunk",
+        "power": 10996,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.385
+      },
+      {
+        "row": 2,
+        "name": "TooCozy ToFight",
+        "power": 9833,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.468
+      },
+      {
+        "row": 3,
+        "name": "Hera",
+        "power": 9303,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.55
+      },
+      {
+        "row": 4,
+        "name": "LADY HAZMAT [decorative]",
+        "power": 8782,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.633
+      },
+      {
+        "row": 5,
+        "name": "DJ!!",
+        "power": 7429,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.715
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9844.jpeg": {
+    "filename": "IMG_9844.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Dinu",
+        "power": 7352,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.375
+      },
+      {
+        "row": 2,
+        "name": "YourMajeSuzzyy",
+        "power": 6804,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.458
+      },
+      {
+        "row": 3,
+        "name": "Diggy",
+        "power": 6707,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.54
+      },
+      {
+        "row": 4,
+        "name": "Olenka",
+        "power": 6265,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.625
+      },
+      {
+        "row": 5,
+        "name": "JOh",
+        "power": 6086,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.707
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9845.jpeg": {
+    "filename": "IMG_9845.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "산라쿠",
+        "power": 6015,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.375
+      },
+      {
+        "row": 2,
+        "name": "DRAVΞN",
+        "power": 5987,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.46
+      },
+      {
+        "row": 3,
+        "name": "SmashingPumCow!",
+        "power": 5846,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.543
+      },
+      {
+        "row": 4,
+        "name": "Pepper",
+        "power": 5729,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.625
+      },
+      {
+        "row": 5,
+        "name": "바나나",
+        "power": 5642,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.708
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9846.jpeg": {
+    "filename": "IMG_9846.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "HYETA",
+        "power": 4697,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.37
+      },
+      {
+        "row": 2,
+        "name": "AntwerpChief",
+        "power": 4501,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.45
+      },
+      {
+        "row": 3,
+        "name": "나무늘보",
+        "power": 4454,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.535
+      },
+      {
+        "row": 4,
+        "name": "Sooner",
+        "power": 4306,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.62
+      },
+      {
+        "row": 5,
+        "name": "HUSTLE",
+        "power": 4279,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.7
+      }
+    ],
+    "partialNotes": [
+      "Narrow sliver of next row at bottom"
+    ]
+  },
+  "IMG_9847.jpeg": {
+    "filename": "IMG_9847.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Pola",
+        "power": 4229,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.375
+      },
+      {
+        "row": 2,
+        "name": "Epilogue",
+        "power": 4166,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.458
+      },
+      {
+        "row": 3,
+        "name": "Misionarul",
+        "power": 3893,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.54
+      },
+      {
+        "row": 4,
+        "name": "나 무",
+        "power": 3871,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.625
+      },
+      {
+        "row": 5,
+        "name": "Gemonek",
+        "power": 3805,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.707
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9848.jpeg": {
+    "filename": "IMG_9848.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Gaia",
+        "power": 3750,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.375
+      },
+      {
+        "row": 2,
+        "name": "IgnaciodelOeste",
+        "power": 3726,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.458
+      },
+      {
+        "row": 3,
+        "name": "Armenia_2025",
+        "power": 3719,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.54
+      },
+      {
+        "row": 4,
+        "name": "Cocolight",
+        "power": 3678,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.625
+      },
+      {
+        "row": 5,
+        "name": "Yerevan",
+        "power": 3616,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.707
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9849.jpeg": {
+    "filename": "IMG_9849.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "HΞRMΞS",
+        "power": 3550,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.375
+      },
+      {
+        "row": 2,
+        "name": "Shaplex",
+        "power": 3481,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.458
+      },
+      {
+        "row": 3,
+        "name": "Bibi",
+        "power": 3468,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.54
+      },
+      {
+        "row": 4,
+        "name": "Black Jack",
+        "power": 3445,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.625
+      },
+      {
+        "row": 5,
+        "name": "나다나다",
+        "power": 3377,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.707
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9850.jpeg": {
+    "filename": "IMG_9850.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 4,
+    "rows": [
+      {
+        "row": 1,
+        "name": "DangerboyZA",
+        "power": 3083,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.375
+      },
+      {
+        "row": 2,
+        "name": "ahmad@blues",
+        "power": 2930,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.458
+      },
+      {
+        "row": 3,
+        "name": "Darkhorse",
+        "power": 2920,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.54
+      },
+      {
+        "row": 4,
+        "name": "Ice Bear",
+        "power": 3788,
+        "registration": "substitute",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.66
+      }
+    ],
+    "partialNotes": [
+      "Hardy is clipped at bottom; full card in IMG_9851.jpeg"
+    ]
+  },
+  "IMG_9851.jpeg": {
+    "filename": "IMG_9851.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Hardy",
+        "power": 3672,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.375
+      },
+      {
+        "row": 2,
+        "name": "Hello1",
+        "power": 3614,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.458
+      },
+      {
+        "row": 3,
+        "name": "Sman",
+        "power": 3602,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.54
+      },
+      {
+        "row": 4,
+        "name": "Jann",
+        "power": 3536,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.625
+      },
+      {
+        "row": 5,
+        "name": "●FIRE MAN●",
+        "power": 3481,
+        "registration": "substitute",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.707
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9852.jpeg": {
+    "filename": "IMG_9852.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Crazy Joe",
+        "power": 3463,
+        "registration": "substitute",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.38
+      },
+      {
+        "row": 2,
+        "name": "강인ㅇ_ㅇ",
+        "power": 3433,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.465
+      },
+      {
+        "row": 3,
+        "name": "Bahias66²",
+        "power": 3418,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.548
+      },
+      {
+        "row": 4,
+        "name": "Zero90",
+        "power": 3261,
+        "registration": "substitute",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.63
+      },
+      {
+        "row": 5,
+        "name": "Nazlı",
+        "power": 3206,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.714
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9853.jpeg": {
+    "filename": "IMG_9853.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Lord Aboelkheer",
+        "power": 3169,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.375
+      },
+      {
+        "row": 2,
+        "name": "BABES",
+        "power": 3112,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.458
+      },
+      {
+        "row": 3,
+        "name": "saitama",
+        "power": 3099,
+        "registration": "substitute",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.54
+      },
+      {
+        "row": 4,
+        "name": "ZeroEmpathy",
+        "power": 3091,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.625
+      },
+      {
+        "row": 5,
+        "name": "English",
+        "power": 3069,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.707
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9854.png": {
+    "filename": "IMG_9854.png",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Sunny",
+        "power": 3014,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.373
+      },
+      {
+        "row": 2,
+        "name": "Baza",
+        "power": 2991,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.455
+      },
+      {
+        "row": 3,
+        "name": "EIGHT",
+        "power": 2929,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.538
+      },
+      {
+        "row": 4,
+        "name": "Hope_間",
+        "power": 2826,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.622
+      },
+      {
+        "row": 5,
+        "name": "MiKi",
+        "power": 2589,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.705
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9855.jpeg": {
+    "filename": "IMG_9855.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 4,
+    "rows": [
+      {
+        "row": 1,
+        "name": "abdツ",
+        "power": 2568,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.38
+      },
+      {
+        "row": 2,
+        "name": "Bonbonit",
+        "power": 2534,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.465
+      },
+      {
+        "row": 3,
+        "name": "デXAVI [decorative]",
+        "power": 2312,
+        "registration": "substitute",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.548
+      },
+      {
+        "row": 4,
+        "name": "Spicy",
+        "power": 4569,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.67
+      }
+    ],
+    "partialNotes": [
+      "stay clipped at bottom"
+    ]
+  },
+  "IMG_9856.png": {
+    "filename": "IMG_9856.png",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 4,
+    "rows": [
+      {
+        "row": 1,
+        "name": "VARUSSSSS",
+        "power": 3624,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.443
+      },
+      {
+        "row": 2,
+        "name": "SmellyForeskin",
+        "power": 3246,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.526
+      },
+      {
+        "row": 3,
+        "name": "kins",
+        "power": 3224,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.61
+      },
+      {
+        "row": 4,
+        "name": "Hhopkins",
+        "power": 3210,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.693
+      }
+    ],
+    "partialNotes": [
+      "stay clipped at top; visible power 4049",
+      "Top edge of next card at bottom"
+    ]
+  },
+  "IMG_9857.jpeg": {
+    "filename": "IMG_9857.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Akaduk",
+        "power": 3131,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.37
+      },
+      {
+        "row": 2,
+        "name": "kuny",
+        "power": 3115,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.455
+      },
+      {
+        "row": 3,
+        "name": "Xanthiane",
+        "power": 3052,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.538
+      },
+      {
+        "row": 4,
+        "name": "infernalhawk",
+        "power": 2975,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.62
+      },
+      {
+        "row": 5,
+        "name": "fUNNY",
+        "power": 2939,
+        "registration": "substitute",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.703
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9858.jpeg": {
+    "filename": "IMG_9858.jpeg",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "黑面蔥",
+        "power": 2834,
+        "registration": "substitute",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.375
+      },
+      {
+        "row": 2,
+        "name": "Jeessmarques",
+        "power": 2827,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.46
+      },
+      {
+        "row": 3,
+        "name": "Fang Rose",
+        "power": 2815,
+        "registration": "substitute",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.543
+      },
+      {
+        "row": 4,
+        "name": "PapaBear",
+        "power": 2812,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.625
+      },
+      {
+        "row": 5,
+        "name": "Cirilla",
+        "power": 2787,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.708
+      }
+    ],
+    "partialNotes": []
+  },
+  "IMG_9859.png": {
+    "filename": "IMG_9859.png",
+    "legion": 1,
+    "totals": {
+      "combatant": {
+        "count": 30,
+        "limit": 30
+      },
+      "substitute": {
+        "count": 10,
+        "limit": 10
+      }
+    },
+    "fullCardCount": 5,
+    "rows": [
+      {
+        "row": 1,
+        "name": "Seraphina",
+        "power": 2716,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.37
+      },
+      {
+        "row": 2,
+        "name": "Annixx",
+        "power": 2687,
+        "registration": "combatant",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": true,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.45
+      },
+      {
+        "row": 3,
+        "name": "Chapinski",
+        "power": 2669,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": true,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": false,
+        "center": 0.535
+      },
+      {
+        "row": 4,
+        "name": "SHADOWⒽⓄⓉ [decorative]",
+        "power": 2388,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.618
+      },
+      {
+        "row": 5,
+        "name": "Miss Spite ᶠᵉʳᵃˡ",
+        "power": 2279,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "voted": false,
+        "battleRequest": false,
+        "decorativeOrSpacingAmbiguity": true,
+        "center": 0.7
+      }
+    ],
+    "partialNotes": [
+      "Very narrow sliver of next ribbon at bottom"
+    ]
+  },
+  "IMG_9860.png": {
+    "legion": 1,
+    "rows": [
+      {
+        "name": "Miss Spite ᶠᵉʳᵃˡ",
+        "power": 2279,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "center": 0.371
+      },
+      {
+        "name": "Mag the LilPanda",
+        "power": 2252,
+        "registration": "combatant",
+        "otherLegion": null,
+        "center": 0.452
+      },
+      {
+        "name": "Sir",
+        "power": 1740,
+        "registration": "unassigned",
+        "otherLegion": null,
+        "center": 0.535
+      },
+      {
+        "name": "&&Mohammed&&",
+        "power": 1719,
+        "registration": "substitute",
+        "otherLegion": null,
+        "center": 0.618
+      },
+      {
+        "name": "혀니94",
+        "power": 1370,
+        "registration": "other-legion",
+        "otherLegion": 2,
+        "center": 0.701
+      }
+    ]
+  }
+}

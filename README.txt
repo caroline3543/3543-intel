@@ -1,0 +1,1 @@
+21 positive screenshots; 100 labelled full cards. Historical labels retained; approximate visually estimated centers require verification. Decorative names may contain descriptive placeholders. Negative fixture excluded from positive runner. No OCR results included.
