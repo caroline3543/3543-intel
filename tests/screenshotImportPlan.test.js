@@ -108,3 +108,12 @@ for (const kind of ['foundry','canyon']) for (const legion of [1,2]) {
     assert.ok(plan(3647).action);
   });
 }
+
+test('screenshot import preserves other event powers and city power',()=>{
+ const {data,context}=setup('foundry',1);
+ Object.assign(data.players[0],{lastFoundryTroopPower:3630,lastCanyonClashTroopPower:946105130,lastTALTroopPower:12345,cityPower:987654321});
+ const {action}=prepareScreenshotImport(data.foundry,context,[{id:'a',power:3647,previousPower:3630}],'powers');
+ const saved=updateEventPlanner(data,action);
+ assert.equal(saved.players[0].lastFoundryTroopPower,3647);
+ for(const field of ['lastCanyonClashTroopPower','lastTALTroopPower','cityPower'])assert.equal(saved.players[0][field],data.players[0][field]);
+});
