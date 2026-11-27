@@ -28,7 +28,7 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
     if(cache.has(name))return cache.get(name);
     const exact=get(0,exactName(name)),equivalent=get(1,normaliseBulkName(name)),lookalikes=get(2,visualKey(name)),strict=get(3,spacingKey(name));
     const selected=exact.length===1?exact[0]:exact.length===0&&strict.length===1?strict[0]:null;
-    const safe=selected&&equivalent.length===1&&equivalent[0].id===selected.id&&lookalikes.length===1;
+    const safe=selected&&(selected.alliance===alliance||preferred.has(selected.id)||registered.has(selected.id))&&equivalent.length===1&&equivalent[0].id===selected.id&&lookalikes.length===1;
     const localSuggestions=safe?[]:bulkCandidates(name,local,alliance).sort((a,b)=>rank(a)-rank(b));
     const wider=safe?[]:bulkCandidates(name,players,alliance);
     const candidates=[...new Map([...exact,...strict,...(safe?[selected]:[]),...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);

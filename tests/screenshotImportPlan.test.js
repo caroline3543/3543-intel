@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { prepareScreenshotImport, screenshotMatches } from '../roster-site/src/foundry/screenshotImportPlan.js';
+import { prepareScreenshotImport, screenshotMatches, createScreenshotMatcher } from '../roster-site/src/foundry/screenshotImportPlan.js';
 import { accessContext, sessionToken } from '../roster-site/server/access.js';
 import { plannerKey, plannerSlot, updateEventPlanner } from '../src/services/eventPlanner.js';
 
@@ -155,7 +155,10 @@ test('OCR exact names cannot bypass roster-wide normalized identity collisions',
  }
  assert.equal(screenshotMatches('Panda',[a],'HOT').player?.id,'a');
  assert.equal(screenshotMatches('ＰＡＮＤＡ',[a],'HOT').player?.id,'a');
- assert.equal(screenshotMatches('Panda',[a],'ARC').player?.id,'a');
+ assert.equal(screenshotMatches('Panda',[a],'ARC').player,null);
+ assert.equal(createScreenshotMatcher([a],'ARC',['a'])('Panda').player?.id,'a');
+ assert.equal(createScreenshotMatcher([a],'ARC',[],['a'])('Panda').player?.id,'a');
+ assert.ok(screenshotMatches('Panda',[a],'ARC').candidates.some(p=>p.id==='a'));
 });
 
 test('OCR spacing and case equivalence requires a unique collision-free identity',()=>{
