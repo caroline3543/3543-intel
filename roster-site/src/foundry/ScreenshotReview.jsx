@@ -11,7 +11,7 @@ import {reviewAvatarSuggestions} from './reviewAvatarSuggestions.js';
 const roles = { combatant: 'Combatant', substitute: 'Substitute', unassigned: 'Unassigned', 'other-legion': 'Other legion', unknown: 'Unknown' };
 const modeLabels = { powers: 'troop powers', roles: 'registrations', both: 'troop powers and registrations' };
 
-export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false, onRetryUsername, onStageHeading }) {
+export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false, onRetryUsername, onStageHeading, onRememberOcrAlias }) {
   const [mode, setMode] = useState(initialMode);
   const [edits, setEdits] = useState(initialEdits);
   const [filter, setFilter] = useState('review');
@@ -24,6 +24,8 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
   const [summary, setSummary] = useState(true);
   const [focusedId, setFocusedId] = useState(null);
   const [identityChoice,setIdentityChoice]=useState(null);
+  const [rememberChoice,setRememberChoice]=useState(null);
+  const [aliasError,setAliasError]=useState('');
   const [retrying,setRetrying]=useState(null);
   async function retryUsername(row){
     if(retrying)return;
@@ -209,6 +211,8 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
                   {candidate.id === (filter === 'review' ? selectedIdentity ?? player?.id : player?.id) && <span aria-hidden="true" style={{color:'#4ade80',marginInlineStart:8}}>✓</span>}
                   {avatarAssist && !query && avatarSuggestion?.rowId===row.rowId && avatarSuggestion.candidateId===candidate.id && <small> · Avatar similarity (advisory)</small>}
                 </button>)}</>}
+                {onRememberOcrAlias && filter==='review' && stage===4 && selectedIdentity && row.name?.trim() && <label><input type="checkbox" disabled={working} checked={rememberChoice?.rowId===row.rowId && rememberChoice?.id===selectedIdentity} onChange={event=>{setAliasError('');setRememberChoice(event.target.checked?{rowId:row.rowId,id:selectedIdentity}:null);}}/> Remember this spelling for future uploads</label>}
+                {aliasError && filter==='review' && stage===4 && <p role="alert">{aliasError}</p>}
                 {unusualPower && (filter !== "review" || stage === 5) && <p className="stage9-power-warning" role="alert">Unusually large change: {previousPower.toLocaleString()} → {power.toLocaleString()}. Check the screenshot and power units before confirming.</p>}
                 {mode !== 'roles' && filter === 'review' && stage === 5 && <div className="stage9-registration-comparison"><div><small>Existing troop power</small><strong>{previousPower?.toLocaleString() ?? 'Not recorded'}</strong></div><div><small>Proposed troop power</small><strong>{power?.toLocaleString() ?? 'Unreadable'}</strong></div></div>}
                 {mode !== 'roles' && (filter !== "review" || stage === 5) && <label>Troop power for {title}<input inputMode="decimal" value={powerText} onChange={event => update(row.rowId, { power: event.target.value, checked: false, powerConfirmed: filter !== 'review' })}/></label>}
@@ -258,8 +262,16 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
       </details>
 
       {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFilter('all'); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Review earlier readings</button><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
-      <div className="stage9-action-footer">{filter === 'review' && focused && exceptions.length > 0 && <div className="stage9-footer-meta"><span role="status">{exceptions.length} remaining</span><button type="button" className="stage9-skip-action" disabled={working} onClick={()=>update(focused.row.rowId,{skip:true})}>Skip this reading</button></div>}{filter === 'review' && focused && exceptions.length > 0 ? <><button type="button" className="screenshot-primary" disabled={working || (stage===4 ? !selectedIdentity : stage===5 ? focused.power===null || focused.conflict && !focused.edit.checked : focused.conflict && !focused.edit.checked)} onClick={()=>{
-        if(stage===4){update(focused.row.rowId,{playerId:selectedIdentity,role:null,registrationReviewed:false,checked:false,powerApproval:null,powerConfirmed:false});setIdentityChoice(null);}
+      <div className="stage9-action-footer">{filter === 'review' && focused && exceptions.length > 0 && <div className="stage9-footer-meta"><span role="status">{exceptions.length} remaining</span><button type="button" className="stage9-skip-action" disabled={working} onClick={()=>update(focused.row.rowId,{skip:true})}>Skip this reading</button></div>}{filter === 'review' && focused && exceptions.length > 0 ? <><button type="button" className="screenshot-primary" disabled={working || (stage===4 ? !selectedIdentity : stage===5 ? focused.power===null || focused.conflict && !focused.edit.checked : focused.conflict && !focused.edit.checked)} onClick={async ()=>{
+        if(stage===4){
+          if(onRememberOcrAlias && rememberChoice?.rowId===focused.row.rowId && rememberChoice?.id===selectedIdentity){
+            setWorking(true);setAliasError('');
+            try{const result=await onRememberOcrAlias(selectedIdentity,focused.row.name);if(!result?.verified){setAliasError(result?.error||'Spelling save not verified.');return;}}
+            catch{setAliasError('Unable to save spelling. Try again or uncheck Remember.');return;}
+            finally{setWorking(false);}
+          }
+          update(focused.row.rowId,{playerId:selectedIdentity,role:null,registrationReviewed:false,checked:false,powerApproval:null,powerConfirmed:false});setIdentityChoice(null);setRememberChoice(null);setAliasError('');
+        }
         else if(stage===5)update(focused.row.rowId,{powerConfirmed:true,powerApproval:{previous:focused.previousPower,next:focused.power}});
         else update(focused.row.rowId,{registrationReviewed:true});
       }}>{stage===4?'Confirm match':stage===5?'Confirm troop power':focused.edit.role?'Confirm registration':'Keep existing registration'}</button></> : <button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button>}</div>
