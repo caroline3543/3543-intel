@@ -5,7 +5,7 @@ import {applyTalBulk} from './tal/bulkActions.js';
 import {applyTalSheetSnapshot} from './tal/sheetSync.js';
 import {BattlePlanner} from './battle/BattlePlanner.jsx';
 import {EventPlanner} from './foundry/EventPlanner.jsx';
-import {EVENT_NAMES,updateEventPlanner} from '../../src/services/eventPlanner.js';
+import {EVENT_NAMES,updateEventPlanner,plannerSlot} from '../../src/services/eventPlanner.js';
 import {SvsComparison} from './svs/SvsComparison.jsx';
 import {applyBattleAction} from './battle/model.js';
 import {withAutomaticRoles} from './tal/autoRoles.js';
@@ -137,7 +137,21 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     const result=await setSharedData(prev=>updateEventPlanner(prev,action));
     if(result?.error)return {error:result.error};
     if(!result?.changed)return {error:'The roster or event changed. Review the import again.'};
-    return {message:'Saved on this device. Check workspace sync for shared confirmation.'};
+    const deadline=Date.now()+35000;
+    while(Date.now()<deadline){
+      const state=await retry();
+      if(state?.conflicts?.length)return {error:'Shared save has a conflict. Resolve workspace conflicts before checking this import again.'};
+      const base=state?.base;
+      if(base){
+        const slot=plannerSlot(base.foundry,action.kind,action.alliance,action.legion);
+        const powersMatch=(action.powers??[]).every(row=>slot.powerByPlayer?.[row.id]===row.value);
+        const rolesMatch=(action.roleChanges??[]).every(row=>(slot.registrations[row.id]||'')===row.role&&(!row.moveFrom||!plannerSlot(base.foundry,action.kind,row.moveFrom.alliance,row.moveFrom.legion).registrations[row.id]));
+        if(slot.occurrenceId===action.expectedOccurrenceId&&powersMatch&&rolesMatch)return {message:'Shared roster changes verified.',verified:true,revision:state.revision};
+      }
+      if(state?.issue)break;
+      await new Promise(resolve=>setTimeout(resolve,500));
+    }
+    return {error:'Changes were saved on this device, but shared confirmation is pending. Check workspace sync before importing again.',pending:true};
   }
 
   useEffect(()=>{if(sync.ready&&sync.joined&&!sync.conflicts?.length){const normalized=withAutomaticRoles(data);if(normalized!==data)setSharedData(normalized);}},[data,sync.ready,sync.joined,sync.conflicts?.length]);
