@@ -155,6 +155,10 @@ try {
     assert.equal(await pending.getByRole('button',{name:'Clear screenshots'}).count(),0);
     assert.equal(await pending.getByRole('button',{name:/Review Legion/}).count(),0);
     await page.screenshot({path:'ocr-review-captures/'+kind+'-pending-recovery.png'});
+    const beforeVerify=await page.evaluate(()=>sessionStorage.getItem('3573-event-preview-fixture-v1'));
+    await pending.getByRole('button',{name:'Check save status'}).click();
+    await pending.getByRole('heading',{name:'Awaiting confirmation'}).waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>sessionStorage.getItem('3573-event-preview-fixture-v1')),beforeVerify,'Verification must not mutate the roster');
     assert.deepEqual(errors,[]);
     await page.close();
   }
