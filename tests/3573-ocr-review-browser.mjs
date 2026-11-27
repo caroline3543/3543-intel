@@ -43,6 +43,7 @@ try {
     },kind);
     await page.reload();
     if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
+    await page.getByRole('button',{name:'Open screenshot import'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     const review=page.getByRole('region',{name:'Review screenshot readings'});
     await review.getByText(/4 readings/).waitFor();
@@ -55,6 +56,7 @@ try {
     await row('Juniper').locator('summary').first().click();
     await row('Juniper').getByRole('textbox',{name:'Troop power for Juniper'}).fill('3638');
     await review.getByLabel('Import mode').selectOption('both');
+    await review.getByLabel('Filter readings').selectOption('all');
     await row('Aster').locator('summary').first().click();
     assert.equal(await row('Aster').getByLabel('Registration for Aster').inputValue(),'');
     await review.getByRole('button',{name:'Review troop powers and registrations changes'}).click();
