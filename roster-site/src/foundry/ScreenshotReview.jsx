@@ -44,9 +44,11 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
     const previousPower = target.powerByPlayer?.[player?.id] ?? (player?.hasPower ? player.power : null);
     const unusualPower = mode !== 'roles' && suspiciousPowerChange(previousPower,power);
     const powerPending = mode !== 'roles' && (edit.power !== undefined && !edit.powerConfirmed || unusualPower && (edit.powerApproval?.previous !== previousPower || edit.powerApproval?.next !== power));
-    const needsReview = powerPending || !player || conflict && !edit.checked || mode !== 'roles' && power === null || mode !== 'powers' && ['unknown','other-legion','combatant','substitute'].includes(row.registration) && !edit.registrationReviewed;
-    return { row, edit, match, player, powerText, power, conflict, needsReview, powerPending, previousPower, unusualPower };
-  }),[rows,edits,matches,playerById,target.powerByPlayer,mode]);
+    const detectedRole={combatant:'join',substitute:'sub'}[row.registration];
+    const registrationPending=mode!=='powers' && ['unknown','other-legion','combatant','substitute'].includes(row.registration) && !edit.registrationReviewed && !(player && detectedRole && target.registrations[player.id]===detectedRole && !conflict && !edit.role);
+    const needsReview = powerPending || !player || conflict && !edit.checked || mode !== 'roles' && power === null || registrationPending;
+    return { row, edit, match, player, powerText, power, conflict, needsReview, powerPending, previousPower, unusualPower, registrationPending };
+  }),[rows,edits,matches,playerById,target.powerByPlayer,target.registrations,mode]);
   useEffect(() => { onDraftChange?.({ mode, edits }); }, [mode, edits]);
   const active = evaluated.filter(item => !item.edit.skip);
   const confirmed = active.filter(item => item.player);
@@ -55,7 +57,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   const issueCounts = [
     ['Identity matches', exceptions.filter(item=>!item.player).length],
     ['Troop power checks', exceptions.filter(item=>mode!=='roles'&&(item.powerPending||item.power===null||item.row.powerConflict?.length>1&&!item.edit.checked)).length],
-    ['Registration checks', exceptions.filter(item=>mode!=='powers'&&['unknown','other-legion','combatant','substitute'].includes(item.row.registration)&&!item.edit.registrationReviewed).length],
+    ['Registration checks', exceptions.filter(item=>item.registrationPending).length],
     ['Conflicting evidence', exceptions.filter(item=>item.conflict&&!item.edit.checked).length],
   ];
   const focused = evaluated.find(item => item.row.rowId === focusedId) ?? exceptions[0];
