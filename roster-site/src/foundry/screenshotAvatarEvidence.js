@@ -6,8 +6,11 @@ export async function screenshotAvatarEvidence(file,bounds){
  try{
   bitmap=await createImageBitmap(file);
   const x=Math.round(bitmap.width*.075),right=Math.round(bitmap.width*.195);
-  const top=bounds.top*bitmap.height,span=(bounds.bottom-bounds.top)*bitmap.height;
-  const y=Math.round(top+span*.04),bottom=Math.round(top+span*.65);
+  const top=bounds.top*bitmap.height,end=bounds.bottom*bitmap.height;
+  const span=bitmap.height*.077;
+  const start=bounds.top<=.336?end-span:top;
+  const y=Math.round(start+span*.04),bottom=Math.round(start+span*.65);
+  if(y<Math.round(top)||bottom>Math.round(end))return null;
   if(right-x<9||bottom-y<9)return null;
   const canvas=document.createElement('canvas');canvas.width=96;canvas.height=96;
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
