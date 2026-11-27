@@ -26,7 +26,7 @@ const name=p=>p.username||p.alias||p.name||String(p.fid||p.id);
 const power=(p,kind)=>kind==='foundry'
  ?p.lastFoundryTroopPower??p.troopPower??p.lastTroopPower
  :p.lastCanyonClashTroopPower??p.lastCanyonTroopPower;
-const alliance=p=>String(p.alliance||p.homeAlliance||p.allianceTag||p.alliance_name||'Unassigned').trim()||'Unassigned';
+const alliance=p=>String(p.allianceTag||p.alliance||p.homeAlliance||p.alliance_name||'Unassigned').trim()||'Unassigned';
 const rank=p=>{const r=String(p.allianceRank??'').toUpperCase();return /^R[1-5]$/.test(r)?r:'Unranked'};
 
 const T10=[66,71,76,83,88,94,99,104,110,115,121],T11=[80,86,92,100,106,114,120,126,135,141,148];
@@ -108,7 +108,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  },[players,kind,saved.imports,saved.powerByPlayer,saved.date,saved.time]);
  const alliances=plannerAlliances([...entries.map(p=>p.alliance),chosen]);
  const registrations=saved.registrations||{},teams=saved.teams||{},assignments=saved.assignments||{},registeredUnder=saved.registeredUnder||{};
- const joined=entries.filter(p=>registrations[p.id]==='join'&&registeredUnder[p.id]===chosen),subs=entries.filter(p=>registrations[p.id]==='sub'&&registeredUnder[p.id]===chosen);
+ const allianceEntries=entries.filter(p=>{const locations=eventRegistrations.get(p.id)||[];return locations.length?locations.some(item=>item.alliance===chosen):p.alliance===chosen;});
+ const joined=allianceEntries.filter(p=>registrations[p.id]==='join'&&registeredUnder[p.id]===chosen),subs=allianceEntries.filter(p=>registrations[p.id]==='sub'&&registeredUnder[p.id]===chosen);
  const elsewhereFor=id=>(eventRegistrations.get(id)||[]).filter(item=>item.alliance!==chosen||item.legion!==legion);
  const roleTitle=role=>REGISTRATION_ROLES.find(([id])=>id===role)?.[1]||'Unassigned';
  const assignmentLabel=({alliance,legion:number,role})=>(alliance===chosen?'':alliance+' · ')+'Legion '+number+' '+roleTitle(role);
@@ -123,6 +124,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const validAssignments=isFoundry?Object.fromEntries(active.map(p=>[p.id,buildings[teams[p.id]].includes(assignments[p.id])?assignments[p.id]:buildings[teams[p.id]][0]])):{};
  const update=(patch,msg,powers)=>{setUndo(saved);onSaveFoundry?.({...saved,...patch},powers);setNotice(msg||'Updated · syncing across devices');};
  const commitRoles=changes=>{
+  if(changes.some(change=>!entries.some(p=>p.id===change.id&&p.matched))){setNotice('Select a valid player profile.');return false;}
   const result=onChangeRoles(changes);
   if(result.error){setNotice(result.error);return false;}
   onRoleFeedback?.();
@@ -184,7 +186,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const pastedList=value=>/\\r|\\n/.test(value)||value.split(/\\s*[,;]\\s*/).filter(Boolean).length>=3;
  const onSearchInput=value=>{if(pastedList(value)){setPaste(value.replace(/\\s*;\\s*/g,'\\n'));setShowPaste(true);setQuery('');setNotice('Multiple players detected. Review the pasted list below.')}else setQuery(value)};
  const matchesRoster=p=>!rosterSearch.trim()||fields(p).some(field=>norm(field).includes(norm(rosterSearch)));
- const roster=entries.filter(p=>activeRole(p.id)||p.alliance===chosen);
+ const roster=allianceEntries;
  const sortedRoster=roster.filter(p=>matchesRoster(p)&&(
    roleFilter!=='all'?activeRole(p.id)===roleFilter:
    !participantsOnly||isParticipant(activeRole(p.id))
@@ -192,7 +194,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    Number(b.hasPower)-Number(a.hasPower)||b.power-a.power||a.name.localeCompare(b.name));
  const rosterPlayerIds=new Set(roster.filter(p=>p.matched).map(p=>p.id));
  const groupedRanks=['R5','R4','R3','R2','R1','Unranked'];
- const selectedIds=()=>editIds||bulkSelected.filter(id=>rosterPlayerIds.has(id));
+ const selectedIds=()=>(editIds||bulkSelected).filter(id=>rosterPlayerIds.has(id));
  const closeEditor=()=>{setBulkAction('');setEditIds(null);setTeammateQuery('');setTeammateIds([])};
  const endSelection=()=>{setBulkMode(false);setBulkSelected([]);closeEditor()};
  const openEditor=(kind,ids)=>{setEditIds(ids);setBulkAction(kind);setBulkLanguage('');setTeammateQuery('');setTeammateIds([]);setBulkRelationshipMode(ids.length>1?'each':'others')};
@@ -209,7 +211,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const applyBulkRelationships=()=>{const ids=selectedIds();if(!ids.length)return;const existing=Array.isArray(teamworkPreferences.pairs)?teamworkPreferences.pairs:[];const key=p=>Array.isArray(p)?p.map(String).sort().join('|'):'';const additions=[];if(bulkRelationshipMode==='each'){for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++)additions.push([ids[i],ids[j]])}else{for(const id of ids)for(const teammate of teammateIds)if(id!==teammate)additions.push([id,teammate])}if(!additions.length){setNotice('Choose at least one teammate');return}const keys=new Set(existing.map(key));const pairs=[...existing];for(const pair of additions){if(!keys.has(key(pair))){pairs.push(pair);keys.add(key(pair))}}onSaveTeamworkPreferences?.({...teamworkPreferences,pairs});setNotice('Teammate preferences updated');closeEditor();setBulkSelected([]);setBulkMode(false)};
  const removeTeammate=(a,b)=>{const pairs=(teamworkPreferences.pairs||[]).filter(pair=>!Array.isArray(pair)||!(pair.map(String).includes(String(a))&&pair.map(String).includes(String(b))));const groups=[];const pairKeys=new Set(pairs.map(pair=>pair.map(String).sort().join('|')));for(const group of teamworkPreferences.groups||[]){const ids=(group.memberIds||[]).map(String);if(!ids.includes(String(a))||!ids.includes(String(b))){groups.push(group);continue}for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const pair=[ids[i],ids[j]],key=pair.slice().sort().join('|');if(key!==[String(a),String(b)].sort().join('|')&&!pairKeys.has(key)){pairs.push(pair);pairKeys.add(key)}}}onSaveTeamworkPreferences?.({...teamworkPreferences,pairs,groups})};
  const relatedTo=id=>[...new Set((teamworkPreferences.pairs||[]).filter(pair=>Array.isArray(pair)&&pair.map(String).includes(String(id))).flatMap(pair=>pair.map(String).filter(other=>other!==String(id))))];
- const teammateMatches=teammateQuery.trim()?entries.filter(p=>p.matched&&!selectedIds().includes(p.id)&&!teammateIds.includes(p.id)&&fields(p).some(field=>norm(field).includes(norm(teammateQuery)))).sort((a,b)=>{const score=p=>p.id===teammateQuery.trim()?0:norm(p.name)===norm(teammateQuery)?1:fields(p).some(v=>norm(v).startsWith(norm(teammateQuery)))?2:3;return score(a)-score(b)||a.name.localeCompare(b.name)}).slice(0,6):[];
+ const teammateMatches=teammateQuery.trim()?allianceEntries.filter(p=>p.matched&&!selectedIds().includes(p.id)&&!teammateIds.includes(p.id)&&fields(p).some(field=>norm(field).includes(norm(teammateQuery)))).sort((a,b)=>{const score=p=>p.id===teammateQuery.trim()?0:norm(p.name)===norm(teammateQuery)?1:fields(p).some(v=>norm(v).startsWith(norm(teammateQuery)))?2:3;return score(a)-score(b)||a.name.localeCompare(b.name)}).slice(0,6):[];
  const bulkRemove=()=>{const ids=selectedIds().filter(id=>activeRole(id));if(ids.length&&requestRoles(ids,''))endSelection()};
  const add=(id,role=addRole)=>{
   const p=entries.find(x=>x.id===id&&x.matched);
@@ -322,6 +324,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      <div className="legion-bulk-buttons">
        <button type="button" autoFocus style={btn} onClick={()=>setConfirmMove(null)}>Cancel</button>
        <button type="button" data-role-feedback style={{...btn,background:'#f5ad38',color:'#101b28'}} onClick={()=>{
+         if(confirmMove.changes.some(change=>!entries.some(p=>p.id===change.id&&p.matched))){setNotice('Select a valid player profile.');setConfirmMove(null);return;}
          const result=onChangeRoles(confirmMove.changes);
          if(result.error){setConfirmMove({...confirmMove,error:result.error});return}
          onRoleFeedback?.();
