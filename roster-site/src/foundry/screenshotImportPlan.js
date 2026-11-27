@@ -7,7 +7,8 @@ export const assignmentLabel = assignment => assignment
   : 'Unassigned';
 
 const exactName = value => String(value ?? '').trim().normalize('NFC');
-const playerFields = player => [player.name, player.nickname, player.playerId, player.fid, player.id, ...(player.searchFields ?? [])];
+const nicknamesOf = player => [player.nickname, ...(Array.isArray(player.ocrAliases) ? player.ocrAliases.filter(value => typeof value === 'string') : [])];
+const playerFields = player => [player.name, ...nicknamesOf(player), player.playerId, player.fid, player.id, ...(player.searchFields ?? [])];
 
 const spacingKey=value=>exactName(value).normalize('NFKC').toLowerCase().replace(/\s/gu,'');
 const visualKey=value=>normaliseBulkName(value).replace(/0/g,'o').replace(/[1l]/g,'i');
@@ -29,7 +30,7 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
   const get=(i,key)=>[...(indexes[i].get(key)?.values()??[])];
   const nicknameIndex=new Map();
   const decorativeNicknameIndex=new Map();
-  for(const p of players){add(nicknameIndex,spacingKey(p.nickname),p);add(decorativeNicknameIndex,decorativeKey(p.nickname),p);}
+  for(const p of players)for(const alias of nicknamesOf(p)){add(nicknameIndex,spacingKey(alias),p);add(decorativeNicknameIndex,decorativeKey(alias),p);}
   const cache=new Map();
   return name=>{
     if(!name)return {candidates:[],player:null};
@@ -38,7 +39,7 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
     const selected=exact.length===1?exact[0]:exact.length===0&&strict.length===1?strict[0]:null;
     const eligible=p=>p.alliance===alliance||preferred.has(p.id)||registered.has(p.id);
     const current=strict.length===1?strict[0]:null;
-    const nicknameCollision=p=>[exactName,normaliseBulkName,visualKey,spacingKey,decorativeKey].some(key=>key(p.nickname)&&key(p.nickname)===key(name));
+    const nicknameCollision=p=>nicknamesOf(p).some(alias=>[exactName,normaliseBulkName,visualKey,spacingKey,decorativeKey].some(key=>key(alias)&&key(alias)===key(name)));
     const currentSafe=current&&eligible(current)&&get(4,normaliseBulkName(name)).length===1&&get(5,visualKey(name)).length===1&&[...exact,...equivalent,...lookalikes].every(p=>p.id===current.id||(!eligible(p)&&!nicknameCollision(p)));
     const legacySafe=selected&&(selected.alliance===alliance||preferred.has(selected.id)||registered.has(selected.id))&&equivalent.length===1&&equivalent[0].id===selected.id&&lookalikes.length===1;
     const decorative=[...new Map([...get(6,decorativeKey(name)),...(decorativeNicknameIndex.get(decorativeKey(name))?.values()??[])].map(p=>[p.id,p])).values()];
