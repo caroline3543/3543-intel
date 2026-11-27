@@ -54,13 +54,17 @@ try {
     await review.getByRole('button',{name:'Review troop powers changes'}).click();
     await review.getByRole('alert').filter({hasText:'Resolve or skip'}).waitFor();
     const row=name=>review.locator('.ocr-reading').filter({has:page.locator('summary > strong',{hasText:name})});
-    await row('Unrecognised fixture').locator('summary').first().click();
+    await review.getByLabel('Filter readings').selectOption('all');
+    if(!(await row('Unrecognised fixture').getAttribute('open')!==null)) await row('Unrecognised fixture').locator('summary').first().click();
     await row('Unrecognised fixture').getByRole('checkbox',{name:'Skip this reading'}).check();
-    await row('Juniper').locator('summary').first().click();
+    if(await row('Juniper').getAttribute('open')===null) await row('Juniper').locator('summary').first().click();
     await row('Juniper').getByRole('textbox',{name:'Troop power for Juniper'}).fill('3638');
     await review.getByLabel('Import mode').selectOption('both');
     await review.getByLabel('Filter readings').selectOption('all');
-    await row('Aster').locator('summary').first().click();
+    for(const name of ['Northvale','Juniper','Aster']){
+      if(await row(name).getAttribute('open')===null) await row(name).locator('summary').first().click();
+      await row(name).getByRole('button',{name:'Keep existing registration'}).click();
+    }
     assert.equal(await row('Aster').getByLabel('Registration for Aster').inputValue(),'');
     await review.getByRole('button',{name:'Review troop powers and registrations changes'}).click();
     const confirm=review.getByRole('region',{name:'Confirm screenshot import'});
