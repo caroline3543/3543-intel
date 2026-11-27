@@ -119,7 +119,7 @@ try {
   },{screenshots,labels,roster,benchmarkAlliance}):null;
   const aliasComparison=rosterPath?await page.evaluate(async ({screenshots,labels,roster,benchmarkAlliance})=>{
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
-    const variants=[roster.map(({nickname,...p})=>p),roster];
+    const variants=[roster.map(({nickname,ocrAliases,...p})=>p),roster.map(({ocrAliases,...p})=>p),roster];
     const results=variants.map(players=>{
       const match=createScreenshotMatcher(players,benchmarkAlliance);
       const counts={correct:0,wrong:0,manual:0,missing:0};
