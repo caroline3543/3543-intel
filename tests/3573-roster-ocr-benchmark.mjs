@@ -13,6 +13,8 @@ const negativePath=process.env.ROSTER_NEGATIVE_SCREENSHOT ? resolve(process.env.
 const groundTruthPath=process.env.ROSTER_GROUND_TRUTH ? resolve(process.env.ROSTER_GROUND_TRUTH) : null;
 const files = (await readdir(directory)).filter(name => /\.(?:png|jpe?g|webp)$/i.test(name)).sort();
 assert.ok(files.length >= 1 && files.length <= 25, 'Put 1–25 original screenshots in ROSTER_SCREENSHOTS_DIR.');
+const labels=groundTruthPath ? JSON.parse(await readFile(groundTruthPath,'utf8')) : null;
+const rosterNames=[...new Set(Object.values(labels??{}).flatMap(s=>s.rows.map(r=>r.name)))];
 process.chdir('roster-site');
 const server = await createServer({ server:{ host:'127.0.0.1', port:5177, strictPort:true } });
 await server.listen();
@@ -24,12 +26,14 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:5177/event-preview.html');
   const workerStarted = performance.now();
-  await page.evaluate(async (workerCount) => {
+  await page.evaluate(async ({workerCount,rosterNames}) => {
     const reader = await import('/src/foundry/readRosterScreenshot.js');
     window.rosterReaders = await Promise.all(Array.from({length:workerCount},()=>reader.createRosterReader()));
     window.rosterReader=window.rosterReaders[0];
     window.scanRoster = reader.readRosterScreenshot;
-  },workerCount);
+    const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
+    window.matchName=createScreenshotMatcher(rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'})),'HOT');
+  },{workerCount,rosterNames});
   const startupMs = Math.round(performance.now() - workerStarted);
   const batchStarted = performance.now();
   const screenshots = new Array(files.length);
@@ -41,7 +45,7 @@ try {
       const file = new File([Uint8Array.from(atob(content), char => char.charCodeAt(0))], filename);
       const started = performance.now();
       try {
-        const data = await window.scanRoster(window.rosterReaders[workerIndex], file, {avatarBenchmark:true});
+        const data = await window.scanRoster(window.rosterReaders[workerIndex], file, {avatarBenchmark:true},{matchName:window.matchName});
         const ms=Math.round(performance.now()-started);
         const {screenshotAvatarEvidence}=await import('/src/foundry/screenshotAvatarEvidence.js');
         const {avatarDistance}=await import('/src/foundry/avatarFingerprint.js');
@@ -72,13 +76,17 @@ try {
     },content);
   }
   const batchMs=Math.round(performance.now()-batchStarted);
-  const labels=groundTruthPath ? JSON.parse(await readFile(groundTruthPath,'utf8')) : null;
   const scores=labels ? screenshots.map(actual=>{
     const expected=labels[actual.filename];
     assert.ok(expected,'Missing ground truth for '+actual.filename);
     return {filename:actual.filename,...scoreScreenshot(expected,actual)};
   }) : null;
   const cards=screenshots.flatMap(s=>s.rows??[]);
+  const retryMetrics={rows:cards.length,rowsWithAlternatives:cards.filter(r=>r.nameAlternatives?.length).length,alternativeExactRecoveries:0};
+  if(labels) for(const screenshot of screenshots) for(const row of screenshot.rows??[]){
+    const label=labels[screenshot.filename].rows.find(l=>Math.abs(l.center-(row.bounds.top+row.bounds.bottom)/2)<=.035);
+    if(label&&row.name!==label.name&&row.nameAlternatives?.includes(label.name))retryMetrics.alternativeExactRecoveries++;
+  }
   const fingerprints=cards.filter(r=>r.avatarEvidence);
   const groups=new Map();
   for(const r of fingerprints){
@@ -94,7 +102,7 @@ try {
     identicalFingerprintGroups:[...groups.values()].filter(g=>g.length>1).map(g=>({count:g.length,names:[...new Set(g)]}))};
   // Only aggregate diagnostics leave the benchmark process; no avatar fingerprints in artifacts.
   for(const row of cards)delete row.avatarEvidence;
-  await writeFile(output, JSON.stringify({workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots,scores,negative,avatarMetrics},null,2)+'\n');
+  await writeFile(output, JSON.stringify({workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots,scores,negative,avatarMetrics,retryMetrics},null,2)+'\n');
   if(scores){
     const sum=key=>scores.reduce((total,s)=>total+s[key],0);
     const expected=sum('expected');
