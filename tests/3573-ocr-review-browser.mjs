@@ -44,7 +44,7 @@ try {
       }
       sessionStorage.setItem('3573-event-preview-fixture-v1',JSON.stringify(workspace));
       const rows=[
-        {name:'Northvale',power:3647,registration:'combatant'},
+        {name:'Northvale',power:3647,registration:'unknown'},
         {name:'Unrecognised fixture',power:3100,registration:'substitute'},
         {name:'Juniper',power:null,registration:'combatant'},
         {name:'Aster',power:4200,registration:'other-legion',otherLegion:2}
@@ -149,7 +149,8 @@ try {
     await review.getByLabel('Import mode').selectOption('both');
     if(await review.locator('.stage9-review-options').getAttribute('open')===null) await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('review');
-    if(await page.getByRole('heading',{name:'Check registration',exact:true}).count()){
+    {
+      await page.getByRole('heading',{name:'Check registration',exact:true}).waitFor();
       await checkResponsive('06-registration-exception');
       await page.screenshot({path:'ocr-review-captures/'+kind+'-06-registration-exception.png',animations:'disabled'});
     }
