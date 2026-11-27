@@ -45,7 +45,7 @@ try {
       sessionStorage.setItem('3573-event-preview-fixture-v1',JSON.stringify(workspace));
       const rows=[
         {name:'Northvale',power:3647,registration:'unknown'},
-        {name:'Unrecognised fixture',power:3100,registration:'substitute'},
+        {name:'Northva1e',power:3100,registration:'substitute'},
         {name:'Juniper',power:null,registration:'combatant'},
         {name:'Aster',power:4200,registration:'other-legion',otherLegion:2}
       ].map((row,i)=>({...row,bounds:{top:.30+i*.077,bottom:.377+i*.077}}));
@@ -67,6 +67,7 @@ try {
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-summary.png'});
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
     await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Confirm player',exact:true}).waitFor();
+    await review.getByRole('button',{name:/Northvale/}).first().waitFor();
     await checkResponsive('04-identity');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-04-identity.png',animations:'disabled'});
     const reread=review.getByRole('button',{name:'Reread username',exact:true});
@@ -98,8 +99,8 @@ try {
     await review.locator('.stage9-action-footer').getByRole('button',{name:'Skip this reading',exact:true}).click();
     if(await review.locator('.stage9-review-options').getAttribute('open')===null) await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('all');
-    if(await row('Unrecognised fixture').getAttribute('open')===null) await row('Unrecognised fixture').locator('summary').first().click();
-    assert.equal(await row('Unrecognised fixture').getByRole('checkbox',{name:'Skip this reading'}).isChecked(),true);
+    if(await row('Northva1e').getAttribute('open')===null) await row('Northva1e').locator('summary').first().click();
+    assert.equal(await row('Northva1e').getByRole('checkbox',{name:'Skip this reading'}).isChecked(),true);
     if(await review.locator('.stage9-review-options').getAttribute('open')===null) await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('review');
     for(const name of ['Northvale','Aster']){
