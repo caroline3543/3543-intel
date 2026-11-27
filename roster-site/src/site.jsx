@@ -132,6 +132,20 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const localInitial=useRef(null);if(!localInitial.current)localInitial.current=loadFromStorage(empty);
   const {data,setData:setSharedData,sync,publish,join,retry,resolve}=useSharedWorkspace(localInitial.current);
   function setData(value){setSharedData(prev=>{const next=withAutomaticRoles(typeof value==='function'?value(prev):value);latest.current=next;return next;});}
+  async function rememberOcrAlias(id,reading){
+    const alias=String(reading??'').trim().normalize('NFC');
+    if(!alias||alias.length>128)return {error:'Enter a valid OCR spelling.'};
+    if(!sync.ready||!sync.joined||sync.conflicts?.length)return {error:'Connect to the shared workspace before saving a spelling.'};
+    await setSharedData(prev=>({...prev,players:prev.players.map(p=>String(p.id)===String(id)?{...p,ocrAliases:[...new Set([...(Array.isArray(p.ocrAliases)?p.ocrAliases:[]),alias])]}:p)}));
+    const deadline=Date.now()+35000;
+    while(Date.now()<deadline){
+      const state=await retry();
+      if(state?.conflicts?.length||state?.issue)break;
+      if(state?.base?.players?.some(p=>String(p.id)===String(id)&&p.ocrAliases?.includes(alias)))return {verified:true};
+      await new Promise(resolve=>setTimeout(resolve,500));
+    }
+    return {error:'Spelling save not verified. Check workspace sync.'};
+  }
   async function saveScreenshotImport(action,{verifyOnly=false}={}){
     if(!sync.ready||!sync.joined||sync.conflicts?.length)return {error:'Connect to the shared workspace and resolve sync conflicts before importing.'};
     if(!verifyOnly){
@@ -455,7 +469,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='castle'&&<section aria-label="Castle Battle coming soon" style={{minHeight:'60vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'32px 20px',textAlign:'center'}}><div style={{maxWidth:320}}><div style={{width:64,height:64,display:'grid',placeItems:'center',borderRadius:20,background:'#203449',margin:'0 auto 18px',color:C.icy}}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h2 style={{fontSize:22,margin:'0 0 8px'}}>Castle Battle</h2><p style={{color:C.icy,fontSize:14,margin:'0 0 8px'}}>Coming soon</p><p style={{color:'#B8C8D5',fontSize:14,lineHeight:1.5,margin:0}}>Castle Battle team planning will be available in a future update.</p></div></section>}
     {['foundry','canyon'].filter(kind=>tab===kind||returnToPlanner===kind).map(kind=><div key={kind} style={{display:tab===kind?'block':'none'}}>
       <EventPlanner kind={kind} players={activePlayers} attendancePlayers={players} storage={data.foundry}
-        onUpdate={action=>setData(prev=>updateEventPlanner(prev,action))} onScreenshotUpdate={saveScreenshotImport} teamworkPreferences={data.talTeamPreferences||{}}
+        onUpdate={action=>setData(prev=>updateEventPlanner(prev,action))} onScreenshotUpdate={saveScreenshotImport} onRememberOcrAlias={rememberOcrAlias} teamworkPreferences={data.talTeamPreferences||{}}
         onRoleFeedback={()=>tapFeedback(preferences.haptics,navigator,14)}
         onSaveTeamworkPreferences={prefs=>setData(prev=>({...prev,talTeamPreferences:prefs}))}
         onUpdatePlayerLanguage={(ids,language)=>{
