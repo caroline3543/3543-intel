@@ -37,13 +37,13 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
     const selected=exact.length===1?exact[0]:exact.length===0&&strict.length===1?strict[0]:null;
     const eligible=p=>p.alliance===alliance||preferred.has(p.id)||registered.has(p.id);
     const current=strict.length===1?strict[0]:null;
-    const currentSafe=current&&eligible(current)&&get(4,normaliseBulkName(name)).length===1&&get(5,visualKey(name)).length===1&&[...exact,...equivalent,...lookalikes].every(p=>p.id===current.id||!eligible(p));
+    const currentSafe=current&&eligible(current)&&get(4,normaliseBulkName(name)).length===1&&get(5,visualKey(name)).length===1&&[...exact,...equivalent,...lookalikes].every(p=>p.id===current.id);
     const legacySafe=selected&&(selected.alliance===alliance||preferred.has(selected.id)||registered.has(selected.id))&&equivalent.length===1&&equivalent[0].id===selected.id&&lookalikes.length===1;
     const decorative=get(6,decorativeKey(name));
     const nicknames=[...(nicknameIndex.get(spacingKey(name))?.values()??[])];
     const nickname=nicknames.length===1&&eligible(nicknames[0])&&[...exact,...equivalent,...lookalikes,...strict,...decorative].every(p=>p.id===nicknames[0].id)?nicknames[0]:null;
     const proposed=currentSafe?current:legacySafe?selected:nickname;
-    const automatic=proposed&&decorative.every(p=>p.id===proposed.id)?proposed:null;
+    const automatic=proposed&&[...exact,...equivalent,...lookalikes,...strict,...decorative,...nicknames].every(p=>p.id===proposed.id)?proposed:null;
     const safe=!!automatic;
     const localSuggestions=safe?[]:bulkCandidates(name,local,alliance).sort((a,b)=>rank(a)-rank(b));
     const wider=safe?[]:bulkCandidates(name,players,alliance);
