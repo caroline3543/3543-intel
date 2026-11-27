@@ -62,11 +62,12 @@ try {
     await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
     await checkResponsive('04-identity');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-04-identity.png',animations:'disabled'});
+    await review.getByText('Review options',{exact:true}).click();
     await review.getByRole('button',{name:'Review troop powers changes'}).click();
     await review.getByRole('alert').filter({hasText:'Resolve or skip'}).waitFor();
     const row=name=>review.locator('.ocr-reading').filter({has:page.locator('summary > strong',{hasText:name})});
     await review.locator('.stage9-action-footer').getByRole('button',{name:'Skip this reading',exact:true}).click();
-    await review.getByText('Review options',{exact:true}).click();
+    if(await review.locator('.stage9-review-options').getAttribute('open')===null) await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('all');
     if(await row('Unrecognised fixture').getAttribute('open')===null) await row('Unrecognised fixture').locator('summary').first().click();
     assert.equal(await row('Unrecognised fixture').getByRole('checkbox',{name:'Skip this reading'}).isChecked(),true);
