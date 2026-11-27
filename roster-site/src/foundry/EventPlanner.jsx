@@ -12,7 +12,7 @@ export function EventPlanner({kind,players,storage,onUpdate,onScreenshotUpdate,.
   const assignments=useMemo(()=>eventAssignments(storage,kind),[storage,kind]);
   const context={kind,alliance,legion,expectedOccurrenceId:plan.occurrenceId};
   const update=fields=>onUpdate({kind,alliance,legion,expectedOccurrenceId:plan.occurrenceId,...fields});
-  return <FoundryTab key={plannerKey(kind,alliance,legion)} {...props} kind={kind} chosen={alliance} legion={legion} players={players}
+  return <FoundryTab key={plan.occurrenceId} {...props} kind={kind} chosen={alliance} legion={legion} players={players}
     changeSelection={(tag,number)=>{setAlliance(tag);setLegion(number);localStorage.setItem(storageKey,tag);}}
     otherLegion={otherLegion} otherPlan={otherPlan}
     screenshotStorage={storage}
@@ -30,6 +30,7 @@ export function EventPlanner({kind,players,storage,onUpdate,onScreenshotUpdate,.
     sharedFoundry={plan} onSaveFoundry={(next,powers)=>update({plan:next,powers})}
     onSaveTroopPower={(id,value)=>update({powers:[{id,value}]})}
     onAttendance={attendance=>update({attendance})}
+    onResetPlanner={scope=>update({resetPlanner:{slots:(scope==='both'?[1,2]:[Number(scope)]).map(number=>({legion:number,expectedOccurrenceId:plannerSlot(storage,kind,alliance,number).occurrenceId,occurrenceId:plannerKey(kind,alliance,number)+':'+crypto.randomUUID()}))}})}
     onNewEvent={()=>update({plan:{occurrenceId:plannerKey(kind,alliance,legion)+':'+crypto.randomUUID(),
       teamCount:plan.teamCount,teamNames:plan.teamNames,shareInstructions:plan.shareInstructions,
       registrations:{},registeredUnder:{},teams:{},assignments:{}}})}/>;

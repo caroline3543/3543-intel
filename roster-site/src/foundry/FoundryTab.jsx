@@ -69,7 +69,7 @@ function InlinePower({player,onSave,metric,onClose}){
  </div>;
 }
 export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',chosen,legion,changeSelection,sharedFoundry={},
-  otherPlan,otherLegion,eventRegistrations,onChangeRoles,onRoleFeedback,onSaveScreenshotPowers,screenshotStorage,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
+  otherPlan,otherLegion,eventRegistrations,onChangeRoles,onRoleFeedback,onSaveScreenshotPowers,screenshotStorage,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,onResetPlanner,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
  const title=EVENT_NAMES[kind],isFoundry=kind==='foundry',metric=isFoundry?'Troop power':'Canyon Clash power';
  const limits=EVENT_LIMITS[kind];
  const colours=TEAM_NAMES.slice(0,sharedFoundry.teamCount||4);
@@ -80,6 +80,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const [view,setView]=useState('players'),[query,setQuery]=useState('');
  const [paste,setPaste]=useState(''),[showPaste,setShowPaste]=useState(false),[notice,setNotice]=useState(''),[selected,setSelected]=useState(null);
  const [undo,setUndo]=useState(null);
+ const [resetScope,setResetScope]=useState('');
  const teamRefs=useRef({});
  const jumpToTeam=c=>{setFocusTeam(c);teamRefs.current[c]?.scrollIntoView({behavior:'smooth',block:'start'});};
  const [focusTeam,setFocusTeam]=useState('Blue'),[moving,setMoving]=useState(null),[confirmGenerate,setConfirmGenerate]=useState(false);
@@ -337,6 +338,14 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      </button>)}
      <div style={{gridColumn:'1 / -1',fontSize:13,color:'#adc2d6'}}>Combatant power <strong style={{color:'#eef5fc'}}>{joined.length>0&&joined.length===missingPower.length?'—':format(total(joined))}</strong>{missingPower.length>0&&<span> · {missingPower.length} missing</span>}</div>
    </div>
+   {onResetPlanner&&<div style={style}>
+     {!resetScope?<button type="button" style={btn} onClick={()=>setResetScope('both')}>Reset planner</button>:<div role="group" aria-label="Reset planner confirmation" style={{display:'grid',gap:8}}>
+       <strong>Reset {chosen} {title} planner?</strong>
+       <label>Legions <select style={btn} value={resetScope} onChange={e=>setResetScope(e.target.value)}><option value="both">Both legions</option><option value="1">Legion 1 only</option><option value="2">Legion 2 only</option></select></label>
+       <small>Clears registrations, teams, assignments and schedule. Previous roster, troop power and attendance history are preserved.</small>
+       <div style={{display:'flex',gap:8}}><button type="button" style={btn} onClick={()=>setResetScope('')}>Cancel</button><button type="button" style={{...btn,color:'#f3adad'}} onClick={()=>{onResetPlanner(resetScope);setResetScope('');setUndo(null);endSelection();setConfirmMove(null);setManaging(null);setNotice('Planner reset requested · syncing');}}>Confirm reset</button></div>
+     </div>}
+   </div>}
    <PlannerAttendance kind={kind} alliance={chosen} legion={legion} plan={saved} players={attendancePlayers}
     onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
    <RosterScreenshotImport kind={kind} title={title} alliance={chosen} activeLegion={legion} storage={screenshotStorage} players={allianceEntries.filter(p=>p.matched)}
