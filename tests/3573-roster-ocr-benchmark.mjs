@@ -88,6 +88,28 @@ try {
     const label=labels[screenshot.filename].rows.find(l=>Math.abs(l.center-(row.bounds.top+row.bounds.bottom)/2)<=.035);
     if(label&&row.name!==label.name&&row.nameAlternatives?.includes(label.name))retryMetrics.alternativeExactRecoveries++;
   }
+  const reviewMetrics=labels?await page.evaluate(async ({screenshots,labels,rosterNames})=>{
+    const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
+    const roster=rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'}));
+    const matcher=createScreenshotMatcher(roster,'HOT');
+    const metrics={labelled:0,automaticCorrect:0,automaticWrong:0,manual:0,originalTop1:0,improvedTop1:0,originalTop8:0,improvedTop8:0};
+    for(const screenshot of screenshots)for(const row of screenshot.rows??[]){
+      const label=labels[screenshot.filename].rows.find(l=>Math.abs(l.center-(row.bounds.top+row.bounds.bottom)/2)<=.035);
+      if(!label)continue;
+      metrics.labelled++;
+      const original=matcher(row.name);
+      if(original.player){metrics[original.player.name===label.name?'automaticCorrect':'automaticWrong']++;continue;}
+      metrics.manual++;
+      const alternatives=(row.nameAlternatives??[]).map(matcher);
+      const candidates=[...new Map([...alternatives.flatMap(m=>m.player?[m.player]:[]),...original.candidates,...alternatives.flatMap(m=>m.candidates)].map(p=>[p.id,p])).values()].slice(0,8);
+      if(original.candidates[0]?.name===label.name)metrics.originalTop1++;
+      if(candidates[0]?.name===label.name)metrics.improvedTop1++;
+      if(original.candidates.some(p=>p.name===label.name))metrics.originalTop8++;
+      if(candidates.some(p=>p.name===label.name))metrics.improvedTop8++;
+    }
+    return metrics;
+  },{screenshots,labels,rosterNames}):null;
+  console.log('Identity review metrics:',JSON.stringify(reviewMetrics));
   const fingerprints=cards.filter(r=>r.avatarEvidence);
   const groups=new Map();
   for(const r of fingerprints){
@@ -103,7 +125,7 @@ try {
     identicalFingerprintGroups:[...groups.values()].filter(g=>g.length>1).map(g=>({count:g.length,names:[...new Set(g)]}))};
   // Only aggregate diagnostics leave the benchmark process; no avatar fingerprints in artifacts.
   for(const row of cards)delete row.avatarEvidence;
-  await writeFile(output, JSON.stringify({retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots,scores,negative,avatarMetrics,retryMetrics},null,2)+'\n');
+  await writeFile(output, JSON.stringify({retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots,scores,negative,avatarMetrics,retryMetrics,reviewMetrics},null,2)+'\n');
   if(scores){
     const sum=key=>scores.reduce((total,s)=>total+s[key],0);
     const expected=sum('expected');
