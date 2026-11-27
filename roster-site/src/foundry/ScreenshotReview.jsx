@@ -133,7 +133,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
                 <summary>{sources[sourceIndex].file.name} · Screenshot evidence</summary>
                 <Evidence file={sources[sourceIndex].file} bounds={bounds}/>
               </details>)}
-              <label><input type="checkbox" checked={!!edit.skip} onChange={event => update(row.rowId, { skip: event.target.checked })}/> Skip this reading</label>
+              {filter !== "review" && <label><input type="checkbox" checked={!!edit.skip} onChange={event => update(row.rowId, { skip: event.target.checked })}/> Skip this reading</label>}
               {!edit.skip && <>
                 {(filter !== "review" || stage === 4) && <><label>Search roster for {title}<input type="search" value={edit.search ?? ''} onChange={event => update(row.rowId, { search: event.target.value })}/></label>
                 {candidates.map(candidate => <button key={candidate.id} type="button" aria-pressed={candidate.id === (filter === 'review' ? identityChoice?.rowId === row.rowId ? identityChoice.id : player?.id : player?.id)}
@@ -188,7 +188,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
         if(stage===4){update(focused.row.rowId,{playerId:identityChoice.id,role:null,registrationReviewed:false,checked:false});setIdentityChoice(null);}
         else if(stage===5)update(focused.row.rowId,{powerConfirmed:true});
         else update(focused.row.rowId,{registrationReviewed:true});
-      }}>{stage===4?'Confirm match':stage===5?'Confirm troop power':focused.edit.role?'Confirm registration':'Keep existing registration'}</button><button type="button" onClick={prepare}>Review {modeLabels[mode]} changes</button></> : <button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button>}</div>
+      }}>{stage===4?'Confirm match':stage===5?'Confirm troop power':focused.edit.role?'Confirm registration':'Keep existing registration'}</button><button type="button" className="stage9-skip-action" disabled={working} onClick={()=>update(focused.row.rowId,{skip:true})}>Skip this reading</button><button type="button" onClick={prepare}>Review {modeLabels[mode]} changes</button></> : <button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button>}</div>
       {status && <p role="alert">{status}</p>}
       <button type="button" disabled={working} onClick={onClose}>Back to screenshots</button>
     </>}
