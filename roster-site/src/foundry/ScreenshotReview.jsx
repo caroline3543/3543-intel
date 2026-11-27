@@ -18,6 +18,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   const [receipt, setReceipt] = useState(null);
   const [summary, setSummary] = useState(true);
   const [focusedId, setFocusedId] = useState(null);
+  const [identityChoice,setIdentityChoice]=useState(null);
   const { alliance, legion, kind } = context;
   const target = plannerSlot(storage, kind, alliance, legion);
   const projected = { ...target.registrations };
@@ -134,8 +135,8 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
               <label><input type="checkbox" checked={!!edit.skip} onChange={event => update(row.rowId, { skip: event.target.checked })}/> Skip this reading</label>
               {!edit.skip && <>
                 {(filter !== "review" || stage === 4) && <><label>Search roster for {title}<input type="search" value={edit.search ?? ''} onChange={event => update(row.rowId, { search: event.target.value })}/></label>
-                {candidates.map(candidate => <button key={candidate.id} type="button" aria-pressed={candidate.id === player?.id}
-                  onClick={() => update(row.rowId, { playerId: candidate.id, ...(candidate.id !== player?.id ? { role: null, registrationReviewed: false, checked: false } : {}) })}>
+                {candidates.map(candidate => <button key={candidate.id} type="button" aria-pressed={candidate.id === (filter === 'review' ? identityChoice?.rowId === row.rowId ? identityChoice.id : player?.id : player?.id)}
+                  onClick={() => filter === 'review' ? setIdentityChoice({rowId:row.rowId,id:candidate.id}) : update(row.rowId, { playerId: candidate.id, ...(candidate.id !== player?.id ? { role: null, registrationReviewed: false, checked: false } : {}) })}>
                   {candidate.name} · {candidate.alliance || 'Alliance unknown'} · ID {candidate.playerId || candidate.id}
                 </button>)}</>}
                 {mode !== 'roles' && (filter !== "review" || stage === 5) && <label>Troop power for {title}<input inputMode="decimal" value={powerText} onChange={event => update(row.rowId, { power: event.target.value, checked: false, powerConfirmed: filter !== 'review' })}/></label>}
@@ -143,17 +144,17 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
                   {row.powerConflict.map(value => <button type="button" key={value} aria-pressed={powerText === String(value)}
                     onClick={() => update(row.rowId, { power: String(value), checked: false, powerConfirmed: filter !== 'review' })}>{value.toLocaleString()}</button>)}
                 </div>}
-                {filter === 'review' && stage === 5 && powerPending && <button type="button" disabled={power === null} onClick={() => update(row.rowId, { powerConfirmed: true })}>Confirm troop power</button>}
+
                 {mode !== 'powers' && (filter !== "review" || stage === 6) && <>
                   <p>Existing registration: {current.length ? current.map(assignmentLabel).join(' / ') : roleName(here || '')}.</p>
                   <label>Registration for {title}
-                    <select value={edit.role ?? ''} onChange={event => update(row.rowId, { role: event.target.value, registrationReviewed: true })}>
+                    <select value={edit.role ?? ''} onChange={event => update(row.rowId, { role: event.target.value, registrationReviewed: filter !== 'review' })}>
                       <option value="">Keep existing</option><option value="join">Legion {legion} combatant</option>
                       <option value="sub">Legion {legion} substitute</option>
                       {here && <option value="remove">Remove Legion {legion} registration</option>}
                     </select>
                   </label>
-                  <button type="button" onClick={() => update(row.rowId, { role: null, registrationReviewed: true })}>Keep existing registration</button>
+                  {filter !== 'review' && <button type="button" onClick={() => update(row.rowId, { role: null, registrationReviewed: true })}>Keep existing registration</button>}
                 </>}
                 {conflict && (filter !== "review" || stage !== 4) && <label><input type="checkbox" checked={!!edit.checked} onChange={event => update(row.rowId, { checked: event.target.checked })}/> I checked the conflicting evidence for this player.</label>}
               </>}
@@ -182,7 +183,11 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
       </label>
       </details>
       {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFilter('all'); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Review earlier readings</button><span>{exceptions.length} remaining</span><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
-      <div className="stage9-action-footer">{filter === 'review' && focused && <p role="status">{exceptions.length} readings remaining</p>}<button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button></div>
+      <div className="stage9-action-footer">{filter === 'review' && focused && <p role="status">{exceptions.length} readings remaining</p>}{filter === 'review' && focused && exceptions.length > 0 ? <><button type="button" className="screenshot-primary" disabled={working || (stage===4 ? identityChoice?.rowId!==focused.row.rowId : stage===5 ? focused.power===null || focused.conflict && !focused.edit.checked : focused.conflict && !focused.edit.checked)} onClick={()=>{
+        if(stage===4){update(focused.row.rowId,{playerId:identityChoice.id,role:null,registrationReviewed:false,checked:false});setIdentityChoice(null);}
+        else if(stage===5)update(focused.row.rowId,{powerConfirmed:true});
+        else update(focused.row.rowId,{registrationReviewed:true});
+      }}>{stage===4?'Confirm match':stage===5?'Confirm troop power':focused.edit.role?'Confirm registration':'Keep existing registration'}</button><button type="button" onClick={prepare}>Review {modeLabels[mode]} changes</button></> : <button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button>}</div>
       {status && <p role="alert">{status}</p>}
       <button type="button" disabled={working} onClick={onClose}>Back to screenshots</button>
     </>}
