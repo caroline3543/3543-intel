@@ -1,3 +1,4 @@
+import { avatarFingerprint } from './avatarFingerprint.js';
 import { simd } from 'wasm-feature-detect';
 import simdCorePath from 'tesseract.js-core/tesseract-core-simd-lstm.wasm.js?url';
 import { createWorker, OEM, PSM } from 'tesseract.js';
@@ -156,7 +157,16 @@ export async function readRosterScreenshot(worker, file, kind) {
         row.otherLegion = Number(dispatch.match(/\bLegion\s*([12])\s+dispatched\b/i)?.[1]) || null;
       }
       const registration = row.otherLegion || otherLegionMarker ? 'other-legion' : classifyRosterCheckboxes(pixels,width,height,top,bottom);
-      rows.push({ ...row, power: readings[0] ?? null, ...(readings.length > 1 ? { powerConflict: readings } : {}),
+      // Experimental, opt-in only: never persist this evidence in ordinary import sessions.
+      let avatarEvidence;
+      if (kind && typeof kind === 'object' && kind.avatarBenchmark === true) {
+        const left=x(.075), right=x(.195), upper=rowY(.04), lower=rowY(.65);
+        if (upper>=top && lower<=bottom && right>left && lower>upper) {
+          const image=context.getImageData(left,upper,right-left,lower-upper);
+          avatarEvidence=avatarFingerprint(image.data,image.width,image.height);
+        }
+      }
+      rows.push({ ...row, ...(avatarEvidence ? { avatarEvidence } : {}), power: readings[0] ?? null, ...(readings.length > 1 ? { powerConflict: readings } : {}),
         registration, voted, battleRequest, bounds: { top: top / height, bottom: bottom / height } });
     }
     return { legion, rows, totals, partial };
