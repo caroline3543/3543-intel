@@ -199,6 +199,8 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
 
   const saving = useRef(false);
   async function saveOnce(action) {
+    const pending=latest.current?.pendingImport;
+    if(pending&&JSON.stringify(pending)!==JSON.stringify(action))return {error:'A previous import is awaiting verification. Check its save status first.',pending:true};
     if (saving.current) return { error: 'An import is already being saved.' };
     if (!sameEvent(latest.current?.occurrenceIds, eventIds.current)) return { error: 'The event changed. Re-scan before importing.' };
     const ids = [...new Set([...action.powers, ...(action.roleChanges ?? [])].map(row => row.id))];
@@ -207,11 +209,14 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     }
     saving.current = true;
     try {
-    const result = await onSave(action);
+    checkpoint({...latest.current,pendingImport:action});
+    await writes.current;
+    const result = await onSave(action,{verifyOnly:!!pending});
     if (!result?.error && result?.message && latest.current && mounted.current) {
-      checkpoint({ ...latest.current, savedIds: [...(latest.current.savedIds ?? []), ...ids] });
+      checkpoint({ ...latest.current, pendingImport:null, savedIds: [...(latest.current.savedIds ?? []), ...ids] });
       await writes.current.catch(() => {});
     }
+    if(result?.error&&!result.pending&&!pending){checkpoint({...latest.current,pendingImport:null});await writes.current;}
     return result;
     } finally { saving.current = false; }
   }
