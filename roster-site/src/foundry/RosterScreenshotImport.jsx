@@ -66,7 +66,17 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     workspaceRef.current?.focus();
-    return () => { document.body.style.overflow = previous; launchRef.current?.focus(); };
+    const trap = event => {
+      if (event.key !== 'Tab') return;
+      const controls = [...(workspaceRef.current?.querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled):not([hidden]),summary,[tabindex="0"]') ?? [])].filter(node => node.getClientRects().length);
+      if (!controls.length) { event.preventDefault(); return; }
+      const first=controls[0], last=controls.at(-1);
+      if (!workspaceRef.current.contains(document.activeElement) || document.activeElement===workspaceRef.current || (event.shiftKey && document.activeElement===first) || (!event.shiftKey && document.activeElement===last)) {
+        event.preventDefault(); (event.shiftKey ? last : first).focus();
+      }
+    };
+    document.addEventListener('keydown',trap);
+    return () => { document.removeEventListener('keydown',trap); document.body.style.overflow = previous; launchRef.current?.focus(); };
   }, [workspaceOpen]);
   const [mode, setMode] = useState(() => {
     try { const value = localStorage.getItem('3573-ocr-import-mode'); return ['powers','roles','both'].includes(value) ? value : 'powers'; }
@@ -209,7 +219,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   return <section className="screenshot-import" aria-label="Troop power upload">
     <button ref={launchRef} type="button" className="screenshot-primary" onClick={() => setWorkspaceOpen(true)}>Open screenshot import</button>
     {workspaceOpen && createPortal(<section ref={workspaceRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Screenshot import workspace" className="stage9-import-workspace">
-      <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {activeLegion}</small><h2>Import roster</h2></div><button type="button" disabled={!!job} onClick={() => { setReview(null); setWorkspaceOpen(false); }}>Close</button></header>
+      <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {review?.legion ?? activeLegion}</small><h2>Import roster</h2></div><button type="button" disabled={!!job} onClick={() => { setReview(null); setWorkspaceOpen(false); }}>Close</button></header>
       <div className="stage9-import-content">
     <input ref={picker} type="file" hidden multiple accept="image/png,image/jpeg,image/webp" aria-label="Troop power screenshots"
       disabled={loading || !!job || !!review} onChange={chooseFiles}/>
