@@ -14,7 +14,7 @@ export function screenshotMatches(name, players, alliance) {
   const exact = players.filter(player => playerFields(player).some(field => exactName(field) === exactName(name)));
   const suggestions = bulkCandidates(name, players, alliance);
   const candidates = [...new Map([...exact, ...suggestions].map(player => [player.id, player])).values()].slice(0, 8);
-  return { candidates, player: exact.length === 1 && exact[0].alliance === alliance ? exact[0] : null };
+  return { candidates, player: exact.length === 1 ? exact[0] : null };
 }
 
 export function prepareScreenshotImport(storage, context, rows, mode) {
@@ -33,6 +33,7 @@ export function prepareScreenshotImport(storage, context, rows, mode) {
     }
     const expectedRole = target.registrations[row.id] || '';
     if (mode === 'powers' || row.role == null || row.role === expectedRole) continue;
+    if (row.alliance !== alliance) return { error: row.name + ': verify alliance membership before registering. You can save troop powers only.' };
     const elsewhere = (assignments.get(row.id) ?? []).filter(item => item.alliance !== alliance || item.legion !== legion);
     const moveFrom = isParticipant(row.role) ? elsewhere[0] : undefined;
     const before = moveFrom ?? (expectedRole ? { alliance, legion, role: expectedRole } : null);

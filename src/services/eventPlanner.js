@@ -191,6 +191,7 @@ export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[
   if(roleChanges){
     const ids=new Set(workspace.players.filter(p=>p.membershipStatus!=='transferred_out').map(p=>String(p.id)));
     if(!roleChanges.length||roleChanges.some(change=>!ids.has(change.id)))return workspace;
+    if(screenshotImport&&roleChanges.some(change=>workspace.players.find(p=>String(p.id)===change.id)?.allianceTag!==alliance))return workspace;
     const {slots}=prepareEventRoles(workspace.foundry,{kind,alliance,legion,expectedOccurrenceId},roleChanges,now);
     if(!slots)return workspace;
     const eventPlans={...workspace.foundry?.eventPlans};

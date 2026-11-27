@@ -125,10 +125,11 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
                   {row.powerConflict.map(value => <button type="button" key={value} aria-pressed={powerText === String(value)}
                     onClick={() => update(row.rowId, { power: String(value), checked: false })}>{value.toLocaleString()}</button>)}
                 </div>}
+                {player && player.alliance !== alliance && <p role="status">Alliance membership mismatch: {player.alliance || 'Unknown'}. Verify membership in Members before registering. Troop powers can still be saved.</p>}
                 {mode !== 'powers' && <>
                   <p>Existing registration: {current.length ? current.map(assignmentLabel).join(' / ') : roleName(here || '')}.</p>
                   <label>Registration for {title}
-                    <select value={edit.role ?? ''} onChange={event => update(row.rowId, { role: event.target.value })}>
+                    <select disabled={!!player && player.alliance !== alliance} value={edit.role ?? ''} onChange={event => update(row.rowId, { role: event.target.value })}>
                       <option value="">Keep existing</option><option value="join">Legion {legion} combatant</option>
                       <option value="sub">Legion {legion} substitute</option>
                       {here && <option value="remove">Remove Legion {legion} registration</option>}

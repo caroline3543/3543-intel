@@ -225,7 +225,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   let joins=joined.length,substitutes=subs.length,added=0,already=0;
   for(const row of rows){
    const id=String(row.id),p=allianceEntries.find(x=>x.id===id&&x.matched);
-   if(!p)return {error:'A selected player is no longer in the roster. Review the import.'};
+   if(!p)return {error:'Player belongs to another alliance or membership is unknown. Verify membership before registering, or use screenshot troop powers only.'};
    if(ids.has(id))return {error:'Duplicate Player ID. Review the import.'};ids.add(id);
    if(isParticipant(addRole)&&elsewhereFor(id).length)return {error:p.name+' is assigned to '+assignmentLabel(elsewhereFor(id)[0])+'. Confirm a move from the roster before importing.'};
    const current=nextRegs[id],under=nextUnder[id];
@@ -348,7 +348,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    </div>}
    <PlannerAttendance kind={kind} alliance={chosen} legion={legion} plan={saved} players={attendancePlayers}
     onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
-   <RosterScreenshotImport kind={kind} title={title} alliance={chosen} activeLegion={legion} storage={screenshotStorage} players={allianceEntries.filter(p=>p.matched)}
+   <RosterScreenshotImport kind={kind} title={title} alliance={chosen} activeLegion={legion} storage={screenshotStorage} players={entries.filter(p=>p.matched)}
      occurrenceIds={{[legion]:saved.occurrenceId,[otherLegion]:otherPlan.occurrenceId}} onSave={onSaveScreenshotPowers}>
    <details className="screenshot-more-options">
      <summary style={{cursor:'pointer',fontWeight:650}}>More options</summary>
@@ -364,7 +364,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      </div>
      <button type="button" style={{...btn,background:'transparent',border:0,padding:'5px 2px',minHeight:30,color:'#a9c4dc',fontSize:13}} onClick={()=>setShowPaste(v=>!v)}>{showPaste?'Hide bulk import':'＋ Paste multiple players'}</button>
    {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} · {metric}</small>{p.recentNoShow&&<NoShow/>}</span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
-   {showPaste&&<BulkPlayerImport players={allianceEntries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
+   {showPaste&&<BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
    </details>
    </RosterScreenshotImport>
    <div style={{...style,padding:12}}>
