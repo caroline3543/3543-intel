@@ -167,6 +167,10 @@ export function prepareEventRoles(storage,{kind,alliance,legion,expectedOccurren
   return {slots:[...from.values(),{alliance,legion,plan:to}]};
 }
 
+export function suspiciousPowerChange(previous,next){
+  return Number.isFinite(previous)&&previous>0&&Number.isFinite(next)&&next>=0&&(next>=previous*10||next<=previous/10);
+}
+
 export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[],attendance,expectedOccurrenceId,move,roleChanges,screenshotImport},now=Date.now()) {
   if(!Object.hasOwn(EVENT_NAMES,kind)||![1,2].includes(legion))return workspace;
   if(screenshotImport){
@@ -174,6 +178,11 @@ export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[
     const validIds=new Set(workspace.players.filter(player=>player.membershipStatus!=='transferred_out').map(player=>String(player.id)));
     if(current.occurrenceId!==expectedOccurrenceId||new Set(powers.map(row=>row.id)).size!==powers.length||
       powers.some(row=>!validIds.has(row.id)||!Number.isSafeInteger(row.value)||row.value<0))return workspace;
+    for(const row of powers){
+      const player=workspace.players.find(p=>String(p.id)===row.id);
+      const previous=current.powerByPlayer?.[row.id]??player?.[powerFields[kind][0]]??(kind==='canyon'?player?.lastCanyonTroopPower:player?.troopPower??player?.lastTroopPower);
+      if(suspiciousPowerChange(previous,row.value)&&(row.powerApproval?.previous!==previous||row.powerApproval?.next!==row.value))return workspace;
+    }
   }
 
   if(roleChanges){
