@@ -104,7 +104,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
     </> : <>
       <p>{rows.length} readings · {new Set(confirmed.map(item => item.player.id)).size} matched · {active.length - confirmed.length} unresolved · {active.filter(item => item.conflict && !item.edit.checked).length} conflicting</p>
       {filter === "review" && focused && <h4 className="stage9-exception-title">{stage===4?"Confirm player identity":stage===5?"Confirm troop power":"Review registration"}</h4>}
-      <label>Import mode
+      <details className="stage9-review-options"><summary>Review options</summary><label>Import mode
         <select value={mode} disabled={working} onChange={event => { setMode(event.target.value); setPreview(null); }}>
           <option value="powers">Troop powers only</option>
           <option value="roles">Registrations only</option>
@@ -122,6 +122,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
           {Object.entries(roles).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
       </label>
+      </details>
       {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Previous reading</button><span>{exceptions.length} remaining</span><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
       <fieldset disabled={working}>
         {visible.map(({ row, edit, match, player, powerText, conflict, needsReview }) => {
