@@ -93,3 +93,10 @@
 .stage9-summary-grid>div{background:#101A28;border-radius:10px;padding:12px;display:grid;gap:4px}
 .stage9-summary-grid strong{font-size:26px;color:#D9B778;font-variant-numeric:tabular-nums}
 .stage9-summary-grid span{color:#A8B8CA}
+
+.stage9-queue{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;flex-wrap:wrap}
+.stage9-queue span{color:#A8B8CA;font-variant-numeric:tabular-nums}
+.stage9-import-workspace .ocr-reading[open]{background:#1B2A3B;border-radius:10px;padding:12px}
+.stage9-import-workspace .ocr-reading-fields{display:grid;gap:10px}
+.stage9-import-workspace .ocr-reading-fields button[aria-pressed=true]{border-color:#D9B778;box-shadow:inset 0 0 0 1px #D9B778}
+.stage9-import-workspace .screenshot-evidence{margin:8px 0;max-width:100%}
