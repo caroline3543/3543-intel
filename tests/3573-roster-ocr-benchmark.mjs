@@ -92,7 +92,7 @@ try {
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
     const roster=rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'}));
     const matcher=createScreenshotMatcher(roster,'HOT');
-    const metrics={labelled:0,automaticCorrect:0,automaticWrong:0,manual:0,originalTop1:0,improvedTop1:0,originalTop8:0,improvedTop8:0};
+    const metrics={labelled:0,automaticCorrect:0,automaticWrong:0,manual:0,originalTop1:0,improvedTop1:0,originalTop8:0,improvedTop8:0,unresolved:[]};
     for(const screenshot of screenshots)for(const row of screenshot.rows??[]){
       const label=labels[screenshot.filename].rows.find(l=>Math.abs(l.center-(row.bounds.top+row.bounds.bottom)/2)<=.035);
       if(!label)continue;
@@ -106,6 +106,7 @@ try {
       if(candidates[0]?.name===label.name)metrics.improvedTop1++;
       if(original.candidates.some(p=>p.name===label.name))metrics.originalTop8++;
       if(candidates.some(p=>p.name===label.name))metrics.improvedTop8++;
+      metrics.unresolved.push({filename:screenshot.filename,expected:label.name,reading:row.name,alternatives:row.nameAlternatives??[],candidates:original.candidates.map(p=>p.name),correctCandidateRank:candidates.findIndex(p=>p.name===label.name)+1,decorativeOrSpacingAmbiguity:!!label.decorativeOrSpacingAmbiguity});
     }
     return metrics;
   },{screenshots,labels,rosterNames}):null;
