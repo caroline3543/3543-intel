@@ -15,6 +15,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   const [working, setWorking] = useState(false);
   const [status, setStatus] = useState('');
   const [done, setDone] = useState(false);
+  const [summary, setSummary] = useState(true);
   const { alliance, legion, kind } = context;
   const target = plannerSlot(storage, kind, alliance, legion);
   const assignments = useMemo(() => eventAssignments(storage, kind), [storage, kind]);
@@ -34,6 +35,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   useEffect(() => { onDraftChange?.({ mode, edits }); }, [mode, edits]);
   const active = evaluated.filter(item => !item.edit.skip);
   const confirmed = active.filter(item => item.player);
+  const exceptions = active.filter(item => item.needsReview);
   const visible = evaluated.filter(({ row, edit, needsReview }) =>
     filter === 'all' || (filter === 'review' ? needsReview && !edit.skip : row.registration === filter));
   const update = (id, patch) => {
@@ -71,7 +73,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
 
   return <section className="ocr-review" aria-label="Review screenshot readings">
     <h3>{alliance} · Legion {legion} review</h3>
-    {done ? <><p role="status">{status}</p><button type="button" onClick={onClose}>Done</button></> : <>
+    {summary && !done ? <div className="stage9-summary"><h4>Import summary</h4><div className="stage9-summary-grid"><div><strong>{rows.length}</strong><span>Readings</span></div><div><strong>{new Set(confirmed.map(item => item.player.id)).size}</strong><span>Matched</span></div><div><strong>{active.length-confirmed.length}</strong><span>Unresolved</span></div><div><strong>{active.filter(item => item.conflict && !item.edit.checked).length}</strong><span>Conflicting</span></div></div><p>{exceptions.length ? exceptions.length + ' readings need your attention before saving.' : 'No outstanding reading exceptions.'}</p><button type="button" className="screenshot-primary" onClick={() => { setSummary(false); if (!exceptions.length) prepare(); }}>{exceptions.length ? 'Resolve ' + exceptions.length + ' readings' : 'Review changes'}</button><button type="button" onClick={onClose}>Back to screenshots</button></div> : done ? <><p role="status">{status}</p><button type="button" onClick={onClose}>Done</button></> : <>
       <p>{rows.length} readings · {new Set(confirmed.map(item => item.player.id)).size} matched · {active.length - confirmed.length} unresolved · {active.filter(item => item.conflict && !item.edit.checked).length} conflicting</p>
       <label>Import mode
         <select value={mode} disabled={working} onChange={event => { setMode(event.target.value); setPreview(null); }}>
