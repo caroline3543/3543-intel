@@ -144,3 +144,14 @@
 .stage9-change-card{padding:12px;gap:6px}.stage9-change-list{gap:8px}.stage9-change-values{gap:4px 8px}.stage9-change-card button{min-height:44px}
 
 .stage9-import-workspace .stage9-power-warning{border:1px solid #D9B778;border-radius:12px;background:#30291f;color:#f3d9a4;padding:12px;line-height:1.45;font-weight:600;}
+
+/* Stage 9 reference: quiet supporting text, compact cards, left-aligned completion. */
+.stage9-import-header h2{font-size:clamp(24px,6.5vw,28px);line-height:1.2}
+.stage9-exception-title{font-size:13px;line-height:1.45;font-weight:400;letter-spacing:normal;color:#A8B8CA;margin:8px 0 12px}
+.stage9-summary-grid>div{background:#1B2A3B}
+.stage9-summary-grid strong{font-size:20px;color:#EAF1FA}
+.stage9-completion{text-align:left;padding:12px 0;gap:12px}
+.stage9-completion-mark{margin:0;width:40px;height:40px;font-size:22px;border-radius:10px}
+.stage9-completion h4{font-size:16px;margin:0}
+.stage9-completion .stage9-action-footer{margin-top:12px}
+.stage9-change-card h5{font-size:15px}
