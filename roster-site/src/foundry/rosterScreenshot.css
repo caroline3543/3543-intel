@@ -140,3 +140,5 @@
 .stage9-issue-breakdown{background:#1B2A3B;border-radius:10px;padding:14px;display:grid;gap:10px}.stage9-issue-breakdown h5{margin:0;font-size:15px}.stage9-issue-breakdown>div{display:flex;justify-content:space-between;gap:12px}.stage9-issue-breakdown strong{color:#D9B778;font-variant-numeric:tabular-nums}.stage9-issue-breakdown small{color:#A8B8CA;font-size:12px}
 
 .stage9-registration-comparison{display:grid;gap:8px}.stage9-registration-comparison>div{background:#1B2A3B;border-radius:10px;padding:12px;display:grid;gap:4px}.stage9-registration-comparison small{color:#A8B8CA;font-size:12px}.stage9-registration-comparison strong{font-size:15px;overflow-wrap:anywhere}
+
+.stage9-change-card{padding:12px;gap:6px}.stage9-change-list{gap:8px}.stage9-change-values{gap:4px 8px}.stage9-change-card button{min-height:44px}
