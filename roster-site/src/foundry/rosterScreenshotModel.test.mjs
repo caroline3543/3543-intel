@@ -34,3 +34,16 @@ test('decorative equivalence collision vetoes even an exact local username',()=>
  const match=createScreenshotMatcher(players,'ARC',['arc'],['arc'])('HERMES');
  assert.equal(match.player,null);assert.deepEqual(new Set(match.candidates.map(p=>p.id)),new Set(['arc','hot']));
 });
+
+test('explicit profile nickname resolves a unique eligible identity',()=>{
+ const player={id:'one',name:'HΞRMΞS',nickname:'Hermes',alliance:'ARC'};
+ for(const reading of ['Hermes','HERMES','Her mes'])assert.equal(createScreenshotMatcher([player],'ARC')(reading).player?.id,'one');
+ assert.equal(createScreenshotMatcher([player],'HOT')('Hermes').player,null);
+});
+test('profile nickname collision across alliances remains manual',()=>{
+ const player={id:'one',name:'HΞRMΞS',nickname:'Hermes',alliance:'ARC'};
+ for(const other of [{id:'two',name:'Other',nickname:'Hermes',alliance:'HOT'},{id:'two',name:'Hermes',alliance:'HOT'}]){
+ const match=createScreenshotMatcher([player,other],'ARC',['one'],['one'])('Hermes');
+ assert.equal(match.player,null);assert.deepEqual(new Set(match.candidates.map(p=>p.id)),new Set(['one','two']));
+ }
+});
