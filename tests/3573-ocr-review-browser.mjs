@@ -50,16 +50,24 @@ try {
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-summary.png'});
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
     await review.getByText(/4 readings/).waitFor();
-    await page.screenshot({path:'ocr-review-captures/'+kind+'-current-review.png'});
+    await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
+    await page.screenshot({path:'ocr-review-captures/'+kind+'-04-identity.png',animations:'disabled'});
     await review.getByRole('button',{name:'Review troop powers changes'}).click();
     await review.getByRole('alert').filter({hasText:'Resolve or skip'}).waitFor();
     const row=name=>review.locator('.ocr-reading').filter({has:page.locator('summary > strong',{hasText:name})});
     await review.getByLabel('Filter readings').selectOption('all');
     if(!(await row('Unrecognised fixture').getAttribute('open')!==null)) await row('Unrecognised fixture').locator('summary').first().click();
     await row('Unrecognised fixture').getByRole('checkbox',{name:'Skip this reading'}).check();
+    await review.getByLabel('Filter readings').selectOption('review');
+    await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
+    await page.screenshot({path:'ocr-review-captures/'+kind+'-05-power.png',animations:'disabled'});
+    await review.getByLabel('Filter readings').selectOption('all');
     if(await row('Juniper').getAttribute('open')===null) await row('Juniper').locator('summary').first().click();
     await row('Juniper').getByRole('textbox',{name:'Troop power for Juniper'}).fill('3638');
     await review.getByLabel('Import mode').selectOption('both');
+    await review.getByLabel('Filter readings').selectOption('review');
+    await review.getByRole('heading',{name:'Review registration'}).waitFor();
+    await page.screenshot({path:'ocr-review-captures/'+kind+'-06-registration.png',animations:'disabled'});
     await review.getByLabel('Filter readings').selectOption('all');
     for(const name of ['Northvale','Juniper','Aster']){
       if(await row(name).getAttribute('open')===null) await row(name).locator('summary').first().click();
