@@ -182,13 +182,14 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
           {Object.entries(roles).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
       </label>
+      {filter === 'review' && focused && exceptions.length > 0 && <button type="button" onClick={prepare}>Review {modeLabels[mode]} changes</button>}
       </details>
       {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFilter('all'); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Review earlier readings</button><span>{exceptions.length} remaining</span><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
-      <div className="stage9-action-footer">{filter === 'review' && focused && <p role="status">{exceptions.length} readings remaining</p>}{filter === 'review' && focused && exceptions.length > 0 ? <><button type="button" className="screenshot-primary" disabled={working || (stage===4 ? identityChoice?.rowId!==focused.row.rowId : stage===5 ? focused.power===null || focused.conflict && !focused.edit.checked : focused.conflict && !focused.edit.checked)} onClick={()=>{
+      <div className="stage9-action-footer">{filter === 'review' && focused && exceptions.length > 0 && <div className="stage9-footer-meta"><span role="status">{exceptions.length} remaining</span><button type="button" className="stage9-skip-action" disabled={working} onClick={()=>update(focused.row.rowId,{skip:true})}>Skip this reading</button></div>}{filter === 'review' && focused && exceptions.length > 0 ? <><button type="button" className="screenshot-primary" disabled={working || (stage===4 ? identityChoice?.rowId!==focused.row.rowId : stage===5 ? focused.power===null || focused.conflict && !focused.edit.checked : focused.conflict && !focused.edit.checked)} onClick={()=>{
         if(stage===4){update(focused.row.rowId,{playerId:identityChoice.id,role:null,registrationReviewed:false,checked:false});setIdentityChoice(null);}
         else if(stage===5)update(focused.row.rowId,{powerConfirmed:true});
         else update(focused.row.rowId,{registrationReviewed:true});
-      }}>{stage===4?'Confirm match':stage===5?'Confirm troop power':focused.edit.role?'Confirm registration':'Keep existing registration'}</button><button type="button" className="stage9-skip-action" disabled={working} onClick={()=>update(focused.row.rowId,{skip:true})}>Skip this reading</button><button type="button" onClick={prepare}>Review {modeLabels[mode]} changes</button></> : <button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button>}</div>
+      }}>{stage===4?'Confirm match':stage===5?'Confirm troop power':focused.edit.role?'Confirm registration':'Keep existing registration'}</button></> : <button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button>}</div>
       {status && <p role="alert">{status}</p>}
       <button type="button" disabled={working} onClick={onClose}>Back to screenshots</button>
     </>}
