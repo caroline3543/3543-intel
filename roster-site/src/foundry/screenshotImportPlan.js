@@ -48,7 +48,7 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
     const safe=!!automatic;
     const localSuggestions=safe?[]:bulkCandidates(name,local,alliance).sort((a,b)=>rank(a)-rank(b));
     const wider=safe?[]:bulkCandidates(name,players,alliance);
-    const candidates=[...new Map([...(automatic?[automatic]:[]),...exact,...strict,...nicknames,...decorative,...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);
+    const candidates=[...new Map([...(automatic?[automatic]:[]),...exact,...strict,...nicknames,...decorative,...equivalent,...lookalikes,...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);
     const suggested=!safe&&equivalent.length===1&&lookalikes.length===1&&equivalent[0].id===lookalikes[0].id&&preferred.has(equivalent[0].id)&&normaliseBulkName(name).length>=4?equivalent[0]:null;
     const result={candidates,player:automatic,suggested};cache.set(name,result);return result;
   };
