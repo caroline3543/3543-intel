@@ -43,6 +43,9 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   const exceptions = active.filter(item => item.needsReview);
   const focused = evaluated.find(item => item.row.rowId === focusedId) ?? exceptions[0];
   const focusedStage = !focused?.player ? 4 : mode !== "roles" && (focused.power === null || focused.conflict && !focused.edit.checked) ? 5 : 6;
+  useEffect(() => {
+    if (filter === 'review' && focusedId && (!focused || focused.edit.skip || !focused.needsReview)) setFocusedId(null);
+  }, [filter, focusedId, focused?.needsReview, focused?.edit.skip]);
   const visible = evaluated.filter(({ row, edit, needsReview }) =>
     filter === 'all' || (filter === 'review' ? row.rowId === focused?.row.rowId : row.registration === filter));
   const update = (id, patch) => {
@@ -123,7 +126,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
         </select>
       </label>
       </details>
-      {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Previous reading</button><span>{exceptions.length} remaining</span><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
+      {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFilter('all'); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Review earlier readings</button><span>{exceptions.length} remaining</span><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
       <fieldset disabled={working}>
         {visible.map(({ row, edit, match, player, powerText, conflict, needsReview }) => {
           const current = assignments.get(player?.id) ?? [];
@@ -172,12 +175,12 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
                 </>}
                 {conflict && (filter !== "review" || stage !== 4) && <label><input type="checkbox" checked={!!edit.checked} onChange={event => update(row.rowId, { checked: event.target.checked })}/> I checked the conflicting evidence for this player.</label>}
               </>}
-              {filter === 'review' && <button type="button" className="screenshot-primary" disabled={!edit.skip && needsReview} onClick={() => { setFocusedId(exceptions.find(item => item.row.rowId !== row.rowId)?.row.rowId ?? null); }}>Continue to next reading</button>}
+
             </div>
           </details>;
         })}
       </fieldset>
-      <div className="stage9-action-footer"><button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button></div>
+      <div className="stage9-action-footer">{filter === 'review' && focused && <p role="status">{exceptions.length} readings remaining</p>}<button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button></div>
       {status && <p role="alert">{status}</p>}
       <button type="button" disabled={working} onClick={onClose}>Back to screenshots</button>
     </>}
