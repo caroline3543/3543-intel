@@ -73,7 +73,7 @@ function ScreenshotResult({ item, locked, onLegion }) {
   </li>;
 }
 
-export function RosterScreenshotImport({ kind, title, alliance, activeLegion, storage, players, occurrenceIds, onSave, children, onContinueTeams }) {
+export function RosterScreenshotImport({ kind, title, alliance, activeLegion, storage, players, preferredIds, occurrenceIds, onSave, children, onContinueTeams }) {
   const sessionKey = kind + ':' + alliance;
   const [session, setSession] = useState(null);
   const latest = useRef(null);
@@ -352,7 +352,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     </div>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
-    {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview {...review} players={players} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage} PreloadEvidence={ReviewEvidence}
+    {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview {...review} players={players} preferredIds={preferredIds} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage} PreloadEvidence={ReviewEvidence}
       initialMode={session?.drafts?.[review.legion]?.mode ?? mode}
       initialEdits={session?.drafts?.[review.legion]?.edits ?? {}}
       onDraftChange={draft => {
