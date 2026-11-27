@@ -100,6 +100,7 @@ try {
     await review.getByLabel('Filter readings').selectOption('all');
     if(await row('Unrecognised fixture').getAttribute('open')===null) await row('Unrecognised fixture').locator('summary').first().click();
     assert.equal(await row('Unrecognised fixture').getByRole('checkbox',{name:'Skip this reading'}).isChecked(),true);
+    if(await review.locator('.stage9-review-options').getAttribute('open')===null) await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('review');
     for(const name of ['Northvale','Aster']){
       if(await row(name).count() && await row(name).getByRole('alert').filter({hasText:'Unusually large change'}).count()){
@@ -144,8 +145,15 @@ try {
     }
     await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('all');
+    if(await review.locator('.stage9-review-options').getAttribute('open')===null) await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Import mode').selectOption('both');
+    if(await review.locator('.stage9-review-options').getAttribute('open')===null) await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('review');
+    if(await page.getByRole('heading',{name:'Check registration',exact:true}).count()){
+      await checkResponsive('06-registration-exception');
+      await page.screenshot({path:'ocr-review-captures/'+kind+'-06-registration-exception.png',animations:'disabled'});
+    }
+    if(await review.locator('.stage9-review-options').getAttribute('open')===null) await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('all');
     for(const name of ['Northvale','Juniper','Aster']){
       if(await row(name).getAttribute('open')===null) await row(name).locator('summary').first().click();
