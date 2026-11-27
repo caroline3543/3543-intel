@@ -46,6 +46,9 @@ try {
     await page.getByRole('button',{name:'Open screenshot import'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     const review=page.getByRole('region',{name:'Review screenshot readings'});
+    await review.getByRole('heading',{name:'Import summary'}).waitFor();
+    await page.screenshot({path:'ocr-review-captures/'+kind+'-current-summary.png'});
+    await review.getByRole('button',{name:/Resolve .* readings/}).click();
     await review.getByText(/4 readings/).waitFor();
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-review.png'});
     await review.getByRole('button',{name:'Review troop powers changes'}).click();
