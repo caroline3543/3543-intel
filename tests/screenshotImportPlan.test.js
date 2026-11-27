@@ -154,6 +154,14 @@ test('OCR exact names cannot bypass roster-wide normalized identity collisions',
   assert.ok(match.candidates.some(p=>p.id==='b'));
  }
  assert.equal(screenshotMatches('Panda',[a],'HOT').player?.id,'a');
- assert.equal(screenshotMatches('ＰＡＮＤＡ',[a],'HOT').player,null);
+ assert.equal(screenshotMatches('ＰＡＮＤＡ',[a],'HOT').player?.id,'a');
  assert.equal(screenshotMatches('Panda',[a],'ARC').player?.id,'a');
+});
+
+test('OCR spacing and case equivalence requires a unique collision-free identity',()=>{
+ const a={id:'a',name:'abdツ',alliance:'HOT'}, b={id:'b',name:'E I G H T',alliance:'HOT'};
+ assert.equal(screenshotMatches('abd ツ',[a,b],'HOT').player?.id,'a');
+ assert.equal(screenshotMatches('eight',[a,b],'HOT').player?.id,'b');
+ assert.equal(screenshotMatches('EIGHT',[a,b,{id:'c',name:'Eight',alliance:'ARC'}],'HOT').player,null);
+ assert.equal(screenshotMatches('an',[{id:'x',name:'XAVI',alliance:'HOT'}],'HOT').player,null);
 });
