@@ -33,7 +33,13 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
   const assignments = useMemo(() => eventAssignments(storage, kind), [storage, kind]);
   const registeredIds=useMemo(()=>Object.keys(target.registrations).filter(id=>['join','sub'].includes(target.registrations[id])),[target.registrations]);
   const matcher=useMemo(()=>createScreenshotMatcher(players,alliance,preferredIds,registeredIds),[players,alliance,preferredIds,registeredIds]);
-  const matches=useMemo(()=>rows.map(row=>matcher(row.name)),[rows,matcher]);
+  const matches=useMemo(()=>rows.map(row=>{
+    const original=matcher(row.name);
+    if(original.player || !row.nameAlternatives?.length) return original;
+    const alternatives=row.nameAlternatives.map(name=>matcher(name));
+    const candidates=[...new Map([...alternatives.flatMap(match=>[match.player,...match.candidates].filter(Boolean)),...original.candidates].map(p=>[p.id,p])).values()].slice(0,8);
+    return {...original,candidates,suggested:null};
+  }),[rows,matcher]);
   const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players]);
   const evaluated = useMemo(()=>rows.map((row, index) => {
     const edit = edits[row.rowId] ?? {};
@@ -179,7 +185,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
               </details>)}
               {filter !== "review" && <label><input type="checkbox" checked={!!edit.skip} onChange={event => update(row.rowId, { skip: event.target.checked })}/> Skip this reading</label>}
               {!edit.skip && <>
-                {(filter !== "review" || stage === 4) && <><label>Search roster for {title}<input type="search" value={edit.search ?? ''} onChange={event => update(row.rowId, { search: event.target.value })}/></label>
+                {(filter !== "review" || stage === 4) && <><>{row.nameAlternatives?.length>0 && <p>Alternative OCR readings: {row.nameAlternatives.join(" · ")}. Check the screenshot before choosing a player.</p>}</><label>Search roster for {title}<input type="search" value={edit.search ?? ''} onChange={event => update(row.rowId, { search: event.target.value })}/></label>
                 {filter==='review' && stage===4 && match.suggested && !query && <p>Suggested match selected. Check the screenshot before confirming.</p>}
                 {candidates.map(candidate => <button key={candidate.id} type="button" style={candidate.id === (filter === 'review' ? selectedIdentity ?? player?.id : player?.id)?{borderColor:'#4ade80',background:'#172e29'}:undefined} aria-pressed={candidate.id === (filter === 'review' ? selectedIdentity ?? player?.id : player?.id)}
                   onClick={() => filter === 'review' ? setIdentityChoice({rowId:row.rowId,id:candidate.id}) : update(row.rowId, { playerId: candidate.id, ...(candidate.id !== player?.id ? { role: null, registrationReviewed: false, checked: false } : {}) })}>

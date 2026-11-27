@@ -80,7 +80,7 @@ function greenDensity(context, left, top, right, bottom) {
   return green * 4 / data.length;
 }
 
-export async function readRosterScreenshot(worker, file, kind) {
+export async function readRosterScreenshot(worker, file, kind, { matchName } = {}) {
   const url = URL.createObjectURL(file);
   const source = new Image();
   try {
@@ -133,6 +133,20 @@ export async function readRosterScreenshot(worker, file, kind) {
         const nameBottom = rowY(otherLegionMarker ? .40 : .54);
         const nameCrop = textCrop(screen, x(.219), top, x(.50), nameBottom - top);
         row.name = stripPowerLine(await recognize(worker, nameCrop, PSM.RAW_LINE));
+      }
+      // Alternative OCR is advisory evidence, never an automatic identity.
+      if (matchName && !matchName(row.name).player) {
+        const nameBottom = Math.min(bottom, rowY(otherLegionMarker ? .40 : .54));
+        if (nameBottom > top) {
+          const alternatives = [];
+          for (const [options, mode] of [[{tight:true}, PSM.RAW_LINE], [{tight:true,dark:true}, PSM.SINGLE_LINE]]) {
+            try {
+              const candidate = stripPowerLine(await recognize(worker, textCrop(screen, x(.219), top, x(.50), nameBottom-top, options), mode));
+              if (candidate && candidate !== row.name && !alternatives.includes(candidate)) alternatives.push(candidate);
+            } catch { break; }
+          }
+          if (alternatives.length) row.nameAlternatives = alternatives;
+        }
       }
       const powerTop = rowY(otherLegionMarker ? .42 : .55);
       const powerBottom = Math.min(bottom, rowY(otherLegionMarker ? .66 : .81));

@@ -241,7 +241,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
           setJob('Scanning screenshots · '+complete+' of '+batch.items.length+' read');
           let outcome;
           try {
-            const reading=await readRosterScreenshot(worker,item.file);
+            const reading=await readRosterScreenshot(worker,item.file,kind,{matchName:matcher});
             outcome=reading.rows.length?{reading,error:''}:{reading:null,partial:reading.partial,error:'No complete player rows found.'};
           }catch(failure){
             outcome={error:failure.message?.startsWith('Use ')?failure.message:'Could not read this screenshot.'};

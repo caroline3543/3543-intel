@@ -85,6 +85,7 @@ export function combineScreenshotRows(screenshots, resolveIdentity = () => null)
         compatible.sources.push(sourceIndex);
         compatible.evidence.push(evidence);
         compatible.observedNames=[...new Set([...(compatible.observedNames??[compatible.name]),row.name])];
+        compatible.nameAlternatives=[...new Set([...(compatible.nameAlternatives??[]),...(row.nameAlternatives??[])])];
         compatible.voted ||= row.voted;
         compatible.battleRequest ||= row.battleRequest;
       } else {
