@@ -1,10 +1,14 @@
 name: Stage 9 baseline integrity
 on:
+  push:
+    branches: ['fix/3573-ocr-upgrade']
   pull_request:
     paths:
       - 'docs/design-baselines/state-3573/ocr-import-v1/**'
       - 'roster-site/**'
-      - 'src/services/eventPlanner.js'
+      - 'src/**'
+      - 'tests/**'
+      - 'package*.json'
       - '.github/workflows/stage9-baseline-integrity.yml'
   workflow_dispatch:
 permissions:
@@ -17,3 +21,13 @@ jobs:
       - name: Verify immutable visual references
         working-directory: docs/design-baselines/state-3573/ocr-import-v1
         run: sha256sum --strict -c SHA256SUMS
+  existing-regression-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build --prefix roster-site
