@@ -221,13 +221,13 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
                 {mode !== 'powers' && (filter !== "review" || stage === 6) && <>
                   <div className="stage9-registration-comparison"><div><small>Detected in screenshot</small><strong>{row.registration==='other-legion'&&row.otherLegion?'Legion '+row.otherLegion+' · Other legion':roles[row.registration]||'Unknown'}</strong></div><div><small>Existing registration</small><strong>{current.length ? current.map(assignmentLabel).join(' / ') : roleName(here || '')}</strong></div></div>
                   <label><span aria-hidden="true">Proposed registration</span>
-                    <select aria-label={"Registration for "+title} value={edit.role ?? proposedRole ?? ''} onChange={event => update(row.rowId, { role: event.target.value, registrationReviewed: filter !== 'review' })}>
+                    <select aria-label={"Registration for "+title} value={edit.registrationReviewed ? (edit.role ?? '') : (edit.role ?? proposedRole ?? '')} onChange={event => update(row.rowId, { role: event.target.value, registrationReviewed: filter !== 'review' })}>
                       <option value="">Keep existing</option><option value="join">Legion {legion} combatant</option>
                       <option value="sub">Legion {legion} substitute</option>
                       {here && <option value="remove">Remove Legion {legion} registration</option>}
                     </select>
                   </label>
-                  {filter !== 'review' && <button type="button" onClick={() => update(row.rowId, { role: null, registrationReviewed: true })}>Keep existing registration</button>}
+                  {filter !== 'review' && <button type="button" onClick={() => update(row.rowId, { role: '', registrationReviewed: true })}>Keep existing registration</button>}
                 </>}
                 {conflict && (filter !== "review" || stage !== 4) && <label><input type="checkbox" checked={!!edit.checked} onChange={event => update(row.rowId, { checked: event.target.checked })}/> I checked the conflicting evidence for this player.</label>}
               </>}
