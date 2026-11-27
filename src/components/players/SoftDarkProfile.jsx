@@ -188,6 +188,11 @@ export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamw
         </ProfileSection>
         <Movements history={player.allianceHistory}/>
         <ProfileIdentity player={player} onSave={onSave} softDark/>
+        <details className="soft-profile-section">
+          <summary>Remembered OCR spellings ({Array.isArray(player.ocrAliases)?player.ocrAliases.length:0})</summary>
+          <p>Spellings remembered during screenshot identity review. Removing one does not change the player's username or nickname.</p>
+          {(Array.isArray(player.ocrAliases)?player.ocrAliases:[]).map(alias=><div key={alias} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBlock:8}}><span style={{overflowWrap:'anywhere'}}>{alias}</span><button type="button" className="soft-profile-button" disabled={!onSave} aria-label={'Remove OCR spelling '+alias} onClick={()=>{if(window.confirm('Remove remembered spelling '+alias+'?'))onSave({...player,ocrAliases:player.ocrAliases.filter(value=>value!==alias)});}}>Remove</button></div>)}
+        </details>
         <ProfileJoiners player={player} onSave={onSave} softDark/>
         <ProfileTeamwork player={player} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} softDark/>
         <ProfileNotes player={player} onSave={onSave} softDark/>
