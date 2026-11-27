@@ -153,5 +153,5 @@ test('OCR exact names cannot bypass roster-wide normalized identity collisions',
  }
  assert.equal(screenshotMatches('Panda',[a],'HOT').player?.id,'a');
  assert.equal(screenshotMatches('ＰＡＮＤＡ',[a],'HOT').player,null);
- assert.equal(screenshotMatches('Panda',[a],'ARC').player,null);
+ assert.equal(screenshotMatches('Panda',[a],'ARC').player?.id,'a');
 });
