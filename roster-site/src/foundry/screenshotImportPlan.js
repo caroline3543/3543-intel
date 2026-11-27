@@ -28,8 +28,11 @@ export function prepareScreenshotImport(storage, context, rows, mode) {
   for (const row of rows) {
     if (mode !== 'roles' && row.power !== null) {
       if (!Number.isSafeInteger(row.power) || row.power < 0) return { error: 'Enter a valid troop power.' };
-      powers.push({ id: row.id, value: row.power });
-      changes.push({ id: row.id, name: row.name, power: row.power, previousPower: target.powerByPlayer?.[row.id] ?? row.previousPower });
+      const previousPower = target.powerByPlayer?.[row.id] ?? row.previousPower;
+      if (previousPower !== row.power) {
+        powers.push({ id: row.id, value: row.power });
+        changes.push({ id: row.id, name: row.name, power: row.power, previousPower });
+      }
     }
     const expectedRole = target.registrations[row.id] || '';
     if (mode === 'powers' || row.role == null || row.role === expectedRole) continue;
