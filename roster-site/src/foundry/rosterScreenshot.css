@@ -71,3 +71,15 @@
 .screenshot-evidence img { display: block; width: min(100%, 480px); }
 .screenshot-evidence span { position: absolute; inset-inline: 6%; border: 2px solid #f5ad38; pointer-events: none; }
 .ocr-power-choices { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+.stage9-import-workspace{position:fixed;inset:0;z-index:10000;background:#101A28;color:#eef4fc;display:flex;flex-direction:column;outline:none;font:14px/1.45 system-ui,sans-serif;box-sizing:border-box}
+.stage9-import-workspace *{box-sizing:border-box}
+.stage9-import-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(16px + env(safe-area-inset-top,0px)) 20px 16px;border-bottom:1px solid #34465a}
+.stage9-import-header small{color:#A8B8CA}
+.stage9-import-header h2{margin:4px 0 0;font-size:24px;line-height:1.2}
+.stage9-import-content{overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px));width:100%;max-width:780px;margin:0 auto}
+.stage9-import-workspace button,.stage9-import-workspace select,.stage9-import-workspace input:not([type=checkbox]):not([type=file]){min-height:44px;max-width:100%;border:1px solid #40546a;border-radius:10px;background:#1B2A3B;color:#eef4fc;font:inherit;padding:10px 12px}
+.stage9-import-workspace .screenshot-primary{background:#D9B778;color:#101A28;min-height:50px;width:100%;font-weight:700;margin-block:12px}
+.stage9-import-workspace label{display:grid;gap:6px;margin-block:10px}
+.stage9-import-workspace .ocr-reading{overflow-wrap:anywhere}
+.stage9-import-workspace button:disabled{opacity:.5}
