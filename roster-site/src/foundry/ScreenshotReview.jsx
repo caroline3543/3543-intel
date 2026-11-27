@@ -234,7 +234,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
           </details>;
         })}
       </fieldset>
-      <details className="stage9-review-options"><summary>Review options</summary><label>Import mode
+      <details key={`options-${stage}-${filter}`} className="stage9-review-options"><summary>Review options</summary><label>Import mode
         <select value={mode} disabled={working} onChange={event => { setMode(event.target.value); setPreview(null); }}>
           <option value="powers">Troop powers only</option>
           <option value="roles">Registrations only</option>
