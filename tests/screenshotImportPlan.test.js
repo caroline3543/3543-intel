@@ -71,9 +71,11 @@ test('safe screenshot matching separates same names, lookalikes and cross-allian
     { id:'a', name:'낭만', searchFields:['José','나무늘보','風見','风之谷','ᴱcho', '763001234'], alliance:'ARC' },
     { id:'b', name:'J0sé', searchFields:['Alias'], alliance:'WAR' },
   ];
-  for (const name of ['낭만', 'Jose\u0301', '나무늘보', '風見', '风之谷', 'ᴱcho', '763001234']) {
+  for (const name of ['낭만', '나무늘보', '風見', '风之谷', 'ᴱcho', '763001234']) {
     assert.equal(screenshotMatches(name, players, 'ARC').player?.id, 'a');
   }
+  assert.equal(screenshotMatches('Jose\u0301', players, 'ARC').player, null);
+  assert.equal(screenshotMatches('Jose\u0301', [players[0]], 'ARC').player?.id, 'a');
   assert.equal(screenshotMatches('J0sé', players, 'ARC').player, null);
   assert.equal(screenshotMatches('Jose', players, 'ARC').player, null);
   assert.equal(screenshotMatches('José', [...players, { id:'c', name:'José', alliance:'HOT' }], 'ARC').player, null);
