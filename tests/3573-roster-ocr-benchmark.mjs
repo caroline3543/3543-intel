@@ -7,6 +7,7 @@ import { createServer } from 'vite';
 
 const directory = resolve(process.env.ROSTER_SCREENSHOTS_DIR ?? '../screenshots');
 const output = resolve(process.argv[2] ?? '../3573-ocr-results.json');
+const negativePath=process.env.ROSTER_NEGATIVE_SCREENSHOT ? resolve(process.env.ROSTER_NEGATIVE_SCREENSHOT) : null;
 const groundTruthPath=process.env.ROSTER_GROUND_TRUTH ? resolve(process.env.ROSTER_GROUND_TRUTH) : null;
 const files = (await readdir(directory)).filter(name => /\.(?:png|jpe?g|webp)$/i.test(name)).sort();
 assert.ok(files.length >= 1 && files.length <= 25, 'Put 1–25 original screenshots in ROSTER_SCREENSHOTS_DIR.');
@@ -43,6 +44,17 @@ try {
     }, { filename, content });
     screenshots.push(reading);
   }
+  let negative=null;
+  if(negativePath){
+    const content=(await readFile(negativePath)).toString('base64');
+    negative=await page.evaluate(async content=>{
+      try{
+        const file=new File([Uint8Array.from(atob(content),c=>c.charCodeAt(0))],'unsupported.jpeg');
+        const result=await window.scanRoster(window.rosterReader,file);
+        return {rejected:false,result};
+      }catch(error){return {rejected:true,message:error.message};}
+    },content);
+  }
   const batchMs=Math.round(performance.now()-batchStarted);
   const labels=groundTruthPath ? JSON.parse(await readFile(groundTruthPath,'utf8')) : null;
   const scores=labels ? screenshots.map(actual=>{
@@ -50,8 +62,9 @@ try {
     assert.ok(expected,'Missing ground truth for '+actual.filename);
     return {filename:actual.filename,...scoreScreenshot(expected,actual)};
   }) : null;
-  await writeFile(output, JSON.stringify({startupMs,batchMs,errors,screenshots,scores},null,2)+'\n');
+  await writeFile(output, JSON.stringify({startupMs,batchMs,errors,screenshots,scores,negative},null,2)+'\n');
   assert.deepEqual(errors, []);
+  if(negative)assert.equal(negative.rejected,true,'Unsupported screenshot must be rejected');
   assert.ok(screenshots.every(result => !result.error));
   console.log('Wrote OCR readings and timings for '+screenshots.length+' original screenshots.');
 } finally {
