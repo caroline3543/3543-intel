@@ -24,6 +24,7 @@ jobs:
       - name: Execute actual OCR
         env:
           ROSTER_SCREENSHOTS_DIR: tests/fixtures/3573-ocr/screenshots
+          ROSTER_NEGATIVE_SCREENSHOT: tests/fixtures/3573-ocr/negative/IMG_9839.jpeg
           ROSTER_GROUND_TRUTH: tests/fixtures/3573-ocr/ground-truth.json
         run: node tests/3573-roster-ocr-benchmark.mjs "$GITHUB_WORKSPACE/ocr-results.json"
       - uses: actions/upload-artifact@v4
