@@ -6,6 +6,14 @@ import {sharedData,validateWorkspace} from '../roster-site/shared/workspace.js';
 
 const initial=sharedData({players:[{id:'hermes',username:'HΞRMΞS',allianceTag:'HOT'}]});
 let remote={revision:1,data:initial},offline=false;
+const real=process.env.OCR_LOCAL_SUPABASE==='1';
+const token='local-only-ocr-persistence-test-token-3573';
+async function edge(input){
+ const response=await fetch('http://127.0.0.1:54321/functions/v1/caroline3573-workspace',{method:'POST',headers:{'Content-Type':'application/json','x-caroline-site-key':token},body:JSON.stringify({workspaceId:'3573-leaders',role:'leader',actor:'isolated-ci',...input})});
+ const result=await response.json();if(!response.ok&&response.status!==409)throw Error('Local edge function: '+response.status+' '+JSON.stringify(result));return result;
+}
+if(real){const before=await edge({action:'read'});remote=await edge({action:'commit',revision:before.revision,data:initial});}
+
 const server=await createServer({root:process.cwd(),configFile:false,server:{host:'127.0.0.1',port:4192,strictPort:true},plugins:[{name:'isolated-workspace-test',configureServer(s){s.middlewares.use('/api/workspace',async(req,res)=>{
  res.setHeader('Content-Type','application/json');
  try{
@@ -14,9 +22,11 @@ const server=await createServer({root:process.cwd(),configFile:false,server:{hos
  let body='';for await(const chunk of req)body+=chunk;
  const input=JSON.parse(body);const data=input.encoded?JSON.parse(gunzipSync(Buffer.from(input.encoded,'base64')).toString()):input.data;
  validateWorkspace(data);
+ if(real){remote=await edge({action:'commit',revision:input.revision,data});if(remote.conflict)res.statusCode=409;res.end(JSON.stringify(remote));return;}
  if(input.revision!==remote.revision){res.statusCode=409;res.end(JSON.stringify({...remote,conflict:true}));return;}
  remote={revision:remote.revision+1,data};
  }
+ if(real)remote=await edge({action:'read'});
  res.end(JSON.stringify(remote));
  }catch(e){res.statusCode=500;res.end(JSON.stringify({error:e.message}));}
  });s.middlewares.use('/alias-test',(_req,res)=>{res.setHeader('Content-Type','text/html');res.end('<!doctype html><title>Isolated alias persistence test</title>');});}}]});
@@ -50,5 +60,5 @@ try{
  await a.context.close();await b.context.close();
  const c=await device();assert.equal(await c.page.evaluate(()=>window.matchAlias()),'hermes');
  await c.context.close();
- console.log('PASS: independent Chromium contexts, real HTTP and IndexedDB, failed save/retry, fresh browser retrieval');
+ console.log('PASS: independent Chromium contexts, real HTTP and IndexedDB, failed save/retry, fresh browser retrieval; backend='+ (real?'local Supabase edge + database':'simulated'));
 }finally{await browser?.close();await server.close();}
