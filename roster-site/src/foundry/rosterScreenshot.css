@@ -110,3 +110,8 @@
 .stage9-mode-options{border:0;padding:0;margin:12px 0;min-width:0}.stage9-mode-options legend{font-size:20px;font-weight:700;margin-bottom:8px}.stage9-import-workspace .stage9-mode-options label{display:flex;align-items:center;gap:12px;background:#1B2A3B;border:1px solid #40546a;border-radius:10px;padding:14px;min-height:76px}.stage9-mode-options label.selected{border-color:#D9B778;box-shadow:inset 0 0 0 1px #D9B778}.stage9-mode-options input[type=radio]{accent-color:#D9B778;flex:none;width:20px;height:20px;min-height:0;padding:0}.stage9-mode-options span{display:grid;gap:4px}.stage9-mode-options small,.stage9-protection{color:#A8B8CA}.stage9-protection{padding:12px;background:#1B2A3B;border-radius:10px}
 
 .stage9-completion{display:grid;gap:16px;text-align:center;padding:24px 0}.stage9-completion-mark{display:grid;place-items:center;margin:0 auto;width:64px;height:64px;border-radius:50%;background:#203c35;color:#a5d8b6;font-size:32px}.stage9-completion h4{font-size:26px;line-height:1.2}.stage9-completion>p{color:#A8B8CA}.stage9-completion .stage9-action-footer{margin-top:24px}
+
+/* Stage 9: reserve scroll space for persistent primary actions. */
+.stage9-import-content:has(.stage9-action-footer){padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+.stage9-import-workspace .stage9-action-footer{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,780px);padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));z-index:4;margin:0}
+.stage9-review-options{color:#A8B8CA;font-size:13px}.stage9-review-options>summary{display:flex;align-items:center;cursor:pointer;min-height:44px}.stage9-exception-title{font-size:22px;line-height:1.25}
