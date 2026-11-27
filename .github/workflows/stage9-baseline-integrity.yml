@@ -64,7 +64,7 @@ jobs:
           import shutil
           root=Path('ocr-review-captures')
           baseline=Path('docs/design-baselines/state-3573/ocr-import-v1/reference-screens')
-          pairs={'03-summary':'current-summary','04-identity':'04-identity','05-power':'05-power','06-registration':'06-registration','07-review':'current-confirmation','08-completion':'current-completion'}
+          pairs={'03-summary':'current-summary','04-identity':'04-identity','05-power':'05-power','06-registration':'06-registration-exception','07-review':'current-confirmation','08-completion':'current-completion'}
           for kind in ('foundry','canyon'):
               for reference,current in pairs.items():
                   dest=root/'paired'/kind/reference
