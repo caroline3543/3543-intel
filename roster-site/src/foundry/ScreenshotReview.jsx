@@ -114,7 +114,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
       </section>
       {status && <p role="alert">{status}</p>}
     </> : <>
-      <p className="stage9-review-counts">{rows.length} readings · {new Set(confirmed.map(item => item.player.id)).size} matched · {active.length - confirmed.length} unresolved · {active.filter(item => item.conflict && !item.edit.checked).length} conflicting</p>
+      <p className="stage9-review-counts" hidden={filter==="review" && !!focused}>{rows.length} readings · {new Set(confirmed.map(item => item.player.id)).size} matched · {active.length - confirmed.length} unresolved · {active.filter(item => item.conflict && !item.edit.checked).length} conflicting</p>
       {filter === "review" && focused && <h4 className="stage9-exception-title">{stage===4?"Confirm player identity":stage===5?"Confirm troop power":"Review registration"}</h4>}
       <fieldset disabled={working}>
         {visible.map(({ row, edit, match, player, powerText, power, powerPending, conflict, needsReview }) => {
@@ -128,15 +128,15 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
               normalized && normaliseBulkName(value).includes(normalized))).slice(0, 8) : match.candidates;
           const title = row.name || 'Unread player name';
           return <details key={row.rowId} className="ocr-reading" open={filter === 'review' ? true : undefined}>
-            <summary><strong>{title}</strong> · {powerText || 'Power missing'} · {roles[row.registration] || 'Unknown'}
-              {edit.skip ? ' · Skipped' : conflict && !edit.checked ? ' · Conflicting readings' : needsReview ? ' · Review' : ''}
-              {player && <small>{player.name} · {player.alliance || 'Alliance unknown'}</small>}
+            <summary><strong>{title}</strong>{filter!=="review" && <> · {powerText || 'Power missing'} · {roles[row.registration] || 'Unknown'}</>}
+              {filter!=="review" && (edit.skip ? ' · Skipped' : conflict && !edit.checked ? ' · Conflicting readings' : needsReview ? ' · Review' : '')}
+              {player && (filter!=="review" || player.name!==title) && <small>{player.name} · {player.alliance || 'Alliance unknown'}</small>}
             </summary>
             <div className="ocr-reading-fields">
               {row.otherLegion > 0 && <p>Dispatched to Legion {row.otherLegion}</p>}
               {(row.voted || row.battleRequest) && <p>{[row.voted && 'Voted', row.battleRequest && 'Battle Request'].filter(Boolean).join(' · ')}</p>}
               {row.evidence.map(({ sourceIndex, bounds }) => <details key={sourceIndex + ':' + bounds?.top} open={filter === 'review' ? true : undefined}>
-                <summary>{sources[sourceIndex].file.name} · Screenshot evidence</summary>
+                <summary>{filter==="review"?"Screenshot evidence":sources[sourceIndex].file.name+" · Screenshot evidence"}</summary>
                 <Evidence file={sources[sourceIndex].file} bounds={bounds}/>
               </details>)}
               {filter !== "review" && <label><input type="checkbox" checked={!!edit.skip} onChange={event => update(row.rowId, { skip: event.target.checked })}/> Skip this reading</label>}
@@ -153,9 +153,9 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
                 </div>}
 
                 {mode !== 'powers' && (filter !== "review" || stage === 6) && <>
-                  <p>Existing registration: {current.length ? current.map(assignmentLabel).join(' / ') : roleName(here || '')}.</p>
-                  <label>Registration for {title}
-                    <select value={edit.role ?? ''} onChange={event => update(row.rowId, { role: event.target.value, registrationReviewed: filter !== 'review' })}>
+                  <div className="stage9-registration-comparison"><div><small>Detected in screenshot</small><strong>{row.registration==='other-legion'&&row.otherLegion?'Legion '+row.otherLegion+' · Other legion':roles[row.registration]||'Unknown'}</strong></div><div><small>Existing registration</small><strong>{current.length ? current.map(assignmentLabel).join(' / ') : roleName(here || '')}</strong></div></div>
+                  <label><span aria-hidden="true">Proposed registration</span>
+                    <select aria-label={"Registration for "+title} value={edit.role ?? ''} onChange={event => update(row.rowId, { role: event.target.value, registrationReviewed: filter !== 'review' })}>
                       <option value="">Keep existing</option><option value="join">Legion {legion} combatant</option>
                       <option value="sub">Legion {legion} substitute</option>
                       {here && <option value="remove">Remove Legion {legion} registration</option>}
