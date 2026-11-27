@@ -160,6 +160,26 @@ try {
     await pending.getByRole('button',{name:'Checking shared save…'}).waitFor({state:'hidden'});
     try { await pending.getByRole('heading',{name:'Awaiting confirmation'}).waitFor({state:'hidden',timeout:5000}); } catch(error) { throw new Error(kind+' recovery: '+await pending.innerText(),{cause:error}); }
     assert.equal(await page.evaluate(()=>sessionStorage.getItem('3573-event-preview-fixture-v1')),beforeVerify,'Verification must not mutate the roster');
+    // A receipt for a change that never reached storage must not replay automatically.
+    await page.evaluate(async kind=>{
+      const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+      await new Promise((resolve,reject)=>{
+        const tx=db.transaction('sessions','readwrite'),store=tx.objectStore('sessions'),key=kind+':ARC',req=store.get(key);
+        req.onsuccess=()=>store.put({...req.result,pendingImport:{kind,alliance:'ARC',legion:1,expectedOccurrenceId:JSON.stringify([kind,'ARC',1]),powers:[{id:'sample-1',value:9999}],roleChanges:[]}},key);
+        tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+      });db.close();
+    },kind);
+    await page.reload();
+    if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
+    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await pending.getByRole('button',{name:'Check save status'}).click();
+    await pending.getByText('Sample save not confirmed.',{exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>sessionStorage.getItem('3573-event-preview-fixture-v1')),beforeVerify);
+    page.once('dialog',dialog=>dialog.accept());
+    await pending.getByRole('button',{name:'Return to review'}).click();
+    await pending.getByRole('heading',{name:'Awaiting confirmation'}).waitFor({state:'hidden'});
+    await pending.getByRole('button',{name:'Review Legion 1 · 4 readings'}).waitFor();
+    assert.equal(await page.evaluate(()=>sessionStorage.getItem('3573-event-preview-fixture-v1')),beforeVerify);
     assert.deepEqual(errors,[]);
     await page.close();
   }
