@@ -20,6 +20,7 @@ const rosterPath=process.env.ROSTER_IDENTITY_SNAPSHOT;
 const roster=rosterPath?JSON.parse(await readFile(resolve(rosterPath),'utf8')):rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'}));
 assert.ok(Array.isArray(roster)&&roster.every(p=>typeof p.id==='string'&&typeof p.name==='string'&&typeof p.alliance==='string'),'Invalid identity snapshot');
 assert.equal(new Set(roster.map(p=>p.id)).size,roster.length,'Duplicate snapshot identity');
+if(rosterPath){assert.ok(labels,'External snapshot requires ID-labelled ground truth');const ids=new Set(roster.map(p=>p.id));for(const screenshot of Object.values(labels))for(const row of screenshot.rows)assert.ok(typeof row.playerId==='string'&&ids.has(row.playerId),'External ground truth must identify every row by a valid player ID');}
 const identityScope=rosterPath?'external roster snapshot':'label-derived roster';
 process.chdir('roster-site');
 const server = await createServer({ server:{ host:'127.0.0.1', port:5177, strictPort:true } });
@@ -96,24 +97,26 @@ try {
   const reviewMetrics=labels?await page.evaluate(async ({screenshots,labels,roster})=>{
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
     const matcher=createScreenshotMatcher(roster,'HOT');
+    const correct=(p,label)=>!!p&&(label.playerId?p.id===label.playerId:p.name===label.name);
     const metrics={labelled:0,automaticCorrect:0,automaticWrong:0,manual:0,originalTop1:0,improvedTop1:0,originalTop8:0,improvedTop8:0,unresolved:[]};
     for(const screenshot of screenshots)for(const row of screenshot.rows??[]){
       const label=labels[screenshot.filename].rows.find(l=>Math.abs(l.center-(row.bounds.top+row.bounds.bottom)/2)<=.035);
       if(!label)continue;
       metrics.labelled++;
       const original=matcher(row.name);
-      if(original.player){metrics[original.player.name===label.name?'automaticCorrect':'automaticWrong']++;continue;}
+      if(original.player){metrics[correct(original.player,label)?'automaticCorrect':'automaticWrong']++;continue;}
       metrics.manual++;
       const alternatives=(row.nameAlternatives??[]).map(matcher);
       const candidates=[...new Map([...alternatives.flatMap(m=>m.player?[m.player]:[]),...original.candidates,...alternatives.flatMap(m=>m.candidates)].map(p=>[p.id,p])).values()].slice(0,8);
-      if(original.candidates[0]?.name===label.name)metrics.originalTop1++;
-      if(candidates[0]?.name===label.name)metrics.improvedTop1++;
-      if(original.candidates.some(p=>p.name===label.name))metrics.originalTop8++;
-      if(candidates.some(p=>p.name===label.name))metrics.improvedTop8++;
-      metrics.unresolved.push({filename:screenshot.filename,expected:label.name,reading:row.name,alternatives:row.nameAlternatives??[],candidates:original.candidates.map(p=>p.name),correctCandidateRank:candidates.findIndex(p=>p.name===label.name)+1,decorativeOrSpacingAmbiguity:!!label.decorativeOrSpacingAmbiguity});
+      if(correct(original.candidates[0],label))metrics.originalTop1++;
+      if(correct(candidates[0],label))metrics.improvedTop1++;
+      if(original.candidates.some(p=>correct(p,label)))metrics.originalTop8++;
+      if(candidates.some(p=>correct(p,label)))metrics.improvedTop8++;
+      metrics.unresolved.push({filename:screenshot.filename,expected:label.name,reading:row.name,alternatives:row.nameAlternatives??[],candidates:original.candidates.map(p=>p.name),correctCandidateRank:candidates.findIndex(p=>correct(p,label))+1,decorativeOrSpacingAmbiguity:!!label.decorativeOrSpacingAmbiguity});
     }
     return metrics;
   },{screenshots,labels,roster}):null;
+  if(rosterPath&&reviewMetrics)delete reviewMetrics.unresolved;
   console.log('Identity review metrics:',JSON.stringify(reviewMetrics));
   const fingerprints=cards.filter(r=>r.avatarEvidence);
   const groups=new Map();
@@ -130,7 +133,7 @@ try {
     identicalFingerprintGroups:[...groups.values()].filter(g=>g.length>1).map(g=>({count:g.length,names:[...new Set(g)]}))};
   // Only aggregate diagnostics leave the benchmark process; no avatar fingerprints in artifacts.
   for(const row of cards)delete row.avatarEvidence;
-  await writeFile(output, JSON.stringify({identityScope,retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots,scores,negative,avatarMetrics,retryMetrics,reviewMetrics},null,2)+'\n');
+  await writeFile(output, JSON.stringify({identityScope,retriesEnabled,workerCount,startupMs,recognitionBatchMs,batchMs,errors,screenshots:rosterPath?undefined:screenshots,scores:rosterPath?undefined:scores,negative:rosterPath?undefined:negative,avatarMetrics:rosterPath?undefined:avatarMetrics,retryMetrics,reviewMetrics},null,2)+'\n');
   if(scores){
     const sum=key=>scores.reduce((total,s)=>total+s[key],0);
     const expected=sum('expected');
