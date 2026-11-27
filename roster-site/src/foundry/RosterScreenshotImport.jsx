@@ -229,7 +229,9 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       <div className="stage9-import-content">
     <input ref={picker} type="file" hidden multiple accept="image/png,image/jpeg,image/webp" aria-label="Troop power screenshots"
       disabled={loading || !!job || !!review} onChange={chooseFiles}/>
-    {!loading && !review && <label>Import mode<select value={mode} disabled={!!job} onChange={event => chooseMode(event.target.value)}><option value="powers">Troop powers only</option><option value="roles">Registrations only</option><option value="both">Troop powers and registrations</option></select></label>}
+    {!review && <div className="stage9-step-strip" aria-label={`Step ${run.current ? 2 : 1} of 8`}>{Array.from({length:8},(_,i)=><span key={i} className={i===(run.current?1:0)?"current":run.current&&i===0?"complete":""}/>)}</div>}
+    {!loading && !review && !run.current && <fieldset className="stage9-mode-options" disabled={!!job}><legend>What would you like to import?</legend>{[['powers','Troop powers only','Update troop powers without changing registrations.'],['roles','Registrations only','Review combatant and substitute assignments.'],['both','Troop powers and registrations','Review both types of changes together.']].map(([value,label,description])=><label key={value} className={mode===value?'selected':''}><input type="radio" name="screenshot-import-mode" value={value} checked={mode===value} onChange={()=>chooseMode(value)}/><span><strong>{label}</strong><small>{description}</small></span></label>)}</fieldset>}
+    {!loading && !review && !run.current && <p className="stage9-protection">Your roster will not change until you review and confirm the import.</p>}
     {loading && <p role="status">Checking for a previous batch…</p>}
     {!loading && !items.length && <>
       <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => picker.current?.click()}>Upload troop power</button>
