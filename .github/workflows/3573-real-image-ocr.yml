@@ -6,7 +6,7 @@ on:
     paths: ['tests/fixtures/3573-ocr/**', 'tests/3573-*.mjs', 'roster-site/src/foundry/**', '.github/workflows/3573-real-image-ocr.yml']
   push:
     branches: [fix/3573-ocr-upgrade, release/3573-ocr-candidate, fix/3573-review-speed]
-    paths: ['tests/fixtures/3573-ocr/**', '.github/workflows/3573-real-image-ocr.yml', 'tests/3573-roster-ocr-benchmark.mjs', 'tests/3573-ocr-score.mjs', 'roster-site/src/foundry/**']
+    paths: ['tests/fixtures/3573-ocr/**', '.github/workflows/3573-real-image-ocr.yml', 'tests/3573-*.mjs', 'roster-site/src/foundry/**', 'roster-site/src/eventPreview.jsx']
 permissions:
   contents: read
 jobs:
@@ -24,6 +24,15 @@ jobs:
       - run: npm ci
       - run: npm install --no-save --package-lock=false playwright@1.56.1
       - run: npx playwright install --with-deps chromium
+      - name: Build isolated roster preview
+        run: npm run build --prefix roster-site
+      - name: Execute browser review regression
+        run: node tests/3573-ocr-review-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ocr-review-captures
+          path: ocr-review-captures/
       - name: Execute actual OCR
         env:
           ROSTER_SCREENSHOTS_DIR: tests/fixtures/3573-ocr/screenshots
