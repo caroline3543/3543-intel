@@ -38,6 +38,7 @@ try {
       });
       // Juniper must be genuinely unassigned to exercise a new registration.
       const workspace=JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1'));
+      workspace.players.push({...workspace.players[0],id:'collision-hot',fid:'357309999',allianceTag:'HOT',username:'Northvale Two'});
       for(const slot of [workspace.foundry,...Object.values(workspace.foundry.eventPlans??{})]){
         if(slot.registrations)delete slot.registrations['sample-1'];
         if(slot.registeredUnder)delete slot.registeredUnder['sample-1'];
@@ -73,8 +74,15 @@ try {
     // Candidate selection is provisional and must be cleared by a changed search.
     const search=review.getByRole('searchbox');
     await search.fill('Northvale');
-    const candidate=review.locator('.stage9-candidate-card').filter({hasText:'Northvale'}).first();
+    const cards=review.locator('.stage9-candidate-card');
+    assert.ok(await cards.count()>=2,'Search must expose multiple candidates');
+    const other=cards.filter({hasText:'Northvale Two'});
+    await other.click();
+    assert.equal(await other.getAttribute('aria-pressed'),'true');
+    const candidate=cards.filter({hasText:'357301200'});
     await candidate.click();
+    assert.equal(await other.getAttribute('aria-pressed'),'false');
+    assert.equal(await candidate.getAttribute('aria-pressed'),'true');
     const confirmMatch=review.getByRole('button',{name:'Confirm match',exact:true});
     assert.equal(await confirmMatch.isEnabled(),true);
     await search.fill('Juniper');
