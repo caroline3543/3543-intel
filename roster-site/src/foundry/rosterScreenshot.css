@@ -155,3 +155,6 @@
 .stage9-completion h4{font-size:16px;margin:0}
 .stage9-completion .stage9-action-footer{margin-top:12px}
 .stage9-change-card h5{font-size:15px}
+
+.stage9-import-workspace .stage9-candidate-card{display:flex;align-items:center;justify-content:space-between;text-align:left;gap:10px;min-height:52px;padding:10px 12px}
+.stage9-candidate-identity{display:grid;gap:3px;min-width:0;overflow-wrap:anywhere}.stage9-candidate-identity strong{font-size:15px;line-height:1.3}.stage9-candidate-identity small{font-size:12px;color:#A8B8CA;line-height:1.4}
