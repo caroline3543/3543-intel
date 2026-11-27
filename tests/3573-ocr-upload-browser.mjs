@@ -71,7 +71,7 @@ try {
     await dialog.getByText('2 of 2 screenshots read',{exact:true}).waitFor({timeout:120000});
     await dialog.locator('input[type=file]').setInputFiles(files.slice(2));
     await dialog.getByText('2 of 3 screenshots read',{exact:true}).waitFor();
-    await dialog.getByRole('button',{name:'Scan screenshots',exact:true}).click();
+    await dialog.getByRole('button',{name:'Resume or retry unread screenshots',exact:true}).click();
     await dialog.getByText('3 of 3 screenshots read',{exact:true}).waitFor({timeout:120000});
     await real.reload();
     if(event==='Canyon Clash')await real.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
