@@ -73,9 +73,15 @@ try {
     await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
     await checkResponsive('05-power');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-05-power.png',animations:'disabled'});
+    const powerInput=row('Juniper').getByRole('textbox',{name:'Troop power for Juniper'});
+    for(const value of ['3','36','363','3638']){
+      await powerInput.fill(value);
+      assert.equal(await powerInput.inputValue(),value);
+      await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
+      assert.equal(await row('Juniper').count(),1);
+    }
+    await row('Juniper').getByRole('button',{name:'Confirm troop power',exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('all');
-    if(await row('Juniper').getAttribute('open')===null) await row('Juniper').locator('summary').first().click();
-    await row('Juniper').getByRole('textbox',{name:'Troop power for Juniper'}).fill('3638');
     await review.getByLabel('Import mode').selectOption('both');
     await review.getByLabel('Filter readings').selectOption('review');
     await review.getByRole('heading',{name:'Review registration'}).waitFor();
