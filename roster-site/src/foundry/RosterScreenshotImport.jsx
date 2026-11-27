@@ -57,6 +57,15 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   const [error, setError] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
   const [review, setReview] = useState(null);
+  const [mode, setMode] = useState(() => {
+    try { const value = localStorage.getItem('3573-ocr-import-mode'); return ['powers','roles','both'].includes(value) ? value : 'powers'; }
+    catch { return 'powers'; }
+  });
+  function chooseMode(value) {
+    setMode(value);
+    try { localStorage.setItem('3573-ocr-import-mode', value); } catch {}
+    if (latest.current) checkpoint({ ...latest.current, mode: value });
+  }
   const run = useRef(null);
   const picker = useRef(null);
   const mounted = useRef(false);
@@ -68,6 +77,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       if (mounted.current) {
         latest.current = value || null;
         setSession(value || null);
+        if (['powers','roles','both'].includes(value?.mode)) setMode(value.mode);
       }
     }).catch(() => {
       if (mounted.current) setRecoveryError('Batch recovery is unavailable in this browser.');
@@ -108,7 +118,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       }
       if (byId.size < files.length + valid.length && byId.size < maxFiles) warnings.push('Duplicate screenshots were skipped.');
       if (mounted.current && byId.size) {
-        checkpoint({ ...latest.current, items: [...byId.values()], occurrenceIds: latest.current?.occurrenceIds ?? eventIds.current });
+        checkpoint({ ...latest.current, items: [...byId.values()], mode, occurrenceIds: latest.current?.occurrenceIds ?? eventIds.current });
       }
     } catch {
       warnings.push('Could not read the selected files.');
@@ -126,7 +136,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     run.current = task;
     let batch = latest.current;
     if (restart) {
-      batch = { items: batch.items.map(({ id, file }) => ({ id, file })), occurrenceIds: eventIds.current };
+      batch = { mode, items: batch.items.map(({ id, file }) => ({ id, file })), occurrenceIds: eventIds.current };
       checkpoint(batch);
     }
     const todo = batch.items.filter(item => !item.reading);
@@ -188,6 +198,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   return <section className="screenshot-import" aria-label="Troop power upload">
     <input ref={picker} type="file" hidden multiple accept="image/png,image/jpeg,image/webp" aria-label="Troop power screenshots"
       disabled={loading || !!job || !!review} onChange={chooseFiles}/>
+    {!loading && !review && <label>Import mode<select value={mode} disabled={!!job} onChange={event => chooseMode(event.target.value)}><option value="powers">Troop powers only</option><option value="roles">Registrations only</option><option value="both">Troop powers and registrations</option></select></label>}
     {loading && <p role="status">Checking for a previous batch…</p>}
     {!loading && !items.length && <>
       <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => picker.current?.click()}>Upload troop power</button>
@@ -214,7 +225,18 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     {job && <><p role="status">{job}</p>{run.current && <button type="button" onClick={() => { run.current.stopped = true; setJob('Stopping after current screenshot…'); }}>Stop scan</button>}</>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
-    {review && <ScreenshotReview {...review} players={players} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage} onClose={() => setReview(null)}/>}
+    {review && <ScreenshotReview {...review} players={players} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage}
+      initialMode={session?.drafts?.[review.legion]?.mode ?? mode}
+      initialEdits={session?.drafts?.[review.legion]?.edits ?? {}}
+      onDraftChange={draft => {
+        if (!latest.current) return;
+        const previous = latest.current.drafts?.[review.legion];
+        if (JSON.stringify(previous) === JSON.stringify(draft)) return;
+        checkpoint({ ...latest.current, mode: draft.mode, drafts: { ...latest.current.drafts, [review.legion]: draft } });
+        setMode(draft.mode);
+        try { localStorage.setItem('3573-ocr-import-mode', draft.mode); } catch {}
+      }}
+      onClose={() => setReview(null)}/>}
     {children}
   </section>;
 }
