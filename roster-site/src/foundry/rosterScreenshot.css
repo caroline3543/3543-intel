@@ -83,3 +83,13 @@
 .stage9-import-workspace label{display:grid;gap:6px;margin-block:10px}
 .stage9-import-workspace .ocr-reading{overflow-wrap:anywhere}
 .stage9-import-workspace button:disabled{opacity:.5}
+
+.stage9-progress-panel,.stage9-summary{background:#1B2A3B;border-radius:10px;padding:16px;margin-block:12px}
+.stage9-progress-panel h3,.stage9-summary h4{font-size:20px;margin:0 0 12px}
+.stage9-progress-panel progress{width:100%;height:10px;accent-color:#D9B778}
+.stage9-source-list{margin-block:16px;color:#A8B8CA}
+.stage9-source-list summary{min-height:44px;padding-block:12px;cursor:pointer}
+.stage9-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.stage9-summary-grid>div{background:#101A28;border-radius:10px;padding:12px;display:grid;gap:4px}
+.stage9-summary-grid strong{font-size:26px;color:#D9B778;font-variant-numeric:tabular-nums}
+.stage9-summary-grid span{color:#A8B8CA}
