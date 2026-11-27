@@ -49,6 +49,9 @@ jobs:
       - name: Mobile OCR upload acceptance
         if: always()
         run: node tests/3573-ocr-upload-browser.mjs
+      - name: Deterministic OCR review acceptance
+        if: always()
+        run: node tests/3573-ocr-review-browser.mjs
       - name: Retain current implementation captures for review
         if: always()
         uses: actions/upload-artifact@v4
