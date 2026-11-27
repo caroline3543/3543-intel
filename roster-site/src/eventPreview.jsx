@@ -9,7 +9,7 @@ import {plannerKey,plannerSlot,updateEventPlanner} from '../../src/services/even
 
 const players=['Northvale','Juniper','Solace','Ember','Tides','Kite','Lumen','Cypress','Aster','Wren'].map((username,index)=>({
   id:'sample-'+index,username,fid:String(357301200+index),allianceTag:'ARC',allianceRank:['R3','R2','R4','R3','R1','R3','R5'][index%7],furnaceLevel:'FC6',
-  lastFoundryTroopPower:index===9?null:96000000-index*3500000,lastCanyonClashTroopPower:1520000000-index*135000000,
+  lastFoundryTroopPower:[3630,3630,15630,8200,7100,5900,4800,4200,4100,null][index],lastCanyonClashTroopPower:1520000000-index*135000000,
   ...(index===0?{allianceName:'Aurora',observationHistory:[
     {stream:'profile',observedAt:'2026-11-24T00:00:00Z',changes:[
       {field:'allianceTag',before:'LUN',after:'ARC'},{field:'username',before:'North Vale',after:'Northvale'},
