@@ -80,7 +80,25 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
 
   return <section className="ocr-review" aria-label="Review screenshot readings">
     <h3>{alliance} · Legion {legion} review</h3>
-    {summary && !done ? <div className="stage9-summary"><h4>Import summary</h4><div className="stage9-summary-grid"><div><strong>{rows.length}</strong><span>Readings</span></div><div><strong>{new Set(confirmed.map(item => item.player.id)).size}</strong><span>Matched</span></div><div><strong>{active.length-confirmed.length}</strong><span>Unresolved</span></div><div><strong>{active.filter(item => item.conflict && !item.edit.checked).length}</strong><span>Conflicting</span></div></div><p>{exceptions.length ? exceptions.length + ' readings need your attention before saving.' : 'No outstanding reading exceptions.'}</p><button type="button" className="screenshot-primary" onClick={() => { setSummary(false); if (!exceptions.length) prepare(); }}>{exceptions.length ? 'Resolve ' + exceptions.length + ' readings' : 'Review changes'}</button><button type="button" onClick={onClose}>Back to screenshots</button></div> : done ? <div className="stage9-summary"><h4>Import complete</h4><p role="status">{status}</p><p>{receipt?.powers ?? 0} troop power updates · {receipt?.roles ?? 0} registration updates</p>{onContinueTeams && <button type="button" className="screenshot-primary" onClick={onContinueTeams}>Continue to Teams</button>}<button type="button" onClick={onClose}>Done</button></div> : <>
+    {summary && !done ? <div className="stage9-summary"><h4>Import summary</h4><div className="stage9-summary-grid"><div><strong>{rows.length}</strong><span>Readings</span></div><div><strong>{new Set(confirmed.map(item => item.player.id)).size}</strong><span>Matched</span></div><div><strong>{active.length-confirmed.length}</strong><span>Unresolved</span></div><div><strong>{active.filter(item => item.conflict && !item.edit.checked).length}</strong><span>Conflicting</span></div></div><p>{exceptions.length ? exceptions.length + ' readings need your attention before saving.' : 'No outstanding reading exceptions.'}</p><button type="button" className="screenshot-primary" onClick={() => { setSummary(false); if (!exceptions.length) prepare(); }}>{exceptions.length ? 'Resolve ' + exceptions.length + ' readings' : 'Review changes'}</button><button type="button" onClick={onClose}>Back to screenshots</button></div> : done ? <div className="stage9-summary"><h4>Import complete</h4><p role="status">{status}</p><p>{receipt?.powers ?? 0} troop power updates · {receipt?.roles ?? 0} registration updates</p>{onContinueTeams && <button type="button" className="screenshot-primary" onClick={onContinueTeams}>Continue to Teams</button>}<button type="button" onClick={onClose}>Done</button></div> : preview ? <>
+      <section aria-label="Confirm screenshot import">
+        <h4>Review proposed changes</h4>
+        <p>{preview.action.powers.length} power updates · {preview.action.roleChanges?.length ?? 0} registration changes · {evaluated.length-active.length} excluded</p>
+        <div className="stage9-summary-grid">
+          {['join','sub'].map(role => <div key={role}><span>{roleName(role)}</span><strong>{Object.values(projected).filter(value=>value===role).length} / {capacity[role]}</strong><span>After import</span></div>)}
+        </div>
+        <p>Registration capacity is validated before saving.</p>
+        <ul>{preview.changes.map(change => <li key={change.id + ':' + (change.after ? 'role' : 'power')}>
+          <strong>{change.name}</strong> · {change.after
+            ? assignmentLabel(change.before) + ' → ' + assignmentLabel(change.after)
+            : (change.previousPower?.toLocaleString() ?? 'No power recorded') + ' → ' + change.power.toLocaleString()}
+          <button type="button" disabled={working} onClick={() => { const item=confirmed.find(entry=>entry.player.id===change.id); if(item){update(item.row.rowId,{skip:true});setFilter('all');} }}>Exclude player</button>
+        </li>)}</ul>
+        <button type="button" className="screenshot-primary" disabled={working} onClick={confirm}>{working ? 'Applying changes…' : preview.changes.some(change => change.destructive) ? 'Confirm registration moves or removals and save' : 'Save ' + modeLabels[mode]}</button>
+        <button type="button" disabled={working} onClick={() => setPreview(null)}>Keep reviewing</button>
+      </section>
+      {status && <p role="alert">{status}</p>}
+    </> : <>
       <p>{rows.length} readings · {new Set(confirmed.map(item => item.player.id)).size} matched · {active.length - confirmed.length} unresolved · {active.filter(item => item.conflict && !item.edit.checked).length} conflicting</p>
       <label>Import mode
         <select value={mode} disabled={working} onChange={event => { setMode(event.target.value); setPreview(null); }}>
@@ -154,22 +172,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
           </details>;
         })}
       </fieldset>
-      {preview ? <section aria-label="Confirm screenshot import">
-        <h4>Review proposed changes</h4>
-        <p>{preview.action.powers.length} power updates · {preview.action.roleChanges?.length ?? 0} registration changes · {evaluated.length-active.length} excluded</p>
-        <div className="stage9-summary-grid">
-          {['join','sub'].map(role => <div key={role}><span>{roleName(role)}</span><strong>{Object.values(projected).filter(value=>value===role).length} / {capacity[role]}</strong><span>After import</span></div>)}
-        </div>
-        <p>Registration capacity is validated before saving.</p>
-        <ul>{preview.changes.map(change => <li key={change.id + ':' + (change.after ? 'role' : 'power')}>
-          <strong>{change.name}</strong> · {change.after
-            ? assignmentLabel(change.before) + ' → ' + assignmentLabel(change.after)
-            : (change.previousPower?.toLocaleString() ?? 'No power recorded') + ' → ' + change.power.toLocaleString()}
-          <button type="button" disabled={working} onClick={() => { const item=confirmed.find(entry=>entry.player.id===change.id); if(item){update(item.row.rowId,{skip:true});setFilter('all');} }}>Exclude player</button>
-        </li>)}</ul>
-        <button type="button" className="screenshot-primary" disabled={working} onClick={confirm}>{working ? 'Applying changes…' : preview.changes.some(change => change.destructive) ? 'Confirm registration moves or removals and save' : 'Save ' + modeLabels[mode]}</button>
-        <button type="button" disabled={working} onClick={() => setPreview(null)}>Keep reviewing</button>
-      </section> : <button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button>}
+      <div className="stage9-action-footer"><button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button></div>
       {status && <p role="alert">{status}</p>}
       <button type="button" disabled={working} onClick={onClose}>Back to screenshots</button>
     </>}
