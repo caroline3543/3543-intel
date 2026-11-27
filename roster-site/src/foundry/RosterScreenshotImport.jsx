@@ -316,7 +316,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   return <section className="screenshot-import" aria-label="Troop power upload">
     <button ref={launchRef} type="button" className="screenshot-primary" onClick={() => setWorkspaceOpen(true)}>Open screenshot import</button>
     {workspaceOpen && createPortal(<section ref={workspaceRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Screenshot import workspace" className="stage9-import-workspace">
-      <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {review?.legion ?? activeLegion}</small><h2>Import roster</h2></div><button type="button" disabled={!!job} onClick={() => { setReview(null); setWorkspaceOpen(false); }}>Close</button></header>
+      <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {review?.legion ?? activeLegion}</small><h2>Import roster</h2></div><button type="button" disabled={!!job} onClick={() => { setSession(latest.current); setReview(null); setWorkspaceOpen(false); }}>Close</button></header>
       <div className="stage9-import-content">
     {session?.pendingImport && !review ? <div className="stage9-summary"><h4>Awaiting confirmation</h4><p>Import changes retained. Check the shared save before submitting another import.</p><p>{title} · {alliance} · Legion {session.pendingImport.legion}</p><div role="status">{pendingStatus}</div><div className="stage9-action-footer"><button type="button" className="screenshot-primary" disabled={checkingPending} onClick={checkPending}>{checkingPending?'Checking shared save…':'Check save status'}</button><button type="button" disabled={checkingPending} onClick={returnToReview}>Return to review</button></div></div> : <>
     <input ref={picker} type="file" hidden multiple accept="image/png,image/jpeg,image/webp" aria-label="Troop power screenshots"
@@ -353,8 +353,8 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
     {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview {...review} players={players} preferredIds={preferredIds} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage} PreloadEvidence={ReviewEvidence}
-      initialMode={session?.drafts?.[review.legion]?.mode ?? mode}
-      initialEdits={session?.drafts?.[review.legion]?.edits ?? {}}
+      initialMode={latest.current?.drafts?.[review.legion]?.mode ?? mode}
+      initialEdits={latest.current?.drafts?.[review.legion]?.edits ?? {}}
       onDraftChange={draft => {
         if (!latest.current) return;
         const previous = latest.current.drafts?.[review.legion];
@@ -363,8 +363,8 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
         setMode(draft.mode);
         try { localStorage.setItem('3573-ocr-import-mode', draft.mode); } catch {}
       }}
-      onContinueTeams={review.legion === activeLegion && onContinueTeams ? () => { setReview(null); setWorkspaceOpen(false); onContinueTeams(); } : undefined}
-      onClose={() => setReview(null)}/></EvidenceCache.Provider>}
+      onContinueTeams={review.legion === activeLegion && onContinueTeams ? () => { setSession(latest.current); setReview(null); setWorkspaceOpen(false); onContinueTeams(); } : undefined}
+      onClose={() => {setSession(latest.current);setReview(null);}}/></EvidenceCache.Provider>}
     </>}
       {!session?.pendingImport && pendingStatus && !review && <p role="status">{pendingStatus}</p>}
       </div>
