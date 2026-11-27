@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { normaliseBulkName } from '../components/bulkImportModel.js';
 import { eventAssignments, plannerSlot, EVENT_LIMITS } from '../../../src/services/eventPlanner.js';
 import { readScreenshotPower } from './rosterScreenshotModel.js';
-import { assignmentLabel, prepareScreenshotImport, roleName, screenshotMatches } from './screenshotImportPlan.js';
+import { assignmentLabel, prepareScreenshotImport, roleName, screenshotMatches, suspiciousPowerChange } from './screenshotImportPlan.js';
 
 const roles = { combatant: 'Combatant', substitute: 'Substitute', unassigned: 'Unassigned', 'other-legion': 'Other legion', unknown: 'Unknown' };
 const modeLabels = { powers: 'troop powers', roles: 'registrations', both: 'troop powers and registrations' };
@@ -35,9 +35,11 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
     const powerText = edit.power ?? (powerConflict ? '' : String(row.power ?? ''));
     const power = powerText.trim() ? readScreenshotPower(powerText) : null;
     const conflict = row.conflict || mode !== 'roles' && powerConflict;
-    const powerPending = mode !== 'roles' && edit.power !== undefined && !edit.powerConfirmed;
+    const previousPower = target.powerByPlayer?.[player?.id] ?? (player?.hasPower ? player.power : null);
+    const unusualPower = mode !== 'roles' && suspiciousPowerChange(previousPower,power);
+    const powerPending = mode !== 'roles' && (edit.power !== undefined && !edit.powerConfirmed || unusualPower && (edit.powerApproval?.previous !== previousPower || edit.powerApproval?.next !== power));
     const needsReview = powerPending || !player || conflict && !edit.checked || mode !== 'roles' && power === null || mode !== 'powers' && ['unknown','other-legion','combatant','substitute'].includes(row.registration) && !edit.registrationReviewed;
-    return { row, edit, match, player, powerText, power, conflict, needsReview, powerPending };
+    return { row, edit, match, player, powerText, power, conflict, needsReview, powerPending, previousPower, unusualPower };
   });
   useEffect(() => { onDraftChange?.({ mode, edits }); }, [mode, edits]);
   const active = evaluated.filter(item => !item.edit.skip);
@@ -70,7 +72,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
     }
     const result = prepareScreenshotImport(storage, context, confirmed.map(({ player, power, edit }) => ({
       id: player.id, name: player.name, alliance: player.alliance, power,
-      previousPower: player.hasPower ? player.power : null,
+      previousPower: player.hasPower ? player.power : null, powerApproval: edit.powerApproval,
       role: edit.role === 'remove' ? '' : edit.role || null,
     })), mode);
     setStatus(result.error ?? '');
@@ -117,7 +119,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
       <p className="stage9-review-counts" hidden={filter==="review" && !!focused}>{rows.length} readings · {new Set(confirmed.map(item => item.player.id)).size} matched · {active.length - confirmed.length} unresolved · {active.filter(item => item.conflict && !item.edit.checked).length} conflicting</p>
       {filter === "review" && focused && <h4 className="stage9-exception-title">{stage===4?"Confirm player identity":stage===5?"Confirm troop power":"Review registration"}</h4>}
       <fieldset disabled={working}>
-        {visible.map(({ row, edit, match, player, powerText, power, powerPending, conflict, needsReview }) => {
+        {visible.map(({ row, edit, match, player, powerText, power, powerPending, previousPower, unusualPower, conflict, needsReview }) => {
           const current = assignments.get(player?.id) ?? [];
           const here = target.registrations[player?.id];
           const query = String(edit.search ?? '').trim().toLocaleLowerCase();
@@ -146,6 +148,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
                   onClick={() => filter === 'review' ? setIdentityChoice({rowId:row.rowId,id:candidate.id}) : update(row.rowId, { playerId: candidate.id, ...(candidate.id !== player?.id ? { role: null, registrationReviewed: false, checked: false } : {}) })}>
                   {candidate.name} · {candidate.alliance || 'Alliance unknown'} · ID {candidate.playerId || candidate.id}
                 </button>)}</>}
+                {unusualPower && (filter !== "review" || stage === 5) && <p role="alert">Unusually large change: {previousPower.toLocaleString()} → {power.toLocaleString()}. Check the screenshot and power units before confirming.</p>}
                 {mode !== 'roles' && (filter !== "review" || stage === 5) && <label>Troop power for {title}<input inputMode="decimal" value={powerText} onChange={event => update(row.rowId, { power: event.target.value, checked: false, powerConfirmed: filter !== 'review' })}/></label>}
                 {mode !== 'roles' && (filter !== "review" || stage === 5) && row.powerConflict?.length > 1 && <div className="ocr-power-choices" aria-label="Competing troop powers">
                   {row.powerConflict.map(value => <button type="button" key={value} aria-pressed={powerText === String(value)}
@@ -193,7 +196,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
       {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFilter('all'); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Review earlier readings</button><span>{exceptions.length} remaining</span><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
       <div className="stage9-action-footer">{filter === 'review' && focused && exceptions.length > 0 && <div className="stage9-footer-meta"><span role="status">{exceptions.length} remaining</span><button type="button" className="stage9-skip-action" disabled={working} onClick={()=>update(focused.row.rowId,{skip:true})}>Skip this reading</button></div>}{filter === 'review' && focused && exceptions.length > 0 ? <><button type="button" className="screenshot-primary" disabled={working || (stage===4 ? identityChoice?.rowId!==focused.row.rowId : stage===5 ? focused.power===null || focused.conflict && !focused.edit.checked : focused.conflict && !focused.edit.checked)} onClick={()=>{
         if(stage===4){update(focused.row.rowId,{playerId:identityChoice.id,role:null,registrationReviewed:false,checked:false});setIdentityChoice(null);}
-        else if(stage===5)update(focused.row.rowId,{powerConfirmed:true});
+        else if(stage===5)update(focused.row.rowId,{powerConfirmed:true,powerApproval:{previous:focused.previousPower,next:focused.power}});
         else update(focused.row.rowId,{registrationReviewed:true});
       }}>{stage===4?'Confirm match':stage===5?'Confirm troop power':focused.edit.role?'Confirm registration':'Keep existing registration'}</button></> : <button type="button" className="screenshot-primary" onClick={prepare}>Review {modeLabels[mode]} changes</button>}</div>
       {status && <p role="alert">{status}</p>}
