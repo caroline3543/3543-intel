@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { normaliseBulkName } from '../components/bulkImportModel.js';
 import { eventAssignments, plannerSlot, EVENT_LIMITS } from '../../../src/services/eventPlanner.js';
 import { readScreenshotPower } from './rosterScreenshotModel.js';
-import { assignmentLabel, prepareScreenshotImport, roleName, screenshotMatches, suspiciousPowerChange } from './screenshotImportPlan.js';
+import { assignmentLabel, prepareScreenshotImport, roleName, createScreenshotMatcher, suspiciousPowerChange } from './screenshotImportPlan.js';
 
 import {createCurrentAvatarEvidence} from './currentAvatarEvidence.js';
 import {screenshotAvatarEvidence} from './screenshotAvatarEvidence.js';
@@ -11,7 +11,7 @@ import {reviewAvatarSuggestions} from './reviewAvatarSuggestions.js';
 const roles = { combatant: 'Combatant', substitute: 'Substitute', unassigned: 'Unassigned', 'other-legion': 'Other legion', unknown: 'Unknown' };
 const modeLabels = { powers: 'troop powers', roles: 'registrations', both: 'troop powers and registrations' };
 
-export function ScreenshotReview({ context, rows, sources, players, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false }) {
+export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false }) {
   const [mode, setMode] = useState(initialMode);
   const [edits, setEdits] = useState(initialEdits);
   const [filter, setFilter] = useState('review');
@@ -31,7 +31,8 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   for (const change of preview?.action.roleChanges ?? []) projected[change.id] = change.role;
   const capacity = EVENT_LIMITS[kind];
   const assignments = useMemo(() => eventAssignments(storage, kind), [storage, kind]);
-  const matches = useMemo(() => rows.map(row => screenshotMatches(row.name, players, alliance)), [rows, players, alliance]);
+  const matcher=useMemo(()=>createScreenshotMatcher(players,alliance,preferredIds),[players,alliance,preferredIds]);
+  const matches=useMemo(()=>rows.map(row=>matcher(row.name)),[rows,matcher]);
   const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players]);
   const evaluated = useMemo(()=>rows.map((row, index) => {
     const edit = edits[row.rowId] ?? {};
