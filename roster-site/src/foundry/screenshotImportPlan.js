@@ -33,7 +33,6 @@ export function prepareScreenshotImport(storage, context, rows, mode) {
     }
     const expectedRole = target.registrations[row.id] || '';
     if (mode === 'powers' || row.role == null || row.role === expectedRole) continue;
-    if (row.alliance !== alliance) return { error: row.name + ': verify alliance membership before registering. You can save troop powers only.' };
     const elsewhere = (assignments.get(row.id) ?? []).filter(item => item.alliance !== alliance || item.legion !== legion);
     const moveFrom = isParticipant(row.role) ? elsewhere[0] : undefined;
     const before = moveFrom ?? (expectedRole ? { alliance, legion, role: expectedRole } : null);

@@ -25,7 +25,7 @@ const name=p=>p.username||p.alias||p.name||String(p.fid||p.id);
 const power=(p,kind)=>kind==='foundry'
  ?p.lastFoundryTroopPower??p.troopPower??p.lastTroopPower
  :p.lastCanyonClashTroopPower??p.lastCanyonTroopPower;
-const alliance=p=>String(p.alliance||p.homeAlliance||p.allianceTag||p.alliance_name||'Unassigned').trim()||'Unassigned';
+const alliance=p=>String(p.allianceTag||p.alliance||p.homeAlliance||p.alliance_name||'Unassigned').trim()||'Unassigned';
 const rank=p=>{const r=String(p.allianceRank??'').toUpperCase();return /^R[1-5]$/.test(r)?r:'Unranked'};
 
 const T10=[66,71,76,83,88,94,99,104,110,115,121],T11=[80,86,92,100,106,114,120,126,135,141,148];
@@ -108,7 +108,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  },[players,kind,saved.imports,saved.powerByPlayer,saved.date,saved.time]);
  const alliances=plannerAlliances([...entries.map(p=>p.alliance),chosen]);
  const registrations=saved.registrations||{},teams=saved.teams||{},assignments=saved.assignments||{},registeredUnder=saved.registeredUnder||{};
- const allianceEntries=entries.filter(p=>p.alliance===chosen);
+ const allianceEntries=entries.filter(p=>{const locations=eventRegistrations.get(p.id)||[];return locations.length?locations.some(item=>item.alliance===chosen):p.alliance===chosen;});
  const joined=allianceEntries.filter(p=>registrations[p.id]==='join'&&registeredUnder[p.id]===chosen),subs=allianceEntries.filter(p=>registrations[p.id]==='sub'&&registeredUnder[p.id]===chosen);
  const elsewhereFor=id=>(eventRegistrations.get(id)||[]).filter(item=>item.alliance!==chosen||item.legion!==legion);
  const roleTitle=role=>REGISTRATION_ROLES.find(([id])=>id===role)?.[1]||'Unassigned';
@@ -124,7 +124,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const validAssignments=isFoundry?Object.fromEntries(active.map(p=>[p.id,buildings[teams[p.id]].includes(assignments[p.id])?assignments[p.id]:buildings[teams[p.id]][0]])):{};
  const update=(patch,msg,powers)=>{setUndo(saved);onSaveFoundry?.({...saved,...patch},powers);setNotice(msg||'Updated · syncing across devices');};
  const commitRoles=changes=>{
-  if(changes.some(change=>!allianceEntries.some(p=>p.id===change.id&&p.matched))){setNotice('Player must belong to the selected alliance.');return false;}
+  if(changes.some(change=>!entries.some(p=>p.id===change.id&&p.matched))){setNotice('Select a valid player profile.');return false;}
    const result=onChangeRoles(changes);
   if(result.error){setNotice(result.error);return false;}
   onRoleFeedback?.();
@@ -182,7 +182,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const norm=v=>String(v||'').normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleLowerCase();
  const plain=v=>norm(v).normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^\\p{L}\\p{N}]/gu,'');
  const fields=p=>[p.name,...(p.searchFields||[]),p.id].filter(v=>String(v||'').trim());
- const searchMatches=query.trim()?allianceEntries.filter(p=>p.matched&&fields(p).some(v=>norm(v).includes(norm(query))||(plain(query).length>=3&&plain(v).length>=3&&plain(v).includes(plain(query))))).slice(0,8):[];
+ const searchMatches=query.trim()?entries.filter(p=>p.matched&&fields(p).some(v=>norm(v).includes(norm(query))||(plain(query).length>=3&&plain(v).length>=3&&plain(v).includes(plain(query))))).slice(0,8):[];
  const pastedList=value=>/\\r|\\n/.test(value)||value.split(/\\s*[,;]\\s*/).filter(Boolean).length>=3;
  const onSearchInput=value=>{if(pastedList(value)){setPaste(value.replace(/\\s*;\\s*/g,'\\n'));setShowPaste(true);setQuery('');setNotice('Multiple players detected. Review the pasted list below.')}else setQuery(value)};
  const matchesRoster=p=>!rosterSearch.trim()||fields(p).some(field=>norm(field).includes(norm(rosterSearch)));
@@ -214,7 +214,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const teammateMatches=teammateQuery.trim()?allianceEntries.filter(p=>p.matched&&!selectedIds().includes(p.id)&&!teammateIds.includes(p.id)&&fields(p).some(field=>norm(field).includes(norm(teammateQuery)))).sort((a,b)=>{const score=p=>p.id===teammateQuery.trim()?0:norm(p.name)===norm(teammateQuery)?1:fields(p).some(v=>norm(v).startsWith(norm(teammateQuery)))?2:3;return score(a)-score(b)||a.name.localeCompare(b.name)}).slice(0,6):[];
  const bulkRemove=()=>{const ids=selectedIds().filter(id=>activeRole(id));if(ids.length&&requestRoles(ids,''))endSelection()};
  const add=(id,role=addRole)=>{
-  const p=allianceEntries.find(x=>x.id===id&&x.matched);
+  const p=entries.find(x=>x.id===id&&x.matched);
   if(!p){setNotice('Select a matched player profile');return}
   if(activeRole(id)===role){setNotice(p.name+' is already registered');return}
   requestRoles([id],role);setQuery('');
@@ -224,8 +224,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   const nextTeams={...teams},nextAssignments={...assignments},imports=[...(saved.imports||[])];
   let joins=joined.length,substitutes=subs.length,added=0,already=0;
   for(const row of rows){
-   const id=String(row.id),p=allianceEntries.find(x=>x.id===id&&x.matched);
-   if(!p)return {error:'Player belongs to another alliance or membership is unknown. Verify membership before registering, or use screenshot troop powers only.'};
+   const id=String(row.id),p=entries.find(x=>x.id===id&&x.matched);
+   if(!p)return {error:'Player profile not found. Review the import.'};
    if(ids.has(id))return {error:'Duplicate Player ID. Review the import.'};ids.add(id);
    if(isParticipant(addRole)&&elsewhereFor(id).length)return {error:p.name+' is assigned to '+assignmentLabel(elsewhereFor(id)[0])+'. Confirm a move from the roster before importing.'};
    const current=nextRegs[id],under=nextUnder[id];
@@ -324,7 +324,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      <div className="legion-bulk-buttons">
        <button type="button" autoFocus style={btn} onClick={()=>setConfirmMove(null)}>Cancel</button>
        <button type="button" data-role-feedback style={{...btn,background:'#f5ad38',color:'#101b28'}} onClick={()=>{
-         if(confirmMove.changes.some(change=>!allianceEntries.some(p=>p.id===change.id&&p.matched))){setNotice('Player must belong to the selected alliance.');setConfirmMove(null);return;}
+         if(confirmMove.changes.some(change=>!entries.some(p=>p.id===change.id&&p.matched))){setNotice('Select a valid player profile.');setConfirmMove(null);return;}
          const result=onChangeRoles(confirmMove.changes);
          if(result.error){setConfirmMove({...confirmMove,error:result.error});return}
          onRoleFeedback?.();

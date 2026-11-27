@@ -65,7 +65,7 @@ export function BulkPlayerImport({players=[],alliance='',roleLabel='Combatants',
      </button>
      {open&&<div style={{padding:'0 2px 12px 27px',display:'grid',gap:8}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}><span style={secondary}>Troop power</span><input aria-label={'Troop power for '+r.username} value={powers[r.key]===undefined?String(r.power??''):powers[r.key]} onChange={e=>setPowers(p=>({...p,[r.key]:e.target.value}))} inputMode="numeric" style={{...control,width:112}}/></div>
-      {current&&alliance&&current.alliance!==alliance&&<p style={{color:palette.warning,fontSize:12}}>Alliance membership mismatch. Verify membership in Members before registering.</p>}
+      {current&&alliance&&current.alliance!==alliance&&<p style={{color:palette.warning,fontSize:12}}>Home alliance differs from the event alliance. Registration will not change membership.</p>}
       {current&&<div style={{borderTop:'1px solid '+palette.border,padding:'9px 0',display:'flex',alignItems:'center',gap:8}}>
        <div style={{minWidth:0,flex:1}}><span style={{...secondary,fontSize:11}}>{r.player?'Matched player':'Suggested roster match'}</span><strong style={{display:'block',fontSize:13,overflowWrap:'anywhere'}}>{current.name}</strong><span style={{...secondary,display:'block'}}>{metadata(current)}</span><span style={{...secondary,display:'block'}}>ID {current.playerId||current.fid||current.searchFields?.find(x=>/^\\d{7,}$/.test(String(x)))||current.id}</span></div>
        {r.status==='review'?<button type="button" onClick={()=>choose(current.id)} style={{...button,background:palette.accent,color:'#0B1525'}}>{startWithMatches?'Use this player':'Match'}</button>:<span style={{color:palette.success}}>✓</span>}
