@@ -58,7 +58,7 @@ try {
     await checkResponsive('current-summary');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-summary.png'});
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
-    await review.getByText(/4 readings/).waitFor();
+    await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
     await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
     await checkResponsive('04-identity');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-04-identity.png',animations:'disabled'});
