@@ -86,3 +86,25 @@ test('a Vercel preview rejects even a valid production session', () => {
   assert.equal(accessContext(req, { ...env, VERCEL_ENV:'preview', VERCEL_GIT_COMMIT_REF:'fix/3573-ocr-upgrade' }), false);
   assert.equal(accessContext(req, { ...env, VERCEL:'1', VERCEL_GIT_COMMIT_REF:'fix/3573-ocr-upgrade' }), false);
 });
+
+for (const kind of ['foundry','canyon']) for (const legion of [1,2]) {
+  test(`${kind} legion ${legion}: unusual power requires exact value approval`,()=>{
+    const {data,context}=setup(kind,legion);
+    const target=data.foundry.eventPlans[plannerKey(kind,'ARC',legion)];
+    target.powerByPlayer={a:3647};
+    const plan=(power,powerApproval,mode='powers')=>prepareScreenshotImport(data.foundry,context,[{id:'a',name:'Alpha',power,powerApproval,role:'sub'}],mode);
+    assert.ok(plan(3650).action);
+    assert.ok(plan(15630).action);
+    for(const value of [36470,364,0,1520000000]){
+      assert.match(plan(value).error,/unusually large/);
+      assert.ok(plan(value,{previous:3647,next:value}).action);
+      assert.match(plan(value,{previous:3647,next:value+1}).error,/unusually large/);
+    }
+    target.powerByPlayer.a=1520000000;
+    assert.match(plan(3647,{previous:3647,next:3647}).error,/unusually large/);
+    assert.ok(plan(3647,{previous:1520000000,next:3647}).action);
+    assert.ok(plan(3647,undefined,'roles').action);
+    delete target.powerByPlayer.a;
+    assert.ok(plan(3647).action);
+  });
+}
