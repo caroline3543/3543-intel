@@ -17,6 +17,14 @@ try {
   await mkdir('ocr-review-captures',{recursive:true});
   for(const kind of ['foundry','canyon']){
     const page=await browser.newPage({viewport:{width:428,height:926},deviceScaleFactor:1,isMobile:true,hasTouch:true});
+    async function checkResponsive(stage){
+      for(const width of [320,390,428]){
+        await page.setViewportSize({width,height:width===428?926:844});
+        const dimensions=await page.locator('.stage9-import-content').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth}));
+        assert.ok(dimensions.scroll<=dimensions.width+1,`${kind} ${stage}: horizontal overflow at ${width}px`);
+      }
+      await page.setViewportSize({width:428,height:926});
+    }
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     await page.goto(origin+'/event-preview.html');
@@ -47,10 +55,12 @@ try {
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     const review=page.getByRole('region',{name:'Review screenshot readings'});
     await review.getByRole('heading',{name:'Import summary'}).waitFor();
+    await checkResponsive('current-summary');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-summary.png'});
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
     await review.getByText(/4 readings/).waitFor();
     await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
+    await checkResponsive('04-identity');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-04-identity.png',animations:'disabled'});
     await review.getByRole('button',{name:'Review troop powers changes'}).click();
     await review.getByRole('alert').filter({hasText:'Resolve or skip'}).waitFor();
@@ -60,6 +70,7 @@ try {
     await row('Unrecognised fixture').getByRole('checkbox',{name:'Skip this reading'}).check();
     await review.getByLabel('Filter readings').selectOption('review');
     await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
+    await checkResponsive('05-power');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-05-power.png',animations:'disabled'});
     await review.getByLabel('Filter readings').selectOption('all');
     if(await row('Juniper').getAttribute('open')===null) await row('Juniper').locator('summary').first().click();
@@ -67,6 +78,7 @@ try {
     await review.getByLabel('Import mode').selectOption('both');
     await review.getByLabel('Filter readings').selectOption('review');
     await review.getByRole('heading',{name:'Review registration'}).waitFor();
+    await checkResponsive('06-registration');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-06-registration.png',animations:'disabled'});
     await review.getByLabel('Filter readings').selectOption('all');
     for(const name of ['Northvale','Juniper','Aster']){
@@ -77,9 +89,11 @@ try {
     await review.getByRole('button',{name:'Review troop powers and registrations changes'}).click();
     const confirm=review.getByRole('region',{name:'Confirm screenshot import'});
     await confirm.waitFor();
+    await checkResponsive('current-confirmation');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-confirmation.png'});
     await confirm.getByRole('button',{name:'Save troop powers and registrations'}).click();
     await review.getByRole('button',{name:'Done',exact:true}).waitFor();
+    await checkResponsive('current-completion');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-completion.png'});
     const saved=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1')));
     assert.equal(saved.foundry.eventPlans[JSON.stringify([kind,'ARC',1])].powerByPlayer['sample-1'],3638);
