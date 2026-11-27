@@ -16,6 +16,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   const [status, setStatus] = useState('');
   const [done, setDone] = useState(false);
   const [summary, setSummary] = useState(true);
+  const [focusedId, setFocusedId] = useState(null);
   const { alliance, legion, kind } = context;
   const target = plannerSlot(storage, kind, alliance, legion);
   const assignments = useMemo(() => eventAssignments(storage, kind), [storage, kind]);
@@ -29,15 +30,16 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
     const powerText = edit.power ?? (powerConflict ? '' : String(row.power ?? ''));
     const power = powerText.trim() ? readScreenshotPower(powerText) : null;
     const conflict = row.conflict || mode !== 'roles' && powerConflict;
-    const needsReview = !player || conflict && !edit.checked || mode !== 'roles' && power === null || mode !== 'powers' && row.registration === 'unknown';
+    const needsReview = !player || conflict && !edit.checked || mode !== 'roles' && power === null || mode !== 'powers' && ['unknown','other-legion','combatant','substitute'].includes(row.registration) && !edit.registrationReviewed;
     return { row, edit, match, player, powerText, power, conflict, needsReview };
   });
   useEffect(() => { onDraftChange?.({ mode, edits }); }, [mode, edits]);
   const active = evaluated.filter(item => !item.edit.skip);
   const confirmed = active.filter(item => item.player);
   const exceptions = active.filter(item => item.needsReview);
+  const focused = evaluated.find(item => item.row.rowId === focusedId) ?? exceptions[0];
   const visible = evaluated.filter(({ row, edit, needsReview }) =>
-    filter === 'all' || (filter === 'review' ? needsReview && !edit.skip : row.registration === filter));
+    filter === 'all' || (filter === 'review' ? row.rowId === focused?.row.rowId : row.registration === filter));
   const update = (id, patch) => {
     setEdits(previous => ({ ...previous, [id]: { ...previous[id], ...patch } }));
     setPreview(null);
@@ -45,7 +47,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   useEffect(() => setPreview(null), [storage]);
 
   function prepare() {
-    if (active.some(item => !item.player || item.conflict && !item.edit.checked ||
+    if (exceptions.length || active.some(item => !item.player || item.conflict && !item.edit.checked ||
       mode !== 'roles' && (item.powerText.trim() ? item.power === null : mode === 'powers' || item.row.powerConflict?.length > 1))) {
       setStatus('Resolve or skip each unmatched or conflicting reading and check the troop powers.');
       return;
@@ -93,6 +95,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
           {Object.entries(roles).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
       </label>
+      {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Previous reading</button><span>{exceptions.length} remaining</span><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
       <fieldset disabled={working}>
         {visible.map(({ row, edit, match, player, powerText, conflict, needsReview }) => {
           const current = assignments.get(player?.id) ?? [];
@@ -104,7 +107,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
               String(value ?? '').toLocaleLowerCase().includes(query) ||
               normalized && normaliseBulkName(value).includes(normalized))).slice(0, 8) : match.candidates;
           const title = row.name || 'Unread player name';
-          return <details key={row.rowId} className="ocr-reading">
+          return <details key={row.rowId} className="ocr-reading" open={filter === 'review' ? true : undefined}>
             <summary><strong>{title}</strong> · {powerText || 'Power missing'} · {roles[row.registration] || 'Unknown'}
               {edit.skip ? ' · Skipped' : conflict && !edit.checked ? ' · Conflicting readings' : needsReview ? ' · Review' : ''}
               {player && <small>{player.name} · {player.alliance || 'Alliance unknown'}</small>}
@@ -112,7 +115,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
             <div className="ocr-reading-fields">
               {row.otherLegion > 0 && <p>Dispatched to Legion {row.otherLegion}</p>}
               {(row.voted || row.battleRequest) && <p>{[row.voted && 'Voted', row.battleRequest && 'Battle Request'].filter(Boolean).join(' · ')}</p>}
-              {row.evidence.map(({ sourceIndex, bounds }) => <details key={sourceIndex + ':' + bounds?.top}>
+              {row.evidence.map(({ sourceIndex, bounds }) => <details key={sourceIndex + ':' + bounds?.top} open={filter === 'review' ? true : undefined}>
                 <summary>{sources[sourceIndex].file.name} · Screenshot evidence</summary>
                 <Evidence file={sources[sourceIndex].file} bounds={bounds}/>
               </details>)}
@@ -120,7 +123,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
               {!edit.skip && <>
                 <label>Search roster for {title}<input type="search" value={edit.search ?? ''} onChange={event => update(row.rowId, { search: event.target.value })}/></label>
                 {candidates.map(candidate => <button key={candidate.id} type="button" aria-pressed={candidate.id === player?.id}
-                  onClick={() => update(row.rowId, { playerId: candidate.id, ...(candidate.id !== player?.id ? { role: null } : {}) })}>
+                  onClick={() => update(row.rowId, { playerId: candidate.id, ...(candidate.id !== player?.id ? { role: null, registrationReviewed: false, checked: false } : {}) })}>
                   {candidate.name} · {candidate.alliance || 'Alliance unknown'} · ID {candidate.playerId || candidate.id}
                 </button>)}
                 {mode !== 'roles' && <label>Troop power for {title}<input inputMode="decimal" value={powerText} onChange={event => update(row.rowId, { power: event.target.value, checked: false })}/></label>}
@@ -131,15 +134,17 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
                 {mode !== 'powers' && <>
                   <p>Existing registration: {current.length ? current.map(assignmentLabel).join(' / ') : roleName(here || '')}.</p>
                   <label>Registration for {title}
-                    <select value={edit.role ?? ''} onChange={event => update(row.rowId, { role: event.target.value })}>
+                    <select value={edit.role ?? ''} onChange={event => update(row.rowId, { role: event.target.value, registrationReviewed: true })}>
                       <option value="">Keep existing</option><option value="join">Legion {legion} combatant</option>
                       <option value="sub">Legion {legion} substitute</option>
                       {here && <option value="remove">Remove Legion {legion} registration</option>}
                     </select>
                   </label>
+                  <button type="button" onClick={() => update(row.rowId, { role: null, registrationReviewed: true })}>Keep existing registration</button>
                 </>}
                 {conflict && <label><input type="checkbox" checked={!!edit.checked} onChange={event => update(row.rowId, { checked: event.target.checked })}/> I checked the conflicting evidence for this player.</label>}
               </>}
+              {filter === 'review' && <button type="button" className="screenshot-primary" disabled={!edit.skip && needsReview} onClick={() => { setFocusedId(exceptions.find(item => item.row.rowId !== row.rowId)?.row.rowId ?? null); }}>Continue to next reading</button>}
             </div>
           </details>;
         })}
