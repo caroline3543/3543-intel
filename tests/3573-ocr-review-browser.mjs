@@ -70,6 +70,16 @@ try {
     await review.getByRole('button',{name:/Northvale/}).first().waitFor();
     await checkResponsive('04-identity');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-04-identity.png',animations:'disabled'});
+    // Candidate selection is provisional and must be cleared by a changed search.
+    const search=review.getByRole('searchbox');
+    await search.fill('Northvale');
+    const candidate=review.locator('.stage9-candidate-card').filter({hasText:'Northvale'}).first();
+    await candidate.click();
+    const confirmMatch=review.getByRole('button',{name:'Confirm match',exact:true});
+    assert.equal(await confirmMatch.isEnabled(),true);
+    await search.fill('Juniper');
+    assert.equal(await confirmMatch.isEnabled(),false,'Changing search must clear provisional identity');
+    await search.fill('');
     const reread=review.getByRole('button',{name:'Reread username',exact:true});
     await reread.click();
     await review.getByRole('button',{name:'Rereading username…',exact:true}).waitFor({state:'hidden',timeout:90000});
