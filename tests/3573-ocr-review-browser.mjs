@@ -66,7 +66,7 @@ try {
     await checkResponsive('current-summary');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-summary.png'});
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
-    await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
+    await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Confirm player',exact:true}).waitFor();
     await checkResponsive('04-identity');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-04-identity.png',animations:'disabled'});
     const reread=review.getByRole('button',{name:'Reread username',exact:true});
@@ -89,7 +89,7 @@ try {
     await page.getByRole('button',{name:'Open screenshot import'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
-    await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
+    await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Confirm player',exact:true}).waitFor();
     assert.equal(await retryStatus.innerText(),firstReading,'Additional OCR evidence must survive reopening');
     await review.getByText('Review options',{exact:true}).click();
     await review.getByRole('button',{name:'Review troop powers changes'}).click();
@@ -106,21 +106,21 @@ try {
         await review.locator('.stage9-action-footer').getByRole('button',{name:'Confirm troop power',exact:true}).click();
       }
     }
-    await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
+    await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Resolve troop power',exact:true}).waitFor();
     await checkResponsive('05-power');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-05-power.png',animations:'disabled'});
     const powerInput=row('Juniper').getByRole('textbox',{name:'Troop power for Juniper'});
     for(const value of ['3','36','363','3638']){
       await powerInput.fill(value);
       assert.equal(await powerInput.inputValue(),value);
-      await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
+      await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Resolve troop power',exact:true}).waitFor();
       assert.equal(await row('Juniper').count(),1);
     }
     await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('button',{name:'Close',exact:true}).click();
     await page.getByRole('button',{name:'Open screenshot import'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
-    await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
+    await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Resolve troop power',exact:true}).waitFor();
     assert.equal(await powerInput.inputValue(),'3638');
     await page.waitForFunction(async kind=>{
       const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
@@ -134,7 +134,7 @@ try {
     await page.getByRole('button',{name:'Open screenshot import'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
-    await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
+    await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('heading',{name:'Resolve troop power',exact:true}).waitFor();
     assert.equal(await powerInput.inputValue(),'3638');
     await review.locator('.stage9-action-footer').getByRole('button',{name:'Confirm troop power',exact:true}).click();
     for(let i=0;i<4;i++){
