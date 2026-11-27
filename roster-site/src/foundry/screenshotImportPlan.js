@@ -1,4 +1,4 @@
-import { bulkCandidates } from '../components/bulkImportModel.js';
+import { bulkCandidates, normaliseBulkName } from '../components/bulkImportModel.js';
 import { eventAssignments, isParticipant, plannerSlot, prepareEventRoles, suspiciousPowerChange } from '../../../src/services/eventPlanner.js';
 
 export const roleName = role => ({ join: 'Combatant', sub: 'Substitute', out: 'Not participating', '': 'Unassigned' })[role] ?? 'Unassigned';
@@ -14,7 +14,10 @@ export function screenshotMatches(name, players, alliance) {
   const exact = players.filter(player => playerFields(player).some(field => exactName(field) === exactName(name)));
   const suggestions = bulkCandidates(name, players, alliance);
   const candidates = [...new Map([...exact, ...suggestions].map(player => [player.id, player])).values()].slice(0, 8);
-  return { candidates, player: exact.length === 1 && exact[0].alliance === alliance ? exact[0] : null };
+  const key=normaliseBulkName(name);
+  const equivalent=key ? players.filter(player=>playerFields(player).some(field=>normaliseBulkName(field)===key)) : [];
+  const safe=exact.length===1 && equivalent.length===1 && equivalent[0].id===exact[0].id && exact[0].alliance===alliance;
+  return { candidates, player: safe ? exact[0] : null };
 }
 
 export { suspiciousPowerChange };
