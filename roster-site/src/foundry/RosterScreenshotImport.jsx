@@ -157,7 +157,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       }
       if (byId.size < files.length + valid.length && byId.size < maxFiles) warnings.push('Duplicate screenshots were skipped.');
       if (mounted.current && byId.size) {
-        checkpoint({ ...latest.current, items: [...byId.values()], mode, occurrenceIds: latest.current?.occurrenceIds ?? eventIds.current });
+        checkpoint({ ...latest.current, items: [...byId.values()], mode, hasNewScreenshots:byId.size>files.length, occurrenceIds: latest.current?.occurrenceIds ?? eventIds.current });
       }
     } catch {
       warnings.push('Could not read the selected files.');
@@ -178,6 +178,8 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       batch = { mode, items: batch.items.map(({ id, file }) => ({ id, file })), occurrenceIds: eventIds.current };
       checkpoint(batch);
     }
+    batch={...batch,scanStarted:true,hasNewScreenshots:false};
+    checkpoint(batch);
     const todo = batch.items.filter(item => !item.reading);
     const workers=[];
     setError('');
@@ -303,7 +305,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     </>}
     {job && !review && !items.length && <p role="status">{job}</p>}
     {!loading && !review && (!items.length || run.current || read < items.length && !stale) && <div className="stage9-action-footer">
-      {run.current ? <button type="button" className="screenshot-primary" disabled={run.current.stopped} onClick={() => { run.current.stopped = true; setJob('Stopping after current screenshot…'); }}>Stop scan</button> : !items.length ? <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => picker.current?.click()}>Upload troop power</button> : <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => scan()}>{read || items.some(item => item.error) ? 'Resume or retry unread screenshots' : 'Scan screenshots'}</button>}
+      {run.current ? <button type="button" className="screenshot-primary" disabled={run.current.stopped} onClick={() => { run.current.stopped = true; setJob('Stopping after current screenshot…'); }}>Stop scan</button> : !items.length ? <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => picker.current?.click()}>Upload troop power</button> : <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => scan()}>{items.some(item=>!item.reading&&item.error) ? 'Retry unread screenshots' : !session?.scanStarted ? 'Scan screenshots' : session?.hasNewScreenshots ? 'Scan new screenshots' : 'Resume scan'}</button>}
     </div>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
