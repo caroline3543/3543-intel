@@ -42,7 +42,16 @@ try {
       const started = performance.now();
       try {
         const data = await window.scanRoster(window.rosterReaders[workerIndex], file, {avatarBenchmark:true});
-        return { filename, ms:Math.round(performance.now()-started), ...data };
+        const ms=Math.round(performance.now()-started);
+        const {screenshotAvatarEvidence}=await import('/src/foundry/screenshotAvatarEvidence.js');
+        const {avatarDistance}=await import('/src/foundry/avatarFingerprint.js');
+        const avatarStarted=performance.now();
+        const cropChecks=[];
+        for(const row of data.rows){
+          const temporary=await screenshotAvatarEvidence(file,row.bounds);
+          cropChecks.push({usable:!!temporary,distance:avatarDistance(temporary,row.avatarEvidence)});
+        }
+        return { filename, ms, ...data, cropChecks, cropMs:Math.round(performance.now()-avatarStarted) };
       } catch (error) {
         return { filename, error:error.message };
       }
@@ -77,7 +86,11 @@ try {
     const group=groups.get(key)??[];
     group.push(r.name);groups.set(key,group);
   }
-  const avatarMetrics={cards:cards.length,usable:fingerprints.length,coverage:cards.length?fingerprints.length/cards.length:0,
+  const cropChecks=screenshots.flatMap(s=>s.cropChecks??[]);
+  const distances=cropChecks.map(c=>c.distance).filter(d=>d!==null).sort((a,b)=>a-b);
+  const cropMetrics={checked:cropChecks.length,usable:cropChecks.filter(c=>c.usable).length,comparable:distances.length,medianDistance:distances[Math.floor(distances.length/2)]??null,withinThreshold:distances.filter(d=>d<=.18).length};
+  for(const screenshot of screenshots){delete screenshot.cropChecks;delete screenshot.cropMs;}
+  const avatarMetrics={cropMetrics,cards:cards.length,usable:fingerprints.length,coverage:cards.length?fingerprints.length/cards.length:0,
     identicalFingerprintGroups:[...groups.values()].filter(g=>g.length>1).map(g=>({count:g.length,names:[...new Set(g)]}))};
   // Only aggregate diagnostics leave the benchmark process; no avatar fingerprints in artifacts.
   for(const row of cards)delete row.avatarEvidence;
