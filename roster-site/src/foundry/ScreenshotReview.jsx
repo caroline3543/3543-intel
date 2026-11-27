@@ -78,7 +78,9 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
     }
   }
 
+  const stage = done ? 8 : summary ? 3 : preview ? 7 : !focused?.player ? 4 : mode !== "roles" && (focused.power === null || focused.conflict && !focused.edit.checked) ? 5 : 6;
   return <section className="ocr-review" aria-label="Review screenshot readings">
+    <div className="stage9-step-strip" aria-label={`Step ${stage} of 8`}>{Array.from({length:8},(_,i)=><span key={i} className={i+1===stage?"current":i+1<stage?"complete":""}/>)}</div>
     <h3>{alliance} · Legion {legion} review</h3>
     {summary && !done ? <div className="stage9-summary"><h4>Import summary</h4><div className="stage9-summary-grid"><div><strong>{rows.length}</strong><span>Readings</span></div><div><strong>{new Set(confirmed.map(item => item.player.id)).size}</strong><span>Matched</span></div><div><strong>{active.length-confirmed.length}</strong><span>Unresolved</span></div><div><strong>{active.filter(item => item.conflict && !item.edit.checked).length}</strong><span>Conflicting</span></div></div><p>{exceptions.length ? exceptions.length + ' readings need your attention before saving.' : 'No outstanding reading exceptions.'}</p><button type="button" className="screenshot-primary" onClick={() => { setSummary(false); if (!exceptions.length) prepare(); }}>{exceptions.length ? 'Resolve ' + exceptions.length + ' readings' : 'Review changes'}</button><button type="button" onClick={onClose}>Back to screenshots</button></div> : done ? <div className="stage9-summary"><h4>Import complete</h4><p role="status">{status}</p><p>{receipt?.powers ?? 0} troop power updates · {receipt?.roles ?? 0} registration updates</p>{onContinueTeams && <button type="button" className="screenshot-primary" onClick={onContinueTeams}>Continue to Teams</button>}<button type="button" onClick={onClose}>Done</button></div> : preview ? <>
       <section aria-label="Confirm screenshot import">
@@ -94,8 +96,8 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
             : (change.previousPower?.toLocaleString() ?? 'No power recorded') + ' → ' + change.power.toLocaleString()}
           <button type="button" disabled={working} onClick={() => { const item=confirmed.find(entry=>entry.player.id===change.id); if(item){update(item.row.rowId,{skip:true});setFilter('all');} }}>Exclude player</button>
         </li>)}</ul>
-        <button type="button" className="screenshot-primary" disabled={working} onClick={confirm}>{working ? 'Applying changes…' : preview.changes.some(change => change.destructive) ? 'Confirm registration moves or removals and save' : 'Save ' + modeLabels[mode]}</button>
-        <button type="button" disabled={working} onClick={() => setPreview(null)}>Keep reviewing</button>
+        <div className="stage9-action-footer"><button type="button" className="screenshot-primary" disabled={working} onClick={confirm}>{working ? 'Applying changes…' : preview.changes.some(change => change.destructive) ? 'Confirm registration moves or removals and save' : 'Save ' + modeLabels[mode]}</button>
+        <button type="button" disabled={working} onClick={() => setPreview(null)}>Keep reviewing</button></div>
       </section>
       {status && <p role="alert">{status}</p>}
     </> : <>
