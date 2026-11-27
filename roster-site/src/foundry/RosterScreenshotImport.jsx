@@ -92,6 +92,19 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     if (latest.current) checkpoint({ ...latest.current, mode: value });
   }
   const run = useRef(null);
+  const warmReader=useRef(null);
+  useEffect(()=>{
+    if(!workspaceOpen)return;
+    return ()=>{
+      const pending=warmReader.current;
+      warmReader.current=null;
+      if(pending)void pending.then(worker=>worker?.terminate()).catch(()=>{});
+    };
+  },[workspaceOpen,sessionKey]);
+  function prewarmReader(){
+    if(warmReader.current||run.current)return;
+    warmReader.current=import('./readRosterScreenshot.js').then(m=>m.createRosterReader()).catch(()=>null);
+  }
   const picker = useRef(null);
   const mounted = useRef(false);
   const writes = useRef(Promise.resolve());
@@ -128,6 +141,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     const incoming = [...event.target.files];
     event.target.value = '';
     if (!incoming.length || run.current) return;
+    prewarmReader();
     const files = latest.current?.items ?? [];
     const valid = incoming.filter(file => allowedTypes.has(file.type) && file.size <= 15 * 1024 * 1024);
     const warnings = [];
@@ -174,7 +188,9 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       const cores=navigator.hardwareConcurrency||2;
       const mobile=matchMedia('(pointer: coarse)').matches;
       const count=Math.min(todo.length,cores<=2?1:mobile?2:3);
-      const initialised=await Promise.allSettled(Array.from({length:count},()=>createRosterReader()));
+      const warm=count?warmReader.current:null;
+      if(warm)warmReader.current=null;
+      const initialised=await Promise.allSettled(Array.from({length:count},(_,i)=>i===0&&warm?warm.then(worker=>worker||createRosterReader()):createRosterReader()));
       for(const result of initialised)if(result.status==='fulfilled')workers.push(result.value);
       if(todo.length&&!workers.length)throw new Error('No reader available');
       let next=0;
@@ -200,6 +216,9 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     }catch{
       if(mounted.current&&!task.stopped)setError('Could not load the screenshot reader. Try scanning again.');
     }finally{
+      if(workers.length&&!task.stopped&&mounted.current&&sameEvent(batch.occurrenceIds,eventIds.current)&&!warmReader.current){
+        warmReader.current=Promise.resolve(workers.shift());
+      }
       await Promise.allSettled(workers.map(worker=>worker.terminate()));
       run.current=null;
       if(mounted.current)setJob('');
