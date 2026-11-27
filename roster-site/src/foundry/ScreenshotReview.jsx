@@ -37,7 +37,8 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
     const original=matcher(row.name);
     if(original.player || !row.nameAlternatives?.length) return original;
     const alternatives=row.nameAlternatives.map(name=>matcher(name));
-    const candidates=[...new Map([...alternatives.flatMap(match=>[match.player,...match.candidates].filter(Boolean)),...original.candidates].map(p=>[p.id,p])).values()].slice(0,8);
+    const exactAlternatives=alternatives.flatMap(match=>match.player?[match.player]:[]);
+    const candidates=[...new Map([...exactAlternatives,...original.candidates,...alternatives.flatMap(match=>match.candidates)].map(p=>[p.id,p])).values()].slice(0,8);
     return {...original,candidates,suggested:null};
   }),[rows,matcher]);
   const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players]);
