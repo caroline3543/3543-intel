@@ -7,7 +7,7 @@ export const assignmentLabel = assignment => assignment
   : 'Unassigned';
 
 const exactName = value => String(value ?? '').trim().normalize('NFC');
-const playerFields = player => [player.name, player.playerId, player.fid, player.id, ...(player.searchFields ?? [])];
+const playerFields = player => [player.name, player.nickname, player.playerId, player.fid, player.id, ...(player.searchFields ?? [])];
 
 const spacingKey=value=>exactName(value).normalize('NFKC').toLowerCase().replace(/\s/gu,'');
 const visualKey=value=>normaliseBulkName(value).replace(/0/g,'o').replace(/[1l]/g,'i');
@@ -27,6 +27,8 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
     add(indexes[6],decorativeKey(p.name),p);
   }
   const get=(i,key)=>[...(indexes[i].get(key)?.values()??[])];
+  const nicknameIndex=new Map();
+  for(const p of players)add(nicknameIndex,spacingKey(p.nickname),p);
   const cache=new Map();
   return name=>{
     if(!name)return {candidates:[],player:null};
@@ -38,12 +40,14 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
     const currentSafe=current&&eligible(current)&&get(4,normaliseBulkName(name)).length===1&&get(5,visualKey(name)).length===1&&[...exact,...equivalent,...lookalikes].every(p=>p.id===current.id||!eligible(p));
     const legacySafe=selected&&(selected.alliance===alliance||preferred.has(selected.id)||registered.has(selected.id))&&equivalent.length===1&&equivalent[0].id===selected.id&&lookalikes.length===1;
     const decorative=get(6,decorativeKey(name));
-    const proposed=currentSafe?current:legacySafe?selected:null;
+    const nicknames=[...(nicknameIndex.get(spacingKey(name))?.values()??[])];
+    const nickname=nicknames.length===1&&eligible(nicknames[0])&&[...exact,...equivalent,...lookalikes,...strict,...decorative].every(p=>p.id===nicknames[0].id)?nicknames[0]:null;
+    const proposed=currentSafe?current:legacySafe?selected:nickname;
     const automatic=proposed&&decorative.every(p=>p.id===proposed.id)?proposed:null;
     const safe=!!automatic;
     const localSuggestions=safe?[]:bulkCandidates(name,local,alliance).sort((a,b)=>rank(a)-rank(b));
     const wider=safe?[]:bulkCandidates(name,players,alliance);
-    const candidates=[...new Map([...(automatic?[automatic]:[]),...exact,...strict,...decorative,...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);
+    const candidates=[...new Map([...(automatic?[automatic]:[]),...exact,...strict,...nicknames,...decorative,...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);
     const suggested=!safe&&equivalent.length===1&&lookalikes.length===1&&equivalent[0].id===lookalikes[0].id&&preferred.has(equivalent[0].id)&&normaliseBulkName(name).length>=4?equivalent[0]:null;
     const result={candidates,player:automatic,suggested};cache.set(name,result);return result;
   };
