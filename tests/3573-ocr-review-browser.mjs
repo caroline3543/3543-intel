@@ -59,7 +59,6 @@ try {
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-summary.png'});
     await review.getByRole('button',{name:/Resolve .* readings/}).click();
     await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
-    await review.getByRole('heading',{name:'Confirm player identity'}).waitFor();
     await checkResponsive('04-identity');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-04-identity.png',animations:'disabled'});
     await review.getByText('Review options',{exact:true}).click();
@@ -72,6 +71,11 @@ try {
     if(await row('Unrecognised fixture').getAttribute('open')===null) await row('Unrecognised fixture').locator('summary').first().click();
     assert.equal(await row('Unrecognised fixture').getByRole('checkbox',{name:'Skip this reading'}).isChecked(),true);
     await review.getByLabel('Filter readings').selectOption('review');
+    for(const name of ['Northvale','Aster']){
+      if(await row(name).count() && await row(name).getByRole('alert').filter({hasText:'Unusually large change'}).count()){
+        await review.locator('.stage9-action-footer').getByRole('button',{name:'Confirm troop power',exact:true}).click();
+      }
+    }
     await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
     await checkResponsive('05-power');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-05-power.png',animations:'disabled'});
@@ -103,6 +107,11 @@ try {
     await review.getByRole('heading',{name:'Confirm troop power'}).waitFor();
     assert.equal(await powerInput.inputValue(),'3638');
     await review.locator('.stage9-action-footer').getByRole('button',{name:'Confirm troop power',exact:true}).click();
+    for(let i=0;i<4;i++){
+      const warning=review.getByRole('alert').filter({hasText:'Unusually large change'});
+      if(!await warning.count())break;
+      await review.locator('.stage9-action-footer').getByRole('button',{name:'Confirm troop power',exact:true}).click();
+    }
     await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Filter readings').selectOption('all');
     await review.getByLabel('Import mode').selectOption('both');
