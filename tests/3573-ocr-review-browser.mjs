@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
+import {mkdir,readFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 
 const origin='http://127.0.0.1:4186';
@@ -15,6 +15,7 @@ try {
   assert.ok(ready);
   browser=await chromium.launch();
   await mkdir('ocr-review-captures',{recursive:true});
+  const evidenceImage=(await readFile('tests/fixtures/3573-ocr/screenshots/IMG_9840.jpeg')).toString('base64');
   for(const kind of ['foundry','canyon']){
     const page=await browser.newPage({viewport:{width:428,height:926},deviceScaleFactor:1,isMobile:true,hasTouch:true});
     async function checkResponsive(stage){
@@ -28,7 +29,7 @@ try {
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     await page.goto(origin+'/event-preview.html');
-    await page.evaluate(async kind=>{
+    await page.evaluate(async ({kind,evidenceImage})=>{
       const db=await new Promise((resolve,reject)=>{
         const req=indexedDB.open('3573-screenshot-import',1);
         req.onupgradeneeded=()=>req.result.createObjectStore('sessions');
@@ -40,15 +41,15 @@ try {
         {name:'Unrecognised fixture',power:3100,registration:'substitute'},
         {name:'Juniper',power:null,registration:'combatant'},
         {name:'Aster',power:4200,registration:'other-legion',otherLegion:2}
-      ].map((row,i)=>({...row,bounds:{top:.1+i*.15,bottom:.2+i*.15}}));
-      const file=new File([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII='),c=>c.charCodeAt(0))],'synthetic-fixture.png',{type:'image/png'});
+      ].map((row,i)=>({...row,bounds:{top:.30+i*.077,bottom:.377+i*.077}}));
+      const file=new File([Uint8Array.from(atob(evidenceImage),c=>c.charCodeAt(0))],'IMG_9840.jpeg',{type:'image/jpeg'});
       await new Promise((resolve,reject)=>{
         const tx=db.transaction('sessions','readwrite');
         tx.objectStore('sessions').put({items:[{id:'fixture',file,reading:{legion:1,rows}}],occurrenceIds:{1:JSON.stringify([kind,'ARC',1]),2:JSON.stringify([kind,'ARC',2])}},kind+':ARC');
         tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
       });
       db.close();
-    },kind);
+    },{kind,evidenceImage});
     await page.reload();
     if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
     await page.getByRole('button',{name:'Open screenshot import'}).click();
