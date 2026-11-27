@@ -16,7 +16,12 @@ export function EventPlanner({kind,players,storage,onUpdate,onScreenshotUpdate,.
     changeSelection={(tag,number)=>{setAlliance(tag);setLegion(number);localStorage.setItem(storageKey,tag);}}
     otherLegion={otherLegion} otherPlan={otherPlan}
     screenshotStorage={storage}
-    onSaveScreenshotPowers={onScreenshotUpdate || (action => {
+    onSaveScreenshotPowers={onScreenshotUpdate || ((action, {verifyOnly=false}={}) => {
+      if(verifyOnly){
+        const slot=plannerSlot(storage,action.kind,action.alliance,action.legion);
+        const matches=slot.occurrenceId===action.expectedOccurrenceId&&(action.powers??[]).every(row=>slot.powerByPlayer?.[row.id]===row.value)&&(action.roleChanges??[]).every(row=>(slot.registrations[row.id]||'')===row.role&&(!row.moveFrom||!plannerSlot(storage,action.kind,row.moveFrom.alliance,row.moveFrom.legion).registrations[row.id]));
+        return matches?{message:'Preview save verified.'}:{error:'Preview save not confirmed.',pending:true};
+      }
       onUpdate(action);
       return { message: 'Changes applied to this preview session.' };
     })}
