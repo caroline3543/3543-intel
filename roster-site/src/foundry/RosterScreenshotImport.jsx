@@ -7,7 +7,7 @@ import './rosterScreenshot.css';
 
 const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const maxFiles = 25;
-const sameEvent = (first, second) => first?.[1] === second[1] && first?.[2] === second[2];
+const sameEvent = (first, second) => !!first && !!second && first[1] === second[1] && first[2] === second[2];
 
 async function screenshotId(file) {
   const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
@@ -193,17 +193,23 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     }
   }
 
+  const saving = useRef(false);
   async function saveOnce(action) {
+    if (saving.current) return { error: 'An import is already being saved.' };
+    if (!sameEvent(latest.current?.occurrenceIds, eventIds.current)) return { error: 'The event changed. Re-scan before importing.' };
     const ids = [...new Set([...action.powers, ...(action.roleChanges ?? [])].map(row => row.id))];
     if (ids.some(id => latest.current?.savedIds?.includes(id))) {
       return { error: 'A selected player was already imported from this batch. Skip the duplicate reading.' };
     }
+    saving.current = true;
+    try {
     const result = await onSave(action);
     if (!result?.error && result?.message && latest.current && mounted.current) {
       checkpoint({ ...latest.current, savedIds: [...(latest.current.savedIds ?? []), ...ids] });
       await writes.current.catch(() => {});
     }
     return result;
+    } finally { saving.current = false; }
   }
 
   const items = session?.items ?? [];
