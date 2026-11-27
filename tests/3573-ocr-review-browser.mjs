@@ -136,6 +136,24 @@ try {
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-completion.png'});
     const saved=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1')));
     assert.equal(saved.foundry.eventPlans[JSON.stringify([kind,'ARC',1])].powerByPlayer['sample-1'],3638);
+    // Simulate a persisted pending receipt after a successful submission.
+    await page.evaluate(async kind=>{
+      const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+      await new Promise((resolve,reject)=>{
+        const tx=db.transaction('sessions','readwrite'),store=tx.objectStore('sessions'),key=kind+':ARC',req=store.get(key);
+        req.onsuccess=()=>{const session=req.result;store.put({...session,pendingImport:{kind,alliance:'ARC',legion:1,expectedOccurrenceId:JSON.stringify([kind,'ARC',1]),powers:[{id:'sample-1',value:3638}],roleChanges:[]}},key);};
+        tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+      });db.close();
+    },kind);
+    await page.reload();
+    if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
+    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    const pending=page.getByRole('dialog',{name:'Screenshot import workspace'});
+    await pending.getByRole('heading',{name:'Awaiting confirmation'}).waitFor();
+    assert.equal(await pending.getByRole('button',{name:'Check save status'}).count(),1);
+    assert.equal(await pending.getByRole('button',{name:'Clear screenshots'}).count(),0);
+    assert.equal(await pending.getByRole('button',{name:/Review Legion/}).count(),0);
+    await page.screenshot({path:'ocr-review-captures/'+kind+'-pending-recovery.png'});
     assert.deepEqual(errors,[]);
     await page.close();
   }
