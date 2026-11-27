@@ -47,7 +47,7 @@ function ScreenshotResult({ item, locked, onLegion }) {
   </li>;
 }
 
-export function RosterScreenshotImport({ kind, title, alliance, activeLegion, storage, players, occurrenceIds, onSave, children }) {
+export function RosterScreenshotImport({ kind, title, alliance, activeLegion, storage, players, occurrenceIds, onSave, children, onContinueTeams }) {
   const sessionKey = kind + ':' + alliance;
   const [session, setSession] = useState(null);
   const latest = useRef(null);
@@ -189,7 +189,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       return { error: 'A selected player was already imported from this batch. Skip the duplicate reading.' };
     }
     const result = await onSave(action);
-    if (!result?.error && latest.current && mounted.current) {
+    if (!result?.error && result?.message && latest.current && mounted.current) {
       checkpoint({ ...latest.current, savedIds: [...(latest.current.savedIds ?? []), ...ids] });
       await writes.current.catch(() => {});
     }
@@ -251,6 +251,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
         setMode(draft.mode);
         try { localStorage.setItem('3573-ocr-import-mode', draft.mode); } catch {}
       }}
+      onContinueTeams={review.legion === activeLegion && onContinueTeams ? () => { setReview(null); setWorkspaceOpen(false); onContinueTeams(); } : undefined}
       onClose={() => setReview(null)}/>}
       </div>
     </section>, document.body)}
