@@ -59,6 +59,10 @@ try{
  assert.equal(await b.page.evaluate(()=>window.matchAlias()),'hermes');
  await a.context.close();await b.context.close();
  const c=await device();assert.equal(await c.page.evaluate(()=>window.matchAlias()),'hermes');
+ await c.page.evaluate(async()=>{await window.client.update(prev=>({...prev,players:prev.players.map(p=>({...p,ocrAliases:[],alias:'HERMES'}))}));await window.client.sync();});
+ assert.equal(remote.data.players[0].alias,'HERMES');
  await c.context.close();
+ const d=await device();assert.equal(await d.page.evaluate(()=>window.matchAlias()),'hermes');
+ await d.context.close();
  console.log('PASS: independent Chromium contexts, real HTTP and IndexedDB, failed save/retry, fresh browser retrieval; backend='+ (real?'local Supabase edge + database':'simulated'));
 }finally{await browser?.close();await server.close();}
