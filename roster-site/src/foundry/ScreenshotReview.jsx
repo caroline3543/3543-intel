@@ -66,10 +66,15 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
     const unusualPower = mode !== 'roles' && suspiciousPowerChange(previousPower,power);
     const powerPending = mode !== 'roles' && (edit.power !== undefined && !edit.powerConfirmed || unusualPower && (edit.powerApproval?.previous !== previousPower || edit.powerApproval?.next !== power));
     const detectedRole={combatant:'join',substitute:'sub'}[row.registration];
-    const registrationPending=mode!=='powers' && ['unknown','other-legion','combatant','substitute'].includes(row.registration) && !edit.registrationReviewed && !(player && detectedRole && target.registrations[player.id]===detectedRole && !conflict && !edit.role);
+    const here=target.registrations[player?.id];
+    const elsewhere=(assignments.get(player?.id)??[]).some(a=>a.alliance!==alliance||a.legion!==legion);
+    const safeNew=player&&player.alliance===alliance&&detectedRole&&!here&&!elsewhere&&!row.conflict;
+    const safeUnchanged=player&&!row.conflict&&((detectedRole&&here===detectedRole&&!elsewhere)||(row.registration==='other-legion'&&!here)||(row.registration==='unassigned'&&!here));
+    const proposedRole=edit.registrationReviewed||edit.role!=null ? (edit.role==='remove'?'':edit.role||null) : safeNew?detectedRole:null;
+    const registrationPending=mode!=='powers'&&!edit.registrationReviewed&&(!safeNew&&!safeUnchanged||!!edit.role);
     const needsReview = powerPending || !player || conflict && !edit.checked || mode !== 'roles' && power === null || registrationPending;
-    return { row, edit, match, player, powerText, power, conflict, needsReview, powerPending, previousPower, unusualPower, registrationPending };
-  }),[rows,edits,matches,playerById,target.powerByPlayer,target.registrations,mode]);
+    return { row, edit, match, player, powerText, power, conflict, needsReview, powerPending, previousPower, unusualPower, registrationPending, proposedRole };
+  }),[rows,edits,matches,playerById,target.powerByPlayer,target.registrations,mode,assignments,alliance,legion]);
   useEffect(() => { onDraftChange?.({ mode, edits }); }, [mode, edits]);
   const active = evaluated.filter(item => !item.edit.skip);
   const confirmed = active.filter(item => item.player);
@@ -122,10 +127,10 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
       setStatus('Resolve or skip each unmatched or conflicting reading and check the troop powers.');
       return;
     }
-    const result = prepareScreenshotImport(storage, context, confirmed.map(({ player, power, edit }) => ({
+    const result = prepareScreenshotImport(storage, context, confirmed.map(({ player, power, edit, proposedRole }) => ({
       id: player.id, name: player.name, alliance: player.alliance, power,
       previousPower: player.hasPower ? player.power : null, powerApproval: edit.powerApproval,
-      role: edit.role === 'remove' ? '' : edit.role || null,
+      role: proposedRole,
     })), mode);
     setStatus(result.error ?? '');
     setPreview(result.error ? null : result);
@@ -173,7 +178,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
       <p className="stage9-review-counts" hidden={filter==="review" && !!focused}>{rows.length} readings · {new Set(confirmed.map(item => item.player.id)).size} matched · {active.length - confirmed.length} unresolved · {active.filter(item => item.conflict && !item.edit.checked).length} conflicting</p>
       {filter === "review" && focused && <h4 className="stage9-exception-title">{stage===4?"Confirm player identity":stage===5?"Confirm troop power":"Review registration"}</h4>}
       <fieldset disabled={working}>
-        {visible.map(({ row, edit, match, player, powerText, power, powerPending, previousPower, unusualPower, conflict, needsReview }) => {
+        {visible.map(({ row, edit, match, player, powerText, power, powerPending, previousPower, unusualPower, conflict, needsReview, proposedRole }) => {
           const current = assignments.get(player?.id) ?? [];
           const here = target.registrations[player?.id];
           const query = String(edit.search ?? '').trim().toLocaleLowerCase();
@@ -216,7 +221,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
                 {mode !== 'powers' && (filter !== "review" || stage === 6) && <>
                   <div className="stage9-registration-comparison"><div><small>Detected in screenshot</small><strong>{row.registration==='other-legion'&&row.otherLegion?'Legion '+row.otherLegion+' · Other legion':roles[row.registration]||'Unknown'}</strong></div><div><small>Existing registration</small><strong>{current.length ? current.map(assignmentLabel).join(' / ') : roleName(here || '')}</strong></div></div>
                   <label><span aria-hidden="true">Proposed registration</span>
-                    <select aria-label={"Registration for "+title} value={edit.role ?? ''} onChange={event => update(row.rowId, { role: event.target.value, registrationReviewed: filter !== 'review' })}>
+                    <select aria-label={"Registration for "+title} value={edit.role ?? proposedRole ?? ''} onChange={event => update(row.rowId, { role: event.target.value, registrationReviewed: filter !== 'review' })}>
                       <option value="">Keep existing</option><option value="join">Legion {legion} combatant</option>
                       <option value="sub">Legion {legion} substitute</option>
                       {here && <option value="remove">Remove Legion {legion} registration</option>}
