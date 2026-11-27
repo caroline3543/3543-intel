@@ -11,7 +11,7 @@ import {reviewAvatarSuggestions} from './reviewAvatarSuggestions.js';
 const roles = { combatant: 'Combatant', substitute: 'Substitute', unassigned: 'Unassigned', 'other-legion': 'Other legion', unknown: 'Unknown' };
 const modeLabels = { powers: 'troop powers', roles: 'registrations', both: 'troop powers and registrations' };
 
-export function ScreenshotReview({ context, rows, sources, players, storage, counts, onClose, onSave, Evidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false }) {
+export function ScreenshotReview({ context, rows, sources, players, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false }) {
   const [mode, setMode] = useState(initialMode);
   const [edits, setEdits] = useState(initialEdits);
   const [filter, setFilter] = useState('review');
@@ -60,6 +60,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   ];
   const focused = evaluated.find(item => item.row.rowId === focusedId) ?? exceptions[0];
   useLayoutEffect(()=>{const node=reviewRef.current; if(!node)return; let parent=node.parentElement; while(parent){if(parent.scrollHeight>parent.clientHeight && /auto|scroll/.test(getComputedStyle(parent).overflowY)){parent.scrollTop=0;break;}parent=parent.parentElement;}},[focused?.row.rowId]);
+  const upcomingFiles=useMemo(()=>[...new Set([focused,...exceptions.filter(item=>item!==focused).slice(0,2)].filter(Boolean).flatMap(item=>item.row.evidence.slice(0,1).map(e=>sources[e.sourceIndex]?.file)).filter(Boolean))],[focused,exceptions,sources]);
   const focusedStage = !focused?.player ? 4 : mode !== "roles" && (focused.powerPending || focused.power === null || focused.conflict && !focused.edit.checked) ? 5 : 6;
   useEffect(() => {
     if (filter === 'review' && focusedId && (!focused || focused.edit.skip || !focused.needsReview)) setFocusedId(null);
@@ -122,6 +123,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
 
   const stage = done ? 8 : summary ? 3 : preview ? 7 : focusedStage;
   return <section ref={reviewRef} className="ocr-review" aria-label="Review screenshot readings">
+    {PreloadEvidence && !done && !preview && <PreloadEvidence files={upcomingFiles}/>}
     <div className="stage9-step-strip" aria-label={`Step ${stage} of 8`}>{Array.from({length:8},(_,i)=><span key={i} className={i+1===stage?"current":i+1<stage?"complete":""}/>)}</div>
 
     {summary && !done ? <div className="stage9-summary"><h4>Import summary</h4><div className="stage9-summary-grid"><div><strong>{rows.length}</strong><span>Readings</span></div><div><strong>{new Set(confirmed.map(item => item.player.id)).size}</strong><span>Matched</span></div><div><strong>{active.length-confirmed.length}</strong><span>Unresolved</span></div><div><strong>{active.filter(item => item.conflict && !item.edit.checked).length}</strong><span>Conflicting</span></div></div><p>{exceptions.length ? exceptions.length + ' readings need your attention before saving.' : 'No outstanding reading exceptions.'}</p>{exceptions.length>0&&<section className="stage9-issue-breakdown" aria-label="Exception breakdown"><h5>What needs attention</h5>{issueCounts.filter(([,count])=>count>0).map(([label,count])=><div key={label}><span>{label}</span><strong>{count}</strong></div>)}<small>A reading may have more than one issue.</small></section>}<div className="stage9-action-footer"><button type="button" className="screenshot-primary" onClick={() => { setSummary(false); if (!exceptions.length) prepare(); }}>{exceptions.length ? 'Resolve ' + exceptions.length + ' readings' : 'Review changes'}</button><button type="button" onClick={onClose}>Back to screenshots</button></div></div> : done ? <div className="stage9-completion"><div className="stage9-completion-mark" aria-hidden="true">✓</div><h4>Import complete</h4><p role="status">{status}</p><div className="stage9-summary-grid"><div><strong>{receipt?.powers ?? 0}</strong><span>Troop power updates</span></div><div><strong>{receipt?.roles ?? 0}</strong><span>Registration updates</span></div></div><p>{receipt?.excluded ?? 0} readings excluded. Registrations outside the submitted changes were not included in this import.</p><div className="stage9-action-footer">{onContinueTeams && <button type="button" className="screenshot-primary" onClick={onContinueTeams}>Continue to Teams</button>}<button type="button" className={!onContinueTeams?"screenshot-primary":undefined} onClick={onClose}>Done</button></div></div> : preview ? <>
@@ -155,7 +157,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
           const candidates = query ? players.filter(candidate =>
             [candidate.name, candidate.playerId, candidate.id, ...(candidate.searchFields ?? [])].some(value =>
               String(value ?? '').toLocaleLowerCase().includes(query) ||
-              normalized && normaliseBulkName(value).includes(normalized))).slice(0, 8) : match.candidates;
+              normalized && normaliseBulkName(value).includes(normalized))).sort((a,b)=>{const rank=p=>{const n=normaliseBulkName(p.name);return n===normalized?0:n.startsWith(normalized)?1:n.includes(normalized)?2:3;};return rank(a)-rank(b)||Number(b.alliance===alliance)-Number(a.alliance===alliance);}).slice(0, 8) : match.candidates;
           const title = row.name || 'Unread player name';
           return <details key={row.rowId} className="ocr-reading" open={filter === 'review' ? true : undefined}>
             <summary><strong>{title}</strong>{filter!=="review" && <> · {powerText || 'Power missing'} · {roles[row.registration] || 'Unknown'}</>}
