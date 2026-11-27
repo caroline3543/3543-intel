@@ -1,7 +1,7 @@
 name: Stage 9 baseline integrity
 on:
   push:
-    branches: ['fix/3573-ocr-upgrade', 'release/3573-ocr-candidate']
+    branches: ['fix/3573-ocr-upgrade', 'release/3573-ocr-candidate', 'fix/3573-review-speed']
   pull_request:
     paths:
       - 'docs/design-baselines/state-3573/ocr-import-v1/**'
