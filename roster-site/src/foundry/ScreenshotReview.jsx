@@ -4,10 +4,14 @@ import { eventAssignments, plannerSlot, EVENT_LIMITS } from '../../../src/servic
 import { readScreenshotPower } from './rosterScreenshotModel.js';
 import { assignmentLabel, prepareScreenshotImport, roleName, screenshotMatches, suspiciousPowerChange } from './screenshotImportPlan.js';
 
+import {createCurrentAvatarEvidence} from './currentAvatarEvidence.js';
+import {screenshotAvatarEvidence} from './screenshotAvatarEvidence.js';
+import {reviewAvatarSuggestions} from './reviewAvatarSuggestions.js';
+
 const roles = { combatant: 'Combatant', substitute: 'Substitute', unassigned: 'Unassigned', 'other-legion': 'Other legion', unknown: 'Unknown' };
 const modeLabels = { powers: 'troop powers', roles: 'registrations', both: 'troop powers and registrations' };
 
-export function ScreenshotReview({ context, rows, sources, players, storage, counts, onClose, onSave, Evidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams }) {
+export function ScreenshotReview({ context, rows, sources, players, storage, counts, onClose, onSave, Evidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false }) {
   const [mode, setMode] = useState(initialMode);
   const [edits, setEdits] = useState(initialEdits);
   const [filter, setFilter] = useState('review');
@@ -58,6 +62,25 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
   useEffect(() => {
     if (filter === 'review' && focusedId && (!focused || focused.edit.skip || !focused.needsReview)) setFocusedId(null);
   }, [filter, focusedId, focused?.needsReview, focused?.edit.skip]);
+  const avatarCache = useMemo(()=>createCurrentAvatarEvidence(),[]);
+  const [avatarSuggestion,setAvatarSuggestion]=useState(null);
+  useEffect(()=>()=>avatarCache.clear(),[avatarCache]);
+  const avatarRow=focused?.row;
+  const avatarCandidates=focused?.match.candidates;
+  const avatarSearch=focused?.edit.search;
+  useEffect(()=>{
+    setAvatarSuggestion(null);
+    if(!avatarAssist||summary||preview||done||filter!=='review'||focusedStage!==4||avatarSearch||!avatarRow||!avatarCandidates?.length)return;
+    const controller=new AbortController();
+    const evidence=avatarRow.evidence?.[0];
+    if(!evidence)return;
+    (async()=>{
+      const fingerprint=await screenshotAvatarEvidence(sources[evidence.sourceIndex]?.file,evidence.bounds);
+      const result=await reviewAvatarSuggestions({fingerprint,candidates:avatarCandidates,referenceCache:avatarCache,signal:controller.signal});
+      if(!controller.signal.aborted&&result)setAvatarSuggestion({rowId:avatarRow.rowId,...result});
+    })().catch(()=>{});
+    return ()=>controller.abort();
+  },[avatarAssist,summary,preview,done,filter,focusedStage,avatarRow,avatarCandidates,avatarSearch,sources,avatarCache]);
   const visible = evaluated.filter(({ row, edit, needsReview }) =>
     filter === 'all' || (filter === 'review' ? row.rowId === focused?.row.rowId : row.registration === filter));
   const update = (id, patch) => {
@@ -150,6 +173,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
                 {candidates.map(candidate => <button key={candidate.id} type="button" aria-pressed={candidate.id === (filter === 'review' ? identityChoice?.rowId === row.rowId ? identityChoice.id : player?.id : player?.id)}
                   onClick={() => filter === 'review' ? setIdentityChoice({rowId:row.rowId,id:candidate.id}) : update(row.rowId, { playerId: candidate.id, ...(candidate.id !== player?.id ? { role: null, registrationReviewed: false, checked: false } : {}) })}>
                   {candidate.name} · {candidate.alliance || 'Alliance unknown'} · ID {candidate.playerId || candidate.id}
+                  {avatarAssist && !query && avatarSuggestion?.rowId===row.rowId && avatarSuggestion.candidateId===candidate.id && <small> · Avatar similarity (advisory)</small>}
                 </button>)}</>}
                 {unusualPower && (filter !== "review" || stage === 5) && <p className="stage9-power-warning" role="alert">Unusually large change: {previousPower.toLocaleString()} → {power.toLocaleString()}. Check the screenshot and power units before confirming.</p>}
                 {mode !== 'roles' && (filter !== "review" || stage === 5) && <label>Troop power for {title}<input inputMode="decimal" value={powerText} onChange={event => update(row.rowId, { power: event.target.value, checked: false, powerConfirmed: filter !== 'review' })}/></label>}
