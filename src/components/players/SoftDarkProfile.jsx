@@ -136,7 +136,7 @@ function More({player,onSave,canFetchEquipment}) {
   </ProfileSection>;
 }
 
-export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamworkPreferences,onSaveTeamworkPreferences,canFetchEquipment=true,talRecord}) {
+export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamworkPreferences,onSaveTeamworkPreferences,canFetchEquipment=true,talRecord,onRememberOcrAlias}) {
   const panel = useRef(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -190,6 +190,7 @@ export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamw
         <ProfileIdentity player={player} onSave={onSave} softDark/>
         <details className="soft-profile-section">
           <summary>Remembered OCR spellings ({Array.isArray(player.ocrAliases)?player.ocrAliases.length:0})</summary>
+          {onRememberOcrAlias && onSave && <button type="button" className="soft-profile-button" onClick={async()=>{const reading=window.prompt('Add an OCR spelling for this player');if(!reading?.trim())return;try{const result=await onRememberOcrAlias(player.id,reading);if(!result?.verified)window.alert(result?.error||'Spelling save not verified.');}catch{window.alert('Unable to save spelling.');}}}>Add spelling</button>}
           <p>Spellings remembered during screenshot identity review. Removing one does not change the player's username or nickname.</p>
           {(Array.isArray(player.ocrAliases)?player.ocrAliases:[]).map(alias=><div key={alias} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBlock:8}}><span style={{overflowWrap:'anywhere'}}>{alias}</span><button type="button" className="soft-profile-button" disabled={!onSave} aria-label={'Remove OCR spelling '+alias} onClick={()=>{if(window.confirm('Remove remembered spelling '+alias+'?'))onSave({...player,ocrAliases:player.ocrAliases.filter(value=>value!==alias)});}}>Remove</button></div>)}
         </details>
