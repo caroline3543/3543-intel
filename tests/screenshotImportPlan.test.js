@@ -137,3 +137,21 @@ test('Canyon import preserves Foundry, TAL and city power',()=>{
  assert.equal(saved.players[0].lastCanyonClashTroopPower,950000000);
  for(const field of ['lastFoundryTroopPower','lastTALTroopPower','cityPower'])assert.equal(saved.players[0][field],data.players[0][field]);
 });
+
+test('OCR exact names cannot bypass roster-wide normalized identity collisions',()=>{
+ const a={id:'a',name:'Panda',alliance:'HOT'};
+ for(const b of [
+  {id:'b',name:'ＰＡＮＤＡ',alliance:'ARC'},
+  {id:'b',name:'Panda!',alliance:'HOT'},
+  {id:'b',name:'Different',searchFields:['P A N D A'],alliance:'WAR'},
+  {id:'b',name:'Pánda',alliance:'RKG'}
+ ]){
+  const match=screenshotMatches('Panda',[a,b],'HOT');
+  assert.equal(match.player,null);
+  assert.ok(match.candidates.some(p=>p.id==='a'));
+  assert.ok(match.candidates.some(p=>p.id==='b'));
+ }
+ assert.equal(screenshotMatches('Panda',[a],'HOT').player?.id,'a');
+ assert.equal(screenshotMatches('ＰＡＮＤＡ',[a],'HOT').player,null);
+ assert.equal(screenshotMatches('Panda',[a],'ARC').player,null);
+});
