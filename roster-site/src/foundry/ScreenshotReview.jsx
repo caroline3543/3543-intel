@@ -96,12 +96,13 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
           {['join','sub'].map(role => <div key={role}><span>{roleName(role)}</span><strong>{Object.values(projected).filter(value=>value===role).length} / {capacity[role]}</strong><span>After import</span></div>)}
         </div>
         <p>Registration capacity is validated before saving.</p>
-        <ul>{preview.changes.map(change => <li key={change.id + ':' + (change.after ? 'role' : 'power')}>
-          <strong>{change.name}</strong> · {change.after
-            ? assignmentLabel(change.before) + ' → ' + assignmentLabel(change.after)
-            : (change.previousPower?.toLocaleString() ?? 'No power recorded') + ' → ' + change.power.toLocaleString()}
-          <button type="button" disabled={working} onClick={() => { const item=confirmed.find(entry=>entry.player.id===change.id); if(item){update(item.row.rowId,{skip:true});setFilter('all');} }}>Exclude player</button>
-        </li>)}</ul>
+        <div className="stage9-change-list">{Array.from(new Set(preview.changes.map(change=>change.id))).map(id=>{
+          const changes=preview.changes.filter(change=>change.id===id);
+          return <article className="stage9-change-card" key={id}><h5>{changes[0].name}</h5>
+            {changes.map((change,i)=><div className="stage9-change-values" key={i}><small>{change.after?'Registration':'Troop power'}</small><span>{change.after?assignmentLabel(change.before):change.previousPower?.toLocaleString()??'Not recorded'}</span><span aria-hidden="true">→</span><strong>{change.after?assignmentLabel(change.after):change.power.toLocaleString()}</strong></div>)}
+            <button type="button" disabled={working} onClick={()=>{const item=confirmed.find(entry=>entry.player.id===id);if(item){update(item.row.rowId,{skip:true});setFilter('all');}}}>Exclude player</button>
+          </article>;
+        })}</div>
         <div className="stage9-action-footer"><button type="button" className="screenshot-primary" disabled={working} onClick={confirm}>{working ? 'Applying changes…' : preview.changes.some(change => change.destructive) ? 'Confirm registration moves or removals and save' : 'Save ' + modeLabels[mode]}</button>
         <button type="button" disabled={working} onClick={() => setPreview(null)}>Keep reviewing</button></div>
       </section>
