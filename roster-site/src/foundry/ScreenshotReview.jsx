@@ -65,7 +65,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
   const focused = evaluated.find(item => item.row.rowId === focusedId) ?? exceptions[0];
   useLayoutEffect(()=>{const node=reviewRef.current; if(!node)return; let parent=node.parentElement; while(parent){if(parent.scrollHeight>parent.clientHeight && /auto|scroll/.test(getComputedStyle(parent).overflowY)){parent.scrollTop=0;break;}parent=parent.parentElement;}},[focused?.row.rowId]);
   const upcomingFiles=useMemo(()=>[...new Set([focused,...exceptions.filter(item=>item!==focused).slice(0,2)].filter(Boolean).flatMap(item=>item.row.evidence.slice(0,1).map(e=>sources[e.sourceIndex]?.file)).filter(Boolean))],[focused,exceptions,sources]);
-  const selectedIdentity=identityChoice?.rowId===focused?.row.rowId?identityChoice.id:!focused?.edit.search?focused?.match.suggested?.id:null;
+  const selectedIdentity=identityChoice && focused && identityChoice.rowId===focused.row.rowId ? identityChoice.id : !focused?.edit.search ? focused?.match?.suggested?.id : null;
   const focusedStage = !focused?.player ? 4 : mode !== "roles" && (focused.powerPending || focused.power === null || focused.conflict && !focused.edit.checked) ? 5 : 6;
   useEffect(() => {
     if (filter === 'review' && focusedId && (!focused || focused.edit.skip || !focused.needsReview)) setFocusedId(null);
