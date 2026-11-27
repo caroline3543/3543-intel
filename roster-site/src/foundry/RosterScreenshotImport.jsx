@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { registrationCountReview, combineScreenshotRows } from './rosterScreenshotModel.js';
 import { readScreenshotSession, writeScreenshotSession } from './screenshotSession.js';
@@ -14,16 +14,20 @@ async function screenshotId(file) {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+const EvidenceCache=createContext(null);
 function ScreenshotImage({ file, bounds }) {
+  const cache=useContext(EvidenceCache);
+  const cached=cache?.get(file);
   const [expanded, setExpanded] = useState(false);
   const crop = bounds && Number.isFinite(bounds.top) && Number.isFinite(bounds.bottom) && bounds.top >= 0 && bounds.bottom <= 1 && bounds.bottom > bounds.top;
-  const [ratio,setRatio] = useState(null);
-  const [url, setUrl] = useState('');
+  const [ratio,setRatio] = useState(cached?.ratio ?? null);
+  const [url, setUrl] = useState(cached?.url ?? '');
   useEffect(() => {
+    if(cached){setUrl(cached.url);setRatio(cached.ratio??null);return;}
     const preview = URL.createObjectURL(file);
     setUrl(preview);
     return () => URL.revokeObjectURL(preview);
-  }, [file]);
+  }, [file,cached]);
   return url && <figure className="screenshot-evidence">
     <div style={crop && !expanded && ratio ? {position:'relative',overflow:'hidden',aspectRatio:ratio/(bounds.bottom-bounds.top),width:'100%'} : undefined}><img src={url} onLoad={e=>{const img=e.currentTarget; if(img.naturalHeight)setRatio(img.naturalWidth/img.naturalHeight);}} style={crop && !expanded && ratio ? {position:'absolute',width:'100%',maxWidth:'none',top:-(bounds.top/(bounds.bottom-bounds.top))*100+'%',left:0} : undefined} alt={'Roster screenshot ' + file.name}/></div>
     {crop && expanded && <span aria-hidden="true" style={{ top: bounds.top * 100 + '%', height: (bounds.bottom - bounds.top) * 100 + '%' }}/>}
@@ -62,6 +66,19 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   const [error, setError] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
   const [review, setReview] = useState(null);
+  const [evidenceCache,setEvidenceCache]=useState(null);
+  useEffect(()=>{
+    if(!review){setEvidenceCache(null);return;}
+    const cache=new Map();
+    for(const source of review.sources??[]){
+      if(!source.file||cache.has(source.file))continue;
+      const url=URL.createObjectURL(source.file);
+      const entry={url,ratio:null};
+      cache.set(source.file,entry);
+    }
+    setEvidenceCache(cache);
+    return ()=>{for(const entry of cache.values())URL.revokeObjectURL(entry.url);};
+  },[review]);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const workspaceRef = useRef(null);
   const launchRef = useRef(null);
@@ -128,9 +145,9 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     };
   }, [sessionKey]);
 
-  function checkpoint(next) {
+  function checkpoint(next, render=true) {
     latest.current = next;
-    if (mounted.current) setSession(next);
+    if (mounted.current && render) setSession(next);
     writes.current = writes.current.catch(() => {}).then(() => writeScreenshotSession(sessionKey, next));
     writes.current.catch(() => {
       if (mounted.current) setRecoveryError('Could not store this batch on this device. Keep this tab open to continue.');
@@ -316,19 +333,19 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     </div>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
-    {review && <ScreenshotReview {...review} players={players} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage}
+    {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview {...review} players={players} storage={storage} onSave={saveOnce} Evidence={ScreenshotImage}
       initialMode={session?.drafts?.[review.legion]?.mode ?? mode}
       initialEdits={session?.drafts?.[review.legion]?.edits ?? {}}
       onDraftChange={draft => {
         if (!latest.current) return;
         const previous = latest.current.drafts?.[review.legion];
         if (JSON.stringify(previous) === JSON.stringify(draft)) return;
-        checkpoint({ ...latest.current, mode: draft.mode, drafts: { ...latest.current.drafts, [review.legion]: draft } });
+        checkpoint({ ...latest.current, mode: draft.mode, drafts: { ...latest.current.drafts, [review.legion]: draft } },false);
         setMode(draft.mode);
         try { localStorage.setItem('3573-ocr-import-mode', draft.mode); } catch {}
       }}
       onContinueTeams={review.legion === activeLegion && onContinueTeams ? () => { setReview(null); setWorkspaceOpen(false); onContinueTeams(); } : undefined}
-      onClose={() => setReview(null)}/>}
+      onClose={() => setReview(null)}/></EvidenceCache.Provider>}
     </>}
       {!session?.pendingImport && pendingStatus && !review && <p role="status">{pendingStatus}</p>}
       </div>
