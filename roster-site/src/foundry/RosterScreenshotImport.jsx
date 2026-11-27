@@ -165,35 +165,44 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       checkpoint(batch);
     }
     const todo = batch.items.filter(item => !item.reading);
-    let worker;
+    const workers=[];
     setError('');
     setJob('Loading multilingual screenshot reader…');
     try {
       const { createRosterReader, readRosterScreenshot } = await import('./readRosterScreenshot.js');
       if (task.stopped) return;
-      worker = await createRosterReader();
-      for (const item of todo) {
-        if (task.stopped || !sameEvent(batch.occurrenceIds, eventIds.current)) break;
-        const complete = batch.items.filter(candidate => candidate.reading).length;
-        setJob('Scanning ' + item.file.name + ' · ' + complete + ' of ' + batch.items.length + ' read');
-        let outcome;
-        try {
-          const reading = await readRosterScreenshot(worker, item.file);
-          outcome = reading.rows.length ? { reading, error: '' } : { reading: null, partial: reading.partial, error: 'No complete player rows found.' };
-        } catch (failure) {
-          outcome = { error: failure.message?.startsWith('Use ') ? failure.message : 'Could not read this screenshot.' };
+      const cores=navigator.hardwareConcurrency||2;
+      const mobile=matchMedia('(pointer: coarse)').matches;
+      const count=Math.min(todo.length,cores<=2?1:mobile?2:3);
+      const initialised=await Promise.allSettled(Array.from({length:count},()=>createRosterReader()));
+      for(const result of initialised)if(result.status==='fulfilled')workers.push(result.value);
+      if(todo.length&&!workers.length)throw new Error('No reader available');
+      let next=0;
+      await Promise.all(workers.map(async worker=>{
+        while(next<todo.length){
+          if(task.stopped||!mounted.current||!sameEvent(batch.occurrenceIds,eventIds.current))break;
+          const item=todo[next++];
+          const complete=batch.items.filter(candidate=>candidate.reading).length;
+          setJob('Scanning screenshots · '+complete+' of '+batch.items.length+' read');
+          let outcome;
+          try {
+            const reading=await readRosterScreenshot(worker,item.file);
+            outcome=reading.rows.length?{reading,error:''}:{reading:null,partial:reading.partial,error:'No complete player rows found.'};
+          }catch(failure){
+            outcome={error:failure.message?.startsWith('Use ')?failure.message:'Could not read this screenshot.'};
+          }
+          if(!mounted.current||!sameEvent(batch.occurrenceIds,eventIds.current))break;
+          batch={...batch,items:batch.items.map(candidate=>candidate.id===item.id?{...item,...outcome}:candidate)};
+          checkpoint(batch);
+          await writes.current.catch(()=>{});
         }
-        batch = { ...batch, items: batch.items.map(candidate => candidate.id === item.id ? { ...item, ...outcome } : candidate) };
-        if (!mounted.current) break;
-        checkpoint(batch);
-        await writes.current.catch(() => {});
-      }
-    } catch {
-      if (mounted.current && !task.stopped) setError('Could not load the screenshot reader. Try scanning again.');
-    } finally {
-      if (worker) await worker.terminate().catch(() => {});
-      run.current = null;
-      if (mounted.current) setJob('');
+      }));
+    }catch{
+      if(mounted.current&&!task.stopped)setError('Could not load the screenshot reader. Try scanning again.');
+    }finally{
+      await Promise.allSettled(workers.map(worker=>worker.terminate()));
+      run.current=null;
+      if(mounted.current)setJob('');
     }
   }
 
