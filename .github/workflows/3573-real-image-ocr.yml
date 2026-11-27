@@ -1,0 +1,33 @@
+name: Real-image OCR benchmark
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/3573-ocr-upgrade]
+    paths: ['tests/fixtures/3573-ocr/**']
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify fixture integrity
+        working-directory: tests/fixtures/3573-ocr
+        run: sha256sum --strict -c SHA256SUMS
+      - run: npm ci
+      - run: npm ci --prefix roster-site
+      - run: npx playwright install --with-deps chromium
+      - name: Execute actual OCR
+        env:
+          ROSTER_SCREENSHOTS_DIR: tests/fixtures/3573-ocr/screenshots
+          ROSTER_GROUND_TRUTH: tests/fixtures/3573-ocr/ground-truth.json
+        run: node tests/3573-roster-ocr-benchmark.mjs "$GITHUB_WORKSPACE/ocr-results.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-image-ocr-results
+          path: ocr-results.json
