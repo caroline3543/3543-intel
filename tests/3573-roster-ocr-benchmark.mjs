@@ -17,6 +17,7 @@ assert.ok(files.length >= 1 && files.length <= 25, 'Put 1–25 original screensh
 const labels=groundTruthPath ? JSON.parse(await readFile(groundTruthPath,'utf8')) : null;
 const rosterNames=[...new Set(Object.values(labels??{}).flatMap(s=>s.rows.map(r=>r.name)))];
 const rosterPath=process.env.ROSTER_IDENTITY_SNAPSHOT;
+const benchmarkAlliance=process.env.ROSTER_BENCHMARK_ALLIANCE??'HOT';
 const roster=rosterPath?JSON.parse(await readFile(resolve(rosterPath),'utf8')):rosterNames.map((name,i)=>({name,id:String(i+1),alliance:'HOT'}));
 assert.ok(Array.isArray(roster)&&roster.every(p=>typeof p.id==='string'&&typeof p.name==='string'&&typeof p.alliance==='string'),'Invalid identity snapshot');
 assert.equal(new Set(roster.map(p=>p.id)).size,roster.length,'Duplicate snapshot identity');
@@ -33,14 +34,14 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:5177/event-preview.html');
   const workerStarted = performance.now();
-  await page.evaluate(async ({workerCount,roster,retriesEnabled}) => {
+  await page.evaluate(async ({workerCount,roster,retriesEnabled,benchmarkAlliance}) => {
     const reader = await import('/src/foundry/readRosterScreenshot.js');
     window.rosterReaders = await Promise.all(Array.from({length:workerCount},()=>reader.createRosterReader()));
     window.rosterReader=window.rosterReaders[0];
     window.scanRoster = reader.readRosterScreenshot;
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
-    window.matchName=retriesEnabled ? createScreenshotMatcher(roster,'HOT') : undefined;
-  },{workerCount,roster,retriesEnabled});
+    window.matchName=retriesEnabled ? createScreenshotMatcher(roster,benchmarkAlliance) : undefined;
+  },{workerCount,roster,retriesEnabled,benchmarkAlliance});
   const startupMs = Math.round(performance.now() - workerStarted);
   const batchStarted = performance.now();
   const screenshots = new Array(files.length);
@@ -94,9 +95,9 @@ try {
     const label=labels[screenshot.filename].rows.find(l=>Math.abs(l.center-(row.bounds.top+row.bounds.bottom)/2)<=.035);
     if(label&&row.name!==label.name&&row.nameAlternatives?.includes(label.name))retryMetrics.alternativeExactRecoveries++;
   }
-  const reviewMetrics=labels?await page.evaluate(async ({screenshots,labels,roster})=>{
+  const reviewMetrics=labels?await page.evaluate(async ({screenshots,labels,roster,benchmarkAlliance})=>{
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
-    const matcher=createScreenshotMatcher(roster,'HOT');
+    const matcher=createScreenshotMatcher(roster,benchmarkAlliance);
     const correct=(p,label)=>!!p&&(label.playerId?p.id===label.playerId:p.name===label.name);
     const metrics={labelled:0,automaticCorrect:0,automaticWrong:0,manual:0,originalTop1:0,improvedTop1:0,originalTop8:0,improvedTop8:0,unresolved:[]};
     for(const screenshot of screenshots)for(const row of screenshot.rows??[]){
@@ -115,12 +116,12 @@ try {
       metrics.unresolved.push({filename:screenshot.filename,expected:label.name,reading:row.name,alternatives:row.nameAlternatives??[],candidates:original.candidates.map(p=>p.name),correctCandidateRank:candidates.findIndex(p=>correct(p,label))+1,decorativeOrSpacingAmbiguity:!!label.decorativeOrSpacingAmbiguity});
     }
     return metrics;
-  },{screenshots,labels,roster}):null;
-  const aliasComparison=rosterPath?await page.evaluate(async ({screenshots,labels,roster})=>{
+  },{screenshots,labels,roster,benchmarkAlliance}):null;
+  const aliasComparison=rosterPath?await page.evaluate(async ({screenshots,labels,roster,benchmarkAlliance})=>{
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
     const variants=[roster.map(({nickname,...p})=>p),roster];
     const results=variants.map(players=>{
-      const match=createScreenshotMatcher(players,'HOT');
+      const match=createScreenshotMatcher(players,benchmarkAlliance);
       const counts={correct:0,wrong:0,manual:0,missing:0};
       for(const screenshot of screenshots)for(const label of labels[screenshot.filename].rows){
         const row=(screenshot.rows??[]).find(r=>Math.abs(label.center-(r.bounds.top+r.bounds.bottom)/2)<=.035);
@@ -133,7 +134,7 @@ try {
     const [withoutAliases,withAliases]=results;
     const reductionPercent=withoutAliases.manual?100*(withoutAliases.manual-withAliases.manual)/withoutAliases.manual:null;
     return {withoutAliases,withAliases,reductionPercent,targetMet:reductionPercent!==null&&reductionPercent>=30&&withAliases.wrong===0&&withAliases.missing===0};
-  },{screenshots,labels,roster}):null;
+  },{screenshots,labels,roster,benchmarkAlliance}):null;
   if(aliasComparison)console.log('Paired alias comparison:',JSON.stringify(aliasComparison));
   if(rosterPath&&reviewMetrics)delete reviewMetrics.unresolved;
   console.log('Identity review metrics:',JSON.stringify(reviewMetrics));
