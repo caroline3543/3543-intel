@@ -22,3 +22,5 @@ test('deduplicates candidates and limits concurrent requests',async()=>{
  await run(async p=>{calls++;active++;max=Math.max(max,active);await Promise.resolve();active--;return fp(p.id==='a'?0:40);},{candidates:[...candidates,{id:'a'},{id:'c'},{id:'d'}]});
  assert.equal(calls,4);assert.equal(max,2);
 });
+
+test('reference retrieval exceptions suppress advisory evidence',async()=>{assert.equal(await run(async()=>{throw Error('unavailable');}),null);});
