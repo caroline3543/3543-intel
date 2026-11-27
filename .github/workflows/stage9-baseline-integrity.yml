@@ -56,6 +56,24 @@ jobs:
       - name: Independent browser alias persistence
         if: always()
         run: node tests/3573-ocr-alias-browser.mjs
+      - name: Assemble paired visual acceptance evidence
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          root=Path('ocr-review-captures')
+          baseline=Path('docs/design-baselines/state-3573/ocr-import-v1/reference-screens')
+          pairs={'03-summary':'current-summary','04-identity':'04-identity','05-power':'05-power','06-registration':'06-registration','07-review':'current-confirmation','08-completion':'current-completion'}
+          for kind in ('foundry','canyon'):
+              for reference,current in pairs.items():
+                  dest=root/'paired'/kind/reference
+                  dest.mkdir(parents=True,exist_ok=True)
+                  shutil.copyfile(baseline/(reference+'.png'),dest/'reference.png')
+                  actual=root/(kind+'-'+current+'.png')
+                  if not actual.is_file(): raise RuntimeError('Missing current capture: '+str(actual))
+                  shutil.copyfile(actual,dest/'current.png')
+          PY
       - name: Retain current implementation captures for review
         if: always()
         uses: actions/upload-artifact@v4
