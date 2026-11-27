@@ -174,7 +174,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
       {status && <p role="alert">{status}</p>}
     </> : <>
       <p className="stage9-review-counts" hidden={filter==="review" && !!focused}>{rows.length} readings · {new Set(confirmed.map(item => item.player.id)).size} matched · {active.length - confirmed.length} unresolved · {active.filter(item => item.conflict && !item.edit.checked).length} conflicting</p>
-      {filter === "review" && focused && <h4 className="stage9-exception-title">{stage===4?"Confirm player identity":stage===5?"Confirm troop power":"Review registration"}</h4>}
+      {filter === "review" && focused && <p className="stage9-exception-title">Exception review · {exceptions.length} remaining</p>}
       <fieldset disabled={working}>
         {visible.map(({ row, edit, match, player, powerText, power, powerPending, previousPower, unusualPower, conflict, needsReview, proposedRole }) => {
           const current = assignments.get(player?.id) ?? [];
@@ -253,10 +253,11 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
         </select>
       </label>
       {filter === 'review' && focused && exceptions.length > 0 && <button type="button" onClick={prepare}>Review {modeLabels[mode]} changes</button>}
-      {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFilter('all'); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Review earlier readings</button><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
+
       </details>
 
-      <div className="stage9-action-footer">{filter === 'review' && focused && exceptions.length > 0 && <div className="stage9-footer-meta"><span role="status">{exceptions.length} remaining</span><button type="button" className="stage9-skip-action" disabled={working} onClick={()=>update(focused.row.rowId,{skip:true})}>Skip this reading</button></div>}{filter === 'review' && focused && exceptions.length > 0 ? <><button type="button" className="screenshot-primary" style={stage===4&&selectedIdentity!=null?{background:"#16834a",color:"#fff"}:undefined} disabled={working || (stage===4 ? !selectedIdentity : stage===5 ? focused.power===null || focused.conflict && !focused.edit.checked : focused.conflict && !focused.edit.checked)} onClick={()=>{
+      {filter === 'review' && focused && <nav className="stage9-queue" aria-label="Exception navigation"><button type="button" disabled={working} onClick={() => { const i=evaluated.indexOf(focused); setFilter('all'); setFocusedId(evaluated[Math.max(0,i-1)].row.rowId); }}>Review earlier readings</button><button type="button" disabled={working} onClick={() => { const next=exceptions.find(item=>item.row.rowId!==focused.row.rowId); if(next)setFocusedId(next.row.rowId); }}>Next exception</button></nav>}
+      <div className="stage9-action-footer">{filter === 'review' && focused && exceptions.length > 0 && <div className="stage9-footer-meta"><span role="status">{exceptions.length} remaining</span><button type="button" className="stage9-skip-action" disabled={working} onClick={()=>update(focused.row.rowId,{skip:true})}>Skip this reading</button></div>}{filter === 'review' && focused && exceptions.length > 0 ? <><button type="button" className="screenshot-primary" disabled={working || (stage===4 ? !selectedIdentity : stage===5 ? focused.power===null || focused.conflict && !focused.edit.checked : focused.conflict && !focused.edit.checked)} onClick={()=>{
         if(stage===4){update(focused.row.rowId,{playerId:selectedIdentity,role:null,registrationReviewed:false,checked:false});setIdentityChoice(null);}
         else if(stage===5)update(focused.row.rowId,{powerConfirmed:true,powerApproval:{previous:focused.previousPower,next:focused.power}});
         else update(focused.row.rowId,{registrationReviewed:true});
