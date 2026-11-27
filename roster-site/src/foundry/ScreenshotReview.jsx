@@ -31,7 +31,8 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
   for (const change of preview?.action.roleChanges ?? []) projected[change.id] = change.role;
   const capacity = EVENT_LIMITS[kind];
   const assignments = useMemo(() => eventAssignments(storage, kind), [storage, kind]);
-  const matcher=useMemo(()=>createScreenshotMatcher(players,alliance,preferredIds),[players,alliance,preferredIds]);
+  const registeredIds=useMemo(()=>Object.keys(target.registrations).filter(id=>['join','sub'].includes(target.registrations[id])),[target.registrations]);
+  const matcher=useMemo(()=>createScreenshotMatcher(players,alliance,preferredIds,registeredIds),[players,alliance,preferredIds,registeredIds]);
   const matches=useMemo(()=>rows.map(row=>matcher(row.name)),[rows,matcher]);
   const playerById = useMemo(() => new Map(players.map(player => [player.id, player])), [players]);
   const evaluated = useMemo(()=>rows.map((row, index) => {
