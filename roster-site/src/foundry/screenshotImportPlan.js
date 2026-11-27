@@ -19,8 +19,11 @@ export function screenshotMatches(name, players, alliance) {
   const visualKey=value=>normaliseBulkName(value).replace(/0/g,'o').replace(/[1l]/g,'i');
   const visual=visualKey(name);
   const lookalikes=visual ? players.filter(player=>playerFields(player).some(field=>visualKey(field)===visual)) : [];
-  const safe=exact.length===1 && equivalent.length===1 && equivalent[0].id===exact[0].id && lookalikes.length===1;
-  return { candidates, player: safe ? exact[0] : null };
+  const spacingKey=value=>exactName(value).normalize('NFKC').toLowerCase().replace(/\s/gu,'');
+  const strict=players.filter(player=>spacingKey(player.name)===spacingKey(name));
+  const selected=exact.length===1?exact[0]:exact.length===0&&strict.length===1?strict[0]:null;
+  const safe=selected && equivalent.length===1 && equivalent[0].id===selected.id && lookalikes.length===1;
+  return { candidates, player: safe ? selected : null };
 }
 
 export { suspiciousPowerChange };
