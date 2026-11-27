@@ -247,4 +247,39 @@ try {
     assert.deepEqual(errors,[]);
     await page.close();
   }
+  // Separate journey: confirm a spelling in Foundry, reload, then reuse it in Canyon.
+  const page=await browser.newPage({viewport:{width:428,height:926},isMobile:true,hasTouch:true});
+  await page.goto(origin+'/event-preview.html');
+  await page.waitForFunction(()=>!!sessionStorage.getItem('3573-event-preview-fixture-v1'));
+  await page.evaluate(async evidenceImage=>{
+    const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onupgradeneeded=()=>req.result.createObjectStore('sessions');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+    const file=new File([Uint8Array.from(atob(evidenceImage),c=>c.charCodeAt(0))],'IMG_9840.jpeg',{type:'image/jpeg'});
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction('sessions','readwrite');
+      for(const kind of ['foundry','canyon']){
+        const power=kind==='foundry'?3630:1520000000;
+        tx.objectStore('sessions').put({items:[{id:'alias-fixture',file,reading:{legion:1,rows:[{name:'Northva1e',power,registration:'unknown',bounds:{top:.3,bottom:.377}}]}}],occurrenceIds:{1:JSON.stringify([kind,'ARC',1]),2:JSON.stringify([kind,'ARC',2])}},kind+':ARC');
+      }
+      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+    });db.close();
+  },evidenceImage);
+  await page.reload();
+  await page.getByRole('button',{name:'Open screenshot import'}).click();
+  await page.getByRole('button',{name:/Review Legion 1 · 1 reading/}).click();
+  const review=page.getByRole('region',{name:'Review screenshot readings'});
+  await review.getByRole('button',{name:/Resolve .* reading/}).click();
+  await review.getByRole('searchbox').fill('Northvale');
+  await review.locator('.stage9-candidate-card').filter({hasText:'357301200'}).click();
+  await review.getByLabel('Remember this spelling for future uploads').check();
+  await review.getByRole('button',{name:'Confirm match',exact:true}).click();
+  await page.waitForFunction(()=>JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1')).players.find(p=>p.id==='sample-0').ocrAliases?.includes('Northva1e'));
+  await page.reload();
+  await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
+  await page.getByRole('button',{name:'Open screenshot import'}).click();
+  await page.getByRole('button',{name:/Review Legion 1 · 1 reading/}).click();
+  await review.getByRole('heading',{name:'Import summary'}).waitFor();
+  assert.equal(await review.getByRole('button',{name:/Resolve .* reading/}).count(),0,'Learned alias must not require another identity review');
+  await page.screenshot({path:'ocr-review-captures/canyon-learned-alias.png'});
+  console.log('PASS: Foundry UI alias confirmation, reload, Canyon automatic reuse in isolated fixture');
+  await page.close();
 } finally {await browser?.close();server.kill();}
