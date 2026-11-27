@@ -159,6 +159,7 @@ export function ScreenshotReview({ context, rows, sources, players, storage, cou
             <summary><strong>{title}</strong>{filter!=="review" && <> · {powerText || 'Power missing'} · {roles[row.registration] || 'Unknown'}</>}
               {filter!=="review" && (edit.skip ? ' · Skipped' : conflict && !edit.checked ? ' · Conflicting readings' : needsReview ? ' · Review' : '')}
               {player && (filter!=="review" || player.name!==title) && <small>{player.name} · {player.alliance || 'Alliance unknown'}</small>}
+              {player && player.alliance !== alliance && <p role="status">Home alliance: {player.alliance || 'Unknown'}. Registration context: {alliance}.</p>}
             </summary>
             <div className="ocr-reading-fields">
               {row.otherLegion > 0 && <p>Dispatched to Legion {row.otherLegion}</p>}
