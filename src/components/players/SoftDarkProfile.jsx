@@ -137,6 +137,9 @@ function More({player,onSave,canFetchEquipment}) {
 }
 
 export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamworkPreferences,onSaveTeamworkPreferences,canFetchEquipment=true,talRecord,onRememberOcrAlias}) {
+  const [aliasDraft,setAliasDraft]=useState('');
+  const [aliasBusy,setAliasBusy]=useState(false);
+  const [aliasFeedback,setAliasFeedback]=useState('');
   const panel = useRef(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -190,7 +193,7 @@ export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamw
         <ProfileIdentity player={player} onSave={onSave} softDark/>
         <details className="soft-profile-section">
           <summary>Remembered OCR spellings ({Array.isArray(player.ocrAliases)?player.ocrAliases.length:0})</summary>
-          {onRememberOcrAlias && onSave && <button type="button" className="soft-profile-button" onClick={async()=>{const reading=window.prompt('Add an OCR spelling for this player');if(!reading?.trim())return;try{const result=await onRememberOcrAlias(player.id,reading);if(!result?.verified)window.alert(result?.error||'Spelling save not verified.');}catch{window.alert('Unable to save spelling.');}}}>Add spelling</button>}
+          {onRememberOcrAlias && onSave && <form onSubmit={async event=>{event.preventDefault();if(!aliasDraft.trim()||aliasBusy)return;setAliasBusy(true);setAliasFeedback('');try{const result=await onRememberOcrAlias(player.id,aliasDraft);if(result?.verified){setAliasDraft('');setAliasFeedback('Spelling saved.');}else setAliasFeedback(result?.error||'Spelling save not verified.');}catch{setAliasFeedback('Unable to save spelling.');}finally{setAliasBusy(false);}}}><label>New OCR spelling<input value={aliasDraft} onChange={event=>setAliasDraft(event.target.value)} maxLength={128} disabled={aliasBusy} placeholder="e.g. HERMES"/></label><button type="submit" className="soft-profile-button" disabled={aliasBusy||!aliasDraft.trim()}>{aliasBusy?'Saving…':'Add spelling'}</button>{aliasFeedback && <p role="status">{aliasFeedback}</p>}</form>}
           <p>Spellings remembered during screenshot identity review. Removing one does not change the player's username or nickname.</p>
           {(Array.isArray(player.ocrAliases)?player.ocrAliases:[]).map(alias=><div key={alias} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBlock:8}}><span style={{overflowWrap:'anywhere'}}>{alias}</span><button type="button" className="soft-profile-button" disabled={!onSave} aria-label={'Remove OCR spelling '+alias} onClick={()=>{if(window.confirm('Remove remembered spelling '+alias+'?'))onSave({...player,ocrAliases:player.ocrAliases.filter(value=>value!==alias)});}}>Remove</button></div>)}
         </details>
