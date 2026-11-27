@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
+import {mkdir,readFile,readdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 
 const origin='http://127.0.0.1:4185';
@@ -54,7 +54,31 @@ try {
     await upload.getByRole('button',{name:'Clear screenshots'}).click();
     await upload.getByRole('button',{name:'Upload troop power'}).waitFor();
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-    assert.deepEqual(errors,[]);
+    // Use a fresh page because the cancellation test intentionally aborts the OCR module.
     await page.close();
+    const real=await browser.newPage({viewport:{width:428,height:926},isMobile:true,hasTouch:true});
+    const realErrors=[];real.on('pageerror',e=>realErrors.push(e.message));
+    await real.goto(origin+'/event-preview.html');
+    if(event==='Canyon Clash')await real.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
+    await real.getByRole('button',{name:'Open screenshot import'}).click();
+    const dialog=real.getByRole('dialog',{name:'Screenshot import workspace'});
+    const dir='tests/fixtures/3573-ocr/screenshots';
+    const names=(await readdir(dir)).sort().slice(0,3);
+    const files=await Promise.all(names.map(async name=>({name,mimeType:name.endsWith('.png')?'image/png':'image/jpeg',buffer:await readFile(dir+'/'+name)})));
+    await dialog.locator('input[type=file]').setInputFiles(files.slice(0,2));
+    await dialog.getByText('0 of 2 screenshots read',{exact:true}).waitFor();
+    await dialog.getByRole('button',{name:'Scan screenshots',exact:true}).click();
+    await dialog.getByText('2 of 2 screenshots read',{exact:true}).waitFor({timeout:120000});
+    await dialog.locator('input[type=file]').setInputFiles(files.slice(2));
+    await dialog.getByText('2 of 3 screenshots read',{exact:true}).waitFor();
+    await dialog.getByRole('button',{name:'Scan screenshots',exact:true}).click();
+    await dialog.getByText('3 of 3 screenshots read',{exact:true}).waitFor({timeout:120000});
+    await real.reload();
+    if(event==='Canyon Clash')await real.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
+    await real.getByRole('button',{name:'Open screenshot import'}).click();
+    await dialog.getByText('3 of 3 screenshots read',{exact:true}).waitFor();
+    assert.deepEqual(realErrors,[]);
+    await real.close();
+    assert.deepEqual(errors,[]);
   }
 } finally {await browser?.close();server.kill();}
