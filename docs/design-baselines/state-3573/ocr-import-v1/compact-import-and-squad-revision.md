@@ -29,4 +29,4 @@ No production release without explicit approval. This document records requireme
 
 The Foundry and Canyon Clash import workspace opens directly to the player-list field. Screenshot upload, processing stages and OCR assets are excluded from this preview. The copyable external extraction prompt uses four tab-separated fields. A separately supplied permanent player ID is still accepted in pasted data.
 
-Keep compact matching, registration review, the manual confirmation for a move, and the gold Squad Balancer action. Preserve saved paste text and decisions on the device. Existing import receipts remain available for verification, including receipts created through the older screenshot workflow. Legacy screenshot drafts remain in browser storage.
+Keep compact matching, registration review, the manual confirmation for a move, and the gold selected team count and Auto-Balance action. Leader chips retain purple selection. Preserve saved paste text and decisions on the device. Existing import receipts remain available for verification, including receipts created through the older screenshot workflow. Legacy screenshot drafts remain in browser storage.
