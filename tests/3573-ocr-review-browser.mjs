@@ -3,8 +3,9 @@ import {spawn} from 'node:child_process';
 import {mkdir,readFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 
-const origin='http://127.0.0.1:4186';
-const server=spawn('./node_modules/.bin/vite',['preview','roster-site','--host','127.0.0.1','--port','4186','--strictPort'],{stdio:'inherit'});
+const origin=process.env.EVENT_PREVIEW_ORIGIN || 'http://127.0.0.1:4186';
+if(process.env.EVENT_PREVIEW_ORIGIN) assert.equal(origin,'https://3573-caroline-demo-7fvk78gxm-sunfire-castle-planner.vercel.app');
+const server=process.env.EVENT_PREVIEW_ORIGIN ? null : spawn('./node_modules/.bin/vite',['preview','roster-site','--host','127.0.0.1','--port','4186','--strictPort'],{stdio:'inherit'});
 let browser;
 try {
   let ready=false;
@@ -282,4 +283,4 @@ try {
   await page.screenshot({path:'ocr-review-captures/canyon-learned-alias.png'});
   console.log('PASS: Foundry UI alias confirmation, reload, Canyon automatic reuse in isolated fixture');
   await page.close();
-} finally {await browser?.close();server.kill();}
+} finally {await browser?.close();server?.kill();}
