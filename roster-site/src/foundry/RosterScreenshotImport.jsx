@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { registrationCountReview, combineScreenshotRows } from './rosterScreenshotModel.js';
+import { registrationCountReview, combineScreenshotRows, parsePastedRoster } from './rosterScreenshotModel.js';
 import { readScreenshotSession, writeScreenshotSession } from './screenshotSession.js';
 import { createScreenshotMatcher } from './screenshotImportPlan.js';
 import { ScreenshotReview } from './ScreenshotReview.jsx';
@@ -85,6 +85,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   const [error, setError] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
   const [review, setReview] = useState(null);
+  const [pasteText,setPasteText]=useState('');
   const [reviewHeading,setReviewHeading]=useState('Your import is ready');
   const [evidenceCache,setEvidenceCache]=useState(null);
   useEffect(()=>{
@@ -110,7 +111,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     workspaceRef.current?.focus();
     const trap = event => {
       if (event.key !== 'Tab') return;
-      const controls = [...(workspaceRef.current?.querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled):not([hidden]),summary,[tabindex="0"]') ?? [])].filter(node => node.getClientRects().length);
+      const controls = [...(workspaceRef.current?.querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled):not([hidden]),textarea:not(:disabled),summary,[tabindex="0"]') ?? [])].filter(node => node.getClientRects().length);
       if (!controls.length) { event.preventDefault(); return; }
       const first=controls[0], last=controls.at(-1);
       if (!workspaceRef.current.contains(document.activeElement) || document.activeElement===workspaceRef.current || (event.shiftKey && document.activeElement===first) || (!event.shiftKey && document.activeElement===last)) {
@@ -334,6 +335,17 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     return { legion, sources, rows, counts: registrationCountReview(readings, rows) };
   }).filter(group => group.rows.length),[activeLegion,items,matcher]);
   const read = items.filter(item => item.reading).length;
+  function reviewPaste(batch){
+    setReviewHeading('Your import is ready');
+    setReview({legion:batch.paste.legion,rows:batch.paste.rows,sources:[],counts:[],context:{kind,alliance,legion:batch.paste.legion,expectedOccurrenceId:batch.occurrenceIds[batch.paste.legion]}});
+  }
+  function startPaste(){
+    if(latest.current || job || loading)return;
+    const parsed=parsePastedRoster(pasteText);
+    if(parsed.error){setError(parsed.error);return;}
+    const batch={items:[],mode:'powers',occurrenceIds:eventIds.current,paste:{legion:activeLegion,rows:parsed.rows}};
+    setError('');setMode('powers');checkpoint(batch);reviewPaste(batch);
+  }
 
   return <section className="screenshot-import" aria-label="Troop power upload">
     <button ref={launchRef} type="button" className="screenshot-primary" onClick={() => setWorkspaceOpen(true)}>Open screenshot import</button>
@@ -345,10 +357,12 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       disabled={loading || !!job || !!review} onChange={chooseFiles}/>
     {!review && <div className="stage9-step-strip" aria-label={`Step ${run.current ? 2 : 1} of 8`}>{Array.from({length:8},(_,i)=><span key={i} className={i===(run.current?1:0)?"current":run.current&&i===0?"complete":""}/>)}</div>}
     {!review && <h3 className="stage9-page-title">{job ? 'Reading screenshots' : 'Import roster'}</h3>}
-    {!loading && !review && !run.current && <fieldset className="stage9-mode-options" disabled={!!job}><legend>What would you like to import?</legend>{[['powers','Troop powers only','Update troop powers without changing registrations.'],['roles','Registrations only','Review combatant and substitute assignments.'],['both','Troop powers and registrations','Review both types of changes together.']].map(([value,label,description])=><label key={value} className={mode===value?'selected':''}><input type="radio" name="screenshot-import-mode" value={value} checked={mode===value} onChange={()=>chooseMode(value)}/><span><strong>{label}</strong><small>{description}</small></span></label>)}</fieldset>}
+    {!loading && !review && !run.current && !session?.paste && <fieldset className="stage9-mode-options" disabled={!!job}><legend>What would you like to import?</legend>{[['powers','Troop powers only','Update troop powers without changing registrations.'],['roles','Registrations only','Review combatant and substitute assignments.'],['both','Troop powers and registrations','Review both types of changes together.']].map(([value,label,description])=><label key={value} className={mode===value?'selected':''}><input type="radio" name="screenshot-import-mode" value={value} checked={mode===value} onChange={()=>chooseMode(value)}/><span><strong>{label}</strong><small>{description}</small></span></label>)}</fieldset>}
     {!loading && !review && !run.current && <p className="stage9-protection">Your roster will not change until you review and confirm the import.</p>}
     {loading && <p role="status">Checking for a previous batch…</p>}
-    {!loading && !items.length && <>
+    {!loading && !review && !session && <details><summary>Paste names and troop powers</summary><p>Legion {activeLegion} · Power updates only. Registrations stay unchanged.</p><label>Roster list<textarea aria-label="Pasted roster list" rows={5} value={pasteText} onChange={e=>setPasteText(e.target.value)} placeholder={'Alice, 128500\nBob — 114200'}/></label><button type="button" disabled={!!job || !pasteText.trim()} onClick={startPaste}>Match pasted readings</button></details>}
+    {!review && session?.paste && <div><p>Saved pasted batch · Legion {session.paste.legion} · {session.paste.rows.length} readings</p>{stale && <p role="alert">Event changed. Clear this batch and paste again.</p>}<button type="button" disabled={stale||!!job} onClick={()=>reviewPaste(session)}>Review pasted readings</button><button type="button" disabled={!!job} onClick={()=>{checkpoint(null);setPasteText('');setError('');}}>Clear pasted batch</button></div>}
+    {!loading && !items.length && !session?.paste && <>
 
       <p>Select up to 25 screenshots. Include the legion heading.</p>
     </>}
@@ -370,13 +384,14 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
       </button>)}
     </>}
     {job && !review && !items.length && <p role="status">{job}</p>}
-    {!loading && !review && (!items.length || run.current || read < items.length && !stale) && <div className="stage9-action-footer">
+    {!loading && !review && !session?.paste && (!items.length || run.current || read < items.length && !stale) && <div className="stage9-action-footer">
       {run.current ? <button type="button" className="screenshot-primary" disabled={run.current.stopped} onClick={() => { run.current.stopped = true; setJob('Stopping after current screenshot…'); }}>Stop scan</button> : !items.length ? <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => picker.current?.click()}>Upload troop power</button> : <button type="button" className="screenshot-primary" disabled={!!job} onClick={() => scan()}>{items.some(item=>!item.reading&&item.error) ? 'Retry unread screenshots' : !session?.scanStarted ? 'Scan screenshots' : session?.hasNewScreenshots ? 'Scan new screenshots' : 'Resume scan'}</button>}
     </div>}
     {error && <p role="alert" className="screenshot-error">{error}</p>}
     {recoveryError && <p role="alert">{recoveryError}</p>}
     {review && <EvidenceCache.Provider value={evidenceCache}><ScreenshotReview onStageHeading={setReviewHeading} {...review} players={players} preferredIds={preferredIds} storage={storage} onSave={saveOnce} onRememberOcrAlias={onRememberOcrAlias} Evidence={ScreenshotImage} PreloadEvidence={ReviewEvidence} onRetryUsername={rereadUsername}
-      initialMode={latest.current?.drafts?.[review.legion]?.mode ?? mode}
+      initialMode={latest.current?.paste ? 'powers' : latest.current?.drafts?.[review.legion]?.mode ?? mode}
+      powersOnly={!!latest.current?.paste}
       initialEdits={latest.current?.drafts?.[review.legion]?.edits ?? {}}
       onDraftChange={draft => {
         if (!latest.current) return;
