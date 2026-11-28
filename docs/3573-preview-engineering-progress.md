@@ -41,3 +41,9 @@ The 19 original RKG screenshots contain 76 visually readable rows. A multimodal 
 | Authenticated persistence and hosted preview | Pending exact-commit evidence | Check the local-Supabase CI workflow and the isolated hosted fixture |
 
 To roll back a preview, reopen the previous immutable Vercel preview URL, or redeploy the previous tested SHA with the preview target. Revert the development commits if the branch needs to return to the prior build. No schema migration is needed. Avoid Vercel production promotion, production rollback and production alias changes.
+
+## Hosted candidate checkpoint
+
+- Vercel preview `dpl_6b7XQ4USzJEvbuF7Ac9oxbKVD52J` deployed `319f430b2013cd69407aba099390870c3089ee81` to the separate demo project. [Open the sample roster](https://3573-caroline-demo-1lyldijx1-sunfire-castle-planner.vercel.app/event-preview.html). The exact candidate passed 600 tests, the build, hosted paste and squad checks at all three mobile widths, grouped TSV/pipe regression checks, and hosted real screenshot upload and review. Its workspace API returned HTTP 401.
+- [Disposable Supabase CI for the deployed commit](https://github.com/caroline3543/3543-intel/actions/runs/46114536482) passed browser persistence with create, failed save and retry, reuse, edit and deletion.
+- The previous hosted PR workflow [failed on an older fixed demo URL](https://github.com/caroline3543/3543-intel/actions/runs/46114539402). The follow-up workflow builds and tests the exact PR head locally. An explicit hosted run checks the supplied immutable preview's fixture assets and workspace access before exercising the hosted journey. Verify the deployment SHA in Vercel before supplying that URL and SHA. That follow-up changes CI and this log only.
