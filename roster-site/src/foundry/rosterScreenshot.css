@@ -191,8 +191,8 @@
 .compact-review-power { text-align: right; font-variant-numeric: tabular-nums; }
 .compact-review-check { color: #6bdfa0; }
 .compact-review-warning { color: #ffd180; }
-.compact-review-row:has(.compact-row-action) { grid-template-columns: 14px minmax(0,1fr) auto auto; height: 44px; }
-.stage9-import-workspace .compact-row-action { min-height: 44px; min-width: 44px; }
+.stage9-import-workspace button.compact-review-row { grid-template-columns: 14px minmax(0,1fr) auto auto; width: 100%; height: 44px; padding: 0 7px; border: 0; border-radius: 0; background: transparent; text-align: left; font-size: 13px; }
+.compact-review-chevron { color: #a8b8ca; min-width: 12px; text-align: center; }
 .compact-review-item .ocr-reading-fields { padding: 8px; }
 .compact-review-item .ocr-reading-fields button { min-height: 44px; }
 

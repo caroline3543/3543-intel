@@ -68,9 +68,18 @@ try {
     const review=page.getByRole('region',{name:'Review screenshot readings'});
     await review.getByRole('heading',{name:'Review imported players'}).waitFor();
     const row=name=>review.locator(`[data-imported-name="${name}"]`);
+    const openRow=async name=>{
+      const item=row(name);
+      if(!await item.evaluate(element=>element.classList.contains('is-expanded')))await item.locator('button.compact-review-row').click();
+      assert.equal(await review.locator('.is-expanded').count(),1);
+    };
     assert.equal(await review.locator('.compact-review-item').count(),4);
+    assert.equal(await review.locator('.is-expanded').count(),0);
     await checkResponsive('compact-review');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-current-summary.png'});
+    await openRow('Juniper');
+    await openRow('Northva1e');
+    assert.equal(await row('Juniper').locator('.ocr-reading-fields').count(),0);
     await checkResponsive('04-identity');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-04-identity.png',animations:'disabled'});
     // Candidate selection is provisional and must be cleared by a changed search.
@@ -109,16 +118,19 @@ try {
     await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('button',{name:'Close',exact:true}).click();
     await page.getByRole('button',{name:'Import roster'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
+    await openRow('Northva1e');
     assert.equal(await retryStatus.innerText(),firstReading,'Additional OCR evidence must survive reopening');
     assert.ok(await review.getByRole('button',{name:'Review troop powers changes'}).isDisabled());
     await row('Northva1e').getByRole('button',{name:'Skip this reading',exact:true}).click();
     assert.ok(await row('Northva1e').getByRole('button',{name:'Restore Northva1e'}).isVisible());
     await review.getByRole('button',{name:'Needs review',exact:true}).click();
     for(const name of ['Northvale','Aster']){
+      if(await row(name).locator('button.compact-review-row').count())await openRow(name);
       if(await row(name).getByRole('alert').filter({hasText:'Unusually large change'}).count()){
         await row(name).getByRole('button',{name:'Confirm troop power',exact:true}).click();
       }
     }
+    await openRow('Juniper');
     const comparison=row('Juniper').locator('.stage9-registration-comparison');
     const expectedPrevious=kind==='foundry'?3630:1385000000;
     assert.ok((await comparison.innerText()).includes(expectedPrevious.toLocaleString('en-US')),'Power comparison must show the correct event-specific recorded value');
@@ -133,6 +145,7 @@ try {
     await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('button',{name:'Close',exact:true}).click();
     await page.getByRole('button',{name:'Import roster'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
+    await openRow('Juniper');
     assert.equal(await powerInput.inputValue(),String(enteredPower));
     await page.waitForFunction(async ({kind,enteredPower})=>{
       const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('3573-screenshot-import',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
@@ -145,9 +158,11 @@ try {
     if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
     await page.getByRole('button',{name:'Import roster'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
+    await openRow('Juniper');
     assert.equal(await powerInput.inputValue(),String(enteredPower));
     await row('Juniper').getByRole('button',{name:'Confirm troop power',exact:true}).click();
     for(const name of ['Northvale','Aster']){
+      if(await row(name).locator('button.compact-review-row').count())await openRow(name);
       if(await row(name).getByRole('alert').filter({hasText:'Unusually large change'}).count()){
         await row(name).getByRole('button',{name:'Confirm troop power',exact:true}).click();
       }
@@ -155,6 +170,7 @@ try {
     await review.getByText('Review options',{exact:true}).click();
     await review.getByLabel('Import mode').selectOption('both');
     await review.getByRole('button',{name:'Needs review',exact:true}).click();
+    await openRow('Northvale');
     assert.ok(await row('Northvale').getByLabel('Registration for Northvale').isVisible());
     await checkResponsive('06-registration-exception');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-06-registration-exception.png',animations:'disabled'});
@@ -162,12 +178,14 @@ try {
     await review.getByLabel('Show edit controls for matched players').check();
     await row('Juniper').getByRole('button',{name:'Edit Juniper'}).click();
     assert.equal(await row('Juniper').getByLabel('Registration for Juniper').inputValue(),'join');
-    await row('Juniper').getByRole('button',{name:'Close details'}).click();
-    if(!await row('Aster').getByLabel('Registration for Aster').count())await row('Aster').getByRole('button',{name:'Edit Aster'}).click();
+    await row('Juniper').getByRole('button',{name:'Close details for Juniper'}).click();
+    await openRow('Aster');
     assert.equal(await row('Aster').getByLabel('Registration for Aster').inputValue(),'');
     await checkResponsive('06-registration');
     await page.screenshot({path:'ocr-review-captures/'+kind+'-06-registration.png',animations:'disabled'});
+    await openRow('Northvale');
     await row('Northvale').getByRole('button',{name:'Keep existing registration'}).click();
+    await openRow('Aster');
     if(await row('Aster').getByRole('button',{name:'Keep existing registration'}).count())await row('Aster').getByRole('button',{name:'Keep existing registration'}).click();
     await review.getByRole('button',{name:'Review troop powers and registrations changes'}).click();
     const confirm=review.getByRole('region',{name:'Confirm screenshot import'});
@@ -247,6 +265,7 @@ try {
   await page.getByRole('button',{name:'Import roster'}).click();
   await page.getByRole('button',{name:/Review Legion 1 · 1 reading/}).click();
   const review=page.getByRole('region',{name:'Review screenshot readings'});
+  await review.getByRole('button',{name:'Review Northva1e',exact:true}).click();
   await review.getByRole('searchbox').fill('Northvale');
   await review.locator('.stage9-candidate-card').filter({hasText:'357301200'}).click();
   await review.getByLabel('Remember this spelling for future uploads').check();
@@ -257,7 +276,7 @@ try {
   await page.getByRole('button',{name:'Import roster'}).click();
   await page.getByRole('button',{name:/Review Legion 1 · 1 reading/}).click();
   await review.getByRole('heading',{name:'Review imported players'}).waitFor();
-  assert.equal(await review.getByRole('button',{name:'Confirm match'}).count(),0,'Learned alias must not require another identity review');
+  assert.match(await review.locator('.stage9-review-counts').innerText(),/1 matched · 0 need review/,'Learned alias must not require another identity review');
   await page.screenshot({path:'ocr-review-captures/canyon-learned-alias.png'});
   console.log('PASS: Foundry UI alias confirmation, reload, Canyon automatic reuse in isolated fixture');
   await page.close();

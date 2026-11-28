@@ -22,6 +22,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
   const [done, setDone] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [openId, setOpenId] = useState(null);
+  const [editing, setEditing] = useState(false);
   const [editMatched,setEditMatched] = useState(false);
   const [aliasError,setAliasError]=useState(null);
   const [retrying,setRetrying]=useState(null);
@@ -151,7 +152,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
       } finally { setWorking(false); }
     }
     update(row.rowId,{playerId:id,choice:null,search:'',remember:false,role:null,registrationReviewed:false,checked:false,powerApproval:null,powerConfirmed:false,keepPower:false});
-    setOpenId(null);
+    setEditing(false);
   }
 
   const stageHeading=done?'Roster updated':preview?'Review changes':'Review imported players';
@@ -187,9 +188,19 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
         {visible.map(item => {
           const { row, edit, match, player, powerText, power, powerPending, previousPower, unusualPower, conflict, needsReview, registrationPending, proposedRole } = item;
           const title = row.name || 'Unread player name';
-          const changing = openId === row.rowId;
           const requiresReview = needsReview || duplicate(item);
-          const showFields = !edit.skip && (requiresReview || changing);
+          const showFields = !edit.skip && openId === row.rowId && (requiresReview || editing);
+          const changing = showFields && editing;
+          const actionable = edit.skip || requiresReview || editMatched || showFields;
+          const Summary = actionable ? 'button' : 'div';
+          const label = edit.skip ? 'Restore' : showFields ? 'Close details for' : requiresReview ? 'Review' : 'Edit';
+          const toggle = event => {
+            if (edit.skip) { update(row.rowId,{skip:false}); return; }
+            setEditing(!requiresReview && !showFields);
+            setOpenId(showFields ? null : row.rowId);
+            const button = event.currentTarget;
+            if (!showFields) requestAnimationFrame(()=>button.scrollIntoView({block:'nearest'}));
+          };
           const query = String(edit.search ?? '').trim().toLocaleLowerCase();
           const normalized = normaliseBulkName(query);
           const candidates = query ? players.filter(candidate =>
@@ -200,12 +211,15 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
           const here = target.registrations[player?.id];
           const current = assignments.get(player?.id) ?? [];
           return <article key={row.rowId} data-imported-name={title} className={showFields?'compact-review-item is-expanded':'compact-review-item'}>
-            <div className="compact-review-row">
+            <Summary className="compact-review-row" {...(actionable ? {
+              type:'button', 'aria-label':label+' '+title,
+              'aria-expanded':edit.skip ? undefined : showFields, 'aria-describedby':'reading-power-'+row.rowId, onClick:toggle,
+            } : {})}>
               <span aria-label={edit.skip?'Skipped':requiresReview?'Needs review':'Matched'} className={requiresReview?'compact-review-warning':'compact-review-check'}>{edit.skip?'↷':requiresReview?'!':'✓'}</span>
               <strong title={player?.name || title}>{player?.name || title}</strong>
-              <span className="compact-review-power">{power?.toLocaleString() ?? '—'}</span>
-              {!showFields && (edit.skip || editMatched) && <button className="compact-row-action" type="button" aria-label={(edit.skip?'Restore ':'Edit ')+title} onClick={()=>edit.skip?update(row.rowId,{skip:false}):setOpenId(row.rowId)}>{edit.skip?'Restore':'Edit'}</button>}
-            </div>
+              <span id={'reading-power-'+row.rowId} className="compact-review-power">{power?.toLocaleString() ?? '—'}</span>
+              {actionable && <span className="compact-review-chevron" aria-hidden="true">{edit.skip?'Restore':showFields?'⌃':'›'}</span>}
+            </Summary>
             {showFields && <div className="ocr-reading-fields">
               {player && player.name !== title && <p>Imported name: <strong>{title}</strong></p>}
               {match.idConflict && <p role="alert">Check player ID {row.fid} against the imported username before selecting a player.</p>}
@@ -228,7 +242,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
                 {choice && onRememberOcrAlias && row.name?.trim() && <label><input type="checkbox" checked={!!edit.remember} onChange={event=>update(row.rowId,{remember:event.target.checked})}/> Remember this spelling for future uploads</label>}
                 {aliasError?.id === row.rowId && <p role="alert">{aliasError.message}</p>}
                 <button type="button" disabled={!choice} onClick={()=>confirmIdentity(row,edit,choice)}>Confirm match</button>
-              </> : <button type="button" onClick={()=>setOpenId(row.rowId)}>Change match</button>}
+              </> : <button type="button" onClick={()=>setEditing(true)}>Change match</button>}
               {player && mode !== 'roles' && (powerPending || conflict || power === null || changing) && <>
                 <div className="stage9-registration-comparison"><div><small>Existing troop power</small><strong>{previousPower?.toLocaleString() ?? 'Not recorded'}</strong></div><div><small>Proposed troop power</small><strong>{power?.toLocaleString() ?? 'Unreadable'}</strong></div></div>
                 {unusualPower && <p className="stage9-power-warning" role="alert">Unusually large change: {previousPower.toLocaleString()} → {power.toLocaleString()}. Check the troop power units.</p>}
@@ -236,8 +250,8 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
                 {row.powerConflict?.length > 1 && <div className="ocr-power-choices" aria-label="Competing troop powers">
                   {row.powerConflict.map(value=><button type="button" key={value} aria-pressed={powerText===String(value)} onClick={()=>update(row.rowId,{power:String(value),keepPower:false,powerConfirmed:false})}>{value.toLocaleString()}</button>)}
                 </div>}
-                <button type="button" disabled={power===null} onClick={()=>{update(row.rowId,{powerConfirmed:true,powerApproval:{previous:previousPower,next:power}});setOpenId(null);}}>Confirm troop power</button>
-                {row.source==='paste' && <button type="button" onClick={()=>{update(row.rowId,{keepPower:true});setOpenId(null);}}>Keep existing troop power</button>}
+                <button type="button" disabled={power===null} onClick={()=>{update(row.rowId,{powerConfirmed:true,powerApproval:{previous:previousPower,next:power}});setEditing(false);}}>Confirm troop power</button>
+                {row.source==='paste' && <button type="button" onClick={()=>{update(row.rowId,{keepPower:true});setEditing(false);}}>Keep existing troop power</button>}
               </>}
               {player && mode !== 'powers' && (registrationPending || changing) && <>
                 <div className="stage9-registration-comparison"><div><small>Imported registration</small><strong>{roles[row.registration] || 'Unknown'}</strong></div><div><small>Existing registration</small><strong>{current.length ? current.map(assignmentLabel).join(' / ') : roleName(here || '')}</strong></div></div>
@@ -246,11 +260,11 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
                   <option value="sub">Legion {legion} substitute</option>
                   {here && <option value="remove">Remove Legion {legion} registration</option>}
                 </select>
-                <button type="button" onClick={()=>{update(row.rowId,{role:edit.role ?? '',registrationReviewed:true});setOpenId(null);}}>{edit.role?'Confirm registration':'Keep existing registration'}</button>
+                <button type="button" onClick={()=>{update(row.rowId,{role:edit.role ?? '',registrationReviewed:true});setEditing(false);}}>{edit.role?'Confirm registration':'Keep existing registration'}</button>
               </>}
               {conflict && <label><input type="checkbox" checked={!!edit.checked} onChange={event=>update(row.rowId,{checked:event.target.checked})}/> I checked the conflicting evidence for this player.</label>}
               <button type="button" onClick={()=>{update(row.rowId,{skip:true});setOpenId(null);}}>Skip this reading</button>
-              {changing && <button type="button" onClick={()=>setOpenId(null)}>Close details</button>}
+
             </div>}
           </article>;
         })}
