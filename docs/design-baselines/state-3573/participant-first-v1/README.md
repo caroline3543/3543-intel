@@ -28,3 +28,7 @@ Existing Stage 9 PDF and eight PNGs located in repository tree. New R01–R10 sc
 
 ## Approved PDF reference
 User approved the reconstructed visual reference PDF for implementation comparison. File: `3573_participant_first_visual_reference_v1.pdf`. Verified repository Git blob SHA: `fdb4b48122ae540bd1e7031b37129a90f6f8649a`. Do not replace without explicit design approval. Individual PNG extraction and SHA256 manifest remain outstanding; PDF approval does not imply implementation acceptance.
+
+## Reference extraction
+Approved PDF SHA-256: `2eea914ac39cd2fee0c1832fe9faf1b8b182f590edcdfc095796b63de48c9489`.
+Render all ten pages using Poppler pdftoppm at 144 DPI, rename R-01.png through R-10.png to R01.png through R10.png in reference-screens/, and generate SHA256SUMS from those files. These are full reference pages, not browser captures; compare the mockup region and acceptance criteria, not whole-page pixel equality. Local extraction and checksum validation passed; repository PNG upload remains outstanding.
