@@ -89,8 +89,6 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const [leaderIds,setLeaderIds]=useState(()=>Object.values(sharedFoundry.teamLeaders??{}));
  const [preferencesEnabled,setPreferencesEnabled]=useState(true);
  const [addRole,setAddRole]=useState('join');
- const [leaderIds,setLeaderIds]=useState([]);
- const [replaceAssignments,setReplaceAssignments]=useState(false);
  const [managing,setManaging]=useState(null);
  const [resetScope,setResetScope]=useState('');
  const [participantsOnly,setParticipantsOnly]=useState(false),[rosterSearch,setRosterSearch]=useState('');
