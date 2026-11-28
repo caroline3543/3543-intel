@@ -141,3 +141,18 @@ export function registrationCountReview(screenshots,rows){
   return {role,detected,expected:values.length===1?values[0]:null,conflict:values.length>1};
  });
 }
+
+ // Pasted rows use the same power parser and identity review as screenshots.
+ // Never infer a registration from a name/power list.
+export function parsePastedRoster(text) {
+  const lines=String(text ?? '').split(/\r?\n/).map((line,index)=>({line:line.trim(),index})).filter(x=>x.line);
+  if(lines.length>100) return {error:'Paste at most 100 readings at a time.',rows:[]};
+  const rows=[];
+  for(const {line,index} of lines){
+    const match=line.match(/^(.+?)(?:\s*[—–\t]\s*|,\s*|\s+-\s+)(\d[\d,.]*(?:\s*[KMB])?)$/i);
+    const power=match?readScreenshotPower(match[2]):null;
+    if(!match||!match[1].trim()||power===null) return {error:'Check line '+(index+1)+': use Name, Troop Power.',rows:[]};
+    rows.push({rowId:'paste:'+index,name:match[1].trim(),power,registration:'unknown',evidence:[],sources:[]});
+  }
+  return {rows,error:rows.length?'':'Paste at least one name and troop power.'};
+}
