@@ -1,8 +1,6 @@
 export const rosterPasteHeader = 'Username\tTroop power\tLegion\tRegistration';
 
-export const rosterExtractionPrompt = `Transcribe the attached Whiteout Survival Foundry or Canyon Clash registration screenshots into a tab-separated player list (TSV).
-
-Return exactly one plain-text code block with this header:
+export const rosterExtractionPrompt = `Transcribe the attached Whiteout Survival Foundry or Canyon Clash registration screenshots into a tab-separated player list (TSV). Return exactly one plain-text code block with this header:
 ${rosterPasteHeader}
 
 Extraction rules:
