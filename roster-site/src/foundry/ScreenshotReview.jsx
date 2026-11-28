@@ -11,8 +11,8 @@ import {reviewAvatarSuggestions} from './reviewAvatarSuggestions.js';
 const roles = { combatant: 'Combatant', substitute: 'Substitute', unassigned: 'Unassigned', 'other-legion': 'Other legion', unknown: 'Unknown' };
 const modeLabels = { powers: 'troop powers', roles: 'registrations', both: 'troop powers and registrations' };
 
-export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false, onRetryUsername, onRememberOcrAlias }) {
-  const [mode, setMode] = useState(initialMode);
+export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', powerOnly = false, initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false, onRetryUsername, onRememberOcrAlias }) {
+  const [mode, setMode] = useState(powerOnly ? 'powers' : initialMode);
   const [edits, setEdits] = useState(initialEdits);
   const [filter, setFilter] = useState('all');
   const [preview, setPreview] = useState(null);
@@ -271,7 +271,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
       </fieldset>
       {filter==='review' && !exceptions.length && <p>All readings are ready.</p>}
       <details className="stage9-review-options"><summary>Review options</summary><label>Import mode
-        <select value={mode} disabled={working} onChange={event=>{setMode(event.target.value);setPreview(null);}}>
+        <select value={mode} disabled={working || powerOnly} onChange={event=>{setMode(event.target.value);setPreview(null);}}>
           <option value="powers">Troop powers only</option>
           <option value="roles">Registrations only</option>
           <option value="both">Troop powers and registrations</option>
