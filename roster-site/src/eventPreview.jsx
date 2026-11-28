@@ -26,14 +26,38 @@ const foundry={
     [plannerKey('canyon','WAR',2)]:{...plannerSlot(null,'canyon','WAR',2),
       registrations:{'sample-9':'sub'},registeredUnder:{'sample-9':'WAR'}}},
 };
-const previewStorageKey = '3573-event-preview-fixture-v1';
+const pilotMode = new URLSearchParams(location.search).get('pilot') === 'rkg';
+const previewStorageKey = '3573-event-preview-fixture-v1' + (pilotMode ? '-rkg' : '');
+
+function readPilotRoster(data) {
+  if (data.version !== 1 || !Array.isArray(data.players) || !data.players.length || data.players.length > 1000
+      || !Array.isArray(data.legion2) || data.legion2.length > 30) throw Error('Choose the RKG pilot roster file.');
+  const players = data.players.map(row => {
+    if (typeof row?.fid !== 'string' || !/^[1-9]\d+$/.test(row.fid)
+        || typeof row.username !== 'string' || !row.username.trim()
+        || typeof row.allianceTag !== 'string') throw Error('The pilot roster contains an invalid player.');
+    return {id:'pilot-'+row.fid,fid:row.fid,username:row.username,allianceTag:row.allianceTag,
+      alias:typeof row.alias==='string'?row.alias:undefined,
+      pastUsernames:Array.isArray(row.pastUsernames)?row.pastUsernames.filter(name=>typeof name==='string'):[]};
+  });
+  const ids = new Set(players.map(player=>player.fid));
+  if (ids.size!==players.length || new Set(data.legion2).size!==data.legion2.length
+      || data.legion2.some(fid=>!ids.has(fid))) throw Error('The pilot roster has duplicate or missing player IDs.');
+  const key=plannerKey('canyon','RKG',2);
+  const assigned=data.legion2.map(fid=>'pilot-'+fid);
+  const legion={...plannerSlot(null,'canyon','RKG',2),
+    registrations:Object.fromEntries(assigned.map(id=>[id,'join'])),
+    registeredUnder:Object.fromEntries(assigned.map(id=>[id,'RKG']))};
+  return {pilot:true,players,foundry:{eventPlans:{[key]:legion}}};
+}
 function previewWorkspace() {
   try { return JSON.parse(sessionStorage.getItem(previewStorageKey)) || { players, foundry }; }
   catch { return { players, foundry }; }
 }
 
 function Preview(){
-  const [kind,setKind]=useState('foundry');
+  const [kind,setKind]=useState(pilotMode?'canyon':'foundry');
+  const [pilotError,setPilotError]=useState('');
   const [opened,open]=useState(null);
   const [teamwork,setTeamwork]=useState({pairs:[['sample-7','sample-9']]});
   const [workspace,save]=useState(previewWorkspace);
@@ -63,9 +87,30 @@ function Preview(){
     try{sessionStorage.setItem(previewStorageKey,JSON.stringify(next));}catch{return {error:'Sample alias could not be saved.'};}
     save(next);return {verified:true};
   };
+  async function loadPilot(event){
+    const file=event.target.files[0];
+    event.target.value='';
+    if(!file)return;
+    setPilotError('');
+    try{
+      if(file.size>1024*1024)throw Error('The pilot roster file must be under 1 MB.');
+      const next=readPilotRoster(JSON.parse(await file.text()));
+      sessionStorage.setItem(previewStorageKey,JSON.stringify(next));
+      localStorage.setItem('caroline3573_canyon_alliance','RKG');
+      save(next);
+    }catch(error){
+      setPilotError(error instanceof SyntaxError?'Choose the RKG pilot roster JSON file.':error.message);
+    }
+  }
+  if(pilotMode&&!workspace.pilot)return <main style={{padding:'12px 16px'}}>
+    <h1>RKG iPhone pilot</h1>
+    <p>Load the roster file to test Canyon Clash. The roster and changes stay in this browser tab.</p>
+    <label style={{display:'grid',gap:8}}>Load RKG pilot roster<input type="file" accept=".json,application/json" onChange={loadPilot}/></label>
+    {pilotError&&<p role="alert">{pilotError}</p>}
+  </main>;
   const profile=workspace.players.find(p=>p.id===opened);
   return <main>
-    <p style={{padding:'4px 16px',color:'#afc1d3'}}>Sample roster · Screenshot imports are saved in this tab</p>
+    <p style={{padding:'4px 16px',color:'#afc1d3'}}>{pilotMode?'RKG pilot roster · Changes are saved in this tab':'Sample roster · Roster imports are saved in this tab'}</p>
     <nav aria-label="Choose event planner">
       <button aria-pressed={kind==='foundry'} onClick={()=>setKind('foundry')}>Foundry</button>
       <button aria-pressed={kind==='canyon'} onClick={()=>setKind('canyon')}>Canyon Clash</button>
