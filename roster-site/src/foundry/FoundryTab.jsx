@@ -92,6 +92,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const [managing,setManaging]=useState(null);
  const [resetScope,setResetScope]=useState('');
  const [participantsOnly,setParticipantsOnly]=useState(true),[rosterSearch,setRosterSearch]=useState('');
+ const [powerOpen,setPowerOpen]=useState(false),[powerFilter,setPowerFilter]=useState('all'),[powerSearch,setPowerSearch]=useState(''),[powerDraft,setPowerDraft]=useState({});
  const [registrationStep,setRegistrationStep]=useState(0),[draftRoles,setDraftRoles]=useState({}),[draftPowers,setDraftPowers]=useState({}),[draftOriginal,setDraftOriginal]=useState({}),[draftError,setDraftError]=useState('');
  const [rosterSort,setRosterSort]=useState('rank'),[editingPower,setEditingPower]=useState(null),[confirmMove,setConfirmMove]=useState(null);
  const [roleFilter,setRoleFilter]=useState('all'),[bulkMode,setBulkMode]=useState(false),[bulkSelected,setBulkSelected]=useState([]),[rankExpanded,setRankExpanded]=useState({R5:true,R4:true,R3:true,R2:true,R1:true});
@@ -154,7 +155,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   }
   return commitRoles(changes);
  };
- const beginRegistration=()=>{setDraftOriginal({...registrations});setDraftPowers({});setDraftError('');setDraftRoles(Object.fromEntries([...joined.map(p=>[p.id,'join']),...subs.map(p=>[p.id,'sub'])]));setRegistrationStep(1);setRosterSearch('');};
+ const beginRegistration=()=>{setPowerOpen(false);setDraftOriginal({...registrations});setDraftPowers({});setDraftError('');setDraftRoles(Object.fromEntries([...joined.map(p=>[p.id,'join']),...subs.map(p=>[p.id,'sub'])]));setRegistrationStep(1);setRosterSearch('');};
  const draftCount=role=>Object.values(draftRoles).filter(v=>v===role).length;
  const toggleDraft=(id,role)=>{setDraftRoles(old=>{const next={...old};if(next[id]===role){delete next[id];return next;}if(Object.values(old).filter(v=>v===role).length>=limits[role])return old;next[id]=role;return next;});onRoleFeedback?.();};
  const draftPlayers=allianceEntries.filter(p=>draftRoles[p.id]);
@@ -385,6 +386,14 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    {showPaste&&<BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
    </details>
    </RosterScreenshotImport>
+   <button type="button" style={{...btn,width:'100%'}} onClick={()=>{setPowerOpen(v=>!v);setPowerDraft({});setPowerSearch('');setPowerFilter('all');setRegistrationStep(0)}}>{powerOpen?'Cancel power recording':'Record troop power'}</button>
+   {powerOpen&&<section aria-label="Independent troop power" style={{...style,display:'grid',gap:10}}>
+     <strong>Record troop power · {chosen}</strong><small>Power only. Registration and legion assignments will not change.</small>
+     <input type="search" aria-label="Search power candidates" placeholder="Search players" value={powerSearch} onChange={e=>setPowerSearch(e.target.value)} style={btn}/>
+     <select aria-label="Filter power candidates" style={btn} value={powerFilter} onChange={e=>setPowerFilter(e.target.value)}>{[['all','All'],['join','Combatants'],['sub','Substitutes'],['out','Not participating'],['missing','Missing power']].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>
+     <div style={{maxHeight:420,overflowY:'auto',display:'grid',gap:8}}>{entries.filter(p=>p.matched&&p.alliance===chosen&&(!powerSearch.trim()||fields(p).some(f=>norm(f).includes(norm(powerSearch))))&&(powerFilter==='all'||(powerFilter==='missing'?!p.hasPower:powerFilter==='out'?!(eventRegistrations.get(p.id)||[]).some(x=>isParticipant(x.role)):(eventRegistrations.get(p.id)||[]).some(x=>x.alliance===chosen&&x.role===powerFilter)))).map(p=><label key={p.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}><span>{p.name}</span><input aria-label={'Independent power for '+p.name} inputMode="numeric" style={{...btn,width:'45%'}} value={powerDraft[p.id]??(p.hasPower?String(p.power):'')} onChange={e=>setPowerDraft(old=>({...old,[p.id]:e.target.value}))}/></label>)}</div>
+     <button type="button" style={{...btn,background:'#d4a64c',color:'#171b22'}} disabled={!Object.values(powerDraft).some(v=>v!=='')||Object.values(powerDraft).some(v=>v!==''&&(!/^\d+$/.test(v)||!Number.isSafeInteger(Number(v))))} onClick={()=>{const powers=entries.filter(p=>p.matched&&p.alliance===chosen&&powerDraft[p.id]!==undefined&&powerDraft[p.id]!=='').map(p=>({id:p.id,value:Number(powerDraft[p.id])}));const result=onChangeRoles([],powers);if(result?.error){setNotice(result.error);return;}setPowerOpen(false);setPowerDraft({});setNotice('Power update requested · syncing');}}>Save troop power</button>
+   </section>}
    {registrationStep>0&&registrationStep<=2&&<section aria-label="Guided registration" style={{...style,display:'grid',gap:10}}>
      <strong>Step {registrationStep} of 4 · {registrationStep===1?'Select combatants':'Select substitutes'}</strong>
      <span>{draftCount(registrationStep===1?'join':'sub')}/{limits[registrationStep===1?'join':'sub']} selected</span>
