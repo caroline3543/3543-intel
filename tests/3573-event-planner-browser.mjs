@@ -199,7 +199,8 @@ try {
 
     await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
     assert.equal(await page.getByRole('button',{name:'Buildings',exact:true}).count(),0);
-    assert.equal(await participants.isChecked(),false);
+    assert.equal(await participants.isChecked(),true);
+    await participants.uncheck();
     assert.equal(await roster.count(),9);
     assert.equal(await roster.getByRole('button',{name:'Open profile for Wren'}).count(),0);
     assert.equal(await sort.inputValue(),'rank');
