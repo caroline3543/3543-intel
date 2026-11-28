@@ -14,6 +14,155 @@ on:
 permissions:
   contents: read
 jobs:
+  integration-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.scope.outputs.full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Determine whether isolated database tests are required
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BRANCH: ${{ github.ref_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          full=true
+          if [[ "$EVENT" == push && "$BRANCH" == fix/3573-paste-only ]] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            changed=$(git diff --name-only "$BEFORE" HEAD)
+            if [[ -n "$changed" ]] && ! grep -Ev '^(roster-site/src/foundry/(parseRosterPaste\.js|pasteDelimiterRegression\.test\.mjs))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify immutable visual references
+        working-directory: docs/design-baselines/state-3573/ocr-import-v1
+        run: sha256sum --strict -c SHA256SUMS
+  existing-regression-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build --prefix roster-site
+  event-browser-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.56.1
+      - run: npx playwright install chromium
+      - run: BUILD_PROFILE_FIXTURE=1 npm run build --prefix roster-site
+      - run: test -f roster-site/dist/event-preview.html
+      - run: node tests/3573-event-planner-browser.mjs
+      - name: Paste-only mobile roster and squads
+        if: github.ref_name == 'fix/3573-paste-only' || github.head_ref == 'fix/3573-paste-only'
+        run: |
+          test ! -d roster-site/dist/ocr-data
+          if grep -Eilr 'tesseract|traineddata' roster-site/dist; then
+            exit 1
+          fi
+          node tests/3573-paste-squads-browser.mjs
+      - name: Retain paste-only mobile captures
+        if: always() && (github.ref_name == 'fix/3573-paste-only' || github.head_ref == 'fix/3573-paste-only')
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage9-paste-only-mobile
+          path: paste-squad-captures/
+          if-no-files-found: warn
+      - name: Mobile OCR upload acceptance
+        if: always() && github.ref_name != 'fix/3573-paste-only' && github.head_ref != 'fix/3573-paste-only'
+        run: node tests/3573-ocr-upload-browser.mjs
+      - name: Deterministic OCR review acceptance
+        if: always() && github.ref_name != 'fix/3573-paste-only' && github.head_ref != 'fix/3573-paste-only'
+        run: node tests/3573-ocr-review-browser.mjs
+      - name: Independent browser alias persistence
+        if: always()
+        run: node tests/3573-ocr-alias-browser.mjs
+      - name: Assemble paired visual acceptance evidence
+        if: always() && github.ref_name != 'fix/3573-paste-only' && github.head_ref != 'fix/3573-paste-only'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          root=Path('ocr-review-captures')
+          baseline=Path('docs/design-baselines/state-3573/ocr-import-v1/reference-screens')
+          pairs={'03-summary':'current-summary','04-identity':'04-identity','05-power':'05-power','06-registration':'06-registration-exception','07-review':'current-confirmation','08-completion':'current-completion'}
+          for kind in ('foundry','canyon'):
+              for reference,current in pairs.items():
+                  dest=root/'paired'/kind/reference
+                  dest.mkdir(parents=True,exist_ok=True)
+                  shutil.copyfile(baseline/(reference+'.png'),dest/'reference.png')
+                  actual=root/(kind+'-'+current+'.png')
+                  if not actual.is_file(): raise RuntimeError('Missing current capture: '+str(actual))
+                  shutil.copyfile(actual,dest/'current.png')
+          PY
+      - name: Retain current implementation captures for review
+        if: always() && github.ref_name != 'fix/3573-paste-only' && github.head_ref != 'fix/3573-paste-only'
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage9-current-ocr-captures
+          path: ocr-review-captures/
+          if-no-files-found: warn
+  local-supabase-browser:
+    needs: integration-scope
+    if: needs.integration-scope.outputs.full == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.54.11
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Start disposable Supabase
+        run: |
+          mkdir -p "$RUNNER_TEMP/ocr-db"
+          cd "$RUNNER_TEMP/ocr-db"
+          supabase init
+          mkdir -p supabase/migrations supabase/functions
+          cp "$GITHUB_WORKSPACE/supabase/schema/caroline_shared_workspace.sql" supabase/migrations/20261128000000_workspace.sql
+          cp -r "$GITHUB_WORKSPACE/supabase/functions/caroline3573-workspace" supabase/functions/
+          supabase start
+          supabase db reset --local
+          printf 'CAROLINE3573_SITE_KEY_HASH=%s\n' "$(printf '%s' local-only-ocr-persistence-test-token-3573 | sha256sum | cut -d' ' -f1)" > "$RUNNER_TEMP/ocr-edge.env"
+          supabase functions serve caroline3573-workspace --no-verify-jwt --env-file "$RUNNER_TEMP/ocr-edge.env" > "$RUNNER_TEMP/ocr-edge.log" 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS -X POST http://127.0.0.1:54321/functions/v1/caroline3573-workspace -H 'Content-Type: application/json' -H 'x-caroline-site-key: local-only-ocr-persistence-test-token-3573' -d '{"workspaceId":"3573-leaders","role":"leader","action":"read"}'; then exit 0; fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/ocr-edge.log"
+          exit 1
+      - name: Verify independent browsers through local edge and database
+        run: OCR_LOCAL_SUPABASE=1 node tests/3573-ocr-alias-browser.mjs
+      - name: Stop disposable stack
+        if: always()
+        run: |
+          cd "$RUNNER_TEMP/ocr-db"
+          supabase stop --no-backup
+ <<< "$changed"; then
+              full=false
+            fi
+          fi
+          echo "full=$full" >> "$GITHUB_OUTPUT"
   verify-reference-assets:
     runs-on: ubuntu-latest
     steps:
