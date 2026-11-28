@@ -70,7 +70,7 @@ export function parseRosterPaste(text, defaultLegion) {
   let header, delimiter, legion = defaultLegion, registration = '';
   const lines = String(text ?? '').split(/\r?\n/u);
   for (const [index, raw] of lines.entries()) {
-    const line = raw.replace(invisible, '').replace(/^\s+/u, '').replace(/[ \u00A0]+$/u, '');
+    const line = raw.replace(invisible, '').replace(/^[ \u00A0]+/u, '').replace(/[ \u00A0]+$/u, '');
     if (!line.trim() || /^\x60\x60\x60(?:tsv|csv|text)?\s*$/iu.test(line)) continue;
     const heading = line.trim().match(/^(?:#{1,6}\s*)?(?:Legion\s*([12])\s*[:–—-]?\s*)?(Combatants?|Substitutes?|Unassigned)?\s*:?$/iu);
     if (heading && (heading[1] || heading[2])) {
@@ -99,7 +99,7 @@ export function parseRosterPaste(text, defaultLegion) {
       const layout = header ?? ['name', 'power', 'legion', 'registration', 'fid'];
       if (values.length > layout.length) throw Error('Unexpected columns. Use the extraction header to specify column order.');
       const row = Object.fromEntries(layout.map((field, i) => [field, values[i] ?? '']));
-      if (!row.name || (!row.power && !row.registration && !registration && !row.fid)) throw Error('Include a username and its power, registration or player ID.');
+      if ((!row.name && !(row.power && (row.registration || registration || row.legion || header))) || (!row.power && !row.registration && !registration && !row.fid)) throw Error('Include a username and its power, registration or player ID, or a structured unread-name row with troop power.');
       if (!header && values.length === 2 && !row.power) throw Error('Troop power is empty.');
       const power = pastePower(row.power);
       const legionText = row.legion || '';
