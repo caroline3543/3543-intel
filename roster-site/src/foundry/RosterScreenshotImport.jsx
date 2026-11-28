@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { registrationCountReview, combineScreenshotRows } from './rosterScreenshotModel.js';
 import { readScreenshotSession, writeScreenshotSession } from './screenshotSession.js';
 import { createScreenshotMatcher } from './screenshotImportPlan.js';
-import { parseRosterPaste, rosterExtractionPrompt } from './parseRosterPaste.js';
+import { parseRosterPaste, rosterExtractionPrompt, rosterPasteHeader } from './parseRosterPaste.js';
 import { ScreenshotReview } from './ScreenshotReview.jsx';
 import './rosterScreenshot.css';
 
@@ -380,7 +380,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     <input ref={picker} type="file" hidden multiple accept="image/png,image/jpeg,image/webp" aria-label="Troop power screenshots"
       disabled={loading || !!job || !!review} onChange={chooseFiles}/>
     {!review && method === 'paste' && <section className="compact-paste">
-      <label>Player list<textarea rows={6} value={paste} placeholder={'Username\tTroop power\tLegion\tRegistration\tPlayer ID'} onChange={event => {
+      <label>Player list<textarea rows={6} value={paste} placeholder={rosterPasteHeader} onChange={event => {
         setPaste(event.target.value); setPastedGroups(null); setPasteDrafts({});
         if (latest.current?.pasteGroups || latest.current?.paste) checkpoint({...latest.current,paste:null,pasteGroups:null,pasteText:null,pasteDrafts:{},pastedSavedIds:[]},false); setPasteErrors([]); setPasteStatus('');
       }}/></label>

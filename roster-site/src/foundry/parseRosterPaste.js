@@ -1,6 +1,8 @@
+export const rosterPasteHeader = 'Username\tTroop power\tLegion\tRegistration';
+
 export const rosterExtractionPrompt = `Transcribe these Whiteout Survival Foundry or Canyon Clash registration screenshots in screenshot order. Return one tab-separated row per visible player in a plain text code block with this header:
-Username	Troop power	Legion	Registration	Player ID
-Copy usernames exactly, including decorations and non-Latin characters. Write troop power as the full integer, with no abbreviations. Legion is 1 or 2 as displayed. Registration is Combatant, Substitute, Unassigned, or Other legion, only when visible. Include Player ID only when the screenshot explicitly shows it. Leave unreadable or absent fields blank. Include repeated rows so the organiser can reconcile them. Do not infer identities, fill missing values, or add commentary inside the block.`;
+${rosterPasteHeader}
+Copy usernames exactly, including decorations and non-Latin characters. Write troop power as the full integer, with no abbreviations. Legion is 1 or 2 as displayed. Registration is Combatant, Substitute, Unassigned, or Other legion, only when visible. Leave unreadable or absent fields blank. Include repeated rows so the organiser can reconcile them. Do not infer identities, fill missing values, or add commentary inside the block.`;
 
 const invisible = /[\u200B\u200E\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/gu;
 const clean = value => String(value ?? '').replace(invisible, '').trim();
