@@ -91,7 +91,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const [addRole,setAddRole]=useState('join');
  const [managing,setManaging]=useState(null);
  const [resetScope,setResetScope]=useState('');
- const [participantsOnly,setParticipantsOnly]=useState(false),[rosterSearch,setRosterSearch]=useState('');
+ const [participantsOnly,setParticipantsOnly]=useState(true),[rosterSearch,setRosterSearch]=useState('');
  const [rosterSort,setRosterSort]=useState('rank'),[editingPower,setEditingPower]=useState(null),[confirmMove,setConfirmMove]=useState(null);
  const [roleFilter,setRoleFilter]=useState('all'),[bulkMode,setBulkMode]=useState(false),[bulkSelected,setBulkSelected]=useState([]),[rankExpanded,setRankExpanded]=useState({R5:true,R4:true,R3:true,R2:true,R1:true});
  const [editIds,setEditIds]=useState(null);
@@ -379,6 +379,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    </details>
    </RosterScreenshotImport>
    <div style={{...style,padding:12}}>
+     <button type="button" style={{...btn,width:'100%',background:'#d4a64c',color:'#171b22',fontWeight:700,marginBottom:10}} onClick={()=>{setParticipantsOnly(v=>!v);setRoleFilter('all');setRosterSearch('');endSelection()}}>{participantsOnly?(joined.length+subs.length?'Edit participants':'Register players'):'Return to registered participants'}</button>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
        <h2 style={{fontSize:16,margin:0}}>Legion {legion} roster</h2>
        <button type="button" style={{...btn,background:bulkMode?'#344c63':'#21354b'}} aria-pressed={bulkMode} onClick={()=>{if(bulkMode)endSelection();else{setEditingPower(null);setManaging(null);setBulkMode(true)}}}>{bulkMode?'Done':'Select'}</button>
@@ -403,7 +404,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
          <button type="button" style={btn} onClick={()=>openEditor('actions',selectedIds())}>More actions</button>
        </div>}
      </div>}
-     {sortedRoster.length===0&&<p style={{color:'#adc2d6'}}>{rosterSearch?'No matching players.':'No players in this view.'}</p>}
+     {sortedRoster.length===0&&<p style={{color:'#adc2d6'}}>{rosterSearch?'No matching players.':participantsOnly&&joined.length+subs.length===0?'No players registered. Select players or import a roster to get started.':'No players in this view.'}</p>}
      {(rosterSort==='rank'?groupedRanks:[null]).map(group=>{
        const rows=group?sortedRoster.filter(p=>p.rank===group):sortedRoster;
        if(!rows.length)return null;
