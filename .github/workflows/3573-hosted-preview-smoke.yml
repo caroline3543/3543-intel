@@ -1,0 +1,36 @@
+name: 3573 hosted preview smoke
+on:
+  pull_request:
+    branches: ['**']
+permissions:
+  contents: read
+jobs:
+  smoke:
+    if: github.head_ref == 'fix/3573-review-speed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify isolated hosted preview
+        env:
+          PREVIEW: https://3573-caroline-demo-7fvk78gxm-sunfire-castle-planner.vercel.app
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const origin = new URL(process.env.PREVIEW);
+          assert.equal(origin.hostname, '3573-caroline-demo-7fvk78gxm-sunfire-castle-planner.vercel.app');
+          const get = path => fetch(new URL(path, origin), {redirect:'manual',signal:AbortSignal.timeout(20000)});
+          const page = await get('/');
+          assert.equal(page.status, 200, 'Preview must serve application HTML; protection requires authorized access');
+          const html = await page.text();
+          assert.match(html, /id=["']root["']/);
+          const assets = [...html.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css))["']/g)].map(m=>m[1]);
+          assert.ok(assets.some(a=>a.endsWith('.js')), 'Missing application bundle');
+          for (const asset of assets) {
+            assert.equal(new URL(asset,origin).origin,origin.origin);
+            const response = await get(asset);
+            assert.equal(response.status,200,'Asset failed: '+asset);
+          }
+          const workspace = await get('/api/workspace');
+          assert.ok([401,403,503].includes(workspace.status),'Unauthenticated workspace must not return data');
+          console.log('Hosted HTML, assets and unauthenticated workspace guard passed');
+          JS
