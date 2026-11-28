@@ -75,7 +75,7 @@ export function parseRosterPaste(text, defaultLegion) {
       const body = line.replace(/^(?:[-*•]|\d+[.)])\s+/u, '');
       const plain = fields(body, null, false);
       const explicitDash = plain.length===2 && /[—–]|\s-\s/u.test(body.slice(plain[0].length,body.length-plain[1].length));
-      if (!delimiter && !explicitDash && plain.length===2 && plain[1].includes(',') && !plain[0].endsWith(',')) {
+      if (!delimiter && !explicitDash && !body.includes('\t') && !body.includes('|') && plain.length===2 && plain[1].includes(',') && !plain[0].endsWith(',')) {
         throw Error('Use a dash, tabs or quoted CSV to separate a name from comma-grouped power.');
       }
       const separated = delimiter ?? (explicitDash ? null : body.includes('\t') ? '\t' : body.includes('|') ? '|' : body.includes(',') && (!/\d,\d{3}(?:,\d{3})*$/u.test(body) || /^[^,]+,\s*\d{1,3}(?:,\d{3})+$/u.test(body)) ? ',' : null);
