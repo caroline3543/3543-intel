@@ -47,3 +47,17 @@ To roll back a preview, reopen the previous immutable Vercel preview URL, or red
 - Vercel preview `dpl_6b7XQ4USzJEvbuF7Ac9oxbKVD52J` deployed `319f430b2013cd69407aba099390870c3089ee81` to the separate demo project. [Open the sample roster](https://3573-caroline-demo-1lyldijx1-sunfire-castle-planner.vercel.app/event-preview.html). The exact candidate passed 600 tests, the build, hosted paste and squad checks at all three mobile widths, grouped TSV/pipe regression checks, and hosted real screenshot upload and review. Its workspace API returned HTTP 401.
 - [Disposable Supabase CI for the deployed commit](https://github.com/caroline3543/3543-intel/actions/runs/46114536482) passed browser persistence with create, failed save and retry, reuse, edit and deletion.
 - The previous hosted PR workflow [failed on an older fixed demo URL](https://github.com/caroline3543/3543-intel/actions/runs/46114539402). The follow-up workflow builds and tests the exact PR head locally. An explicit hosted run checks the supplied immutable preview's fixture assets and workspace access before exercising the hosted journey. Verify the deployment SHA in Vercel before supplying that URL and SHA. That follow-up changes CI and this log only.
+
+## Canyon Clash commander roster coverage
+
+The Legion Commander panel pushes the list and registration totals down. The checkbox layout's scan boundary truncated the fourth readable row in 17 of 19 original RKG screenshots. The reader now selects the list bounds and totals crop from the detected layout. Username retry uses the same list geometry. Regions without enough visible card height stay flagged as partial.
+
+| Measure on the 19 original RKG images | Previous | Layout-aware reader |
+| --- | ---: | ---: |
+| Readable rows detected (76 visually transcribed) | 59 | 76 |
+| Troop powers agreeing with visual transcription | 57 | 76 |
+| Extra complete rows | 0 | 0 |
+| Screenshots with both totals read correctly | 0 | 19 |
+| Two-worker recognition time, retries disabled | 16.8 s | 18.5 s |
+
+The row benchmark pairs OCR output with the earlier visual transcript by vertical position. It measures extraction and power coverage. It does not establish verified player identities or per-player registration accuracy. The obscured legion heading on one screenshot still requires manual legion selection. Unrecognised registration controls still require review. No private screenshot or player data was added to Git.
