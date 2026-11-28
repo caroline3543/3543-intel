@@ -33,7 +33,12 @@ jobs:
           full=true
           if [[ "$EVENT" == push && "$BRANCH" == fix/3573-paste-only ]] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
             changed=$(git diff --name-only "$BEFORE" HEAD)
-            if [[ -n "$changed" ]] && ! grep -Ev '^(roster-site/src/foundry/(parseRosterPaste\.js|pasteDelimiterRegression\.test\.mjs))
+            if [[ -n "$changed" ]] && ! grep -Ev '^(roster-site/src/foundry/(parseRosterPaste[.]js|pasteDelimiterRegression[.]test[.]mjs))$' <<< "$changed"; then
+              full=false
+            fi
+          fi
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+  verify-reference-assets:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
