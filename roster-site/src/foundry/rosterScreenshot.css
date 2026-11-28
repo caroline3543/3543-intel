@@ -203,8 +203,8 @@
 .squad-config .squad-count button { padding-inline: 0 !important; }
 .squad-config .squad-leaders { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
 .squad-config button, .squad-member button { min-height: 44px !important; }
-.squad-config button[aria-pressed="true"], .squad-config .squad-primary, .squad-member button[aria-pressed="true"] { background: #493667 !important; border-color: #b596e5 !important; color: #f4ebff !important; }
-.squad-config .squad-primary { width: 100%; }
+.squad-config button[aria-pressed="true"], .squad-member button[aria-pressed="true"] { background: #493667 !important; border-color: #b596e5 !important; color: #f4ebff !important; }
+.squad-config .squad-primary { width: 100%; background: #f5ad38 !important; border-color: #f5ad38 !important; color: #101b28 !important; }
 .squad-config details { margin-top: 6px; }
 .squad-config summary { min-height: 44px; align-content: center; cursor: pointer; }
 .squad-config button { max-width: 100%; overflow-wrap: anywhere; }
