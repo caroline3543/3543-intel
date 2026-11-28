@@ -156,6 +156,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   return commitRoles(changes);
  };
  useEffect(()=>{setRegistrationStep(0);setPowerOpen(false);setDraftPowers({});setPowerDraft({});setDraftRoles({});setDraftError('');},[chosen,legion,kind,saved.occurrenceId]);
+ const selectPlannerContext=(tag,number)=>{if(tag===chosen&&number===legion)return;if((registrationStep>0||powerOpen)&&!window.confirm('Discard unsaved changes and switch roster?'))return;changeSelection(tag,number);};
  const beginRegistration=()=>{setPowerOpen(false);setDraftOriginal({...registrations});setDraftPowers({});setDraftError('');setDraftRoles(Object.fromEntries([...joined.map(p=>[p.id,'join']),...subs.map(p=>[p.id,'sub'])]));setRegistrationStep(1);setRosterSearch('');};
  const draftCount=role=>Object.values(draftRoles).filter(v=>v===role).length;
  const toggleDraft=(id,role)=>{setDraftRoles(old=>{const next={...old};if(next[id]===role){delete next[id];return next;}if(Object.values(old).filter(v=>v===role).length>=limits[role])return old;next[id]=role;return next;});onRoleFeedback?.();};
@@ -315,7 +316,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
       </div>}
     </div>
     {!bulkMode&&managing===p.id&&<div className="legion-player-options">
-      {elsewhere&&<button type="button" style={btn} onClick={()=>changeSelection(elsewhere.alliance,elsewhere.legion)}>View {assignmentLabel(elsewhere)}</button>}
+      {elsewhere&&<button type="button" style={btn} onClick={()=>selectPlannerContext(elsewhere.alliance,elsewhere.legion)}>View {assignmentLabel(elsewhere)}</button>}
       {!elsewhere&&<>
         <button type="button" data-role-feedback style={btn} onClick={()=>requestRoles([p.id],'out')}>Not participating</button>
         {role&&<button type="button" data-role-feedback style={btn} onClick={()=>requestRoles([p.id],'')}>Unassign</button>}
@@ -328,8 +329,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  return <section style={{padding:'10px 16px 110px',color:'#eef5fc'}}>
   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:9}}><div><h1 style={{fontSize:25,margin:'0 0 2px'}}>{title}</h1></div><button style={btn} onClick={()=>{if(undo){onSaveFoundry?.(undo);setUndo(null);setNotice('Last change undone')}}} disabled={!undo}>Undo</button></div>
   <div className="legion-context">
-    <label>Registration alliance<select aria-label={title+' registration alliance'} value={chosen} onChange={e=>changeSelection(e.target.value,1)} style={{...btn,width:'100%',marginTop:4}}>{alliances.map(a=><option key={a}>{a}</option>)}</select></label>
-    <fieldset><legend>Legion</legend><div className="legion-switch">{[1,2].map(number=><button key={number} type="button" aria-pressed={legion===number} onClick={()=>changeSelection(chosen,number)} style={{...btn,padding:'6px 3px',borderColor:legion===number?'#a3cbef':'#40546a',background:legion===number?'#2b4660':'#21354b'}}>Legion {number}</button>)}</div></fieldset>
+    <label>Registration alliance<select aria-label={title+' registration alliance'} value={chosen} onChange={e=>selectPlannerContext(e.target.value,1)} style={{...btn,width:'100%',marginTop:4}}>{alliances.map(a=><option key={a}>{a}</option>)}</select></label>
+    <fieldset><legend>Legion</legend><div className="legion-switch">{[1,2].map(number=><button key={number} type="button" aria-pressed={legion===number} onClick={()=>selectPlannerContext(chosen,number)} style={{...btn,padding:'6px 3px',borderColor:legion===number?'#a3cbef':'#40546a',background:legion===number?'#2b4660':'#21354b'}}>Legion {number}</button>)}</div></fieldset>
   </div>
   <div style={{display:'grid',gridTemplateColumns:'repeat('+(isFoundry?3:2)+',minmax(0,1fr))',gap:6,marginBottom:10}}>{[['players','Players'],['teams','Teams'],...(isFoundry?[['buildings','Buildings']]:[])].map(([id,label])=><button key={id} onClick={()=>setView(id)} style={{...btn,background:view===id?'#f5ad38':'#172a3e',color:view===id?'#101b28':'#e9f2fa',padding:'8px 3px',minHeight:40}}>{label}</button>)}</div>
   {notice&&<div role="status" style={{...style,fontSize:13,color:'#f5bd5b'}}>{notice}</div>}
@@ -414,8 +415,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
      <div style={{display:'flex',gap:8}}><button type="button" style={btn} onClick={()=>setRegistrationStep(v=>v-1)}>Back</button><button type="button" style={btn} onClick={()=>setRegistrationStep(0)}>Cancel</button><button type="button" disabled={invalidDraftPower} style={{...btn,background:'#d4a64c',color:'#171b22'}} onClick={()=>registrationStep===3?setRegistrationStep(4):confirmDraft()}>{registrationStep===3?'Review registration':'Confirm registration'}</button></div>
    </section>}
    <div style={{...style,padding:12}}>
-     <button type="button" style={{...btn,width:'100%',background:'#d4a64c',color:'#171b22',fontWeight:700,marginBottom:10}} onClick={()=>{setParticipantsOnly(v=>!v);setRoleFilter('all');setRosterSearch('');endSelection()}}>{participantsOnly?(joined.length+subs.length?'Edit participants':'Register players'):'Return to registered participants'}</button>
-     <button type="button" style={{...btn,width:'100%',marginBottom:8}} onClick={beginRegistration}>Guided registration (draft)</button>
+     <button type="button" style={{...btn,width:'100%',background:'#d4a64c',color:'#171b22',fontWeight:700,marginBottom:10}} onClick={beginRegistration}>{joined.length+subs.length?'Edit participants':'Register players'}</button>
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
        <h2 style={{fontSize:16,margin:0}}>Legion {legion} roster</h2>
        <button type="button" style={{...btn,background:bulkMode?'#344c63':'#21354b'}} aria-pressed={bulkMode} onClick={()=>{if(bulkMode)endSelection();else{setEditingPower(null);setManaging(null);setBulkMode(true)}}}>{bulkMode?'Done':'Select'}</button>
