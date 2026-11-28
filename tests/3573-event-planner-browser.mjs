@@ -70,6 +70,9 @@ try {
     assert.ok(await page.getByRole('button',{name:'Buildings',exact:true}).isVisible());
     const roster=page.locator('.legion-player');
     const participants=page.getByRole('checkbox',{name:'Participants only'});
+    assert.equal(await roster.count(),7);
+    assert.equal(await participants.isChecked(),true);
+    await page.getByRole('button',{name:'Edit participants',exact:true}).click();
     assert.equal(await roster.count(),10);
     assert.equal(await participants.isChecked(),false);
     assert.deepEqual(await page.locator('[data-roster-rank]').evaluateAll(groups=>groups.map(g=>g.dataset.rosterRank)),['R5','R4','R3','R2','R1']);
@@ -95,8 +98,10 @@ try {
     assert.equal(await page.getByRole('button',{name:'Lumen · Legion 1 Substitute',exact:true}).count(),0);
     await sort.selectOption('power');
     await page.getByRole('button',{name:'Legion 2',exact:true}).click();
+    assert.equal(await roster.count(),1);
+    assert.equal(await participants.isChecked(),true);
+    await participants.uncheck();
     assert.equal(await roster.count(),10);
-    assert.equal(await participants.isChecked(),false);
     await participants.check();
     assert.equal(await roster.count(),1);
     await participants.uncheck();
@@ -108,6 +113,7 @@ try {
     assert.deepEqual(await page.evaluate(()=>window.rolePulses),[]);
     await page.getByRole('button',{name:'Cancel',exact:true}).click();
     await page.getByRole('button',{name:'Legion 1',exact:true}).click();
+    await participants.uncheck();
     await page.getByRole('button',{name:'Cypress · Not participating',exact:true}).waitFor();
     await rosterSearch.fill('Aster');
     const otherLegion=page.getByRole('button',{name:'Aster · Legion 2 Substitute',exact:true});
@@ -133,6 +139,7 @@ try {
     await eventPower.getByText('1.52B',{exact:true}).waitFor();
     await profile.getByRole('button',{name:'Close profile'}).click();
 
+    await participants.uncheck();
     await page.getByRole('button',{name:'Kite · Legion 1 Combatant',exact:true}).click();
     await page.getByRole('button',{name:'Kite · Legion 1 Substitute',exact:true}).click();
     await page.getByRole('button',{name:'Kite · Unassigned',exact:true}).click();
