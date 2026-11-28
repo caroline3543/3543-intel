@@ -33,6 +33,26 @@ if(process.env.ROSTER_REQUIRE_INDEPENDENT_GATE==='1'){
   }
 }
 const identityScope=rosterPath?'external roster snapshot':'label-derived roster';
+  // Release validation must use an externally supplied identity snapshot, not
+  // a roster reconstructed from the evaluation labels. Never treat replay as proof.
+  const requireIndependentGate=process.env.ROSTER_REQUIRE_INDEPENDENT_GATE==='1';
+  if(requireIndependentGate){
+    assert.ok(rosterPath && groundTruthPath,'Release gate requires external roster and ID-labelled evaluation screenshots');
+    assert.ok(process.env.ROSTER_ALIAS_TRAINING_MANIFEST,'Release gate requires a separate alias training manifest');
+    const training=JSON.parse(await readFile(resolve(process.env.ROSTER_ALIAS_TRAINING_MANIFEST),'utf8'));
+    assert.ok(Array.isArray(training)&&training.length>0,'Training manifest must contain SHA-256 image hashes');
+    const {createHash}=await import('node:crypto');
+    const hashes=new Set(training);
+    assert.ok(training.every(h=>typeof h==='string'&&/^[a-f0-9]{64}$/.test(h)),'Invalid training image hash');
+    const evaluationHashes=new Set();
+    for(const filename of files){
+      const hash=createHash('sha256').update(await readFile(resolve(directory,filename))).digest('hex');
+      assert.ok(!hashes.has(hash),'Evaluation screenshot overlaps training: '+filename);
+      assert.ok(!evaluationHashes.has(hash),'Duplicate evaluation screenshot: '+filename);
+      evaluationHashes.add(hash);
+    }
+  }
+
 process.chdir('roster-site');
 const server = await createServer({ server:{ host:'127.0.0.1', port:5177, strictPort:true } });
 await server.listen();
@@ -197,22 +217,6 @@ try {
     return {withoutAliases,withNicknames,withAliases,reductionPercent,targetMet:reductionPercent!==null&&reductionPercent>=30&&withAliases.wrong===0&&withAliases.missing===0};
   },{screenshots,labels,roster,benchmarkAlliance}):null;
   if(aliasComparison)console.log('Paired alias comparison:',JSON.stringify(aliasComparison));
-  // Release validation must use an externally supplied identity snapshot, not
-  // a roster reconstructed from the evaluation labels. Never treat replay as proof.
-  const requireIndependentGate=process.env.ROSTER_REQUIRE_INDEPENDENT_GATE==='1';
-  if(requireIndependentGate){
-    assert.ok(rosterPath && groundTruthPath,'Release gate requires external roster and ID-labelled evaluation screenshots');
-    assert.ok(process.env.ROSTER_ALIAS_TRAINING_MANIFEST,'Release gate requires a separate alias training manifest');
-    const training=JSON.parse(await readFile(resolve(process.env.ROSTER_ALIAS_TRAINING_MANIFEST),'utf8'));
-    assert.ok(Array.isArray(training)&&training.length>0,'Training manifest must contain SHA-256 image hashes');
-    const {createHash}=await import('node:crypto');
-    const hashes=new Set(training);
-    assert.ok(training.every(h=>typeof h==='string'&&/^[a-f0-9]{64}$/.test(h)),'Invalid training image hash');
-    for(const filename of files){
-      const hash=createHash('sha256').update(await readFile(resolve(directory,filename))).digest('hex');
-      assert.ok(!hashes.has(hash),'Evaluation screenshot overlaps training: '+filename);
-    }
-  }
 
   const repeatUpload=labels?await page.evaluate(async ({screenshots,labels,roster,benchmarkAlliance})=>{
     const {createScreenshotMatcher}=await import('/src/foundry/screenshotImportPlan.js');
