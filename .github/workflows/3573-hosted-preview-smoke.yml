@@ -8,7 +8,7 @@ jobs:
   smoke:
     if: github.head_ref == 'fix/3573-review-speed'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Verify isolated hosted preview
         env:
@@ -33,4 +33,37 @@ jobs:
           const workspace = await get('/api/workspace');
           assert.ok([401,403,503].includes(workspace.status),'Unauthenticated workspace must not return data');
           console.log('Hosted HTML, assets and unauthenticated workspace guard passed');
+          JS
+      - name: Install pinned browser test runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Verify hosted React startup and access gate
+        env:
+          PREVIEW: https://3573-caroline-demo-7fvk78gxm-sunfire-castle-planner.vercel.app
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch();
+          try {
+            for (const viewport of [{width:390,height:844},{width:1280,height:800}]) {
+              const context = await browser.newContext({viewport});
+              const page = await context.newPage();
+              const errors = [];
+              page.on('pageerror', e => errors.push(e.message));
+              await page.route('**/*', route => {
+                const url = new URL(route.request().url());
+                return url.origin === process.env.PREVIEW && ['GET','HEAD'].includes(route.request().method()) ? route.continue() : route.abort();
+              });
+              await page.goto(process.env.PREVIEW, {waitUntil:'domcontentloaded'});
+              await page.locator('input[type=password]').waitFor({state:'visible',timeout:30000});
+              await page.locator('input[type=password]').fill('synthetic-test-only');
+              assert.equal(await page.locator('input[type=password]').inputValue(),'synthetic-test-only');
+              assert.equal(await page.locator('input[type=password]').getAttribute('type'),'password');
+              assert.deepEqual(errors,[]);
+              await context.close();
+            }
+            console.log('Hosted React startup and password input passed on mobile and desktop');
+          } finally { await browser.close(); }
           JS
