@@ -9,6 +9,27 @@ const server=process.env.EVENT_PREVIEW_ORIGIN ? null : spawn('./node_modules/.bi
 const output=process.env.SQUAD_CAPTURE_DIR ?? 'paste-squad-captures';
 const previewPath='/event-preview.html';
 let browser;
+
+function savedImport(page, key, value) {
+ return page.evaluate(async ({key,value})=>{
+  const db=await new Promise((resolve,reject)=>{
+   const open=indexedDB.open('3573-screenshot-import',1);
+   open.onupgradeneeded=()=>open.result.createObjectStore('sessions');
+   open.onsuccess=()=>resolve(open.result);
+   open.onerror=()=>reject(open.error);
+  });
+  try {
+   return await new Promise((resolve,reject)=>{
+    const transaction=db.transaction('sessions', value ? 'readwrite' : 'readonly');
+    const store=transaction.objectStore('sessions');
+    const request=value ? store.put(value,key) : store.get(key);
+    transaction.oncomplete=()=>resolve(request.result);
+    transaction.onerror=()=>reject(transaction.error);
+   });
+  } finally { db.close(); }
+ },{key,value});
+}
+
 try{
  for(let attempt=0;attempt<40;attempt++){
   try{if((await fetch(origin+previewPath)).ok)break;}catch{}
@@ -38,9 +59,16 @@ try{
   };
   await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:kind,exact:true}).click();
   await page.getByRole('button',{name:'Import roster'}).click();
-  const dialog=page.getByRole('dialog',{name:'Screenshot import workspace'});
-  assert.equal(await dialog.getByRole('button',{name:'Paste player list'}).getAttribute('aria-pressed'),'true');
+  const dialog=page.getByRole('dialog',{name:'Roster import workspace'});
+  assert.equal(await dialog.locator('input[type=file]').count(),0);
+  assert.equal(await dialog.getByRole('button',{name:'Upload screenshots'}).count(),0);
   const box=dialog.getByRole('textbox',{name:'Player list',exact:true});
+  await dialog.getByText('Extract a list with AI',{exact:true}).click();
+  await dialog.getByRole('button',{name:'Copy extraction prompt'}).click();
+  const prompt=await page.evaluate(()=>navigator.clipboard.readText());
+  assert.equal(prompt.split('\n')[1],'Username\tTroop power\tLegion\tRegistration');
+  assert.doesNotMatch(prompt,/player id/i);
+  await dialog.getByText('Extract a list with AI',{exact:true}).click();
   await box.fill('Broken|140|3|Combatant');
   await dialog.getByRole('button',{name:'Match players'}).click();
   await dialog.getByText('Line 1: Legion must be 1 or 2.').waitFor();
@@ -55,7 +83,7 @@ Lumen\t${p[4]}\t1\tSubstitute`;
   await capture('paste');
   const matchingStarted=performance.now();
   await dialog.getByRole('button',{name:'Match players'}).click();
-  const review=dialog.getByRole('region',{name:'Review screenshot readings'});
+  const review=dialog.getByRole('region',{name:'Review imported players'});
   const compact=review.locator('.compact-review-row');
   await compact.first().waitFor();
   const clickToRowsMs=Math.round(performance.now()-matchingStarted);
@@ -111,6 +139,72 @@ Lumen\t${p[4]}\t1\tSubstitute`;
   assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/Northvale/);
   await page.locator('[data-team-card="Blue"]').scrollIntoViewIfNeeded();
   await capture('teams');
+  if(width===390){
+   const event=kind==='Foundry'?'foundry':'canyon';
+   const key=event+':ARC';
+   const otherSlot=JSON.stringify([event,'ARC',2]);
+   const applied=await snapshot();
+   const seeded=structuredClone(applied);
+   seeded.foundry.eventPlans[otherSlot]={...seeded.foundry.eventPlans[otherSlot],occurrenceId:otherSlot,registrations:{'sample-8':'sub'},registeredUnder:{'sample-8':'ARC'}};
+   await page.evaluate(data=>sessionStorage.setItem('3573-event-preview-fixture-v1',JSON.stringify(data)),seeded);
+   // An unverified legacy receipt must be read without applying its proposed change.
+   const pending={kind:event,alliance:'ARC',legion:1,expectedOccurrenceId:slot,powers:[{id:'sample-0',value:p[0]+1}],screenshotImport:true};
+   const prior=await savedImport(page,key);
+   const legacy={...prior,items:[{id:'legacy-image',file:'archived-screenshot'}],drafts:{1:{mode:'powers',edits:{}}},pendingImport:pending,pendingImportMethod:undefined};
+   await savedImport(page,key,legacy);
+   const reopen=async()=>{
+    await page.reload();
+    await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:kind,exact:true}).click();
+    await page.getByRole('button',{name:'Import roster'}).click();
+   };
+   await reopen();
+   await dialog.getByRole('button',{name:'Check save status'}).click();
+   await dialog.getByText('Sample save not confirmed.',{exact:true}).waitFor();
+   assert.deepEqual(await snapshot(),seeded);
+   assert.deepEqual((await savedImport(page,key)).pendingImport,pending);
+   // Simulate the original save having arrived after the browser closed.
+   pending.powers[0].value=p[0];
+   await savedImport(page,key,{...legacy,pendingImport:pending});
+   await reopen();
+   await dialog.getByRole('button',{name:'Check save status'}).click();
+   await dialog.getByText('Sample roster save verified.',{exact:true}).waitFor();
+   assert.equal(await box.inputValue(),batch);
+   const recovered=await savedImport(page,key);
+   assert.equal(recovered.pendingImport,null);
+   assert.deepEqual(recovered.savedIds,['sample-0']);
+   assert.deepEqual(recovered.items,legacy.items);
+   assert.deepEqual(recovered.drafts,legacy.drafts);
+
+   // Draft text survives a reload before matching, and a move requires two approvals.
+   const move='Aster\t\t1\tCombatant';
+   await box.fill(move);
+   await page.waitForFunction(async ({key,move})=>{
+    const db=await new Promise(resolve=>{
+     const open=indexedDB.open('3573-screenshot-import',1);
+     open.onsuccess=()=>resolve(open.result);
+    });
+    try {
+     return await new Promise(resolve=>{
+      const get=db.transaction('sessions').objectStore('sessions').get(key);
+      get.onsuccess=()=>resolve(get.result?.pasteText===move);
+     });
+    } finally { db.close(); }
+   },{key,move});
+   await reopen();
+   await box.waitFor();
+   await dialog.getByRole('button',{name:'Match players'}).click();
+   await review.getByRole('button',{name:'Review Aster',exact:true}).click();
+   await review.getByRole('combobox',{name:'Registration for Aster'}).selectOption('join');
+   await review.getByRole('button',{name:'Confirm registration',exact:true}).click();
+   await review.getByRole('button',{name:'Review registrations changes'}).click();
+   assert.equal((await snapshot()).foundry.eventPlans[otherSlot].registrations['sample-8'],'sub');
+   assert.equal((await snapshot()).foundry.eventPlans[slot].registrations['sample-8'],undefined);
+   await review.getByRole('button',{name:'Confirm registration moves or removals and save'}).click();
+   await review.getByRole('heading',{name:'Import complete'}).waitFor();
+   const moved=(await snapshot()).foundry.eventPlans;
+   assert.equal(moved[otherSlot].registrations['sample-8'],undefined);
+   assert.equal(moved[slot].registrations['sample-8'],'join');
+  }
   assert.deepEqual(errors,[]);
   assert.ok(!requests.some(url=>/ocr-data|tesseract|\/api\//iu.test(url)),'Paste journey must bypass OCR and shared services');
   timing.push({kind,width,clickToRowsMs,syntheticJourneyMs:Math.round(performance.now()-started)});

@@ -91,3 +91,11 @@ Branch `fix/3573-paste-first` opens the shared roster importer on Paste player l
 The public demo uses synthetic data. Private RKG pilot inputs run only in isolated browser storage with network writes blocked. Production promotion requires explicit approval after the real-device timing and organiser check.
 
 The preview-only RKG pilot accepts a roster file at `event-preview.html?pilot=rkg`. Its event data stays in the current browser tab. The file is distributed separately and is excluded from both the source tree and the hosted demo assets. The automated isolated replay checks all 76 expected powers, the 28 combatants and seven substitutes in Legion 1, the 24 pre-existing Legion 2 assignments, and team generation and copying. Its timing is not a substitute for an organiser's iPhone run.
+
+## Paste-only preview
+
+Branch `fix/3573-paste-only` starts from `89edbe22b13389c789a50c0a986bfe37309c5058`. Foundry and Canyon Clash open directly to paste. The build omits OCR models and worker bundles. The separate `fix/3573-review-speed` branch retains the integrated reader. Paste drafts and review decisions remain recoverable in browser storage. Outstanding legacy receipts can be checked without resubmitting a mutation.
+
+Run `npm test`, `BUILD_PROFILE_FIXTURE=1 npm run build --prefix roster-site`, and `node tests/3573-paste-squads-browser.mjs` with Playwright Chromium installed. Browser coverage includes 320, 390 and 428 CSS pixels for both planners. The Stage 9 workflow retains the resulting screenshots. The preview demo uses isolated browser fixtures and no shared workspace writes. Hosted verification requires a deployment for the exact commit.
+
+Rollback the preview by reverting the paste-only commit on this preview branch and deploying the revert, or reopen the prior verified preview. Retain the current browser storage if old draft recovery is needed. Production deployment and promotion require separate authorization.

@@ -1,7 +1,7 @@
 name: Stage 9 baseline integrity
 on:
   push:
-    branches: ['fix/3573-ocr-upgrade', 'release/3573-ocr-candidate', 'fix/3573-review-speed', 'fix/3573-paste-first']
+    branches: ['fix/3573-ocr-upgrade', 'release/3573-ocr-candidate', 'fix/3573-review-speed', 'fix/3573-paste-first', 'fix/3573-paste-only']
   pull_request:
     paths:
       - 'docs/design-baselines/state-3573/ocr-import-v1/**'
@@ -47,17 +47,32 @@ jobs:
       - run: BUILD_PROFILE_FIXTURE=1 npm run build --prefix roster-site
       - run: test -f roster-site/dist/event-preview.html
       - run: node tests/3573-event-planner-browser.mjs
+      - name: Paste-only mobile roster and squads
+        if: github.ref_name == 'fix/3573-paste-only' || github.head_ref == 'fix/3573-paste-only'
+        run: |
+          test ! -d roster-site/dist/ocr-data
+          if grep -Eilr 'tesseract|traineddata' roster-site/dist; then
+            exit 1
+          fi
+          node tests/3573-paste-squads-browser.mjs
+      - name: Retain paste-only mobile captures
+        if: always() && (github.ref_name == 'fix/3573-paste-only' || github.head_ref == 'fix/3573-paste-only')
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage9-paste-only-mobile
+          path: paste-squad-captures/
+          if-no-files-found: warn
       - name: Mobile OCR upload acceptance
-        if: always()
+        if: always() && github.ref_name != 'fix/3573-paste-only' && github.head_ref != 'fix/3573-paste-only'
         run: node tests/3573-ocr-upload-browser.mjs
       - name: Deterministic OCR review acceptance
-        if: always()
+        if: always() && github.ref_name != 'fix/3573-paste-only' && github.head_ref != 'fix/3573-paste-only'
         run: node tests/3573-ocr-review-browser.mjs
       - name: Independent browser alias persistence
         if: always()
         run: node tests/3573-ocr-alias-browser.mjs
       - name: Assemble paired visual acceptance evidence
-        if: always()
+        if: always() && github.ref_name != 'fix/3573-paste-only' && github.head_ref != 'fix/3573-paste-only'
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -75,7 +90,7 @@ jobs:
                   shutil.copyfile(actual,dest/'current.png')
           PY
       - name: Retain current implementation captures for review
-        if: always()
+        if: always() && github.ref_name != 'fix/3573-paste-only' && github.head_ref != 'fix/3573-paste-only'
         uses: actions/upload-artifact@v4
         with:
           name: stage9-current-ocr-captures

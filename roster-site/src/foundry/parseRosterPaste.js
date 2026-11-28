@@ -1,8 +1,13 @@
 export const rosterPasteHeader = 'Username\tTroop power\tLegion\tRegistration';
 
-export const rosterExtractionPrompt = `Transcribe these Whiteout Survival Foundry or Canyon Clash registration screenshots in screenshot order. Return one tab-separated row per visible player in a plain text code block with this header:
+export const rosterExtractionPrompt = `Transcribe the attached Whiteout Survival Foundry or Canyon Clash registration screenshots. Return one plain-text code block with this exact tab-separated header:
 ${rosterPasteHeader}
-Copy usernames exactly, including decorations and non-Latin characters. Write troop power as the full integer, with no abbreviations. Legion is 1 or 2 as displayed. Registration is Combatant, Substitute, Unassigned, or Other legion, only when visible. Leave unreadable or absent fields blank. Include repeated rows so the organiser can reconcile them. Do not infer identities, fill missing values, or add commentary inside the block.`;
+
+- Follow the attachment order, then the visible top-to-bottom order in each screenshot. Include one row per visible player, including repeats across screenshots. Skip headings and summary counts.
+- Copy each username exactly, including case, accents, decorative symbols and non-Latin characters.
+- Copy the displayed troop power as full digits with no grouping separators. Leave it blank if the full value cannot be read.
+- Use the displayed roster heading for Legion (1 or 2). For Registration, use Combatant, Substitute, Unassigned, or Other legion only when the player row shows that status. Do not assume that opening a legion tab makes a player a combatant.
+- Keep all four fields separated by actual tabs, even when fields are blank. Leave anything absent, ambiguous, or unreadable blank. Do not guess identities or add extra columns or commentary.`;
 
 const invisible = /[\u200B\u200E\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/gu;
 const clean = value => String(value ?? '').replace(invisible, '').trim();

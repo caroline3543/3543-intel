@@ -24,3 +24,9 @@ No production release without explicit approval. This document records requireme
 - The paste entry accepts a copyable transcription prompt, explicitly labels the fallback legion and reports invalid source line numbers before review. The screenshot entry retains image processing, evidence crops and draft recovery.
 - The Squad Balancer uses purple count and leader selections, places Settings behind disclosure and confirms rebalancing after teams exist. Existing locked and manually assigned players stay on their teams. Reducing the count requires moving protected players off removed teams first.
 - Capture the unmodified browser journey at 320, 390 and 428 CSS px. Review captures against the Stage 9 dark workspace, context and confirmation requirements and the newer compact interaction references. The original PNG checksums continue to identify the Stage 9 reference set.
+
+### Paste-only preview
+
+The Foundry and Canyon Clash import workspace opens directly to the player-list field. Screenshot upload, processing stages and OCR assets are excluded from this preview. The copyable external extraction prompt uses four tab-separated fields. A separately supplied permanent player ID is still accepted in pasted data.
+
+Keep compact matching, registration review, the manual confirmation for a move, and the gold Squad Balancer action. Preserve saved paste text and decisions on the device. Existing import receipts remain available for verification, including receipts created through the older screenshot workflow. Legacy screenshot drafts remain in browser storage.

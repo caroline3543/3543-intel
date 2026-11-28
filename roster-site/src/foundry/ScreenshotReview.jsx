@@ -156,11 +156,11 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
   }
 
   const stageHeading=done?'Roster updated':preview?'Review changes':'Review imported players';
-  return <section className="ocr-review" aria-label="Review screenshot readings">
+  return <section className="ocr-review" aria-label="Review imported players">
     {PreloadEvidence && !done && !preview && <PreloadEvidence files={upcomingFiles}/>}
     <h3 className="stage9-page-title">{stageHeading}</h3>
     { done ? <div className="stage9-completion"><div className="stage9-completion-mark" aria-hidden="true">✓</div><h4>Import complete</h4><p role="status">{status}</p><div className="stage9-summary-grid"><div><strong>{receipt?.powers ?? 0}</strong><span>Troop power updates</span></div><div><strong>{receipt?.roles ?? 0}</strong><span>Registration updates</span></div></div><p>{receipt?.excluded ?? 0} readings excluded. Registrations outside the submitted changes were not included in this import.</p><div className="stage9-action-footer">{onContinueTeams && <button type="button" className="screenshot-primary" onClick={onContinueTeams}>Continue to Teams</button>}<button type="button" className={!onContinueTeams?"screenshot-primary":undefined} onClick={onClose}>Done</button></div></div> : preview ? <>
-      <section aria-label="Confirm screenshot import">
+      <section aria-label="Confirm roster import">
         <h4>Import totals</h4>
         <div className="stage9-summary-grid stage9-confirmation-totals"><div><strong>{preview.action.powers.length}</strong><span>Power updates</span></div><div><strong>{preview.action.roleChanges?.length ?? 0}</strong><span>Registration changes</span></div><div><strong>{evaluated.length-active.length}</strong><span>Excluded readings</span></div></div><h4>Projected legion capacity</h4>
         <div className="stage9-summary-grid">
@@ -239,7 +239,7 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
                   <span className="stage9-candidate-identity"><strong>{candidate.name}</strong><small>{candidate.alliance || 'Alliance unknown'} · ID {candidate.playerId || candidate.id}{candidate.furnaceLevel ? ' · '+candidate.furnaceLevel : ''}</small></span>
                   {avatarAssist && !query && avatarSuggestion?.rowId===row.rowId && avatarSuggestion?.candidateId===candidate.id && <small>Avatar similarity</small>}
                 </button>)}
-                {choice && onRememberOcrAlias && row.name?.trim() && <label><input type="checkbox" checked={!!edit.remember} onChange={event=>update(row.rowId,{remember:event.target.checked})}/> Remember this spelling for future uploads</label>}
+                {choice && onRememberOcrAlias && row.name?.trim() && <label><input type="checkbox" checked={!!edit.remember} onChange={event=>update(row.rowId,{remember:event.target.checked})}/> Remember this spelling for future imports</label>}
                 {aliasError?.id === row.rowId && <p role="alert">{aliasError.message}</p>}
                 <button type="button" disabled={!choice} onClick={()=>confirmIdentity(row,edit,choice)}>Confirm match</button>
               </> : <button type="button" onClick={()=>setEditing(true)}>Change match</button>}
