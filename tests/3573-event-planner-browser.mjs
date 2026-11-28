@@ -87,6 +87,13 @@ try {
     await independent.getByRole('textbox',{name:'Independent power for Cypress',exact:true}).fill('123456789');
     await independent.getByRole('button',{name:'Save troop power',exact:true}).click();
     assert.equal(await roster.count(),7);
+    await page.getByRole('button',{name:'Edit participants',exact:true}).click();
+    await guided.getByRole('button',{name:'Next: substitutes'}).click();
+    await guided.getByRole('button',{name:'Next: troop power'}).click();
+    await powerStep.getByRole('textbox',{name:'Draft troop power for Northvale',exact:true}).fill('123456789');
+    await powerStep.getByRole('button',{name:'Review registration'}).click();
+    await page.getByRole('region',{name:'Registration review'}).getByRole('button',{name:'Confirm registration',exact:true}).click();
+    assert.equal(await roster.count(),7);
     await participants.uncheck();
     assert.equal(await roster.count(),10);
     assert.equal(await participants.isChecked(),false);
