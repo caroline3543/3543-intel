@@ -16,3 +16,11 @@ Reference: 3543 production commit 8767d7163009fd5d5b28b6684a8bcb0e14be85ac, src/
 - Verify 320/390/428 px layouts, keyboard accessibility, touch targets, no overflow, leader limits, no duplicate assignments, and balancing regression tests.
 
 No production release without explicit approval. This document records requirements, not implementation or benchmark evidence.
+
+## Implementation and review evidence
+
+- Both import methods enter the same ordered review list. Successful rows are 35 CSS px with a green check and full, right-aligned integer power. The All and Needs review filters are visible above the list. Edit controls for resolved rows are available through Review options.
+- Resolve identity, power and registration exceptions inline. A selected candidate becomes a match only after confirmation. The final confirmation shows changed values and projected legion capacity before the one save action.
+- The paste entry accepts a copyable transcription prompt, explicitly labels the fallback legion and reports invalid source line numbers before review. The screenshot entry retains image processing, evidence crops and draft recovery.
+- The Squad Balancer uses purple count and leader selections, places Settings behind disclosure and confirms rebalancing after teams exist. Existing locked and manually assigned players stay on their teams. Reducing the count requires moving protected players off removed teams first.
+- Capture the unmodified browser journey at 320, 390 and 428 CSS px. Review captures against the Stage 9 dark workspace, context and confirmation requirements and the newer compact interaction references. The original PNG checksums continue to identify the Stage 9 reference set.

@@ -6,6 +6,8 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
 const retriesEnabled=process.env.ROSTER_OCR_RETRIES!=='0';
+const unlabelledEvent=process.env.ROSTER_EVENT_KIND;
+assert.ok(!unlabelledEvent||['foundry','canyon'].includes(unlabelledEvent),'ROSTER_EVENT_KIND must be foundry or canyon');
 const workerCount=Number(process.env.ROSTER_OCR_WORKERS??1);
 assert.ok(Number.isInteger(workerCount)&&workerCount>=1&&workerCount<=4);
 const directory = resolve(process.env.ROSTER_SCREENSHOTS_DIR ?? '../screenshots');
@@ -33,7 +35,7 @@ if(process.env.ROSTER_REQUIRE_INDEPENDENT_GATE==='1'){
     assert.equal(new Set(rows.map(r=>r.center)).size,rows.length,'Duplicate row centers: '+filename);
   }
 }
-const identityScope=rosterPath?'external roster snapshot':'label-derived roster';
+const identityScope=rosterPath?'external roster snapshot':labels?'label-derived roster':'unlabelled extraction diagnostics';
   // Release validation must use an externally supplied identity snapshot, not
   // a roster reconstructed from the evaluation labels. Never treat replay as proof.
   const requireIndependentGate=process.env.ROSTER_REQUIRE_INDEPENDENT_GATE==='1';
@@ -80,7 +82,7 @@ try {
   for(let index=workerIndex;index<files.length;index+=workerCount){
     const filename=files[index];
     const content = (await readFile(resolve(directory, filename))).toString('base64');
-    const eventLabel=String(labels?.[filename]?.kind??labels?.[filename]?.event??'').toLowerCase();
+    const eventLabel=String(labels?.[filename]?.kind??labels?.[filename]?.event??unlabelledEvent??'').toLowerCase();
     const eventKind=eventLabel.includes('canyon')?'canyon':eventLabel==='foundry'?'foundry':null;
     const reading = await page.evaluate(async ({ filename, content, workerIndex, eventKind }) => {
       const file = new File([Uint8Array.from(atob(content), char => char.charCodeAt(0))], filename);

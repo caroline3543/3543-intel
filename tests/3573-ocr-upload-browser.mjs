@@ -4,7 +4,7 @@ import {mkdir,readFile,readdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 
 const origin=process.env.EVENT_PREVIEW_ORIGIN || 'http://127.0.0.1:4185';
-if(process.env.EVENT_PREVIEW_ORIGIN) assert.equal(origin,'https://3573-caroline-demo-7fvk78gxm-sunfire-castle-planner.vercel.app');
+if(process.env.EVENT_PREVIEW_ORIGIN) assert.match(new URL(origin).hostname,/^3573-caroline(?:-demo)?-[a-z0-9]+-sunfire-castle-planner\.vercel\.app$/);
 const server=process.env.EVENT_PREVIEW_ORIGIN ? null : spawn('./node_modules/.bin/vite',['preview','roster-site','--host','127.0.0.1','--port','4185','--strictPort'],{stdio:'inherit'});
 let browser;
 try {
@@ -14,7 +14,7 @@ try {
     await new Promise(resolve=>setTimeout(resolve,250));
   }
   assert.ok(ready,'Fixture server did not start');
-  browser=await chromium.launch();
+  browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE});
   await mkdir('ocr-review-captures',{recursive:true});
   for(const event of ['Foundry','Canyon Clash']){
     const page=await browser.newPage({viewport:{width:428,height:926},deviceScaleFactor:1,isMobile:true,hasTouch:true});

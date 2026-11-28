@@ -145,7 +145,8 @@ export function prepareEventRoles(storage,{kind,alliance,legion,expectedOccurren
       const prior=from.get(key)?.plan||plannerSlot(storage,kind,source.alliance,source.legion);
       from.set(key,{...source,plan:{...prior,registrations:withoutPlayer(prior.registrations,id),
         registeredUnder:withoutPlayer(prior.registeredUnder,id),teams:withoutPlayer(prior.teams,id),
-        assignments:withoutPlayer(prior.assignments,id)}});
+        assignments:withoutPlayer(prior.assignments,id), ...(prior.teamLocks?{teamLocks:withoutPlayer(prior.teamLocks,id)}:{}), ...(prior.manualTeams?{manualTeams:withoutPlayer(prior.manualTeams,id)}:{}),
+        ...(prior.teamLeaders?{teamLeaders:Object.fromEntries(Object.entries(prior.teamLeaders).filter(([,leader])=>leader!==id))}:{})}});
       if(prior.powerByPlayer?.[id]!=null&&to.powerByPlayer?.[id]==null)to.powerByPlayer={...to.powerByPlayer,[id]:prior.powerByPlayer[id]};
     }else if(moveFrom)return fail('The original assignment changed. Review the rosters before moving the player.');
     if(role){
@@ -158,6 +159,9 @@ export function prepareEventRoles(storage,{kind,alliance,legion,expectedOccurren
     if(role!=='join'){
       delete to.teams[id];
       delete to.assignments[id];
+      if(to.teamLocks?.[id])to.teamLocks=withoutPlayer(to.teamLocks,id);
+      if(to.manualTeams?.[id])to.manualTeams=withoutPlayer(to.manualTeams,id);
+      if(Object.values(to.teamLeaders??{}).includes(id))to.teamLeaders=Object.fromEntries(Object.entries(to.teamLeaders).filter(([,leader])=>leader!==id));
     }
   }
   for(const [role,label] of REGISTRATION_ROLES.filter(([role])=>isParticipant(role))){

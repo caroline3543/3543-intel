@@ -1,4 +1,4 @@
-import { bulkCandidates, normaliseBulkName } from '../components/bulkImportModel.js';
+import { createBulkCandidateSearch, normaliseBulkName } from '../components/bulkImportModel.js';
 import { eventAssignments, isParticipant, plannerSlot, prepareEventRoles, suspiciousPowerChange } from '../../../src/services/eventPlanner.js';
 
 export const roleName = role => ({ join: 'Combatant', sub: 'Substitute', out: 'Not participating', '': 'Unassigned' })[role] ?? 'Unassigned';
@@ -6,16 +6,17 @@ export const assignmentLabel = assignment => assignment
   ? [assignment.alliance, 'Legion ' + assignment.legion, roleName(assignment.role)].join(' · ')
   : 'Unassigned';
 
-const exactName = value => String(value ?? '').trim().normalize('NFC');
+const exactName = value => String(value ?? '').replace(/[\u200B\u200E\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/gu, '').trim().normalize('NFC');
 const nicknamesOf = player => [...new Set([player.nickname, player.alias, ...(Array.isArray(player.ocrAliases) ? player.ocrAliases : [])].filter(value => typeof value === 'string' && value.trim()))];
 const playerFields = player => [player.name, ...nicknamesOf(player), player.playerId, player.fid, player.id, ...(player.searchFields ?? [])];
 
 const spacingKey=value=>exactName(value).normalize('NFKC').toLowerCase().replace(/\s/gu,'');
-const visualKey=value=>normaliseBulkName(value).replace(/0/g,'o').replace(/[1l]/g,'i');
+const visualKey=value=>normaliseBulkName(exactName(value)).replace(/0/g,'o').replace(/[1l]/g,'i');
 // OCR-specific equivalences are evidence for review, never independent identity proof.
-const decorativeKey=value=>normaliseBulkName(String(value??'').normalize('NFKC').replace(/[Ξξ=]/gu,'e').replace(/ı/gu,'i').replace(/[¥]/gu,'y'));
+const decorativeKey=value=>normaliseBulkName(exactName(value).normalize('NFKC').replace(/[Ξξ=]/gu,'e').replace(/ı/gu,'i').replace(/[¥]/gu,'y'));
 export function createScreenshotMatcher(players,alliance,preferredIds=[],registeredIds=[]){
   const preferred=new Set(preferredIds),registered=new Set(registeredIds);
+  const eligible=p=>p.alliance===alliance||preferred.has(p.id)||registered.has(p.id);
   const local=players.filter(p=>preferred.has(p.id)||p.alliance===alliance);
   const rank=p=>registered.has(p.id)?0:preferred.has(p.id)?1:p.alliance===alliance?2:3;
   // Collapse identity evidence only when the destination record is unambiguous.
@@ -35,9 +36,9 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
   const indexes=[new Map(),new Map(),new Map(),new Map(),new Map(),new Map(),new Map()];
   const add=(map,key,p)=>{if(!key)return; if(!map.has(key))map.set(key,new Map());const target=representatives.get(p.id)??p;map.get(key).set(target.id,target);};
   for(const p of players){
-    for(const field of playerFields(p)){add(indexes[0],exactName(field),p);add(indexes[1],normaliseBulkName(field),p);add(indexes[2],visualKey(field),p);}
+    for(const field of playerFields(p)){add(indexes[0],exactName(field),p);add(indexes[1],normaliseBulkName(exactName(field)),p);add(indexes[2],visualKey(field),p);}
     add(indexes[3],spacingKey(p.name),p);
-    add(indexes[4],normaliseBulkName(p.name),p);
+    add(indexes[4],normaliseBulkName(exactName(p.name)),p);
     add(indexes[5],visualKey(p.name),p);
     add(indexes[6],decorativeKey(p.name),p);
   }
@@ -46,12 +47,24 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
   const decorativeNicknameIndex=new Map();
   for(const p of players)for(const alias of nicknamesOf(p)){add(nicknameIndex,spacingKey(alias),p);add(decorativeNicknameIndex,decorativeKey(alias),p);}
   const cache=new Map();
-  return name=>{
+  // Most imports are exact. Build the suggestion indexes only when review needs them.
+  let findLocal,findWider;
+  return function match(name,{fid,source='screenshot'}={}){
+    name=exactName(name);
+    if(fid){
+      const records=groups.get(String(fid))??[];
+      const destinations=[...new Map(records.map(p=>{const target=representatives.get(p.id)??p;return [target.id,target];})).values()];
+      const byName=match(name,{source});
+      const candidate=destinations.length===1&&eligible(destinations[0])?destinations[0]:null;
+      // Require corroboration when explicit ID and name provide conflicting or incomplete evidence.
+      const player=candidate&&byName.player?.id===candidate.id?candidate:null;
+      return {player,suggested:null,candidates:[...new Map([...destinations,...byName.candidates].map(p=>[p.id,p])).values()].slice(0,8),idConflict:!player};
+    }
     if(!name)return {candidates:[],player:null};
-    if(cache.has(name))return cache.get(name);
+    const cacheKey=source+'\0'+name;
+    if(cache.has(cacheKey))return cache.get(cacheKey);
     const exact=get(0,exactName(name)),equivalent=get(1,normaliseBulkName(name)),lookalikes=get(2,visualKey(name)),strict=get(3,spacingKey(name));
     const selected=exact.length===1?exact[0]:exact.length===0&&strict.length===1?strict[0]:null;
-    const eligible=p=>p.alliance===alliance||preferred.has(p.id)||registered.has(p.id);
     const current=strict.length===1?strict[0]:null;
     const nicknameCollision=p=>nicknamesOf(p).some(alias=>[exactName,normaliseBulkName,visualKey,spacingKey,decorativeKey].some(key=>key(alias)&&key(alias)===key(name)));
     const currentSafe=current&&eligible(current)&&get(4,normaliseBulkName(name)).length===1&&get(5,visualKey(name)).length===1&&[...exact,...equivalent,...lookalikes].every(p=>p.id===current.id||(!eligible(p)&&!nicknameCollision(p)));
@@ -62,11 +75,11 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
     const proposed=currentSafe?current:legacySafe?selected:nickname;
     const automatic=proposed&&decorative.every(p=>p.id===proposed.id)&&nicknames.every(p=>p.id===proposed.id)?proposed:null;
     const safe=!!automatic;
-    const localSuggestions=safe?[]:bulkCandidates(name,local,alliance).sort((a,b)=>rank(a)-rank(b));
-    const wider=safe?[]:bulkCandidates(name,players,alliance);
+    const wider=safe?[]:(findWider??=createBulkCandidateSearch(players,alliance))(name);
+    const localSuggestions=safe?[]:(local.length===players.length?[...wider]:(findLocal??=createBulkCandidateSearch(local,alliance))(name)).sort((a,b)=>rank(a)-rank(b));
     const candidates=[...new Map([...(automatic?[automatic]:[]),...exact,...strict,...nicknames,...decorative,...equivalent,...lookalikes,...localSuggestions,...wider].map(p=>[p.id,p])).values()].slice(0,8);
-    const suggested=!safe&&equivalent.length===1&&lookalikes.length===1&&equivalent[0].id===lookalikes[0].id&&preferred.has(equivalent[0].id)&&normaliseBulkName(name).length>=4?equivalent[0]:null;
-    const result={candidates,player:automatic,suggested};cache.set(name,result);return result;
+    const suggested=source!=='paste'&&!safe&&equivalent.length===1&&lookalikes.length===1&&equivalent[0].id===lookalikes[0].id&&preferred.has(equivalent[0].id)&&normaliseBulkName(name).length>=4?equivalent[0]:null;
+    const result={candidates,player:automatic,suggested};cache.set(cacheKey,result);return result;
   };
 }
 export function screenshotMatches(name,players,alliance){return createScreenshotMatcher(players,alliance)(name);}

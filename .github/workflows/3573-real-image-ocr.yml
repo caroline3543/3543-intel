@@ -26,13 +26,21 @@ jobs:
       - run: npx playwright install chromium
       - name: Build isolated roster preview
         run: BUILD_PROFILE_FIXTURE=1 npm run build --prefix roster-site
-      - name: Execute browser review regression
-        run: node tests/3573-ocr-review-browser.mjs
+      - name: Execute roster import and squad browser regressions
+        run: |
+          node tests/3573-ocr-review-browser.mjs
+          node tests/3573-ocr-upload-browser.mjs
+          node tests/3573-event-planner-browser.mjs
+          node tests/3573-paste-squads-browser.mjs
+      - name: Measure cold paste matching
+        run: node tests/3573-paste-performance.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ocr-review-captures
-          path: ocr-review-captures/
+          path: |
+            ocr-review-captures/
+            paste-squad-captures/
       - name: Execute actual OCR
         if: ${{ !cancelled() }}
         env:
