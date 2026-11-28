@@ -264,7 +264,7 @@ function moveLegion(workspace,{kind,alliance,legion,expectedOccurrenceId,move},n
 }
 
 export function resizePlannerTeams(plan,count) {
-  if(![3,4,5,6].includes(count))return plan;
+  if(![2,3,4,5,6].includes(count))return plan;
   const teams=Object.fromEntries(Object.entries(plan.teams||{}).filter(([,name])=>TEAM_NAMES.slice(0,count).includes(name)));
   const assignments=Object.fromEntries(Object.entries(plan.assignments||{}).filter(([id])=>teams[id]));
   return {...plan,teamCount:count,teams,assignments};
