@@ -11,7 +11,7 @@ import {reviewAvatarSuggestions} from './reviewAvatarSuggestions.js';
 const roles = { combatant: 'Combatant', substitute: 'Substitute', unassigned: 'Unassigned', 'other-legion': 'Other legion', unknown: 'Unknown' };
 const modeLabels = { powers: 'troop powers', roles: 'registrations', both: 'troop powers and registrations' };
 
-export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false, onRetryUsername, onStageHeading, onRememberOcrAlias }) {
+export function ScreenshotReview({ context, rows, sources, players, preferredIds, storage, counts, onClose, onSave, Evidence, PreloadEvidence, initialMode = 'powers', powersOnly = false, initialEdits = {}, onDraftChange, onContinueTeams, avatarAssist = false, onRetryUsername, onStageHeading, onRememberOcrAlias }) {
   const [mode, setMode] = useState(initialMode);
   const [edits, setEdits] = useState(initialEdits);
   const [filter, setFilter] = useState('all');
@@ -241,13 +241,13 @@ export function ScreenshotReview({ context, rows, sources, players, preferredIds
           </details>;
         })}
       </fieldset>
-      <details key={`options-${stage}-${filter}`} className="stage9-review-options"><summary>Review options</summary><label>Import mode
+      <details key={`options-${stage}-${filter}`} className="stage9-review-options"><summary>Review options</summary>{!powersOnly && <label>Import mode
         <select value={mode} disabled={working} onChange={event => { setMode(event.target.value); setPreview(null); }}>
           <option value="powers">Troop powers only</option>
           <option value="roles">Registrations only</option>
           <option value="both">Troop powers and registrations</option>
         </select>
-      </label>
+      </label>}
       <details>
         <summary>Registration totals and coverage</summary>
         {counts.map(count => <p key={count.role}>{roles[count.role]} · Game {count.conflict ? 'totals conflict' : count.expected ?? 'unreadable'} · OCR {count.detected} · Matched {new Set(confirmed.filter(item => item.row.registration === count.role && (!item.conflict || item.edit.checked)).map(item => item.player.id)).size}</p>)}
