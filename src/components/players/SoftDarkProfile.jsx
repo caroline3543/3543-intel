@@ -136,7 +136,24 @@ function More({player,onSave,canFetchEquipment}) {
   </ProfileSection>;
 }
 
-export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamworkPreferences,onSaveTeamworkPreferences,canFetchEquipment=true,talRecord}) {
+export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamworkPreferences,onSaveTeamworkPreferences,canFetchEquipment=true,talRecord,onRememberOcrAlias}) {
+  const [aliasDraft,setAliasDraft]=useState('');
+  const [aliasBusy,setAliasBusy]=useState(false);
+  const [editingAlias,setEditingAlias]=useState(null);
+  async function saveSpelling(value,previous=null){
+    if(aliasBusy)return;
+    setAliasBusy(true);
+    setAliasFeedback('');
+    try{
+      const result=await onRememberOcrAlias(player.id,value,previous);
+      if(!result?.verified){setAliasFeedback(result?.error||'Spelling save could not be verified.');return;}
+      setAliasDraft('');
+      setEditingAlias(null);
+      setAliasFeedback(value===null?'Spelling removed.':'Spelling saved.');
+    }catch{setAliasFeedback('Unable to save spelling.');}
+    finally{setAliasBusy(false);}
+  }
+  const [aliasFeedback,setAliasFeedback]=useState('');
   const panel = useRef(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -188,6 +205,26 @@ export function SoftDarkProfile({player,onClose,events = [],onSave,players,teamw
         </ProfileSection>
         <Movements history={player.allianceHistory}/>
         <ProfileIdentity player={player} onSave={onSave} softDark/>
+        <details className="soft-profile-section">
+          <summary>Remembered OCR spellings ({Array.isArray(player.ocrAliases)?player.ocrAliases.length:0})</summary>
+          {onRememberOcrAlias && onSave && <>
+            <form onSubmit={event=>{event.preventDefault();if(aliasDraft.trim())void saveSpelling(aliasDraft,editingAlias);}}>
+              <label>{editingAlias?'Edit OCR spelling':'New OCR spelling'}<input value={aliasDraft} onChange={event=>setAliasDraft(event.target.value)} maxLength={128} disabled={aliasBusy}/></label>
+              <button type="submit" className="soft-profile-button" disabled={aliasBusy||!aliasDraft.trim()}>{aliasBusy?'Saving…':editingAlias?'Save spelling':'Add spelling'}</button>
+              {editingAlias&&<button type="button" className="soft-profile-button" disabled={aliasBusy} onClick={()=>{setEditingAlias(null);setAliasDraft('');}}>Cancel</button>}
+            </form>
+            {aliasFeedback && <p role="status">{aliasFeedback}</p>}
+          </>}
+          {(Array.isArray(player.ocrAliases)?player.ocrAliases:[]).map(alias=><div key={alias} className="soft-profile-row" style={{gap:8,flexWrap:'wrap'}}>
+            <span style={{flex:1,overflowWrap:'anywhere'}}>{alias}</span>
+            {onRememberOcrAlias&&onSave&&<button type="button" className="soft-profile-button" disabled={aliasBusy} aria-label={'Edit OCR spelling '+alias} onClick={()=>{setEditingAlias(alias);setAliasDraft(alias);setAliasFeedback('');}}>Edit</button>}
+            <button type="button" className="soft-profile-button" disabled={!onSave||aliasBusy} aria-label={'Remove OCR spelling '+alias} onClick={()=>{
+              if(!window.confirm('Remove remembered spelling '+alias+'?'))return;
+              if(onRememberOcrAlias)void saveSpelling(null,alias);
+              else onSave({...player,ocrAliases:player.ocrAliases.filter(value=>value!==alias)});
+            }}>Remove</button>
+          </div>)}
+        </details>
         <ProfileJoiners player={player} onSave={onSave} softDark/>
         <ProfileTeamwork player={player} players={players} preferences={teamworkPreferences} onSavePreferences={onSaveTeamworkPreferences} softDark/>
         <ProfileNotes player={player} onSave={onSave} softDark/>

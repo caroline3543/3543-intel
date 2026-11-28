@@ -22,3 +22,28 @@ test('cross-alliance OCR lookalike remains advisory even with a registered local
  assert.equal(match.player,null);assert.equal(match.suggested,null);
  assert.ok(match.candidates.some(p=>p.id==='hot-1'));
 });
+
+test('decorative OCR equivalence exposes candidates without automatically accepting them',()=>{
+ for(const [name,reading] of [['HΞRMΞS','HERMES'],['DRAVΞN','DRAV=N'],['Nazlı','Nazli'],['DJ!!','DJ']]){
+  const match=createScreenshotMatcher([{id:'one',name,alliance:'ARC'}],'ARC')(reading);
+  assert.equal(match.player,null,reading);assert.equal(match.candidates[0]?.id,'one',reading);
+ }
+});
+test('decorative equivalence collision vetoes even an exact local username',()=>{
+ const players=[{id:'arc',name:'HERMES',alliance:'ARC'},{id:'hot',name:'HΞRMΞS',alliance:'HOT'}];
+ const match=createScreenshotMatcher(players,'ARC',['arc'],['arc'])('HERMES');
+ assert.equal(match.player,null);assert.deepEqual(new Set(match.candidates.map(p=>p.id)),new Set(['arc','hot']));
+});
+
+test('explicit profile nickname resolves a unique eligible identity',()=>{
+ const player={id:'one',name:'HΞRMΞS',nickname:'Hermes',alliance:'ARC'};
+ for(const reading of ['Hermes','HERMES','Her mes'])assert.equal(createScreenshotMatcher([player],'ARC')(reading).player?.id,'one');
+ assert.equal(createScreenshotMatcher([player],'HOT')('Hermes').player,null);
+});
+test('profile nickname collision across alliances remains manual',()=>{
+ const player={id:'one',name:'HΞRMΞS',nickname:'Hermes',alliance:'ARC'};
+ for(const other of [{id:'two',name:'Other',nickname:'Hermes',alliance:'HOT'},{id:'two',name:'Hermes',alliance:'HOT'}]){
+ const match=createScreenshotMatcher([player,other],'ARC',['one'],['one'])('Hermes');
+ assert.equal(match.player,null);assert.deepEqual(new Set(match.candidates.map(p=>p.id)),new Set(['one','two']));
+ }
+});

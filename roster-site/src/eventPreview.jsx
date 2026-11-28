@@ -56,6 +56,13 @@ function Preview(){
     save(next);
     return { message: 'Saved to the sample roster in this tab.' };
   };
+  const rememberAlias=(id,reading)=>{
+    const value=String(reading).trim().normalize('NFC');
+    if(!value||value.length>128||!workspace.players.some(p=>p.id===id))return {error:'Invalid sample alias.'};
+    const next={...workspace,players:workspace.players.map(p=>p.id===id?{...p,ocrAliases:[...new Set([...(p.ocrAliases??[]),value])]}:p)};
+    try{sessionStorage.setItem(previewStorageKey,JSON.stringify(next));}catch{return {error:'Sample alias could not be saved.'};}
+    save(next);return {verified:true};
+  };
   const profile=workspace.players.find(p=>p.id===opened);
   return <main>
     <p style={{padding:'4px 16px',color:'#afc1d3'}}>Sample roster · Screenshot imports are saved in this tab</p>
@@ -66,7 +73,7 @@ function Preview(){
     </nav>
     {kind==='changes'?<NameChanges players={workspace.players} plan={{}} onOpen={open}/>:<EventPlanner key={kind} kind={kind} players={workspace.players} storage={workspace.foundry}
       onRoleFeedback={()=>tapFeedback(readPreferences().haptics,navigator,14)}
-      onUpdate={action=>save(prev=>updateEventPlanner(prev,action))} onScreenshotUpdate={saveScreenshot} onOpenPlayerProfile={open}
+      onUpdate={action=>save(prev=>updateEventPlanner(prev,action))} onScreenshotUpdate={saveScreenshot} onRememberOcrAlias={rememberAlias} onOpenPlayerProfile={open}
       teamworkPreferences={teamwork} onSaveTeamworkPreferences={setTeamwork}
       onUpdatePlayerLanguage={(ids,language)=>save(prev=>({...prev,players:prev.players.map(player=>
         ids.includes(player.id)?addRecordedLanguage(player,language):player)}))}/>}

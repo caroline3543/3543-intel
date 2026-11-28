@@ -1,0 +1,86 @@
+name: 3573 preview smoke
+on:
+  pull_request:
+    branches: ['**']
+  workflow_dispatch:
+    inputs:
+      preview_origin:
+        description: Immutable Vercel demo preview origin verified against preview_commit
+        required: true
+        type: string
+      preview_commit:
+        description: Full Git commit SHA shown on the Vercel deployment
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.head_ref == 'fix/3573-review-speed' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      EVENT_PREVIEW_ORIGIN: ${{ inputs.preview_origin }}
+      PREVIEW_COMMIT: ${{ inputs.preview_commit }}
+    steps:
+      - name: Verify preview parameters
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          assert.match(process.env.PREVIEW_COMMIT, /^[a-f0-9]{40}$/);
+          const origin = new URL(process.env.EVENT_PREVIEW_ORIGIN);
+          assert.equal(origin.origin, process.env.EVENT_PREVIEW_ORIGIN);
+          assert.match(origin.origin, /^https:\/\/3573-caroline-demo-[a-z0-9]+-sunfire-castle-planner\.vercel\.app$/);
+          JS
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.preview_commit || github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      - name: Install pinned browser test runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Build exact commit with sample fixtures
+        run: BUILD_PROFILE_FIXTURE=1 npm run build --prefix roster-site
+      - name: Verify hosted fixture assets and workspace isolation
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const origin = new URL(process.env.EVENT_PREVIEW_ORIGIN);
+          const get = path => fetch(new URL(path,origin),{redirect:'error',signal:AbortSignal.timeout(20000)});
+          const page = await get('/event-preview.html');
+          assert.equal(page.status,200,'Hosted sample roster must be available');
+          const html = await page.text();
+          const assets = text => [...text.matchAll(/(?:src|href)="(\/assets\/[^"]+\.(?:js|css))"/g)].map(m=>m[1]).sort();
+          assert.ok(assets(html).some(path=>path.endsWith('.js')),'Missing hosted fixture script');
+          for(const path of assets(html)){
+            const response=await get(path);
+            assert.equal(response.status,200);
+            assert.ok((await response.arrayBuffer()).byteLength>0,'Empty hosted asset');
+          }
+          const workspace=await get('/api/workspace');
+          assert.ok([401,403,503].includes(workspace.status),'Unauthenticated workspace must never return data');
+          JS
+      - name: Exercise Foundry and Canyon Clash
+        run: |
+          node tests/3573-event-planner-browser.mjs
+          node tests/3573-paste-squads-browser.mjs
+          node tests/3573-ocr-upload-browser.mjs
+          node tests/3573-ocr-review-browser.mjs
+      - name: Retain preview captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-smoke-captures
+          path: |
+            ocr-review-captures/
+            paste-squad-captures/
+          if-no-files-found: warn

@@ -6,7 +6,7 @@ import { createWorker, OEM, PSM } from 'tesseract.js';
 import workerPath from 'tesseract.js/dist/worker.min.js?url';
 import { ROSTER_OCR_LANGUAGES } from './rosterOcrLanguages.js';
 import corePath from 'tesseract.js-core/tesseract-core-lstm.wasm.js?url';
-import { classifyRosterCheckboxes, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from './rosterScreenshotModel.js';
+import { classifyRosterCheckboxes, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow, rosterScreenshotLayout, readRosterRegistrationLabel } from './rosterScreenshotModel.js';
 
 function canvas(width, height) {
   return Object.assign(document.createElement('canvas'), { width, height });
@@ -98,14 +98,15 @@ export async function readRosterScreenshot(worker, file, kind, { matchName } = {
     const context = screen.getContext('2d', { willReadFrequently: true });
     context.drawImage(source, 0, 0, width, height);
     const pixels = context.getImageData(0, 0, width, height).data;
-    const regions = pickScreenshotRows(pixels, width, height);
+    const layout = rosterScreenshotLayout(pixels, width, height);
+    const regions = pickScreenshotRows(pixels, width, height, layout);
     const x = value => Math.round(width * value);
     const y = value => Math.round(height * value);
     const header = textCrop(screen, x(.24), y(.17), x(.55), y(.048), { invert: true });
     const legion = readScreenshotLegion(await recognize(worker, header, PSM.SINGLE_LINE));
     if (!legion && !regions.length) throw new Error('Use a full screenshot of the legion registration roster.');
     async function readTotal(left, right) {
-      const text = await recognize(worker, textCrop(screen, x(left), y(.262), x(right - left), y(.026), { dark: true }),
+      const text = await recognize(worker, textCrop(screen, x(left), y(layout.totalsTop), x(right - left), y(.026), { dark: true }),
         PSM.SINGLE_LINE, '0123456789/');
       const [count, limit] = text.replace(/\s/g, '').match(/^\d{1,2}\/\d{1,2}$/)?.[0].split('/').map(Number) ?? [];
       return limit > 0 && count <= limit ? { count, limit } : null;
@@ -119,7 +120,7 @@ export async function readRosterScreenshot(worker, file, kind, { matchName } = {
       }
       const h = bottom - top;
       const nominalHeight = y(.077);
-      const start = top <= y(.336) ? bottom - nominalHeight : top;
+      const start = top <= y(layout.listStart + .001) ? bottom - nominalHeight : top;
       const rowY = ratio => Math.round(start + nominalHeight * ratio);
       const otherLegionMarker = greenDensity(context, x(.22), rowY(.69), x(.63), bottom) > .035;
       const voted = greenDensity(context, x(.78), Math.max(top, rowY(-.03)), x(.92), rowY(.22)) > .13;
@@ -171,7 +172,18 @@ export async function readRosterScreenshot(worker, file, kind, { matchName } = {
         const dispatch = await recognize(worker, dispatchCrop, PSM.SINGLE_LINE);
         row.otherLegion = Number(dispatch.match(/\bLegion\s*([12])\s+dispatched\b/i)?.[1]) || null;
       }
-      const registration = row.otherLegion || otherLegionMarker ? 'other-legion' : classifyRosterCheckboxes(pixels,width,height,top,bottom);
+      let registration = 'other-legion';
+      if (!row.otherLegion && !otherLegionMarker) {
+        if (layout.registrationLabels) {
+          // Start below the green Voted badge, which can otherwise obscure short labels.
+          const statusTop = Math.max(top, rowY(.30));
+          const statusBottom = Math.min(bottom, rowY(.79));
+          const label = textCrop(screen, x(.73), statusTop, x(.20), statusBottom-statusTop, { dark: true, tight: true });
+          registration = readRosterRegistrationLabel(await recognize(worker, label, PSM.SINGLE_BLOCK));
+        } else {
+          registration = classifyRosterCheckboxes(pixels,width,height,top,bottom);
+        }
+      }
       // Experimental, opt-in only: never persist this evidence in ordinary import sessions.
       let avatarEvidence;
       if (kind && typeof kind === 'object' && kind.avatarBenchmark === true) {
@@ -200,7 +212,9 @@ export async function retryRosterUsername(file,bounds,existingWorker) {
     const screen=canvas(width,height),context=screen.getContext('2d',{willReadFrequently:true});
     context.drawImage(source,0,0,width,height);
     const top=Math.round(bounds.top*height),bottom=Math.round(bounds.bottom*height),nominal=Math.round(height*.077);
-    const start=top<=Math.round(height*.336)?bottom-nominal:top;
+    const layout=rosterScreenshotLayout(context.getImageData(0,0,width,height).data,width,height);
+    // The first row may be clipped under the roster toolbar.
+    const start=top<=Math.round(height*(layout.listStart+.001))?bottom-nominal:top;
     const other=greenDensity(context,Math.round(width*.22),Math.round(start+nominal*.69),Math.round(width*.63),bottom)>.035;
     const end=Math.min(bottom,Math.round(start+nominal*(other ? .40 : .54)));
     if(end<=top)return '';

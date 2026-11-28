@@ -11,7 +11,7 @@ export function passwordMatches(password,hash){
 }
 function sign(payload,env){return createHmac('sha256',env.SESSION_SECRET).update(`${payload}:${env.ACCESS_PASSWORD_HASH}`).digest('base64url');}
 export function configured(env=process.env){
-  const hostedPreview=env.VERCEL_ENV!=='production'&&env.VERCEL_GIT_COMMIT_REF==='fix/3573-ocr-upgrade';
+  const hostedPreview=env.VERCEL_ENV!=='production'&&['fix/3573-ocr-upgrade','fix/3573-review-speed'].includes(env.VERCEL_GIT_COMMIT_REF);
   return !hostedPreview&&Boolean(env.SESSION_SECRET?.length>=32&&env.ACCESS_PASSWORD_HASH?.includes(':'));
 }
 export function sessionToken(env=process.env,now=Date.now(),remember=false){

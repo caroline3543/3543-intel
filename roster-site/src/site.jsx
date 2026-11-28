@@ -1,3 +1,4 @@
+import {playerSearchFields} from '../../src/services/playerNames.js';
 import {useMembershipRefresh} from './useMembershipRefresh.js';
 import {MembershipRefreshStatus} from './components/MembershipRefreshStatus.jsx';
 import {MEMBERSHIP_STALE_AFTER_MS,verifiedMembershipTime} from '../../src/services/rosterViewService.js';
@@ -132,6 +133,38 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const localInitial=useRef(null);if(!localInitial.current)localInitial.current=loadFromStorage(empty);
   const {data,setData:setSharedData,sync,publish,join,retry,resolve}=useSharedWorkspace(localInitial.current);
   function setData(value){setSharedData(prev=>{const next=withAutomaticRoles(typeof value==='function'?value(prev):value);latest.current=next;return next;});}
+  async function rememberOcrAlias(id,reading,previousAlias=null){
+    const alias=String(reading??'').trim().normalize('NFC');
+    const remove=reading===null&&typeof previousAlias==='string';
+    if(!remove&&(!alias||alias.length>128))return {error:'Enter a valid OCR spelling.'};
+    if(!sync.ready||!sync.joined||sync.conflicts?.length)return {error:'Connect to the shared workspace before saving a spelling.'};
+    const key=value=>String(value??'').normalize('NFKC').toLowerCase().replace(/[Ξξ=]/gu,'e').replace(/ı/gu,'i').replace(/¥/gu,'y').normalize('NFD').replace(/[\p{P}\p{S}\p{M}\s\u200B\u200E\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/gu,'').replace(/0/g,'o').replace(/[1l]/g,'i');
+    if(!remove&&!key(alias))return {error:'Enter a spelling containing letters or numbers.'};
+    let rejected='';
+    const result=await setSharedData(prev=>{
+      const player=prev.players.find(p=>String(p.id)===String(id));
+      if(!player){rejected='Player no longer exists.';return prev;}
+      const aliases=Array.isArray(player.ocrAliases)?player.ocrAliases:[];
+      if(previousAlias!==null&&!aliases.includes(previousAlias)){rejected='This spelling already changed. Reopen the player profile.';return prev;}
+      if(!remove&&prev.players.some(p=>p!==player&&[p.username,p.name,p.nickname,p.fid,p.id,...playerSearchFields(p),...(Array.isArray(p.ocrAliases)?p.ocrAliases:[])].some(value=>key(value)===key(alias)))){
+        rejected='This spelling conflicts with another player. Choose a different spelling.';return prev;
+      }
+      const next=aliases.filter(value=>value!==previousAlias);
+      if(!remove)next.push(alias);
+      return {...prev,players:prev.players.map(p=>p===player?{...p,ocrAliases:[...new Set(next)]}:p)};
+    });
+    if(rejected||result?.error)return {error:rejected||result.error};
+    const deadline=Date.now()+35000;
+    while(Date.now()<deadline){
+      const state=await retry();
+      if(state?.conflicts?.length||state?.issue)break;
+      const player=state?.base?.players?.find(p=>String(p.id)===String(id));
+      const aliases=player?.ocrAliases??[];
+      if(player&&(remove||aliases.includes(alias))&&(previousAlias===null||!remove&&previousAlias===alias||!aliases.includes(previousAlias)))return {verified:true};
+      await new Promise(resolve=>setTimeout(resolve,500));
+    }
+    return {error:'Spelling save not verified. Check workspace sync.'};
+  }
   async function saveScreenshotImport(action,{verifyOnly=false}={}){
     if(!sync.ready||!sync.joined||sync.conflicts?.length)return {error:'Connect to the shared workspace and resolve sync conflicts before importing.'};
     if(!verifyOnly){
@@ -441,7 +474,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {sync.mode!=='join'&&!sync.conflicts?.length&&<div>
     {tab==='members'&&!DEFAULT_ALLIANCES.every(tag=>players.some(p=>p.allianceTag===tag))&&<AllianceSetup players={players} onLoad={importRoster}/>}
     {returnToPlanner&&tab==='members'&&<div style={{position:'sticky',top:0,zIndex:10,padding:'10px 16px',background:'#142438',borderBottom:'1px solid #40546a'}}><button type="button" style={button} onClick={backToPlanner}>← Back to {EVENT_NAMES[returnToPlanner]}</button></div>}
-    {tab==='members'&&players.length>0&&<RosterTab enable3573Tracking transferEvents={transferEvents} teamworkPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamworkPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('TAL teamwork preferences saved.');}} initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} legionPlan={data.talPlan||newPlan()} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
+    {tab==='members'&&players.length>0&&<RosterTab enable3573Tracking transferEvents={transferEvents} teamworkPreferences={data.talTeamPreferences||{players:{},pairs:[]}} onSaveTeamworkPreferences={prefs=>{setData(prev=>({...prev,talTeamPreferences:prefs}));setMessage('TAL teamwork preferences saved.');}} initialPlayerId={initialPlayerId} onInitialPlayerOpened={()=>setInitialPlayerId(null)} legionPlan={data.talPlan||newPlan()} onRefreshLegion={refreshLegion} legionRefresh={legionRefresh} players={players} events={data.events||[]} roles={withBuiltinRole(data.customRoles||[])} onSaveCustomRoles={customRoles=>setData(prev=>({...prev,customRoles}))} onSavePlayer={save} onRememberOcrAlias={rememberOcrAlias} onUpdatePlayers={update} onDeletePlayer={setDeleting} onLoadAlliance={()=>setImporting(true)} showToast={setMessage}/>}
     {tab==='events'&&<section aria-label="Events" style={{padding:'12px 16px',display:'grid',gap:8}}>
       {eventCards.map(({id,label,description,available,icon})=><button key={id} type="button" disabled={!available} onClick={()=>navigate(id)}
         style={{...button,textAlign:'left',padding:'13px 14px',minHeight:64,display:'grid',gridTemplateColumns:'22px minmax(0,1fr) auto',alignItems:'center',gap:12,opacity:available?1:.56,cursor:available?'pointer':'not-allowed',background:available?'#203449':'#172739',borderColor:available?'#40546a':'#293b4d'}}>
@@ -455,7 +488,7 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
     {tab==='castle'&&<section aria-label="Castle Battle coming soon" style={{minHeight:'60vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'32px 20px',textAlign:'center'}}><div style={{maxWidth:320}}><div style={{width:64,height:64,display:'grid',placeItems:'center',borderRadius:20,background:'#203449',margin:'0 auto 18px',color:C.icy}}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h2 style={{fontSize:22,margin:'0 0 8px'}}>Castle Battle</h2><p style={{color:C.icy,fontSize:14,margin:'0 0 8px'}}>Coming soon</p><p style={{color:'#B8C8D5',fontSize:14,lineHeight:1.5,margin:0}}>Castle Battle team planning will be available in a future update.</p></div></section>}
     {['foundry','canyon'].filter(kind=>tab===kind||returnToPlanner===kind).map(kind=><div key={kind} style={{display:tab===kind?'block':'none'}}>
       <EventPlanner kind={kind} players={activePlayers} attendancePlayers={players} storage={data.foundry}
-        onUpdate={action=>setData(prev=>updateEventPlanner(prev,action))} onScreenshotUpdate={saveScreenshotImport} teamworkPreferences={data.talTeamPreferences||{}}
+        onUpdate={action=>setData(prev=>updateEventPlanner(prev,action))} onScreenshotUpdate={saveScreenshotImport} onRememberOcrAlias={rememberOcrAlias} teamworkPreferences={data.talTeamPreferences||{}}
         onRoleFeedback={()=>tapFeedback(preferences.haptics,navigator,14)}
         onSaveTeamworkPreferences={prefs=>setData(prev=>({...prev,talTeamPreferences:prefs}))}
         onUpdatePlayerLanguage={(ids,language)=>{

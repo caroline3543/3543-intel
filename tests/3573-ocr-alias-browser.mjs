@@ -1,0 +1,75 @@
+import {chromium} from 'playwright';
+import {createServer} from 'vite';
+import assert from 'node:assert/strict';
+import {gunzipSync} from 'node:zlib';
+import {sharedData,validateWorkspace} from '../roster-site/shared/workspace.js';
+
+const initial=sharedData({players:[{id:'hermes',username:'HΞRMΞS',allianceTag:'HOT'}]});
+let remote={revision:1,data:initial},offline=false;
+const real=process.env.OCR_LOCAL_SUPABASE==='1';
+const token='local-only-ocr-persistence-test-token-3573';
+async function edge(input){
+ const response=await fetch('http://127.0.0.1:54321/functions/v1/caroline3573-workspace',{method:'POST',headers:{'Content-Type':'application/json','x-caroline-site-key':token},body:JSON.stringify({workspaceId:'3573-leaders',role:'leader',actor:'isolated-ci',...input})});
+ const result=await response.json();if(!response.ok&&response.status!==409)throw Error('Local edge function: '+response.status+' '+JSON.stringify(result));return result;
+}
+if(real){const before=await edge({action:'read'});remote=await edge({action:'commit',revision:before.revision,data:initial});}
+
+const server=await createServer({root:process.cwd(),configFile:false,server:{host:'127.0.0.1',port:4192,strictPort:true},plugins:[{name:'isolated-workspace-test',configureServer(s){s.middlewares.use('/api/workspace',async(req,res)=>{
+ res.setHeader('Content-Type','application/json');
+ try{
+ if(req.method==='POST'){
+ if(offline){res.statusCode=503;res.end(JSON.stringify({error:'Test network failure'}));return;}
+ let body='';for await(const chunk of req)body+=chunk;
+ const input=JSON.parse(body);const data=input.encoded?JSON.parse(gunzipSync(Buffer.from(input.encoded,'base64')).toString()):input.data;
+ validateWorkspace(data);
+ if(real){remote=await edge({action:'commit',revision:input.revision,data});if(remote.conflict)res.statusCode=409;res.end(JSON.stringify(remote));return;}
+ if(input.revision!==remote.revision){res.statusCode=409;res.end(JSON.stringify({...remote,conflict:true}));return;}
+ remote={revision:remote.revision+1,data};
+ }
+ if(real)remote=await edge({action:'read'});
+ res.end(JSON.stringify(remote));
+ }catch(e){res.statusCode=500;res.end(JSON.stringify({error:e.message}));}
+ });s.middlewares.use('/alias-test',(_req,res)=>{res.setHeader('Content-Type','text/html');res.end('<!doctype html><title>Isolated alias persistence test</title>');});}}]});
+let browser;
+try{
+ await server.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE});
+ async function device(){
+ const context=await browser.newContext();const page=await context.newPage();await page.goto('http://127.0.0.1:4192/alias-test');
+ await page.evaluate(async()=>{
+ const {createSharedWorkspace,workspaceCache,workspaceRequest}=await import('/roster-site/src/sharedWorkspace.js');
+ const {createScreenshotMatcher}=await import('/roster-site/src/foundry/screenshotImportPlan.js');
+ const controller=createSharedWorkspace({initial:{players:[]},cache:workspaceCache(),request:workspaceRequest});
+ window.client=controller;
+ window.matchAlias=(reading='HERMES')=>createScreenshotMatcher(controller.getState().local.players.map(p=>({...p,name:p.username,alliance:p.allianceTag})),'HOT')(reading).player?.id??null;
+ await controller.initialize();
+ });
+ return {context,page};
+ }
+ const a=await device(),b=await device();
+ assert.equal(await b.page.evaluate(()=>window.matchAlias()),null);
+ offline=true;
+ await a.page.evaluate(async()=>{await window.client.update(prev=>({...prev,players:prev.players.map(p=>({...p,ocrAliases:['HERMES']}))}));await window.client.sync();});
+ assert.ok(await a.page.evaluate(()=>window.client.getState().issue));
+ await b.page.evaluate(()=>window.client.sync());
+ assert.equal(await b.page.evaluate(()=>window.matchAlias()),null);
+ offline=false;
+ await a.page.evaluate(()=>window.client.sync());
+ assert.deepEqual(remote.data.players[0].ocrAliases,['HERMES']);
+ await b.page.evaluate(()=>window.client.sync());
+ assert.equal(await b.page.evaluate(()=>window.matchAlias()),'hermes');
+ await a.context.close();await b.context.close();
+ const c=await device();assert.equal(await c.page.evaluate(()=>window.matchAlias()),'hermes');
+ await c.page.evaluate(async()=>{await window.client.update(prev=>({...prev,players:prev.players.map(p=>({...p,ocrAliases:['Hermees']}))}));await window.client.sync();});
+ assert.deepEqual(remote.data.players[0].ocrAliases,['Hermees']);
+ await c.context.close();
+ const d=await device();
+ assert.equal(await d.page.evaluate(()=>window.matchAlias()),null);
+ assert.equal(await d.page.evaluate(()=>window.matchAlias('Hermees')),'hermes');
+ await d.page.evaluate(async()=>{await window.client.update(prev=>({...prev,players:prev.players.map(p=>({...p,ocrAliases:[]}))}));await window.client.sync();});
+ await d.context.close();
+ const e=await device();
+ assert.equal(await e.page.evaluate(()=>window.matchAlias('Hermees')),null);
+ assert.equal(remote.data.players[0].username,'HΞRMΞS');
+ await e.context.close();
+ console.log('PASS: independent Chromium contexts, real HTTP and IndexedDB, failed save/retry, fresh browser retrieval; backend='+ (real?'local Supabase edge + database':'simulated'));
+}finally{await browser?.close();await server.close();}

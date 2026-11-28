@@ -5,7 +5,7 @@ export function gameApiConfig(env = process.env) {
   if (!base || !key || !token) return null;
   try {
     const url = new URL(base);
-    if (env.VERCEL_ENV === 'preview' &&
+    if (env.VERCEL_ENV && env.VERCEL_ENV !== 'production' &&
         (url.hostname === productionProject || url.origin !== env.STATE_3573_PREVIEW_API_ORIGIN)) return null;
     return {base:url.origin, key, token};
   } catch {

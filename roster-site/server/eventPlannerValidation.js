@@ -26,10 +26,14 @@ export function validateEventPlannerData(data,now=Date.now()) {
     if(!Object.hasOwn(EVENT_NAMES,kind)||typeof alliance!=='string'||!alliance||![1,2].includes(legion)||
        key!==plannerKey(kind,alliance,legion)||!plain(plan)||
        typeof plan.occurrenceId!=='string'||(plan.occurrenceId!==key&&!plan.occurrenceId.startsWith(key+':'))||
-       ![3,4,5,6].includes(plan.teamCount)||!plain(plan.registrations)||!plain(plan.registeredUnder)||
+       ![2,3,4,5,6].includes(plan.teamCount)||!plain(plan.registrations)||!plain(plan.registeredUnder)||
        !plain(plan.teams)||!plain(plan.assignments)||
        ((plan.date||plan.time)&&!eventStart(plan.date,plan.time)))throw Error('Invalid event plan.');
     if(plan.powerByPlayer!=null&&(!plain(plan.powerByPlayer)||Object.values(plan.powerByPlayer).some(value=>!Number.isSafeInteger(value)||value<0)))throw Error('Invalid event troop power.');
+    for(const pins of [plan.teamLocks,plan.manualTeams]){
+     if(pins!=null&&(!plain(pins)||Object.entries(pins).some(([id,value])=>value!==true||!Object.hasOwn(plan.teams,id))))throw Error('Invalid team assignment protection.');
+    }
+    if(plan.teamLeaders!=null&&(!plain(plan.teamLeaders)||Object.entries(plan.teamLeaders).some(([team,id])=>!Object.hasOwn(plan.teams,id)||plan.teams[id]!==team)))throw Error('Invalid team leader.');
     const roles=Object.values(plan.registrations);
     if(roles.some(role=>!['','join','sub','out'].includes(role))||roles.filter(role=>role==='join').length>EVENT_LIMITS[kind].join||
        roles.filter(role=>role==='sub').length>EVENT_LIMITS[kind].sub||Object.entries(plan.teams).some(([id,team])=>

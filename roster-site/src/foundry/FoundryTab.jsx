@@ -1,4 +1,5 @@
 import './legionRoster.css';
+import {balanceEventSquads} from './balanceEventSquads.js';
 import {RosterScreenshotImport} from './RosterScreenshotImport.jsx';
 import {BulkPlayerImport} from '../components/BulkPlayerImport.jsx';
 import {foundryShareMessages,foundryMessageStats,FOUNDRY_DEFAULT_INSTRUCTIONS} from './foundryShare.js';
@@ -7,7 +8,7 @@ import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
 import {playerAvatarUrl} from '../../../src/services/playerAvatarService.js';
 import {playerSearchFields} from '../../../src/services/playerNames.js';
 import {PlannerAttendance} from './PlannerAttendance.jsx';
-import {EVENT_NAMES,EVENT_LIMITS,REGISTRATION_ROLES,isParticipant,TEAM_NAMES,plannerAlliances,eventStart,recentNoShow,resizePlannerTeams,formatPlannerPower} from '../../../src/services/eventPlanner.js';
+import {EVENT_NAMES,EVENT_LIMITS,REGISTRATION_ROLES,isParticipant,TEAM_NAMES,plannerAlliances,eventStart,recentNoShow,formatPlannerPower} from '../../../src/services/eventPlanner.js';
 import {gameLanguageName,gameLanguageCode,recordedLanguageNames} from '../../../src/services/gameLanguageService.js';
 const supportedLanguageCodes=new Set(['en','ko','zh-TW','zh-CN','tr','ar','ru','es','pl','uk','it','fr','ka','de','pt','ja']);
 const languageOptions=['English','Korean','Traditional Chinese','Simplified Chinese','Turkish','Arabic','Russian','Spanish','Polish','Ukrainian','Italian','French','Georgian','German','Portuguese','Japanese'];
@@ -16,9 +17,9 @@ const resolveLanguage=value=>{const raw=String(value||'').trim();if(!raw)return 
 const languageLabel=value=>gameLanguageName(value)||String(value||'');
 const teamColors={Blue:'#397DB6',Yellow:'#D8A13C',Green:'#348D68',Pink:'#F05A9D',Purple:'#B28DEC',Teal:'#50B4BD'};
 const standardBuildings={Blue:['Prototype Site I','Boiler Room'],Yellow:['Prototype Site II','Central Transit Station'],Green:['Repair Facility I','Repair Facility III'],Pink:['Repair Facility II','Repair Facility IV']};
-const anchorBuildings=['Prototype Site I','Prototype Site II','Repair Facility I'];
-// Prototype I and Boiler must have separate team anchors.
-const anchorTeams=['Blue','Yellow','Green'];
+const buildingsFor = count => ({...standardBuildings, Purple:allBuildings,Teal:allBuildings,
+ ...(count===2?{Blue:[...standardBuildings.Blue,...standardBuildings.Green],Yellow:[...standardBuildings.Yellow,...standardBuildings.Pink]}:
+ count===3?{Green:[...standardBuildings.Green,...standardBuildings.Pink]}:{})});
 const allBuildings=Object.values(standardBuildings).flat();
 const style={background:'#142438',border:'1px solid #30465a',borderRadius:16,padding:12,marginBottom:10};
 const btn={border:'1px solid #40546a',borderRadius:12,background:'#21354b',color:'#e9f2fa',padding:'9px 12px',minHeight:40,fontWeight:650,cursor:'pointer'};
@@ -70,12 +71,11 @@ function InlinePower({player,onSave,metric,onClose}){
  </div>;
 }
 export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',chosen,legion,changeSelection,sharedFoundry={},
-  otherPlan,otherLegion,eventRegistrations,onChangeRoles,onRoleFeedback,onSaveScreenshotPowers,screenshotStorage,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,onResetPlanner,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
+  otherPlan,otherLegion,eventRegistrations,onChangeRoles,onRoleFeedback,onSaveScreenshotPowers,onRememberOcrAlias,screenshotStorage,onSaveFoundry,onSaveTroopPower,onAttendance,onNewEvent,onResetPlanner,teamworkPreferences={},onSaveTeamworkPreferences,onUpdatePlayerLanguage,onOpenPlayerProfile}){
  const title=EVENT_NAMES[kind],isFoundry=kind==='foundry',metric=isFoundry?'Troop power':'Canyon Clash power';
  const limits=EVENT_LIMITS[kind];
  const colours=TEAM_NAMES.slice(0,sharedFoundry.teamCount||4);
- const buildings={...standardBuildings, Purple:allBuildings,Teal:allBuildings,
-  ...(colours.length===3?{Green:[...standardBuildings.Green,...standardBuildings.Pink]}:{})};
+ const buildings=buildingsFor(colours.length);
  const format=n=>formatPlannerPower(n,kind);
  const saved=sharedFoundry||{};
  const [view,setView]=useState('players'),[query,setQuery]=useState('');
@@ -85,6 +85,9 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const teamRefs=useRef({});
  const jumpToTeam=c=>{setFocusTeam(c);teamRefs.current[c]?.scrollIntoView({behavior:'smooth',block:'start'});};
  const [focusTeam,setFocusTeam]=useState('Blue'),[moving,setMoving]=useState(null),[confirmGenerate,setConfirmGenerate]=useState(false);
+ const [teamCount,setTeamCount]=useState(colours.length);
+ const [leaderIds,setLeaderIds]=useState(()=>Object.values(sharedFoundry.teamLeaders??{}));
+ const [preferencesEnabled,setPreferencesEnabled]=useState(true);
  const [addRole,setAddRole]=useState('join');
  const [managing,setManaging]=useState(null);
  const [resetScope,setResetScope]=useState('');
@@ -104,7 +107,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  useEffect(()=>setInstructions(saved.shareInstructions||FOUNDRY_DEFAULT_INSTRUCTIONS),[saved.shareInstructions]);
  const avatarFor=p=>players.find(x=>String(x.id??x.fid??name(x))===p.id)||{username:p.name};
  const entries=useMemo(()=>{
-  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));const reading=saved.powerByPlayer?.[id]??power(p,kind);return [id,{id,name:name(p),power:Number(reading)||0,hasPower:reading!=null&&reading!==''&&Number.isFinite(Number(reading)),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),furnaceLevel:p.furnaceLevel??p.furnace??p.furnace_level??null,cityPower:p.cityPower??p.powerLevel??p.power??null,languages:recordedLanguageNames(p),playerId:p.fid,avatarUrl:playerAvatarUrl(p),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String),recentNoShow:recentNoShow(p.plannerAttendance,eventStart(saved.date,saved.time))}]}));
+  const map=new Map(players.map(p=>{const id=String(p.id??p.fid??name(p));const reading=saved.powerByPlayer?.[id]??power(p,kind);return [id,{id,name:name(p),power:Number(reading)||0,hasPower:reading!=null&&reading!==''&&Number.isFinite(Number(reading)),rank:rank(p),alliance:alliance(p),matched:true,tierScore:tierScore(p),furnaceLevel:p.furnaceLevel??p.furnace??p.furnace_level??null,cityPower:p.cityPower??p.powerLevel??p.power??null,languages:recordedLanguageNames(p),playerId:p.fid,fid:p.fid,nickname:p.alias||p.nickname,ocrAliases:Array.isArray(p.ocrAliases)?p.ocrAliases:[],avatarUrl:playerAvatarUrl(p),searchFields:[...playerSearchFields(p),p.id,p.nickname].filter(Boolean).map(String),recentNoShow:recentNoShow(p.plannerAttendance,eventStart(saved.date,saved.time))}]}));
   for(const p of saved.imports||[]){const current=map.get(p.id);map.set(p.id,current?{...current,power:saved.powerByPlayer?.[p.id]??p.power??current.power,hasPower:(saved.powerByPlayer?.[p.id]??p.power)!=null||current.hasPower}:{...p,hasPower:p.power!=null,alliance:p.alliance||'Unassigned',matched:false});}
   return [...map.values()].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
  },[players,kind,saved.imports,saved.powerByPlayer,saved.date,saved.time]);
@@ -150,36 +153,28 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   }
   return commitRoles(changes);
  };
- const autoTeams=(mode='all')=>{
-  setConfirmGenerate(false);
-  const next=mode==='add'?{...teams}:{},alloc=mode==='add'?{...validAssignments}:{};
-  const totals=Object.fromEntries(colours.map(c=>[c,0])),members=Object.fromEntries(colours.map(c=>[c,[]]));
-  const attending=[...joined].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
-  const prefs=teamworkPreferences||{},pairs=Array.isArray(prefs.pairs)?prefs.pairs:[],groups=Array.isArray(prefs.groups)?prefs.groups:[];
-  const affinity=(a,b)=>{
-   const linked=pairs.some(pair=>Array.isArray(pair)&&pair.map(String).includes(a.id)&&pair.map(String).includes(b.id))||groups.some(g=>Array.isArray(g.memberIds)&&g.memberIds.map(String).includes(a.id)&&g.memberIds.map(String).includes(b.id));
-   return (linked?2:0)+(a.languages?.some(language=>b.languages?.includes(language))?1:0);
-  };
-  const put=(p,c)=>{next[p.id]=c;totals[c]+=p.power;members[c].push(p)};
-  if(mode==='add')attending.forEach(p=>{if(colours.includes(next[p.id]))put(p,next[p.id])});
-  const ranked=attending.filter(p=>p.power>0);
-  const anchors=ranked.slice(0,3);
-  if(mode==='all'&&isFoundry){
-   anchors.forEach((p,i)=>{const building=anchorBuildings[i];const c=anchorTeams[i];put(p,c);alloc[p.id]=building});
+ const eligibleSquad = joined.filter(player=>!elsewhereFor(player.id).length);
+ const leaders = leaderIds.filter(id=>eligibleSquad.some(player=>player.id===id));
+ const locks = saved.teamLocks ?? {};
+ const autoTeams=(preserveAll=false)=>{
+  const result=balanceEventSquads({players:eligibleSquad,count:teamCount,leaderIds:leaders,plan:saved,preferences:teamworkPreferences,preserveAll,preferencesEnabled});
+  if(result.error){setNotice(result.error);return;}
+  if(eligibleSquad.length!==joined.length){setNotice('Resolve duplicate legion registrations before balancing teams.');return;}
+  const nextBuildings=buildingsFor(teamCount);
+  const alloc={};
+  if(isFoundry)for(const [colour,members] of Object.entries(result.members)){
+   const locations=nextBuildings[colour];
+   const totals=locations.map(()=>0);
+   for(const player of members){
+    const previous=teams[player.id]===colour?locations.indexOf(assignments[player.id]):-1;
+    const index=previous>=0?previous:totals.indexOf(Math.min(...totals));
+    alloc[player.id]=locations[index];
+    totals[index]+=player.power;
+   }
   }
-  attending.filter(p=>!next[p.id]).forEach(p=>{
-   const available=colours.filter(c=>members[c].length<Math.ceil(attending.length/colours.length));
-   const choices=available.length?available:colours;
-   const minimum=Math.min(...choices.map(c=>totals[c]));
-   const viable=choices.filter(c=>totals[c]<=minimum+Math.max(1,minimum*.05));
-   const c=viable.sort((x,y)=>members[y].reduce((n,q)=>n+affinity(p,q),0)-members[x].reduce((n,q)=>n+affinity(p,q),0)||totals[x]-totals[y]||colours.indexOf(x)-colours.indexOf(y))[0];
-   put(p,c);
-  });
-  if(isFoundry)colours.forEach(c=>{
-   const bins=buildings[c].map(()=>0);members[c].forEach(p=>{const i=buildings[c].indexOf(alloc[p.id]);if(i>=0)bins[i]+=p.power});
-   members[c].filter(p=>!alloc[p.id]).sort((a,b)=>b.power-a.power).forEach(p=>{const i=bins.indexOf(Math.min(...bins));alloc[p.id]=buildings[c][i];bins[i]+=p.power});
-  });
-  update({teams:next,assignments:alloc},mode==='all'?'Teams regenerated':'Unassigned players added without changing existing assignments');
+  update({teamCount,teams:result.teams,assignments:alloc,teamLeaders:result.leaders,teamLocks:result.locks,manualTeams:result.manual},'Teams balanced');
+  if(!TEAM_NAMES.slice(0,teamCount).includes(focusTeam))setFocusTeam('Blue');
+  setConfirmGenerate(false);
  };
  const norm=v=>String(v||'').normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleLowerCase();
  const plain=v=>norm(v).normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^\\p{L}\\p{N}]/gu,'');
@@ -223,7 +218,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  };
  const confirmBulkImport=rows=>{
   const ids=new Set(),nextRegs={...registrations},nextUnder={...registeredUnder};
-  const nextTeams={...teams},nextAssignments={...assignments},imports=[...(saved.imports||[])];
+  const nextTeams={...teams},nextAssignments={...assignments},nextLocks={...saved.teamLocks},nextManual={...saved.manualTeams},nextLeaders={...saved.teamLeaders},imports=[...(saved.imports||[])];
   let joins=joined.length,substitutes=subs.length,added=0,already=0;
   for(const row of rows){
    const id=String(row.id),p=entries.find(x=>x.id===id&&x.matched);
@@ -238,7 +233,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     if(addRole==='join')joins++;else if(addRole==='sub')substitutes++;
     if(joins>limits.join||substitutes>limits.sub)return {error:'Not enough '+(addRole==='join'?'combatant':'substitute')+' slots. Adjust registration before importing.'};
     nextRegs[id]=addRole;nextUnder[id]=chosen;
-    if(addRole!=='join'){delete nextTeams[id];delete nextAssignments[id]}
+    if(addRole!=='join'){delete nextLocks[id];delete nextManual[id];if(nextLeaders[nextTeams[id]]===id)delete nextLeaders[nextTeams[id]];delete nextTeams[id];delete nextAssignments[id]}
     added++;
    }
    if(row.power!==null){
@@ -247,12 +242,25 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     const index=imports.findIndex(x=>x.id===id);if(index>=0)imports[index]=record;else imports.push(record);
    }
   }
-  update({imports,registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments},added+' registered · '+already+' already registered',rows.filter(row=>row.power!==null).map(row=>({id:String(row.id),value:row.power})));
+  update({imports,registrations:nextRegs,registeredUnder:nextUnder,teams:nextTeams,assignments:nextAssignments,teamLocks:nextLocks,manualTeams:nextManual,teamLeaders:nextLeaders},added+' registered · '+already+' already registered',rows.filter(row=>row.power!==null).map(row=>({id:String(row.id),value:row.power})));
   return {message:added+' registered · '+already+' already registered'};
  };
- const swapTeams=()=>{if(swapFrom===swapTo||!colours.includes(swapFrom)||!colours.includes(swapTo))return;const next={...teams},alloc={...assignments};for(const p of active){const from=teams[p.id];if(from!==swapFrom&&from!==swapTo)continue;const to=from===swapFrom?swapTo:swapFrom;next[p.id]=to;if(isFoundry){const index=buildings[from].indexOf(validAssignments[p.id]);alloc[p.id]=buildings[to][Math.max(0,index)]||buildings[to][0];}}update({teams:next,assignments:alloc},swapFrom+' and '+swapTo+' teams swapped');setSwapOpen(false);setMoving(null);setSelected(null);onRoleFeedback?.();};
- const assign=(id,colour)=>{const nextTeams={...teams,[id]:colour};const nextAlloc={...assignments};if(isFoundry&&!buildings[colour].includes(nextAlloc[id]))nextAlloc[id]=buildings[colour][0];update({teams:nextTeams,assignments:nextAlloc},'Team updated')};
- const move=(id,building)=>{const colour=buildings[focusTeam]?.includes(building)?focusTeam:colours.find(c=>buildings[c].includes(building));if(!colour)return;update({teams:{...teams,[id]:colour},assignments:{...assignments,[id]:building}},'Building updated');setSelected(null)};
+ const swapTeams=()=>{if(active.some(p=>locks[p.id]&&(teams[p.id]===swapFrom||teams[p.id]===swapTo))){setNotice('Unlock the selected teams’ players before swapping.');return;}if(swapFrom===swapTo||!colours.includes(swapFrom)||!colours.includes(swapTo))return;const next={...teams},alloc={...assignments};for(const p of active){const from=teams[p.id];if(from!==swapFrom&&from!==swapTo)continue;const to=from===swapFrom?swapTo:swapFrom;next[p.id]=to;if(isFoundry){const index=buildings[from].indexOf(validAssignments[p.id]);alloc[p.id]=buildings[to][Math.max(0,index)]||buildings[to][0];}}const swappedLeaders={...saved.teamLeaders};delete swappedLeaders[swapFrom];delete swappedLeaders[swapTo];if(saved.teamLeaders?.[swapFrom])swappedLeaders[swapTo]=saved.teamLeaders[swapFrom];if(saved.teamLeaders?.[swapTo])swappedLeaders[swapFrom]=saved.teamLeaders[swapTo];update({teams:next,assignments:alloc,teamLeaders:swappedLeaders},swapFrom+' and '+swapTo+' teams swapped');setSwapOpen(false);setMoving(null);setSelected(null);onRoleFeedback?.();};
+ const assign=(id,colour)=>{
+  if(locks[id]||elsewhereFor(id).length)return;
+  const nextTeams={...teams,[id]:colour},nextAlloc={...assignments};
+  if(isFoundry&&!buildings[colour].includes(nextAlloc[id]))nextAlloc[id]=buildings[colour][0];
+  const teamLeaders=Object.fromEntries(Object.entries(saved.teamLeaders??{}).filter(([team,leader])=>leader!==id||team===colour));
+  update({teams:nextTeams,assignments:nextAlloc,teamLeaders,manualTeams:{...saved.manualTeams,[id]:true}},'Team updated');
+ };
+ const move=(id,building)=>{
+  if(locks[id]||elsewhereFor(id).length)return;
+  const colour=buildings[focusTeam]?.includes(building)?focusTeam:colours.find(c=>buildings[c].includes(building));
+  if(!colour)return;
+  const teamLeaders=Object.fromEntries(Object.entries(saved.teamLeaders??{}).filter(([team,leader])=>leader!==id||team===colour));
+  update({teams:{...teams,[id]:colour},assignments:{...assignments,[id]:building},teamLeaders,manualTeams:{...saved.manualTeams,[id]:true}},'Building updated');
+  setSelected(null);
+ };
  const generatedTeamMessage=()=>colours.map(c=>c.toUpperCase()+' TEAM\n'+joined.filter(p=>teams[p.id]===c).sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name)).map(p=>p.name).join(', ')).join('\n\n');
  const copyTeamMessage=async()=>{const message=teamMessage===null?generatedTeamMessage():teamMessage;try{await navigator.clipboard.writeText(message);setNotice('Team message copied')}catch{setNotice('Copy failed. Select the text and copy manually.')}};
  const teamTitle=c=>(teamNames[c]||c).trim()||c;
@@ -352,7 +360,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    <PlannerAttendance kind={kind} alliance={chosen} legion={legion} plan={saved} players={attendancePlayers}
     onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
    <RosterScreenshotImport kind={kind} title={title} alliance={chosen} activeLegion={legion} storage={screenshotStorage} players={entries.filter(p=>p.matched)} preferredIds={allianceEntries.filter(p=>p.matched).map(p=>p.id)}
-     occurrenceIds={{[legion]:saved.occurrenceId,[otherLegion]:otherPlan.occurrenceId}} onSave={onSaveScreenshotPowers} onContinueTeams={()=>setView('teams')}>
+     occurrenceIds={{[legion]:saved.occurrenceId,[otherLegion]:otherPlan.occurrenceId}} onSave={onSaveScreenshotPowers} onRememberOcrAlias={onRememberOcrAlias} onContinueTeams={()=>setView('teams')}>
    <details className="screenshot-more-options">
      <summary style={{cursor:'pointer',fontWeight:650}}>More options</summary>
      <div style={{display:'flex',alignItems:'center',gap:8,margin:'7px 0',flexWrap:'wrap'}}>
@@ -428,20 +436,44 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    </div>
   </>}
   {(view==='teams'||view==='buildings')&&<>
-   <div style={{...style,padding:12}}>
+   {(assignedCount>0||view==='buildings')&&<div style={{...style,padding:12}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><strong>Team balance</strong><span style={{fontSize:12,color:'#a9bfd0'}}>{assignedCount}/{joined.length} assigned</span></div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(68px,1fr))',gap:7}}>{colours.map(c=><button key={c} onClick={()=>{setMoving(null);setSelected(null);if(view==='teams')jumpToTeam(c);else setFocusTeam(c)}} style={{...btn,minWidth:0,padding:'10px 3px',borderColor:focusTeam===c?teamColors[c]:'#40546a',background:focusTeam===c?'#263b50':'#1a2b40'}}><div style={{height:4,background:teamColors[c],borderRadius:4,marginBottom:8}}/><div style={{fontSize:11}}>{c}</div><div style={{fontSize:13,marginTop:3}}>{teamTotals[c]?format(teamTotals[c]):'—'}</div></button>)}</div>
     <div style={{fontSize:12,color:'#a9bfd0',marginTop:10}}>{!assignedCount?'Generate teams to see balance':missingPower.length?'Missing troop power for '+missingPower.length+' player(s). Balance is provisional.':balanceSpread+'% spread between strongest and weakest team'}</div>
-   </div>
+   </div>}
    {view==='teams'&&<>
-    <label style={{display:'block',marginBottom:10}}>Teams per legion <select aria-label="Teams per legion" value={colours.length} style={btn} onChange={e=>{const count=Number(e.target.value);update(resizePlannerTeams(saved,count),'Team count updated');if(!TEAM_NAMES.slice(0,count).includes(focusTeam))setFocusTeam('Blue');}}>{[3,4,5,6].map(n=><option key={n}>{n}</option>)}</select></label>
-    <div style={{display:'flex',justifyContent:'flex-end',gap:8,flexWrap:'wrap',marginBottom:10}}><button style={btn} onClick={()=>{setSwapFrom(colours[0]);setSwapTo(colours[1]);setSwapOpen(v=>!v);setConfirmGenerate(false)}}>⇄ Swap teams</button><button style={{...btn,padding:'8px 12px',background:'#263b50'}} onClick={()=>{setConfirmGenerate(v=>!v);setSwapOpen(false)}}>⚙ Generate teams</button></div>
+    <section style={style} aria-label="Squad Balancer" className="squad-config">
+      <h3>Squad Balancer</h3>
+      <p>{eligibleSquad.length} eligible combatants{missingPower.length>0?' · '+missingPower.length+' missing troop power':''}</p>
+      <span id="squad-team-count">Number of teams</span>
+      <div className="squad-count" role="group" aria-labelledby="squad-team-count">
+        {[2,3,4,5,6].map(count=><button key={count} type="button" style={btn} aria-pressed={count===teamCount} disabled={count<leaders.length} onClick={()=>{setTeamCount(count);setConfirmGenerate(false);}}>{count}</button>)}
+      </div>
+      {eligibleSquad.length>0&&<><span id="squad-leader-label">Team leaders (optional) · {leaders.length}/{teamCount}</span>
+      <div className="squad-leaders" role="group" aria-labelledby="squad-leader-label">
+        {eligibleSquad.map(player=><button key={player.id} type="button" style={btn} aria-pressed={leaders.includes(player.id)} disabled={!leaders.includes(player.id)&&leaders.length>=teamCount}
+          onClick={()=>{setLeaderIds(leaders.includes(player.id)?leaders.filter(id=>id!==player.id):[...leaders,player.id]);setConfirmGenerate(false);}}>{player.name}</button>)}
+      </div></>}
+      <button type="button" className="squad-primary" style={btn} disabled={!eligibleSquad.length} onClick={()=>{setSwapOpen(false);if(assignedCount)setConfirmGenerate(true);else autoTeams();}}>Auto-Balance {teamCount} Teams</button>
+      {confirmGenerate&&<div className="squad-confirm"><p>Rebalance the current teams? Locked and manually moved players stay assigned.</p>
+        <button type="button" style={btn} onClick={()=>autoTeams()}>Confirm rebalance</button>
+        <button type="button" style={btn} onClick={()=>setConfirmGenerate(false)}>Cancel</button>
+      </div>}
+      <details><summary>Settings</summary>
+        <label><input type="checkbox" checked={preferencesEnabled} onChange={e=>setPreferencesEnabled(e.target.checked)}/> Consider languages and preferred teammates</label>
+        {assignedCount>0&&<div className="squad-advanced">
+          <button type="button" style={btn} onClick={()=>autoTeams(true)}>Add unassigned players only</button>
+          <button type="button" style={btn} onClick={()=>{setSwapFrom(colours[0]);setSwapTo(colours[1]);setSwapOpen(v=>!v);setConfirmGenerate(false)}}>Swap teams</button>
+        </div>}
+      </details>
+    </section>
     {swapOpen&&<section aria-label="Swap teams" style={style}><strong>Swap entire teams</strong><p style={{fontSize:12,color:'#a9bfd0'}}>Players exchange colours. Buildings and colour-specific instructions stay in place.</p><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{[[swapFrom,setSwapFrom,'First team'],[swapTo,setSwapTo,'Second team']].map(([value,set,label])=><label key={label}>{label}<select aria-label={label} style={{...btn,width:'100%'}} value={value} onChange={e=>set(e.target.value)}>{colours.map(c=><option key={c} value={c}>{c} · {active.filter(p=>teams[p.id]===c).length} players</option>)}</select></label>)}</div><div style={{display:'flex',gap:8,marginTop:12}}><button style={btn} onClick={()=>setSwapOpen(false)}>Cancel</button><button style={{...btn,background:'#f5ad38',color:'#101b28'}} disabled={swapFrom===swapTo||!colours.includes(swapFrom)||!colours.includes(swapTo)} onClick={swapTeams}>Swap {swapFrom} and {swapTo}</button></div></section>}
-    <p style={{fontSize:12,color:'#9ab1c3',margin:'0 0 14px'}}>Balances troop power while considering language and preferred teammates.</p>
-    {confirmGenerate&&<div style={style}><strong>Team generation</strong><p style={{fontSize:13,color:'#a9bfd0'}}>{isFoundry&&'The strongest three combatants anchor the first three colour zones. '}Adding unassigned players keeps existing assignments.</p>{missingPower.length>0&&<p style={{fontSize:12,color:'#f5bd5b'}}>{missingPower.length} player(s) have missing troop power.</p>}<div style={{display:'grid',gap:8}}><button style={{...btn,background:'#32694d'}} onClick={()=>autoTeams('add')}>Add unassigned players only</button><button style={{...btn,background:'#70521f'}} onClick={()=>{autoTeams('all')}}>Regenerate all teams{isFoundry?' and buildings':''}</button><button style={btn} onClick={()=>setConfirmGenerate(false)}>Cancel</button></div></div>}
     {joined.some(p=>!teams[p.id])&&<div style={{...style,borderColor:'#B78B45'}}><h3 style={{margin:'0 0 12px'}}>Unallocated players <span style={{fontSize:13,color:'#a9bfd0'}}>({joined.filter(p=>!teams[p.id]).length})</span></h3>{joined.filter(p=>!teams[p.id]).map(p=><div key={p.id} style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}><div style={{flex:1,minWidth:0}}><div style={{display:'flex',gap:9,alignItems:'center'}}><PlayerAvatar player={avatarFor(p)} size={36}/><div><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:'#a9bfd0'}}>{p.power?format(p.power)+' '+metric.toLowerCase():'Missing troop power'}{p.tierScore!==null?' · Tier score '+p.tierScore:''}</div></div></div></div><select aria-label={'Assign '+p.name+' to team'} defaultValue="" onChange={e=>{if(e.target.value)assign(p.id,e.target.value)}} style={{...btn,maxWidth:130}}><option value="" disabled>Assign</option>{colours.map(c=><option key={c} value={c}>{c}</option>)}</select></div>)}</div>}
-    {colours.map(c=><div key={c} data-team-card={c} ref={el=>{teamRefs.current[c]=el}} style={{...style,scrollMarginTop:20,borderTop:'4px solid '+teamColors[c]}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div onClick={()=>setExpanded(v=>({...v,[c]:v[c]===false}))} style={{cursor:'pointer'}}><h2 style={{fontSize:19,margin:0,color:teamColors[c]}}>{teamTitle(c)} team {expanded[c]!==false?'⌃':'⌄'}</h2><span style={{fontSize:12,color:'#a9bfd0'}}>{active.filter(p=>teams[p.id]===c).length} players · {format(teamTotals[c])} power</span></div><button style={{...btn,padding:'8px'}} onClick={()=>{navigator.clipboard?.writeText(active.filter(p=>teams[p.id]===c).map(p=>p.name).join('\n'));setNotice(c+' team copied')}}>Copy</button></div>
-    <label style={{display:'block',fontSize:12,color:'#a9bfd0',marginBottom:8}}>Team name<input aria-label={'Name for '+c+' team'} value={teamNames[c]??c} onChange={e=>setTeamNames(v=>({...v,[c]:e.target.value}))} onBlur={e=>saveTeamName(c,e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',marginTop:4}}/></label>{expanded[c]!==false&&active.filter(p=>teams[p.id]===c).map(p=><div key={p.id} style={{borderTop:'1px solid #30465a',padding:'12px 0'}}><div style={{display:'flex',alignItems:'center',gap:8}}><PlayerAvatar player={avatarFor(p)} size={38}/><div style={{flex:1,minWidth:0}}><strong style={{fontSize:14}}>{p.name}</strong><div style={{fontSize:12,color:p.power>0?'#a9bfd0':'#f5bd5b'}}>{p.power>0?format(p.power)+' '+metric.toLowerCase():'Missing troop power'}</div>{p.tierScore!==null&&<div style={{fontSize:12,color:'#83B5CE'}}>Tier strength score · {p.tierScore}</div>}<PlayerChips languages={p.languages} teammates={teammateNames(p,active.filter(other=>teams[other.id]===teams[p.id]))}/></div><button aria-label={'Move '+p.name+' to another team'} style={{...btn,padding:'8px 10px'}} onClick={()=>setMoving(moving===p.id?null:p.id)}>⇄</button></div>{moving===p.id&&<div role="group" aria-label={'Move '+p.name+' to'} style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{colours.filter(x=>x!==c).map(x=><button key={x} style={{...btn,padding:'8px',borderColor:teamColors[x]}} onClick={()=>{assign(p.id,x);setMoving(null);jumpToTeam(x)}}>{x}</button>)}</div>}</div>)}
+    {colours.map(c=><div key={c} data-team-card={c} ref={el=>{teamRefs.current[c]=el}} style={{...style,scrollMarginTop:20,borderTop:'4px solid '+teamColors[c]}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div onClick={()=>setExpanded(v=>({...v,[c]:v[c]===false}))} style={{cursor:'pointer'}}><h2 style={{fontSize:19,margin:0,color:teamColors[c]}}>{teamTitle(c)} team {expanded[c]!==false?'⌃':'⌄'}</h2><span style={{fontSize:12,color:'#a9bfd0'}}>{active.filter(p=>teams[p.id]===c).length} players · {format(teamTotals[c])} recorded power</span></div><button style={{...btn,padding:'8px'}} onClick={()=>copyShare(active.filter(p=>teams[p.id]===c).map(p=>p.name).join('\n'))}>Copy</button></div>
+    <label style={{display:'block',fontSize:12,color:'#a9bfd0',marginBottom:8}}>Team name<input aria-label={'Name for '+c+' team'} value={teamNames[c]??c} onChange={e=>setTeamNames(v=>({...v,[c]:e.target.value}))} onBlur={e=>saveTeamName(c,e.target.value)} style={{...btn,width:'100%',boxSizing:'border-box',marginTop:4}}/></label>{expanded[c]!==false&&active.filter(p=>teams[p.id]===c).map(p=><div key={p.id} className="squad-member"><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{flex:1,minWidth:0,overflowWrap:'anywhere'}}><strong style={{fontSize:14}}>{p.name}{saved.teamLeaders?.[c]===p.id?' · Leader':''}</strong><div style={{fontSize:12,color:p.power>0?'#a9bfd0':'#f5bd5b'}}>{p.hasPower?format(p.power)+' '+metric.toLowerCase():'Missing troop power'}</div>{p.tierScore!==null&&<div style={{fontSize:12,color:'#83B5CE'}}>Tier strength score · {p.tierScore}</div>}<PlayerChips languages={p.languages} teammates={teammateNames(p,active.filter(other=>teams[other.id]===teams[p.id]))}/></div><button type="button" aria-label={(locks[p.id]?'Unlock ':'Lock ')+p.name} aria-pressed={!!locks[p.id]} style={btn} onClick={()=>{
+      const next={...locks};if(next[p.id])delete next[p.id];else next[p.id]=true;
+      update({teamLocks:next},next[p.id]?'Assignment locked':'Assignment unlocked');
+    }}>{locks[p.id]?'Unlock':'Lock'}</button><button disabled={!!locks[p.id]} aria-label={'Move '+p.name+' to another team'} style={{...btn,padding:'8px 10px'}} onClick={()=>setMoving(moving===p.id?null:p.id)}>⇄</button></div>{moving===p.id&&<div role="group" aria-label={'Move '+p.name+' to'} style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>{colours.filter(x=>x!==c).map(x=><button key={x} style={{...btn,padding:'8px',borderColor:teamColors[x]}} onClick={()=>{assign(p.id,x);setMoving(null);jumpToTeam(x)}}>{x}</button>)}</div>}</div>)}
     {expanded[c]!==false&&!active.some(p=>teams[p.id]===c)&&<p style={{fontSize:13,color:'#a9bfd0'}}>No players assigned to this team.</p>}</div>)}
     <div style={{...style,padding:14}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap'}}>
