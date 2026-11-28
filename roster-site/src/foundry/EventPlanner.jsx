@@ -26,10 +26,10 @@ export function EventPlanner({kind,players,storage,onUpdate,onScreenshotUpdate,.
       return { message: 'Changes applied to this preview session.' };
     })}
     eventRegistrations={assignments}
-    onChangeRoles={roleChanges=>{
-      const {error}=prepareEventRoles(storage,context,roleChanges);
+    onChangeRoles={(roleChanges,powers=[])=>{
+      const {error}=roleChanges.length?prepareEventRoles(storage,context,roleChanges):{};
       if(error)return {error};
-      update({roleChanges});
+      update({...(roleChanges.length?{roleChanges}:{}),powers});
       return {};
     }}
     sharedFoundry={plan} onSaveFoundry={(next,powers)=>update({plan:next,powers})}
