@@ -86,7 +86,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   const [error, setError] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
   const [review, setReview] = useState(null);
-  const [method, setMethod] = useState('screenshots');
+  const [method, setMethod] = useState('paste');
   const [paste, setPaste] = useState('');
   const [pasteErrors, setPasteErrors] = useState([]);
   const [pasteStatus, setPasteStatus] = useState('');
@@ -170,6 +170,8 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
           setMethod('paste');
           setPastedGroups([{legion,rows,sources:[],counts:[],context:{kind,alliance,legion,expectedOccurrenceId:value.occurrenceIds[legion]}}]);
           setPasteDrafts(value.drafts ?? {});
+        } else if (value?.items?.length) {
+          setMethod('screenshots');
         }
       }
     }).catch(() => {
@@ -368,7 +370,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   }
 
   return <section className="screenshot-import" aria-label="Troop power upload">
-    <button ref={launchRef} type="button" className="screenshot-primary" onClick={() => setWorkspaceOpen(true)}>Open screenshot import</button>
+    <button ref={launchRef} type="button" className="screenshot-primary" onClick={() => setWorkspaceOpen(true)}>Import roster</button>
     {workspaceOpen && createPortal(<section ref={workspaceRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Screenshot import workspace" className="stage9-import-workspace">
       <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {review?.legion ?? activeLegion}</small><h2>Import roster</h2></div><button type="button" disabled={!!job} onClick={() => { setSession(latest.current); setReview(null); setWorkspaceOpen(false); }}>Close</button></header>
       <div className="stage9-import-content">
@@ -407,7 +409,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
     {loading && <p role="status">Checking for a previous batch…</p>}
     {!loading && !items.length && <>
 
-      <p>Select up to 25 screenshots. Include the legion heading.</p>
+      <p>Select up to 25 screenshots. Include the legion heading. For rosters with a Legion Commander panel, use Paste player list.</p>
     </>}
     {!!items.length && !review && <>
       

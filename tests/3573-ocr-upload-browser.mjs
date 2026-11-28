@@ -22,8 +22,9 @@ try {
     page.on('pageerror',e=>errors.push(e.message));
     await page.goto(origin+'/event-preview.html');
     if(event==='Canyon Clash') await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
-    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await page.getByRole('button',{name:'Import roster'}).click();
     const upload=page.getByRole('dialog',{name:'Screenshot import workspace'});
+    await upload.getByRole('button',{name:'Upload screenshots',exact:true}).click();
     await upload.getByRole('button',{name:'Upload troop power'}).waitFor();
     const key=event==='Foundry'?'foundry':'canyon';
     await page.screenshot({path:'ocr-review-captures/'+key+'-01-current-upload.png'});
@@ -34,7 +35,7 @@ try {
     await upload.getByText('Duplicate screenshots were skipped.',{exact:true}).waitFor();
     await page.reload();
     if(event==='Canyon Clash') await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
-    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await page.getByRole('button',{name:'Import roster'}).click();
     await upload.getByText('0 of 1 screenshots read',{exact:true}).waitFor();
     // Hold the lazy OCR module request to capture the genuine loading UI without external OCR assets.
     let releaseReader;
@@ -70,8 +71,9 @@ try {
     });
     await real.goto(origin+'/event-preview.html');
     if(event==='Canyon Clash')await real.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
-    await real.getByRole('button',{name:'Open screenshot import'}).click();
+    await real.getByRole('button',{name:'Import roster'}).click();
     const dialog=real.getByRole('dialog',{name:'Screenshot import workspace'});
+    await dialog.getByRole('button',{name:'Upload screenshots',exact:true}).click();
     const dir='tests/fixtures/3573-ocr/screenshots';
     const names=(await readdir(dir)).sort().slice(0,3);
     const files=await Promise.all(names.map(async name=>({name,mimeType:name.endsWith('.png')?'image/png':'image/jpeg',buffer:await readFile(dir+'/'+name)})));
@@ -93,7 +95,7 @@ try {
     await real.waitForFunction(()=>window.__ocrWorkerCounts.created===window.__ocrWorkerCounts.terminated);
     await real.reload();
     if(event==='Canyon Clash')await real.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:event}).click();
-    await real.getByRole('button',{name:'Open screenshot import'}).click();
+    await real.getByRole('button',{name:'Import roster'}).click();
     await dialog.getByText('3 of 3 screenshots read',{exact:true}).waitFor();
     assert.deepEqual(realErrors,[]);
     await real.close();

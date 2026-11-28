@@ -74,5 +74,9 @@ test('two teams and protected assignments pass validation and are cleaned on rem
 });
 
 test('candidate preview disables shared workspace access even with production-shaped credentials',()=>{
- assert.equal(configured({VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:'fix/3573-review-speed',SESSION_SECRET:'x'.repeat(32),ACCESS_PASSWORD_HASH:'salt:hash'}),false);
+ const credentials={SESSION_SECRET:'x'.repeat(32),ACCESS_PASSWORD_HASH:'salt:hash'};
+ for(const branch of ['fix/3573-review-speed','fix/3573-paste-first']){
+  assert.equal(configured({...credentials,VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:branch}),false);
+  assert.equal(configured({...credentials,VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:branch}),true);
+ }
 });

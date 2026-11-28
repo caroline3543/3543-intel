@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   smoke:
-    if: github.head_ref == 'fix/3573-review-speed' || github.event_name == 'workflow_dispatch'
+    if: github.head_ref == 'fix/3573-review-speed' || github.head_ref == 'fix/3573-paste-first' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:

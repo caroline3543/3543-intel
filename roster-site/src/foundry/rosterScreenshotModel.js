@@ -30,31 +30,15 @@ export function readScreenshotRow(text) {
   };
 }
 
-const checkboxLayout = { listStart: .335, listEnd: .747, totalsTop: .262 };
-const commanderLayout = { listStart: .435, listEnd: .791, totalsTop: .362, registrationLabels: true };
-
-export function rosterScreenshotLayout(pixels, width, height) {
-  const matches = (x, y, rgb) => {
-    const offset = (Math.floor(height * y) * width + Math.floor(width * x)) * 4;
-    return rgb.every((value, channel) => Math.abs(pixels[offset + channel] - value) <= 8);
-  };
-  // The commander panel sits above the totals and shifts the scrolling roster.
-  // Check both ends of the gradient across the panel, plus its pale lower margin.
-  const commander = [.1, .385, .9].every(x =>
-    matches(x, .255, [127, 176, 230]) && matches(x, .31, [119, 169, 223])
-  ) && matches(.55, .33, [218, 230, 246]);
-  return commander ? commanderLayout : checkboxLayout;
-}
-
-export function pickScreenshotRows(pixels, width, height, layout = rosterScreenshotLayout(pixels, width, height)) {
+export function pickScreenshotRows(pixels, width, height) {
   const columns = [.43, .56, .69, .89].map(ratio => Math.floor(width * ratio));
   const hasFill = y => columns.filter(x => {
     const offset = (y * width + x) * 4;
     const [r, g, b] = [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
     return Math.abs(r - 167) < 16 && Math.abs(g - 194) < 13 && Math.abs(b - 236) < 13;
   }).length >= 2;
-  const start = Math.round(height * layout.listStart);
-  const end = Math.round(height * layout.listEnd);
+  const start = Math.round(height * .335);
+  const end = Math.round(height * .747);
   const rows = [];
   let top = null, bottom = 0;
   function finish() {
@@ -118,15 +102,6 @@ export function combineScreenshotRows(screenshots, resolveIdentity = () => null)
     if (key && list.length > 1) list.forEach(row => { row.conflict = true; });
   }
   return records;
-}
-
-export function readRosterRegistrationLabel(text) {
-  switch (String(text).trim().toLowerCase().replace(/\s+/gu, ' ')) {
-    case 'join': return 'combatant';
-    case 'substitute': return 'substitute';
-    case 'no engagements': return 'unassigned';
-    default: return 'unknown';
-  }
 }
 
 // Read tick ink against the underlying button fill in the centre of each

@@ -1,7 +1,7 @@
 name: Isolated Supabase OCR persistence
 on:
   push:
-    branches: ['fix/3573-review-speed']
+    branches: ['fix/3573-review-speed', 'fix/3573-paste-first']
   workflow_dispatch:
 permissions:
   contents: read

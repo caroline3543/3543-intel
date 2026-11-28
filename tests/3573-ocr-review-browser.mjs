@@ -63,7 +63,7 @@ try {
     },{kind,evidenceImage});
     await page.reload();
     if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
-    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await page.getByRole('button',{name:'Import roster'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     const review=page.getByRole('region',{name:'Review screenshot readings'});
     await review.getByRole('heading',{name:'Review imported players'}).waitFor();
@@ -107,7 +107,7 @@ try {
     await review.getByRole('button',{name:'Rereading username…',exact:true}).waitFor({state:'hidden',timeout:90000});
     assert.equal(await retryStatus.innerText(),firstReading,'Repeated recognition must remain stable');
     await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('button',{name:'Close',exact:true}).click();
-    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await page.getByRole('button',{name:'Import roster'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     assert.equal(await retryStatus.innerText(),firstReading,'Additional OCR evidence must survive reopening');
     assert.ok(await review.getByRole('button',{name:'Review troop powers changes'}).isDisabled());
@@ -131,7 +131,7 @@ try {
       assert.equal(await row('Juniper').count(),1);
     }
     await page.getByRole('dialog',{name:'Screenshot import workspace'}).getByRole('button',{name:'Close',exact:true}).click();
-    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await page.getByRole('button',{name:'Import roster'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     assert.equal(await powerInput.inputValue(),String(enteredPower));
     await page.waitForFunction(async ({kind,enteredPower})=>{
@@ -143,7 +143,7 @@ try {
     },{kind,enteredPower});
     await page.reload();
     if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
-    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await page.getByRole('button',{name:'Import roster'}).click();
     await page.getByRole('button',{name:'Review Legion 1 · 4 readings'}).click();
     assert.equal(await powerInput.inputValue(),String(enteredPower));
     await row('Juniper').getByRole('button',{name:'Confirm troop power',exact:true}).click();
@@ -192,7 +192,7 @@ try {
     },{kind,enteredPower});
     await page.reload();
     if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
-    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await page.getByRole('button',{name:'Import roster'}).click();
     const pending=page.getByRole('dialog',{name:'Screenshot import workspace'});
     await pending.getByRole('heading',{name:'Awaiting confirmation'}).waitFor();
     assert.equal(await pending.getByRole('button',{name:'Check save status'}).count(),1);
@@ -215,7 +215,7 @@ try {
     },{kind,enteredPower});
     await page.reload();
     if(kind==='canyon')await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
-    await page.getByRole('button',{name:'Open screenshot import'}).click();
+    await page.getByRole('button',{name:'Import roster'}).click();
     await pending.getByRole('button',{name:'Check save status'}).click();
     await pending.getByText('Sample save not confirmed.',{exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>sessionStorage.getItem('3573-event-preview-fixture-v1')),beforeVerify);
@@ -244,7 +244,7 @@ try {
     });db.close();
   },evidenceImage);
   await page.reload();
-  await page.getByRole('button',{name:'Open screenshot import'}).click();
+  await page.getByRole('button',{name:'Import roster'}).click();
   await page.getByRole('button',{name:/Review Legion 1 · 1 reading/}).click();
   const review=page.getByRole('region',{name:'Review screenshot readings'});
   await review.getByRole('searchbox').fill('Northvale');
@@ -254,7 +254,7 @@ try {
   await page.waitForFunction(()=>JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1')).players.find(p=>p.id==='sample-0').ocrAliases?.includes('Northva1e'));
   await page.reload();
   await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Canyon Clash'}).click();
-  await page.getByRole('button',{name:'Open screenshot import'}).click();
+  await page.getByRole('button',{name:'Import roster'}).click();
   await page.getByRole('button',{name:/Review Legion 1 · 1 reading/}).click();
   await review.getByRole('heading',{name:'Review imported players'}).waitFor();
   assert.equal(await review.getByRole('button',{name:'Confirm match'}).count(),0,'Learned alias must not require another identity review');

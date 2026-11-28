@@ -37,9 +37,9 @@ try{
    await page.screenshot({path:`${output}/${kind==='Foundry'?'foundry':'canyon'}-${width}-${stage}.png`,animations:'disabled'});
   };
   await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:kind,exact:true}).click();
-  await page.getByRole('button',{name:'Open screenshot import'}).click();
+  await page.getByRole('button',{name:'Import roster'}).click();
   const dialog=page.getByRole('dialog',{name:'Screenshot import workspace'});
-  await dialog.getByRole('button',{name:'Paste player list'}).click();
+  assert.equal(await dialog.getByRole('button',{name:'Paste player list'}).getAttribute('aria-pressed'),'true');
   const box=dialog.getByRole('textbox',{name:'Player list',exact:true});
   await box.fill('Broken|140|3|Combatant');
   await dialog.getByRole('button',{name:'Match players'}).click();

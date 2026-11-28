@@ -83,3 +83,9 @@ On the same 59 rows covered by the original OCR, the screenshot candidate still 
 - Observed automatic identity accuracy **passed on this batch**. Both candidate methods preserved all visible powers and registration statuses. One unreadable screenshot heading still needs a legion choice.
 - Integrated screenshot manual-review reduction **failed** on the common set. Paste met the comparative review target on the common set with visually checked transcription. This run does not measure the transcription accuracy of an arbitrary external AI.
 - Keep the production gate open for the integrated screenshot workflow. Name recognition quality is the remaining bottleneck. Evaluate any name recovery changes on a separate holdout, with reused or ambiguous names kept in review.
+
+## Paste-first release candidate
+
+Branch `fix/3573-paste-first` opens the shared roster importer on Paste player list and restores either type of saved draft. The approved compact review and gold Squad Balancer action are included. The automatic screenshot extractor in this branch uses the deployed production reader and its existing checkbox geometry. Commander layout recognition remains on `fix/3573-review-speed` pending its separate manual-review gate. Manual username rereading in review still uses the production geometry.
+
+The public demo uses synthetic data. Private RKG pilot inputs run only in isolated browser storage with network writes blocked. Production promotion requires explicit approval after the real-device timing and organiser check.

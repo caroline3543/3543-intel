@@ -5,7 +5,7 @@ on:
     branches: [main, verification/3573-ocr-ci-base]
     paths: ['tests/fixtures/3573-ocr/**', 'tests/3573-*.mjs', 'roster-site/src/foundry/**', '.github/workflows/3573-real-image-ocr.yml']
   push:
-    branches: [fix/3573-ocr-upgrade, release/3573-ocr-candidate, fix/3573-review-speed]
+    branches: [fix/3573-ocr-upgrade, release/3573-ocr-candidate, fix/3573-review-speed, fix/3573-paste-first]
     paths: ['tests/fixtures/3573-ocr/**', '.github/workflows/3573-real-image-ocr.yml', 'tests/3573-*.mjs', 'roster-site/src/foundry/**', 'roster-site/src/eventPreview.jsx']
 permissions:
   contents: read

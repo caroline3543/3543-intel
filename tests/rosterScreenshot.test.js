@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { combineScreenshotRows, pickScreenshotRows, readRosterRegistrationLabel, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from '../roster-site/src/foundry/rosterScreenshotModel.js';
+import { combineScreenshotRows, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from '../roster-site/src/foundry/rosterScreenshotModel.js';
 import { parseBulkPlayers } from '../roster-site/src/components/bulkImportModel.js';
 import { plannerSlot, updateEventPlanner } from '../src/services/eventPlanner.js';
 
@@ -64,42 +64,4 @@ test('batch import removes identical overlapping rows and keeps conflicting read
   assert.deepEqual(combined.map(row => row.sources), [[0,1],[0],[1],[1]]);
   assert.ok(combined[0].conflict && combined[2].conflict);
   assert.equal(new Set(combined.map(row => row.rowId)).size, combined.length);
-});
-
-test('commander roster retains complete rows below the checkbox layout cutoff', () => {
-  const width = 200, height = 1000;
-  const pixels = new Uint8ClampedArray(width * height * 4);
-  const paint = (top, bottom, rgb) => {
-    for (let y = top; y < bottom; y++) {
-      for (let x = 0; x < width; x++) pixels.set(rgb, (y * width + x) * 4);
-    }
-  };
-  paint(255, 256, [127, 176, 230]);
-  paint(310, 311, [119, 169, 223]);
-  paint(330, 331, [218, 230, 246]);
-  paint(439, 516, [167, 193, 235]);
-  paint(522, 599, [167, 193, 235]);
-  paint(605, 682, [167, 193, 235]);
-  paint(688, 765, [167, 193, 235]);
-  paint(771, 791, [167, 193, 235]);
-  paint(805, 881, [167, 193, 235]);
-
-  assert.deepEqual(pickScreenshotRows(pixels, width, height), [
-    {top:439,bottom:516}, {top:522,bottom:599}, {top:605,bottom:682},
-    {top:688,bottom:765}, {top:771,bottom:791,partial:true},
-  ]);
-
-  paint(330, 331, [0, 0, 0]);
-  assert.deepEqual(pickScreenshotRows(pixels, width, height).at(-1), {
-    top:688,bottom:747,partial:true,
-  });
-});
-
-test('commander roster registration requires a complete recognised label', () => {
-  assert.equal(readRosterRegistrationLabel(' Join '), 'combatant');
-  assert.equal(readRosterRegistrationLabel('Substitute'), 'substitute');
-  assert.equal(readRosterRegistrationLabel('No\nengagements'), 'unassigned');
-  for (const text of ['', 'Voted', 'Not joined', 'Subs', 'Join Substitute', 'Legion 2 dispatched']) {
-    assert.equal(readRosterRegistrationLabel(text), 'unknown');
-  }
 });
