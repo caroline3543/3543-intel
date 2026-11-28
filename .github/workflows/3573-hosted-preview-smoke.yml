@@ -7,7 +7,7 @@ permissions:
 jobs:
   smoke:
     if: github.head_ref == 'fix/3573-review-speed'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Verify isolated hosted preview
