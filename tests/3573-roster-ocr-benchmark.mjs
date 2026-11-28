@@ -28,6 +28,7 @@ if(process.env.ROSTER_REQUIRE_INDEPENDENT_GATE==='1'){
   for(const filename of files){
     const rows=labels[filename].rows;
     assert.ok(Array.isArray(rows)&&rows.length>0,'Empty evaluation labels: '+filename);
+    assert.ok(['foundry','canyon','canyon clash'].includes(String(labels[filename].kind??labels[filename].event??'').toLowerCase()),'Independent evaluation requires explicit event type: '+filename);
     assert.ok(rows.every(r=>Number.isFinite(r.center)&&r.center>=0&&r.center<=1),'Invalid row center: '+filename);
     assert.equal(new Set(rows.map(r=>r.center)).size,rows.length,'Duplicate row centers: '+filename);
   }
@@ -79,11 +80,13 @@ try {
   for(let index=workerIndex;index<files.length;index+=workerCount){
     const filename=files[index];
     const content = (await readFile(resolve(directory, filename))).toString('base64');
-    const reading = await page.evaluate(async ({ filename, content, workerIndex }) => {
+    const eventLabel=String(labels?.[filename]?.kind??labels?.[filename]?.event??'').toLowerCase();
+    const eventKind=eventLabel.includes('canyon')?'canyon':eventLabel==='foundry'?'foundry':null;
+    const reading = await page.evaluate(async ({ filename, content, workerIndex, eventKind }) => {
       const file = new File([Uint8Array.from(atob(content), char => char.charCodeAt(0))], filename);
       const started = performance.now();
       try {
-        const data = await window.scanRoster(window.rosterReaders[workerIndex], file, {avatarBenchmark:true},{matchName:window.matchName});
+        const data = await window.scanRoster(window.rosterReaders[workerIndex], file, eventKind??{avatarBenchmark:true},{matchName:window.matchName});
         const ms=Math.round(performance.now()-started);
         const {screenshotAvatarEvidence}=await import('/src/foundry/screenshotAvatarEvidence.js');
         const {avatarDistance}=await import('/src/foundry/avatarFingerprint.js');
@@ -97,7 +100,7 @@ try {
       } catch (error) {
         return { filename, error:error.message };
       }
-    }, { filename, content, workerIndex });
+    }, { filename, content, workerIndex, eventKind });
     screenshots[index]=reading;
   }
   }));
