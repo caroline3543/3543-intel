@@ -31,7 +31,7 @@ export function readScreenshotRow(text) {
 }
 
 const checkboxLayout = { listStart: .335, listEnd: .747, totalsTop: .262 };
-const commanderLayout = { listStart: .435, listEnd: .791, totalsTop: .362 };
+const commanderLayout = { listStart: .435, listEnd: .791, totalsTop: .362, registrationLabels: true };
 
 export function rosterScreenshotLayout(pixels, width, height) {
   const matches = (x, y, rgb) => {
@@ -118,6 +118,15 @@ export function combineScreenshotRows(screenshots, resolveIdentity = () => null)
     if (key && list.length > 1) list.forEach(row => { row.conflict = true; });
   }
   return records;
+}
+
+export function readRosterRegistrationLabel(text) {
+  switch (String(text).trim().toLowerCase().replace(/\s+/gu, ' ')) {
+    case 'join': return 'combatant';
+    case 'substitute': return 'substitute';
+    case 'no engagements': return 'unassigned';
+    default: return 'unknown';
+  }
 }
 
 // Read tick ink against the underlying button fill in the centre of each

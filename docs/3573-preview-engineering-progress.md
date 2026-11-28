@@ -61,3 +61,9 @@ The Legion Commander panel pushes the list and registration totals down. The che
 | Two-worker recognition time, retries disabled | 16.8 s | 18.5 s |
 
 The row benchmark pairs OCR output with the earlier visual transcript by vertical position. It measures extraction and power coverage. It does not establish verified player identities or per-player registration accuracy. The obscured legion heading on one screenshot still requires manual legion selection. Unrecognised registration controls still require review. No private screenshot or player data was added to Git.
+
+## Commander roster registration labels
+
+The commander layout uses text labels in the right column. The reader crops below the voting badge and recognises complete English labels for Join, Substitute and No engagements. Dispatch evidence takes precedence, and unfamiliar or unreadable labels stay unknown. The older checkbox reader and the importer's existing identity, capacity and move checks are unchanged.
+
+On the 19 original RKG screenshots, all 76 row powers and all 76 registration statuses agreed with the visual transcript. The statuses were 28 combatants, 7 substitutes, 17 unassigned and 24 dispatched to Legion 2. The earlier layout-only change recognised 24 of the 76 statuses. OCR still identified 18 of the 19 legion headings, and the obscured heading requires an explicit destination selection. This verifies visible fields on this capture set. It does not independently verify player identity or translated labels.

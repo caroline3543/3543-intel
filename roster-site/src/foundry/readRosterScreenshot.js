@@ -6,7 +6,7 @@ import { createWorker, OEM, PSM } from 'tesseract.js';
 import workerPath from 'tesseract.js/dist/worker.min.js?url';
 import { ROSTER_OCR_LANGUAGES } from './rosterOcrLanguages.js';
 import corePath from 'tesseract.js-core/tesseract-core-lstm.wasm.js?url';
-import { classifyRosterCheckboxes, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow, rosterScreenshotLayout } from './rosterScreenshotModel.js';
+import { classifyRosterCheckboxes, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow, rosterScreenshotLayout, readRosterRegistrationLabel } from './rosterScreenshotModel.js';
 
 function canvas(width, height) {
   return Object.assign(document.createElement('canvas'), { width, height });
@@ -172,7 +172,18 @@ export async function readRosterScreenshot(worker, file, kind, { matchName } = {
         const dispatch = await recognize(worker, dispatchCrop, PSM.SINGLE_LINE);
         row.otherLegion = Number(dispatch.match(/\bLegion\s*([12])\s+dispatched\b/i)?.[1]) || null;
       }
-      const registration = row.otherLegion || otherLegionMarker ? 'other-legion' : classifyRosterCheckboxes(pixels,width,height,top,bottom);
+      let registration = 'other-legion';
+      if (!row.otherLegion && !otherLegionMarker) {
+        if (layout.registrationLabels) {
+          // Start below the green Voted badge, which can otherwise obscure short labels.
+          const statusTop = Math.max(top, rowY(.30));
+          const statusBottom = Math.min(bottom, rowY(.79));
+          const label = textCrop(screen, x(.73), statusTop, x(.20), statusBottom-statusTop, { dark: true, tight: true });
+          registration = readRosterRegistrationLabel(await recognize(worker, label, PSM.SINGLE_BLOCK));
+        } else {
+          registration = classifyRosterCheckboxes(pixels,width,height,top,bottom);
+        }
+      }
       // Experimental, opt-in only: never persist this evidence in ordinary import sessions.
       let avatarEvidence;
       if (kind && typeof kind === 'object' && kind.avatarBenchmark === true) {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { combineScreenshotRows, pickScreenshotRows, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from '../roster-site/src/foundry/rosterScreenshotModel.js';
+import { combineScreenshotRows, pickScreenshotRows, readRosterRegistrationLabel, readScreenshotLegion, readScreenshotPower, readScreenshotRow } from '../roster-site/src/foundry/rosterScreenshotModel.js';
 import { parseBulkPlayers } from '../roster-site/src/components/bulkImportModel.js';
 import { plannerSlot, updateEventPlanner } from '../src/services/eventPlanner.js';
 
@@ -93,4 +93,13 @@ test('commander roster retains complete rows below the checkbox layout cutoff', 
   assert.deepEqual(pickScreenshotRows(pixels, width, height).at(-1), {
     top:688,bottom:747,partial:true,
   });
+});
+
+test('commander roster registration requires a complete recognised label', () => {
+  assert.equal(readRosterRegistrationLabel(' Join '), 'combatant');
+  assert.equal(readRosterRegistrationLabel('Substitute'), 'substitute');
+  assert.equal(readRosterRegistrationLabel('No\nengagements'), 'unassigned');
+  for (const text of ['', 'Voted', 'Not joined', 'Subs', 'Join Substitute', 'Legion 2 dispatched']) {
+    assert.equal(readRosterRegistrationLabel(text), 'unknown');
+  }
 });
