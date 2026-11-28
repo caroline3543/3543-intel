@@ -8,7 +8,7 @@ jobs:
   smoke:
     if: github.head_ref == 'fix/3573-review-speed'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Verify isolated hosted preview
         env:
@@ -34,6 +34,7 @@ jobs:
           assert.ok([401,403,503].includes(workspace.status),'Unauthenticated workspace must not return data');
           console.log('Hosted HTML, assets and unauthenticated workspace guard passed');
           JS
+      - uses: actions/checkout@v4
       - name: Install pinned browser test runner
         run: |
           npm install --no-save --package-lock=false playwright@1.56.1
@@ -67,3 +68,8 @@ jobs:
             console.log('Hosted React startup and password input passed on mobile and desktop');
           } finally { await browser.close(); }
           JS
+      - name: Hosted synthetic event planner acceptance
+        env:
+          EVENT_PREVIEW_ORIGIN: https://3573-caroline-demo-7fvk78gxm-sunfire-castle-planner.vercel.app
+        run: |
+          node tests/3573-event-planner-browser.mjs
