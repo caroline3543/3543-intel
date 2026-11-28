@@ -29,6 +29,20 @@ function csv(line) {
   }
 }
 
+const powerPattern = /^(?:\d+|\d{1,3}(?:,\d{3})+|\d{1,3}(?:[ \u00A0\u202F]\d{3})+)(?:\.\d+(?=\s*[KMB]$))?(?:\s*[KMB])?$/iu;
+
+function pastePower(value) {
+  if (!value) return null;
+  if (!powerPattern.test(value)) throw Error('Troop power must be a whole number with clear thousands grouping.');
+  const compact = value.replace(/[,\s]/gu, '').toUpperCase();
+  const scale = {K:3,M:6,B:9}[compact.at(-1)] ?? 0;
+  const [whole,fraction=''] = (scale ? compact.slice(0,-1) : compact).split('.');
+  if (/[^0]/u.test(fraction.slice(scale))) throw Error('Troop power must resolve to a whole number.');
+  const power = Number(whole+fraction.slice(0,scale).padEnd(scale,'0'));
+  if (!Number.isSafeInteger(power)) throw Error('Troop power is too large.');
+  return power;
+}
+
 function fields(line, delimiter, header) {
   if (delimiter === '\t' || delimiter === '|') return line.split(delimiter);
   if (delimiter === ',') {
@@ -40,7 +54,7 @@ function fields(line, delimiter, header) {
     }
     return cells;
   }
-  const match = line.match(/^(.+?)(?:\s+[—–-]\s+|\s+)([0-9]+(?:(?:[, \u00A0\u202F])[0-9]{3})*)$/u);
+  const match = line.match(/^(.+?)(?:\s*[—–]\s*|\s+-\s+|\s+)([0-9]+(?:(?:[, \u00A0\u202F])[0-9]{3})*(?:\.\d+)?(?:\s*[KMB])?)$/iu);
   return match ? match.slice(1) : [line];
 }
 
@@ -59,7 +73,12 @@ export function parseRosterPaste(text, defaultLegion) {
     }
     try {
       const body = line.replace(/^(?:[-*•]|\d+[.)])\s+/u, '');
-      const separated = delimiter ?? (body.includes('\t') ? '\t' : body.includes('|') ? '|' : body.includes(',') && (!/\d,\d{3}(?:,\d{3})*$/u.test(body) || /^[^,]+,\s*\d{1,3}(?:,\d{3})+$/u.test(body)) ? ',' : null);
+      const plain = fields(body, null, false);
+      const explicitDash = plain.length===2 && /[—–]|\s-\s/u.test(body.slice(plain[0].length,body.length-plain[1].length));
+      if (!delimiter && !explicitDash && plain.length===2 && plain[1].includes(',') && !plain[0].endsWith(',')) {
+        throw Error('Use a dash, tabs or quoted CSV to separate a name from comma-grouped power.');
+      }
+      const separated = delimiter ?? (explicitDash ? null : body.includes('\t') ? '\t' : body.includes('|') ? '|' : body.includes(',') && (!/\d,\d{3}(?:,\d{3})*$/u.test(body) || /^[^,]+,\s*\d{1,3}(?:,\d{3})+$/u.test(body)) ? ',' : null);
       let values = fields(body, separated, header).map(clean);
       // An unquoted two-column CSV can end in a comma-grouped number.
       if (!separated && values.length === 1 && body.includes(',')) values = fields(body, ',', header).map(clean);
@@ -75,10 +94,7 @@ export function parseRosterPaste(text, defaultLegion) {
       const row = Object.fromEntries(layout.map((field, i) => [field, values[i] ?? '']));
       if (!row.name || (!row.power && !row.registration && !registration && !row.fid)) throw Error('Include a username and its power, registration or player ID.');
       if (!header && values.length === 2 && !row.power) throw Error('Troop power is empty.');
-      const powerValue = row.power || '';
-      if (powerValue && !/^(?:\d+|\d{1,3}(?:,\d{3})+|\d{1,3}(?:[ \u00A0\u202F]\d{3})+)$/u.test(powerValue)) throw Error('Troop power must be a whole number with clear thousands grouping.');
-      const power = powerValue ? Number(powerValue.replace(/[,\s]/gu, '')) : null;
-      if (power !== null && !Number.isSafeInteger(power)) throw Error('Troop power is too large.');
+      const power = pastePower(row.power);
       const legionText = row.legion || '';
       if (legionText && !/^(?:Legion\s*)?[12]$/iu.test(legionText)) throw Error('Legion must be 1 or 2.');
       const status = row.registration || registration;
@@ -90,5 +106,6 @@ export function parseRosterPaste(text, defaultLegion) {
       errors.push({ line: index + 1, message: error.message });
     }
   }
+  if(rows.length>100)return {rows:[],errors:[{line:0,message:'Paste at most 100 player readings at a time.'}]};
   return { rows, errors };
 }
