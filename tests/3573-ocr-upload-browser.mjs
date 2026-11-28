@@ -3,8 +3,9 @@ import {spawn} from 'node:child_process';
 import {mkdir,readFile,readdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 
-const origin='http://127.0.0.1:4185';
-const server=spawn('./node_modules/.bin/vite',['preview','roster-site','--host','127.0.0.1','--port','4185','--strictPort'],{stdio:'inherit'});
+const origin=process.env.EVENT_PREVIEW_ORIGIN || 'http://127.0.0.1:4185';
+if(process.env.EVENT_PREVIEW_ORIGIN) assert.equal(origin,'https://3573-caroline-demo-7fvk78gxm-sunfire-castle-planner.vercel.app');
+const server=process.env.EVENT_PREVIEW_ORIGIN ? null : spawn('./node_modules/.bin/vite',['preview','roster-site','--host','127.0.0.1','--port','4185','--strictPort'],{stdio:'inherit'});
 let browser;
 try {
   let ready=false;
@@ -98,4 +99,4 @@ try {
     await real.close();
     assert.deepEqual(errors,[]);
   }
-} finally {await browser?.close();server.kill();}
+} finally {await browser?.close();server?.kill();}
