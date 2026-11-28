@@ -31,6 +31,12 @@ Output requirements:
 - Before returning, silently verify every row has four fields, every populated troop power contains digits only, every populated Legion is 1 or 2, and every populated registration uses an allowed status.
 - Return only the plain-text code block. No explanations or additional commentary.`;
 
+export const defaultExtractionInstructions = rosterExtractionPrompt.split('\n\nExtraction rules:')[1].split('\n\nOutput requirements:')[0].trim();
+export function buildExtractionPrompt(instructions) {
+  if (typeof instructions !== 'string' || !instructions.trim()) return rosterExtractionPrompt;
+  return rosterExtractionPrompt.split('\n\nExtraction rules:')[0] + '\n\nExtraction rules:\n' + instructions.trim() + '\n\nOutput requirements:' + rosterExtractionPrompt.split('\n\nOutput requirements:')[1];
+}
+
 const invisible = /[\u200B\u200E\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/gu;
 const clean = value => String(value ?? '').replace(invisible, '').trim();
 const key = value => clean(value).toLowerCase().replace(/[_ -]+/gu, '');

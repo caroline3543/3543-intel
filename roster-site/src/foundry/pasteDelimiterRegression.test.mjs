@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseRosterPaste, rosterExtractionPrompt, rosterPasteHeader} from './parseRosterPaste.js';
+import {parseRosterPaste, rosterExtractionPrompt, rosterPasteHeader, buildExtractionPrompt, defaultExtractionInstructions} from './parseRosterPaste.js';
 for(const delimiter of ['\t','|']) test('grouped power with '+JSON.stringify(delimiter),()=>{const result=parseRosterPaste('Alice'+delimiter+'443,581,938',1);assert.deepEqual(result.errors,[]);assert.equal(result.rows[0].name,'Alice');assert.equal(result.rows[0].power,443581938);});
 
 test('blank usernames preserve power, legion and registration for review',()=>{
@@ -13,4 +13,13 @@ test('blank usernames preserve power, legion and registration for review',()=>{
  assert.equal(rosterExtractionPrompt.split('\n')[1],rosterPasteHeader);
  assert.equal(rosterPasteHeader.split('\t').length,4);
  assert.doesNotMatch(rosterExtractionPrompt,/player id/i);
+});
+
+test('custom instructions preserve protected header and output contract',()=>{
+ assert.equal(buildExtractionPrompt(null),rosterExtractionPrompt);
+ assert.equal(buildExtractionPrompt(defaultExtractionInstructions),rosterExtractionPrompt);
+ const custom=buildExtractionPrompt('Check every visible row.');
+ assert.equal(custom.split('\n')[1],rosterPasteHeader);
+ assert.ok(custom.includes('Check every visible row.'));
+ assert.ok(custom.includes('exactly three actual tab characters'));
 });

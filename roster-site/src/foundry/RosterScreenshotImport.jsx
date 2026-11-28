@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { readScreenshotSession, writeScreenshotSession } from './screenshotSession.js';
-import { parseRosterPaste, rosterExtractionPrompt, rosterPasteHeader } from './parseRosterPaste.js';
+import { parseRosterPaste, buildExtractionPrompt, defaultExtractionInstructions, rosterPasteHeader } from './parseRosterPaste.js';
 import { ScreenshotReview } from './ScreenshotReview.jsx';
 import './rosterScreenshot.css';
 
@@ -21,7 +21,7 @@ function restorePaste(session, kind, alliance) {
   };
 }
 
-export function RosterScreenshotImport({ kind, title, alliance, activeLegion, storage, players, preferredIds, occurrenceIds, onSave, onRememberOcrAlias, children, onContinueTeams }) {
+export function RosterScreenshotImport({ kind, title, alliance, activeLegion, storage, players, preferredIds, occurrenceIds, onSave, onRememberOcrAlias, children, onContinueTeams, extractionInstructions, onSaveExtractionInstructions }) {
   const sessionKey = kind + ':' + alliance;
   const [session, setSession] = useState(null);
   const latest = useRef(null);
@@ -32,6 +32,19 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   const [recoveryError, setRecoveryError] = useState('');
   const [review, setReview] = useState(null);
   const [pasteErrors, setPasteErrors] = useState([]);
+  const [promptDraft, setPromptDraft] = useState(null);
+  const [promptSaving, setPromptSaving] = useState(false);
+  const prompt = buildExtractionPrompt(extractionInstructions);
+  async function savePrompt(value) {
+    setPromptSaving(true);
+    try {
+      const result = await onSaveExtractionInstructions(value);
+      if (!result || result.error) throw Error(result?.error || 'Could not save instructions.');
+      setPromptDraft(null);
+      setPasteStatus('Instructions saved on this device. Shared workspace sync will update other devices.');
+    } catch (error) { setPasteStatus(error.message || 'Could not save instructions.'); }
+    finally { setPromptSaving(false); }
+  }
   const [pasteStatus, setPasteStatus] = useState('');
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const workspaceRef = useRef(null);
@@ -224,11 +237,12 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
           }}/></label>
           <p>Use tabs, commas, pipes, or one username and troop power per line. Rows without a legion use Legion {activeLegion}.</p>
           <details><summary>Extract a list with AI</summary>
-            <textarea readOnly rows={6} aria-label="AI extraction prompt" value={rosterExtractionPrompt}/>
+            <textarea readOnly rows={6} aria-label="AI extraction prompt" value={prompt}/>
             <button type="button" onClick={async () => {
-              try { await navigator.clipboard.writeText(rosterExtractionPrompt); setPasteStatus('Extraction prompt copied.'); }
+              try { await navigator.clipboard.writeText(prompt); setPasteStatus('Extraction prompt copied.'); }
               catch { setPasteStatus('Select the extraction prompt and copy it manually.'); }
             }}>Copy extraction prompt</button>
+            {onSaveExtractionInstructions && (promptDraft === null ? <button type="button" onClick={() => setPromptDraft(extractionInstructions || defaultExtractionInstructions)}>Edit instructions</button> : <div><label>Custom extraction instructions<textarea rows={10} maxLength={12000} value={promptDraft} onChange={e => setPromptDraft(e.target.value)}/></label><p>The TSV header and output requirements are protected.</p><button type="button" disabled={promptSaving || !promptDraft.trim()} onClick={() => savePrompt(promptDraft.trim())}>Save prompt</button><button type="button" disabled={promptSaving} onClick={() => setPromptDraft(null)}>Cancel</button><button type="button" disabled={promptSaving} onClick={() => savePrompt(null)}>Reset to default</button></div>)}
           </details>
           {stale && <p role="alert">This draft is from a different event. Match the list again to review it for the current event.</p>}
           {pasteErrors.length > 0 && <ul role="alert">{pasteErrors.map(({ line, message }) => <li key={line}>Line {line}: {message}</li>)}</ul>}
