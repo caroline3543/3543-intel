@@ -201,6 +201,10 @@ export function updateEventPlanner(workspace,{kind,alliance,legion,plan,powers=[
     }
   }
 
+  if(powers.length){
+    const validIds=new Set(workspace.players.filter(p=>p.membershipStatus!=='transferred_out').map(p=>String(p.id)));
+    if(new Set(powers.map(row=>String(row.id))).size!==powers.length||powers.some(row=>!validIds.has(String(row.id))||!Number.isSafeInteger(row.value)||row.value<0))return workspace;
+  }
   if(roleChanges){
     const ids=new Set(workspace.players.filter(p=>p.membershipStatus!=='transferred_out').map(p=>String(p.id)));
     if(!roleChanges.length||roleChanges.some(change=>!ids.has(change.id)))return workspace;
