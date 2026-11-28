@@ -18,8 +18,22 @@ export function createScreenshotMatcher(players,alliance,preferredIds=[],registe
   const preferred=new Set(preferredIds),registered=new Set(registeredIds);
   const local=players.filter(p=>preferred.has(p.id)||p.alliance===alliance);
   const rank=p=>registered.has(p.id)?0:preferred.has(p.id)?1:p.alliance===alliance?2:3;
+  // Collapse identity evidence only when the destination record is unambiguous.
+  // Never use a game FID as a writable workspace record ID.
+  const groups=new Map();
+  for(const p of players){
+    const fid=String(p.fid??'').trim();
+    if(!/^\d+$/.test(fid)||/^0+$/.test(fid))continue;
+    if(!groups.has(fid))groups.set(fid,[]);
+    groups.get(fid).push(p);
+  }
+  const representatives=new Map();
+  for(const group of groups.values()){
+    const eligible=group.filter(p=>p.alliance===alliance||preferred.has(p.id)||registered.has(p.id));
+    if(eligible.length===1)for(const p of group)representatives.set(p.id,eligible[0]);
+  }
   const indexes=[new Map(),new Map(),new Map(),new Map(),new Map(),new Map(),new Map()];
-  const add=(map,key,p)=>{if(!key)return; if(!map.has(key))map.set(key,new Map());map.get(key).set(p.id,p);};
+  const add=(map,key,p)=>{if(!key)return; if(!map.has(key))map.set(key,new Map());const target=representatives.get(p.id)??p;map.get(key).set(target.id,target);};
   for(const p of players){
     for(const field of playerFields(p)){add(indexes[0],exactName(field),p);add(indexes[1],normaliseBulkName(field),p);add(indexes[2],visualKey(field),p);}
     add(indexes[3],spacingKey(p.name),p);
