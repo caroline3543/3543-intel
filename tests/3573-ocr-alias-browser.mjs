@@ -32,7 +32,7 @@ const server=await createServer({root:process.cwd(),configFile:false,server:{hos
  });s.middlewares.use('/alias-test',(_req,res)=>{res.setHeader('Content-Type','text/html');res.end('<!doctype html><title>Isolated alias persistence test</title>');});}}]});
 let browser;
 try{
- await server.listen();browser=await chromium.launch({headless:true});
+ await server.listen();browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE});
  async function device(){
  const context=await browser.newContext();const page=await context.newPage();await page.goto('http://127.0.0.1:4192/alias-test');
  await page.evaluate(async()=>{
@@ -40,7 +40,7 @@ try{
  const {createScreenshotMatcher}=await import('/roster-site/src/foundry/screenshotImportPlan.js');
  const controller=createSharedWorkspace({initial:{players:[]},cache:workspaceCache(),request:workspaceRequest});
  window.client=controller;
- window.matchAlias=()=>createScreenshotMatcher(controller.getState().local.players.map(p=>({...p,name:p.username,alliance:p.allianceTag})),'HOT')('HERMES').player?.id??null;
+ window.matchAlias=(reading='HERMES')=>createScreenshotMatcher(controller.getState().local.players.map(p=>({...p,name:p.username,alliance:p.allianceTag})),'HOT')(reading).player?.id??null;
  await controller.initialize();
  });
  return {context,page};
@@ -59,10 +59,17 @@ try{
  assert.equal(await b.page.evaluate(()=>window.matchAlias()),'hermes');
  await a.context.close();await b.context.close();
  const c=await device();assert.equal(await c.page.evaluate(()=>window.matchAlias()),'hermes');
- await c.page.evaluate(async()=>{await window.client.update(prev=>({...prev,players:prev.players.map(p=>({...p,ocrAliases:[],alias:'HERMES'}))}));await window.client.sync();});
- assert.equal(remote.data.players[0].alias,'HERMES');
+ await c.page.evaluate(async()=>{await window.client.update(prev=>({...prev,players:prev.players.map(p=>({...p,ocrAliases:['Hermees']}))}));await window.client.sync();});
+ assert.deepEqual(remote.data.players[0].ocrAliases,['Hermees']);
  await c.context.close();
- const d=await device();assert.equal(await d.page.evaluate(()=>window.matchAlias()),'hermes');
+ const d=await device();
+ assert.equal(await d.page.evaluate(()=>window.matchAlias()),null);
+ assert.equal(await d.page.evaluate(()=>window.matchAlias('Hermees')),'hermes');
+ await d.page.evaluate(async()=>{await window.client.update(prev=>({...prev,players:prev.players.map(p=>({...p,ocrAliases:[]}))}));await window.client.sync();});
  await d.context.close();
+ const e=await device();
+ assert.equal(await e.page.evaluate(()=>window.matchAlias('Hermees')),null);
+ assert.equal(remote.data.players[0].username,'HΞRMΞS');
+ await e.context.close();
  console.log('PASS: independent Chromium contexts, real HTTP and IndexedDB, failed save/retry, fresh browser retrieval; backend='+ (real?'local Supabase edge + database':'simulated'));
 }finally{await browser?.close();await server.close();}

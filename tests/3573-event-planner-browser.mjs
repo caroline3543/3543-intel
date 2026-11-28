@@ -7,6 +7,8 @@ const server=process.env.EVENT_PREVIEW_ORIGIN ? null : spawn('./node_modules/.bi
 async function verifySwap(page, requestedA, requestedB){
   const snapshot=()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('3573-event-preview-fixture-v1')));
   const before=await snapshot();
+  const settings=page.getByRole('region',{name:'Squad Balancer'}).locator('details');
+  if(await settings.getAttribute('open')===null)await settings.locator('summary').click();
   await page.getByRole('button',{name:/Swap teams/}).click();
   const panel=page.getByRole('region',{name:'Swap teams'});
   const first=panel.getByRole('combobox',{name:'First team'}),second=panel.getByRole('combobox',{name:'Second team'});
@@ -51,7 +53,7 @@ try {
     try{if((await fetch(origin+'/event-preview.html'+(process.env.EVENT_PREVIEW_QUERY||''))).ok)break;}catch{}
     await new Promise(resolve=>setTimeout(resolve,250));
   }
-  browser=await chromium.launch();
+  browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE});
   for(const width of [390,1280]){
     const page=await browser.newPage({viewport:{width,height:844}});
     page.setDefaultTimeout(10000);
@@ -140,10 +142,13 @@ try {
     await page.getByRole('button',{name:'Not participating',exact:true}).click();
     await page.getByRole('button',{name:'Kite · Not participating',exact:true}).click();
     await page.getByRole('button',{name:'Teams',exact:true}).click();
-    const count=page.getByRole('combobox',{name:'Teams per legion'});
-    for(const size of [3,4,5,6])await count.selectOption(String(size));
-    await page.getByRole('button',{name:/Generate teams/}).click();
-    await page.getByRole('button',{name:/Regenerate all teams/}).click();
+    const count=page.getByRole('group',{name:'Number of teams'});
+    for(const size of [2,3,4,5,6]){
+      const button=count.getByRole('button',{name:String(size),exact:true});
+      await button.click();
+      assert.equal(await button.getAttribute('aria-pressed'),'true');
+    }
+    await page.getByRole('button',{name:'Auto-Balance 6 Teams'}).click();
     await verifySwap(page);
     await verifySwap(page,'Blue','Purple');
     await verifySwap(page,'Yellow','Teal');
@@ -153,8 +158,11 @@ try {
     await page.getByRole('button',{name:/Move Northvale to another team/}).click();
     await page.getByRole('group',{name:'Move Northvale to',exact:true}).getByRole('button',{name:'Purple',exact:true}).click();
     await page.locator('[data-team-card="Purple"]').getByText('Northvale',{exact:true}).waitFor();
-    await count.selectOption('3');
-    await page.getByRole('combobox',{name:'Assign Northvale to team',exact:true}).waitFor();
+    await count.getByRole('button',{name:'3',exact:true}).click();
+    await page.getByRole('button',{name:'Auto-Balance 3 Teams'}).click();
+    await page.getByRole('button',{name:'Confirm rebalance'}).click();
+    await page.getByText('Move players off removed teams and unlock any locked assignments before reducing team count.').waitFor();
+    await page.locator('[data-team-card="Purple"]').getByText('Northvale',{exact:true}).waitFor();
 
     await page.getByRole('button',{name:'Players',exact:true}).click();
     await page.getByText(/Event schedule ·/).click();
@@ -221,8 +229,7 @@ try {
     await profile.getByRole('button',{name:'Close profile'}).click();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     await page.getByRole('button',{name:'Teams',exact:true}).click();
-    await page.getByRole('button',{name:/Generate teams/}).click();
-    await page.getByRole('button',{name:/Regenerate all teams/}).click();
+    await page.getByRole('button',{name:'Auto-Balance 4 Teams'}).click();
     await verifySwap(page);
     await page.getByRole('navigation',{name:'Choose event planner'}).getByRole('button',{name:'Changes'}).click();
     const changes=page.getByRole('article');
