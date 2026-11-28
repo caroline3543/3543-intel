@@ -27,7 +27,7 @@ Output requirements:
 - Every data row must contain exactly four fields separated by exactly three actual tab characters.
 - Preserve empty fields, including leading and trailing tabs. Never shift values into another column when a field is missing.
 - Do not use spaces as column separators or insert placeholders such as Unknown, N/A or question marks.
-- Do not guess player identities.
+- Do not guess usernames.
 - Before returning, silently verify every row has four fields, every populated troop power contains digits only, every populated Legion is 1 or 2, and every populated registration uses an allowed status.
 - Return only the plain-text code block. No explanations or additional commentary.`;
 
