@@ -18,23 +18,52 @@ export function parseBulkPlayers(text,parsePower){
   return {key:index,raw,username,power,powerText};
  }).filter(Boolean);
 }
-export function bulkCandidates(name,players,preferredAlliance){
- const raw=String(name||'').trim().toLocaleLowerCase(),key=normaliseBulkName(name);
- return players.map(player=>{
-  const fields=[player.name,...(player.searchFields||[]),player.id].filter(Boolean).map(String);
-  const idExact=String(player.playerId||player.fid||player.id)===String(name).trim()&&/^\d+$/.test(String(name).trim());
-  const exact=String(player.name||'').trim()===String(name).trim();
-  const normalized=key.length>=3&&fields.some(v=>normaliseBulkName(v)===key);
-  const fuzzy=key.length>=4&&fields.some(v=>{const k=normaliseBulkName(v);return k.length>=4&&(k.includes(key)||key.includes(k)||editDistance(k,key)<=(key.length>=8?2:1))});
-  const score=idExact?110:exact?100:normalized?90:fuzzy?60:0;
-  return {...player,score};
- }).filter(p=>p.score>0).sort((a,b)=>b.score-a.score||(Number(b.alliance===preferredAlliance)-Number(a.alliance===preferredAlliance))||a.name.localeCompare(b.name)).slice(0,8);
+export function createBulkCandidateSearch(players, preferredAlliance) {
+ const indexed = players.map(player => ({
+  player,
+  fields: [...new Set([player.name, ...(player.searchFields || []), player.id].filter(Boolean).map(normaliseBulkName))],
+  fid: String(player.playerId || player.fid || player.id),
+ }));
+ return name => {
+  const raw = String(name || '').trim();
+  const key = normaliseBulkName(name);
+  const numeric = /^\d+$/.test(raw);
+  const maxDistance = key.length >= 8 ? 2 : 1;
+  const matches = [];
+  for (const {player, fields, fid} of indexed) {
+   const score = numeric && fid === raw ? 110
+    : String(player.name || '').trim() === raw ? 100
+    : key.length >= 3 && fields.includes(key) ? 90
+    : key.length >= 4 && fields.some(field => field.length >= 4 && (field.includes(key) || key.includes(field) || withinDistance(field,key,maxDistance))) ? 60 : 0;
+   if (score) matches.push({...player, score});
+  }
+  return matches.sort((a,b)=>b.score-a.score || Number(b.alliance===preferredAlliance)-Number(a.alliance===preferredAlliance) || a.name.localeCompare(b.name)).slice(0,8);
+ };
 }
-function editDistance(a,b){
- if(Math.abs(a.length-b.length)>2)return 3;
- let row=Array.from({length:b.length+1},(_,i)=>i);
- for(let i=1;i<=a.length;i++){const next=[i];for(let j=1;j<=b.length;j++)next[j]=Math.min(next[j-1]+1,row[j]+1,row[j-1]+(a[i-1]===b[j-1]?0:1));row=next;if(Math.min(...row)>2)return 3;}
- return row[b.length];
+
+export function bulkCandidates(name,players,preferredAlliance){
+ return createBulkCandidateSearch(players,preferredAlliance)(name);
+}
+
+function withinDistance(a,b,limit){
+ if(Math.abs(a.length-b.length)>limit)return false;
+ const outside=limit+1;
+ let previous=new Uint16Array(b.length+1), current=new Uint16Array(b.length+1);
+ for(let j=0;j<=Math.min(limit,b.length);j++)previous[j]=j;
+ if(limit<b.length)previous[limit+1]=outside;
+ for(let i=1;i<=a.length;i++){
+  const from=Math.max(1,i-limit), to=Math.min(b.length,i+limit);
+  current[from-1]=from===1?i:outside;
+  if(to<b.length)current[to+1]=outside;
+  let best=outside;
+  for(let j=from;j<=to;j++){
+   current[j]=Math.min(current[j-1]+1,previous[j]+1,previous[j-1]+Number(a[i-1]!==b[j-1]));
+   best=Math.min(best,current[j]);
+  }
+  if(best>limit)return false;
+  [previous,current]=[current,previous];
+ }
+ return previous[b.length]<=limit;
 }
 export function resolveBulkRows(rows,players,choices={},powers={},alliance=''){
  return rows.map(row=>{

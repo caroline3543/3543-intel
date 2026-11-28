@@ -1,3 +1,4 @@
+import {playerSearchFields} from '../../src/services/playerNames.js';
 import {useMembershipRefresh} from './useMembershipRefresh.js';
 import {MembershipRefreshStatus} from './components/MembershipRefreshStatus.jsx';
 import {MEMBERSHIP_STALE_AFTER_MS,verifiedMembershipTime} from '../../src/services/rosterViewService.js';
@@ -132,24 +133,34 @@ function Members({onLogout,error,preferences,onPreferencesChange}){
   const localInitial=useRef(null);if(!localInitial.current)localInitial.current=loadFromStorage(empty);
   const {data,setData:setSharedData,sync,publish,join,retry,resolve}=useSharedWorkspace(localInitial.current);
   function setData(value){setSharedData(prev=>{const next=withAutomaticRoles(typeof value==='function'?value(prev):value);latest.current=next;return next;});}
-  async function rememberOcrAlias(id,reading){
+  async function rememberOcrAlias(id,reading,previousAlias=null){
     const alias=String(reading??'').trim().normalize('NFC');
-    if(!alias||alias.length>128)return {error:'Enter a valid OCR spelling.'};
+    const remove=reading===null&&typeof previousAlias==='string';
+    if(!remove&&(!alias||alias.length>128))return {error:'Enter a valid OCR spelling.'};
     if(!sync.ready||!sync.joined||sync.conflicts?.length)return {error:'Connect to the shared workspace before saving a spelling.'};
-    const key=value=>String(value??'').normalize('NFKC').toLowerCase().replace(/[Ξξ=]/gu,'e').replace(/ı/gu,'i').replace(/¥/gu,'y').normalize('NFD').replace(/[\p{P}\p{S}\p{M}\s]/gu,'').replace(/0/g,'o').replace(/[1l]/g,'i');
-    if(!key(alias))return {error:'Enter a spelling containing letters or numbers.'};
+    const key=value=>String(value??'').normalize('NFKC').toLowerCase().replace(/[Ξξ=]/gu,'e').replace(/ı/gu,'i').replace(/¥/gu,'y').normalize('NFD').replace(/[\p{P}\p{S}\p{M}\s\u200B\u200E\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/gu,'').replace(/0/g,'o').replace(/[1l]/g,'i');
+    if(!remove&&!key(alias))return {error:'Enter a spelling containing letters or numbers.'};
     let rejected='';
-    await setSharedData(prev=>{
-      if(!prev.players.some(p=>String(p.id)===String(id))){rejected='Player no longer exists.';return prev;}
-      if(prev.players.some(p=>String(p.id)!==String(id)&&[p.username,p.name,p.alias,p.nickname,p.fid,p.id,...(Array.isArray(p.ocrAliases)?p.ocrAliases:[]),...(Array.isArray(p.pastUsernames)?p.pastUsernames:[])].some(value=>key(value)===key(alias)))){rejected='This spelling conflicts with another player. Uncheck Remember to confirm this reading only.';return prev;}
-      return {...prev,players:prev.players.map(p=>String(p.id)===String(id)?{...p,ocrAliases:[...new Set([...(Array.isArray(p.ocrAliases)?p.ocrAliases:[]),alias])]}:p)};
+    const result=await setSharedData(prev=>{
+      const player=prev.players.find(p=>String(p.id)===String(id));
+      if(!player){rejected='Player no longer exists.';return prev;}
+      const aliases=Array.isArray(player.ocrAliases)?player.ocrAliases:[];
+      if(previousAlias!==null&&!aliases.includes(previousAlias)){rejected='This spelling already changed. Reopen the player profile.';return prev;}
+      if(!remove&&prev.players.some(p=>p!==player&&[p.username,p.name,p.nickname,p.fid,p.id,...playerSearchFields(p),...(Array.isArray(p.ocrAliases)?p.ocrAliases:[])].some(value=>key(value)===key(alias)))){
+        rejected='This spelling conflicts with another player. Choose a different spelling.';return prev;
+      }
+      const next=aliases.filter(value=>value!==previousAlias);
+      if(!remove)next.push(alias);
+      return {...prev,players:prev.players.map(p=>p===player?{...p,ocrAliases:[...new Set(next)]}:p)};
     });
-    if(rejected)return {error:rejected};
+    if(rejected||result?.error)return {error:rejected||result.error};
     const deadline=Date.now()+35000;
     while(Date.now()<deadline){
       const state=await retry();
       if(state?.conflicts?.length||state?.issue)break;
-      if(state?.base?.players?.some(p=>String(p.id)===String(id)&&p.ocrAliases?.includes(alias)))return {verified:true};
+      const player=state?.base?.players?.find(p=>String(p.id)===String(id));
+      const aliases=player?.ocrAliases??[];
+      if(player&&(remove||aliases.includes(alias))&&(previousAlias===null||!remove&&previousAlias===alias||!aliases.includes(previousAlias)))return {verified:true};
       await new Promise(resolve=>setTimeout(resolve,500));
     }
     return {error:'Spelling save not verified. Check workspace sync.'};
