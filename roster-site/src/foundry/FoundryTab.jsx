@@ -92,7 +92,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const [managing,setManaging]=useState(null);
  const [resetScope,setResetScope]=useState('');
  const [participantsOnly,setParticipantsOnly]=useState(true),[rosterSearch,setRosterSearch]=useState('');
- const [registrationStep,setRegistrationStep]=useState(0),[draftRoles,setDraftRoles]=useState({});
+ const [registrationStep,setRegistrationStep]=useState(0),[draftRoles,setDraftRoles]=useState({}),[draftPowers,setDraftPowers]=useState({}),[draftOriginal,setDraftOriginal]=useState({}),[draftError,setDraftError]=useState('');
  const [rosterSort,setRosterSort]=useState('rank'),[editingPower,setEditingPower]=useState(null),[confirmMove,setConfirmMove]=useState(null);
  const [roleFilter,setRoleFilter]=useState('all'),[bulkMode,setBulkMode]=useState(false),[bulkSelected,setBulkSelected]=useState([]),[rankExpanded,setRankExpanded]=useState({R5:true,R4:true,R3:true,R2:true,R1:true});
  const [editIds,setEditIds]=useState(null);
@@ -154,9 +154,12 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
   }
   return commitRoles(changes);
  };
- const beginRegistration=()=>{setDraftRoles(Object.fromEntries([...joined.map(p=>[p.id,'join']),...subs.map(p=>[p.id,'sub'])]));setRegistrationStep(1);setRosterSearch('');};
+ const beginRegistration=()=>{setDraftOriginal({...registrations});setDraftPowers({});setDraftError('');setDraftRoles(Object.fromEntries([...joined.map(p=>[p.id,'join']),...subs.map(p=>[p.id,'sub'])]));setRegistrationStep(1);setRosterSearch('');};
  const draftCount=role=>Object.values(draftRoles).filter(v=>v===role).length;
  const toggleDraft=(id,role)=>{setDraftRoles(old=>{const next={...old};if(next[id]===role){delete next[id];return next;}if(Object.values(old).filter(v=>v===role).length>=limits[role])return old;next[id]=role;return next;});onRoleFeedback?.();};
+ const draftPlayers=allianceEntries.filter(p=>draftRoles[p.id]);
+ const invalidDraftPower=Object.values(draftPowers).some(v=>v!==''&&(!/^\d+$/.test(v)||!Number.isSafeInteger(Number(v))));
+ const confirmDraft=()=>{if(invalidDraftPower){setDraftError('Enter whole nonnegative troop power values.');return;}const ids=new Set([...Object.keys(draftOriginal).filter(id=>isParticipant(draftOriginal[id])),...Object.keys(draftRoles)]);const changes=[...ids].filter(id=>(draftRoles[id]||'')!==(draftOriginal[id]||'')).map(id=>({id,role:draftRoles[id]||'',expectedRole:draftOriginal[id]||''}));if(changes.some(c=>!entries.some(p=>p.id===c.id&&p.matched)|| (isParticipant(c.role)&&elsewhereFor(c.id).length))){setDraftError('Player assignments changed. Cancel and reopen registration.');return;}const powers=draftPlayers.filter(p=>draftPowers[p.id]!==undefined&&draftPowers[p.id]!=='').map(p=>({id:p.id,value:Number(draftPowers[p.id])}));const result=onChangeRoles(changes,powers);if(result?.error){setDraftError(result.error);return;}setRegistrationStep(0);setParticipantsOnly(true);setRoleFilter('all');setRosterSearch('');setNotice('Registration update requested · syncing');};
  const eligibleSquad = joined.filter(player=>!elsewhereFor(player.id).length);
  const leaders = leaderIds.filter(id=>eligibleSquad.some(player=>player.id===id));
  const locks = saved.teamLocks ?? {};
@@ -382,12 +385,19 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    {showPaste&&<BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
    </details>
    </RosterScreenshotImport>
-   {registrationStep>0&&<section aria-label="Guided registration" style={{...style,display:'grid',gap:10}}>
-     <strong>Step {registrationStep} of 2 · {registrationStep===1?'Select combatants':'Select substitutes'}</strong>
+   {registrationStep>0&&registrationStep<=2&&<section aria-label="Guided registration" style={{...style,display:'grid',gap:10}}>
+     <strong>Step {registrationStep} of 4 · {registrationStep===1?'Select combatants':'Select substitutes'}</strong>
      <span>{draftCount(registrationStep===1?'join':'sub')}/{limits[registrationStep===1?'join':'sub']} selected</span>
      <input type="search" aria-label="Search registration candidates" placeholder="Search players" value={rosterSearch} onChange={e=>setRosterSearch(e.target.value)} style={btn}/>
      <div style={{maxHeight:420,overflowY:'auto',display:'grid',gap:5}}>{allianceEntries.filter(p=>p.matched&&matchesRoster(p)&&(registrationStep===1||draftRoles[p.id]!=='join')).map(p=>{const role=registrationStep===1?'join':'sub',selected=draftRoles[p.id]===role,blocked=elsewhereFor(p.id).length>0;return <button key={p.id} type="button" aria-pressed={selected} disabled={blocked||(!selected&&draftCount(role)>=limits[role])} onClick={()=>toggleDraft(p.id,role)} style={{...btn,textAlign:'left',borderColor:selected?'#d4a64c':'#40546a',borderWidth:selected?2:1}}>{p.name} · {blocked?assignmentLabel(elsewhereFor(p.id)[0]):p.hasPower?format(p.power):'Missing power'}{selected?' ✓':''}</button>})}</div>
-     <div style={{display:'flex',gap:8}}><button type="button" style={btn} onClick={()=>{setRegistrationStep(registrationStep===2?1:0);setRosterSearch('')}}>{registrationStep===2?'Back':'Cancel'}</button>{registrationStep===1?<button type="button" style={btn} onClick={()=>{setRegistrationStep(2);setRosterSearch('')}}>Next: substitutes</button>:<button type="button" style={btn} onClick={()=>{setRegistrationStep(0);setRosterSearch('')}}>Close draft</button>}</div>
+     <div style={{display:'flex',gap:8}}><button type="button" style={btn} onClick={()=>{setRegistrationStep(registrationStep===2?1:0);setRosterSearch('')}}>{registrationStep===2?'Back':'Cancel'}</button>{registrationStep===1?<button type="button" style={btn} onClick={()=>{setRegistrationStep(2);setRosterSearch('')}}>Next: substitutes</button>:<button type="button" style={btn} onClick={()=>{setRegistrationStep(3);setRosterSearch('')}}>Next: troop power</button>}</div>
+   </section>}
+   {registrationStep>=3&&<section aria-label={registrationStep===3?'Participant troop power':'Registration review'} style={{...style,display:'grid',gap:10}}>
+     <strong>Step {registrationStep} of 4 · {registrationStep===3?'Troop power':'Review registration'}</strong>
+     <span>{draftCount('join')}/{limits.join} combatants · {draftCount('sub')}/{limits.sub} substitutes</span>
+     {['join','sub'].map(role=><div key={role}><strong>{roleTitle(role)}</strong>{draftPlayers.filter(p=>draftRoles[p.id]===role).map(p=><label key={p.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:8}}><span>{p.name}</span>{registrationStep===3?<input aria-label={'Draft troop power for '+p.name} inputMode="numeric" style={{...btn,width:'45%'}} value={draftPowers[p.id]??(p.hasPower?String(p.power):'')} onChange={e=>setDraftPowers(old=>({...old,[p.id]:e.target.value}))}/>:<span>{draftPowers[p.id]!==undefined?draftPowers[p.id]||'Missing power':p.hasPower?format(p.power):'Missing power'}</span>}</label>)}</div>)}
+     {draftError&&<p role="alert">{draftError}</p>}
+     <div style={{display:'flex',gap:8}}><button type="button" style={btn} onClick={()=>setRegistrationStep(v=>v-1)}>Back</button><button type="button" style={btn} onClick={()=>setRegistrationStep(0)}>Cancel</button><button type="button" disabled={invalidDraftPower} style={{...btn,background:'#d4a64c',color:'#171b22'}} onClick={()=>registrationStep===3?setRegistrationStep(4):confirmDraft()}>{registrationStep===3?'Review registration':'Confirm registration'}</button></div>
    </section>}
    <div style={{...style,padding:12}}>
      <button type="button" style={{...btn,width:'100%',background:'#d4a64c',color:'#171b22',fontWeight:700,marginBottom:10}} onClick={()=>{setParticipantsOnly(v=>!v);setRoleFilter('all');setRosterSearch('');endSelection()}}>{participantsOnly?(joined.length+subs.length?'Edit participants':'Register players'):'Return to registered participants'}</button>
