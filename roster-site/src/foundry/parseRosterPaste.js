@@ -1,13 +1,37 @@
 export const rosterPasteHeader = 'Username\tTroop power\tLegion\tRegistration';
 
-export const rosterExtractionPrompt = `Transcribe the attached Whiteout Survival Foundry or Canyon Clash registration screenshots. Return one plain-text code block with this exact tab-separated header:
+export const rosterExtractionPrompt = `Transcribe the attached Whiteout Survival Foundry or Canyon Clash registration screenshots into a tab-separated player list (TSV).
+
+Return exactly one plain-text code block with this header:
 ${rosterPasteHeader}
 
-- Follow the attachment order, then the visible top-to-bottom order in each screenshot. Include one row per visible player, including repeats across screenshots. Skip headings and summary counts.
-- Copy each username exactly, including case, accents, decorative symbols and non-Latin characters.
-- Copy the displayed troop power as full digits with no grouping separators. Leave it blank if the full value cannot be read.
-- Use the displayed roster heading for Legion (1 or 2). For Registration, use Combatant, Substitute, Unassigned, or Other legion only when the player row shows that status. Do not assume that opening a legion tab makes a player a combatant.
-- Keep all four fields separated by actual tabs, even when fields are blank. Leave anything absent, ambiguous, or unreadable blank. Do not guess identities or add extra columns or commentary.`;
+Extraction rules:
+- Process screenshots in attachment order and players in visible top-to-bottom order.
+- Include one row per visible player, including repeated players across screenshots. The importing application handles duplicate review.
+- Exclude headings, summary counts and interface labels.
+
+Username:
+- Copy the displayed username exactly, preserving capitalisation, accents, superscripts, decorative symbols, spaces and non-Latin characters.
+- Do not translate, normalise or simplify usernames.
+- If any part of the username is unreadable, leave the username field empty. Still extract the remaining fields. Never present a partial username as a complete identity.
+
+Troop power:
+- Copy displayed troop power as full digits without commas, spaces or abbreviations. Do not confuse troop power with city power.
+- If the complete value cannot be confidently read, leave the field empty.
+
+Legion and registration:
+- Use 1 or 2 for Legion, based on the displayed roster heading.
+- Use only Combatant, Substitute, Unassigned or Other legion for registration, based on the individual player's visible status.
+- Do not assume a player is a combatant simply because they appear under a legion tab.
+- Leave uncertain values empty.
+
+Output requirements:
+- Every data row must contain exactly four fields separated by exactly three actual tab characters.
+- Preserve empty fields, including leading and trailing tabs. Never shift values into another column when a field is missing.
+- Do not use spaces as column separators or insert placeholders such as Unknown, N/A or question marks.
+- Do not guess player identities.
+- Before returning, silently verify every row has four fields, every populated troop power contains digits only, every populated Legion is 1 or 2, and every populated registration uses an allowed status.
+- Return only the plain-text code block. No explanations or additional commentary.`;
 
 const invisible = /[\u200B\u200E\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/gu;
 const clean = value => String(value ?? '').replace(invisible, '').trim();
