@@ -1,7 +1,6 @@
 import './legionRoster.css';
 import {balanceEventSquads} from './balanceEventSquads.js';
 import {RosterScreenshotImport} from './RosterScreenshotImport.jsx';
-import {BulkPlayerImport} from '../components/BulkPlayerImport.jsx';
 import {foundryShareMessages,foundryMessageStats,FOUNDRY_DEFAULT_INSTRUCTIONS} from './foundryShare.js';
 import {useMemo,useState,useRef,useEffect} from 'react';
 import {PlayerAvatar} from '../../../src/components/players/PlayerAvatar.jsx';
@@ -374,22 +373,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     onSchedule={(date,time)=>update({date,time},'Schedule saved')} onNewEvent={()=>{setUndo(null);onNewEvent();}} onAttendance={onAttendance} card={style} button={btn}/>
    <RosterScreenshotImport key={chosen} kind={kind} title={title} alliance={chosen} activeLegion={legion} storage={screenshotStorage} players={entries.filter(p=>p.matched)} preferredIds={allianceEntries.filter(p=>p.matched).map(p=>p.id)}
      occurrenceIds={{[legion]:saved.occurrenceId,[otherLegion]:otherPlan.occurrenceId}} onSave={onSaveScreenshotPowers} onRememberOcrAlias={onRememberOcrAlias} extractionInstructions={extractionInstructions} onSaveExtractionInstructions={onSaveExtractionInstructions} onContinueTeams={()=>setView('teams')}>
-   <details className="screenshot-more-options">
-     <summary style={{cursor:'pointer',fontWeight:650}}>More options</summary>
-     <div style={{display:'flex',alignItems:'center',gap:8,margin:'7px 0',flexWrap:'wrap'}}>
-       <div role="group" aria-label="Registration role" style={{display:'flex',gap:4,flexWrap:'wrap',background:'#0d1b2c',borderRadius:10,padding:3}}>
-         {REGISTRATION_ROLES.map(([role,label])=><button key={role} type="button" aria-pressed={addRole===role} onClick={()=>setAddRole(role)} style={{...btn,minHeight:32,padding:'5px 9px',fontSize:12,borderRadius:9,border:'none',background:addRole===role?'#344c63':'transparent'}}>{label}</button>)}
-       </div>
-     </div>
-     <div style={{display:'flex',alignItems:'center',gap:9,background:'#20344a',border:'1px solid #496077',borderRadius:12,padding:'0 12px'}}>
-       <span aria-hidden="true" style={{fontSize:20,color:'#eeb85a'}}>⊕</span>
-       <input aria-label="Search and add player by name or ID" value={query} onChange={e=>onSearchInput(e.target.value)} placeholder="Search name or Player ID to add" style={{background:'transparent',color:'#eef5fc',border:0,outline:'none',minHeight:42,width:'100%',fontSize:14}}/>
-       {query&&<button type="button" aria-label="Clear search" onClick={()=>setQuery('')} style={{...btn,padding:'4px 8px',minHeight:32}}>×</button>}
-     </div>
-     <button type="button" style={{...btn,background:'transparent',border:0,padding:'5px 2px',minHeight:30,color:'#a9c4dc',fontSize:13}} onClick={()=>setShowPaste(v=>!v)}>{showPaste?'Hide bulk import':'＋ Paste multiple players'}</button>
-   {query.trim()&&<div style={style}>{searchMatches.length?searchMatches.map(p=><button key={p.id} onClick={()=>add(p.id)} style={{...btn,width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,textAlign:'left'}}><span><strong>{p.name}</strong><small style={{display:'block',color:'#a9bfd0'}}>{p.alliance} · {format(p.power)} · {metric}</small>{p.recentNoShow&&<NoShow/>}</span><span>{registrations[p.id]&&registeredUnder[p.id]===chosen?'✓':'＋'}</span></button>):<div style={{fontSize:13,color:'#a9bfd0'}}>No matching profile. Check the name or Player ID.</div>}</div>}
-   {showPaste&&<BulkPlayerImport players={entries.filter(p=>p.matched)} alliance={chosen} roleLabel={REGISTRATION_ROLES.find(([role])=>role===addRole)[1]} context={title} initialText={paste} onConfirm={confirmBulkImport} onClose={()=>{setPaste('');setShowPaste(false)}}/>}
-   </details>
+
    </RosterScreenshotImport>
    <button type="button" style={{...btn,width:'100%'}} onClick={()=>{setPowerOpen(v=>!v);setPowerDraft({});setPowerSearch('');setPowerFilter('all');setRegistrationStep(0)}}>{powerOpen?'Cancel power recording':'Record troop power'}</button>
    {powerOpen&&<section aria-label="Independent troop power" style={{...style,display:'grid',gap:10}}>
