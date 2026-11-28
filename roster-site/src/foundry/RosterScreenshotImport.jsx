@@ -47,6 +47,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   }
   const [pasteStatus, setPasteStatus] = useState('');
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [powerOnly,setPowerOnly]=useState(false);
   const workspaceRef = useRef(null);
   const launchRef = useRef(null);
   const mounted = useRef(false);
@@ -143,6 +144,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   }
 
   async function saveOnce(action) {
+    if(powerOnly && action.roleChanges?.length) return {error:'Power-only imports cannot change registration.'};
     const previous = latest.current;
     const pending = previous?.pendingImport;
     if (pending && JSON.stringify(pending) !== JSON.stringify(action)) return { error: 'A previous import is awaiting verification. Check its save status first.', pending: true };
@@ -215,9 +217,10 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
   }
 
   return <section className="screenshot-import" aria-label="Roster import">
-    <button ref={launchRef} type="button" className="screenshot-primary" onClick={() => setWorkspaceOpen(true)}>Import roster</button>
+    <button ref={launchRef} type="button" className="screenshot-primary" onClick={() => {setPowerOnly(false);setWorkspaceOpen(true)}}>Import roster</button>
+    <button type="button" onClick={()=>{setPowerOnly(true);setWorkspaceOpen(true)}}>Paste troop power only</button>
     {workspaceOpen && createPortal(<section ref={workspaceRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Roster import workspace" className="stage9-import-workspace">
-      <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {review?.legion ?? activeLegion}</small><h2>Import roster</h2></div><button type="button" disabled={checkingPending} onClick={closeWorkspace}>Close</button></header>
+      <header className="stage9-import-header"><div><small>{title} · {alliance} · Legion {review?.legion ?? activeLegion}</small><h2>{powerOnly?'Import troop power':'Import roster'}</h2></div><button type="button" disabled={checkingPending} onClick={closeWorkspace}>Close</button></header>
       <div className="stage9-import-content">
         {loading && <p role="status">Restoring saved imports…</p>}
         {session?.pendingImport && !review ? <div className="stage9-summary">
@@ -252,7 +255,7 @@ export function RosterScreenshotImport({ kind, title, alliance, activeLegion, st
           </button>) : <button type="button" className="screenshot-primary" disabled={loading || recoveryFailed || saving.current || !paste.trim()} onClick={reviewPaste}>{stale ? 'Match list for current event' : 'Match players'}</button>}
         </section>}
         {recoveryError && <p role="alert">{recoveryError}</p>}
-        {review && <ScreenshotReview {...review} sources={[]} counts={[]} players={players} preferredIds={preferredIds} storage={storage} onSave={saveOnce} onRememberOcrAlias={onRememberOcrAlias}
+        {review && <ScreenshotReview key={String(powerOnly)+':'+review.legion} powerOnly={powerOnly} {...review} sources={[]} counts={[]} players={players} preferredIds={preferredIds} storage={storage} onSave={saveOnce} onRememberOcrAlias={onRememberOcrAlias}
           initialMode={draft?.mode ?? (review.rows.some(row => row.power !== null) ? review.rows.some(row => row.registration !== 'unknown') ? 'both' : 'powers' : 'roles')}
           initialEdits={draft?.edits}
           onDraftChange={next => {
