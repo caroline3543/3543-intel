@@ -86,6 +86,8 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  const jumpToTeam=c=>{setFocusTeam(c);teamRefs.current[c]?.scrollIntoView({behavior:'smooth',block:'start'});};
  const [focusTeam,setFocusTeam]=useState('Blue'),[moving,setMoving]=useState(null),[confirmGenerate,setConfirmGenerate]=useState(false);
  const [addRole,setAddRole]=useState('join');
+ const [leaderIds,setLeaderIds]=useState([]);
+ const [replaceAssignments,setReplaceAssignments]=useState(false);
  const [managing,setManaging]=useState(null);
  const [resetScope,setResetScope]=useState('');
  const [participantsOnly,setParticipantsOnly]=useState(false),[rosterSearch,setRosterSearch]=useState('');
@@ -152,7 +154,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
  };
  const autoTeams=(mode='all')=>{
   setConfirmGenerate(false);
-  const next=mode==='add'?{...teams}:{},alloc=mode==='add'?{...validAssignments}:{};
+  const next={},alloc={};
   const totals=Object.fromEntries(colours.map(c=>[c,0])),members=Object.fromEntries(colours.map(c=>[c,[]]));
   const attending=[...joined].sort((a,b)=>b.power-a.power||a.name.localeCompare(b.name));
   const prefs=teamworkPreferences||{},pairs=Array.isArray(prefs.pairs)?prefs.pairs:[],groups=Array.isArray(prefs.groups)?prefs.groups:[];
@@ -161,10 +163,15 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    return (linked?2:0)+(a.languages?.some(language=>b.languages?.includes(language))?1:0);
   };
   const put=(p,c)=>{next[p.id]=c;totals[c]+=p.power;members[c].push(p)};
-  if(mode==='add')attending.forEach(p=>{if(colours.includes(next[p.id]))put(p,next[p.id])});
+  const leaders=leaderIds.map(id=>attending.find(p=>p.id===id)).filter(Boolean);
+  if(leaders.length>colours.length){setNotice('Choose no more than one leader per team.');return;}
+  if(mode==='add')attending.forEach(p=>{if(colours.includes(teams[p.id])){put(p,teams[p.id]);if(validAssignments[p.id])alloc[p.id]=validAssignments[p.id];}});
+  const used=new Set(leaders.filter(p=>next[p.id]).map(p=>next[p.id]));
+  if(mode==='add'&&used.size!==leaders.filter(p=>next[p.id]).length){setNotice('Selected leaders share an existing team. Move them apart first.');return;}
+  for(const p of leaders.filter(p=>!next[p.id])){const c=colours.find(c=>!used.has(c));if(!c){setNotice('No distinct team available for leader.');return;}put(p,c);used.add(c);}
   const ranked=attending.filter(p=>p.power>0);
   const anchors=ranked.slice(0,3);
-  if(mode==='all'&&isFoundry){
+  if(mode==='all'&&isFoundry&&!leaders.length&&colours.length>=3){
    anchors.forEach((p,i)=>{const building=anchorBuildings[i];const c=anchorTeams[i];put(p,c);alloc[p.id]=building});
   }
   attending.filter(p=>!next[p.id]).forEach(p=>{
@@ -180,6 +187,7 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
    members[c].filter(p=>!alloc[p.id]).sort((a,b)=>b.power-a.power).forEach(p=>{const i=bins.indexOf(Math.min(...bins));alloc[p.id]=buildings[c][i];bins[i]+=p.power});
   });
   update({teams:next,assignments:alloc},mode==='all'?'Teams regenerated':'Unassigned players added without changing existing assignments');
+  setReplaceAssignments(false);
  };
  const norm=v=>String(v||'').normalize('NFKC').trim().replace(/\\s+/g,' ').toLocaleLowerCase();
  const plain=v=>norm(v).normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^\\p{L}\\p{N}]/gu,'');
@@ -434,8 +442,15 @@ export function FoundryTab({players=[],attendancePlayers=players,kind='foundry',
     <div style={{fontSize:12,color:'#a9bfd0',marginTop:10}}>{!assignedCount?'Generate teams to see balance':missingPower.length?'Missing troop power for '+missingPower.length+' player(s). Balance is provisional.':balanceSpread+'% spread between strongest and weakest team'}</div>
    </div>
    {view==='teams'&&<>
-    <label style={{display:'block',marginBottom:10}}>Teams per legion <select aria-label="Teams per legion" value={colours.length} style={btn} onChange={e=>{const count=Number(e.target.value);update(resizePlannerTeams(saved,count),'Team count updated');if(!TEAM_NAMES.slice(0,count).includes(focusTeam))setFocusTeam('Blue');}}>{[3,4,5,6].map(n=><option key={n}>{n}</option>)}</select></label>
-    <div style={{display:'flex',justifyContent:'flex-end',gap:8,flexWrap:'wrap',marginBottom:10}}><button style={btn} onClick={()=>{setSwapFrom(colours[0]);setSwapTo(colours[1]);setSwapOpen(v=>!v);setConfirmGenerate(false)}}>⇄ Swap teams</button><button style={{...btn,padding:'8px 12px',background:'#263b50'}} onClick={()=>{setConfirmGenerate(v=>!v);setSwapOpen(false)}}>⚙ Generate teams</button></div>
+    <section aria-label="Squad balancer" style={{...style,borderColor:'#7661a8'}}>
+      <strong>Squad balancer</strong><p style={{fontSize:12,color:'#a9bfd0',margin:'6px 0'}}>Balance {joined.length} combatants. Substitutes excluded.</p>
+      <div role="group" aria-label="Teams per legion" style={{display:'flex',gap:6,margin:'10px 0'}}>{[2,3,4,5,6].map(count=><button key={count} type="button" aria-pressed={colours.length===count} style={{...btn,flex:1,minWidth:0,padding:4,minHeight:44,borderColor:colours.length===count?'#a78bfa':'#40546a'}} onClick={()=>{if(count<leaderIds.length){setNotice('Deselect leaders before reducing team count.');return;}if(Object.values(teams).some(c=>!TEAM_NAMES.slice(0,count).includes(c))){setNotice('Move players out of removed teams before reducing team count.');return;}update(resizePlannerTeams(saved,count),'Team count updated');if(!TEAM_NAMES.slice(0,count).includes(focusTeam))setFocusTeam('Blue');}}>{count}</button>)}</div>
+      <div style={{fontSize:12,marginBottom:6}}>Team leaders (optional) · {leaderIds.filter(id=>joined.some(p=>p.id===id)).length}/{colours.length}</div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:6,maxHeight:180,overflowY:'auto'}}>{joined.map(p=><button key={p.id} type="button" aria-pressed={leaderIds.includes(p.id)} style={{...btn,minHeight:44,padding:'6px 10px',borderRadius:20,maxWidth:'100%',overflowWrap:'anywhere',borderColor:leaderIds.includes(p.id)?'#a78bfa':'#40546a'}} onClick={()=>setLeaderIds(ids=>ids.includes(p.id)?ids.filter(id=>id!==p.id):ids.filter(id=>joined.some(q=>q.id===id)).length<colours.length?[...ids.filter(id=>joined.some(q=>q.id===id)),p.id]:ids)}>{leaderIds.includes(p.id)?'✓ ':''}{p.name}</button>)}</div>
+      {missingPower.length>0&&<p style={{fontSize:12,color:'#f5bd5b'}}>{missingPower.length} combatants have missing power. Balance is provisional.</p>}
+      <details style={{margin:'10px 0'}}><summary>Advanced options</summary><label style={{display:'block',padding:'8px 0'}}><input type="checkbox" checked={replaceAssignments} onChange={e=>setReplaceAssignments(e.target.checked)}/> Replace existing team and building assignments</label><button style={btn} onClick={()=>{setSwapFrom(colours[0]);setSwapTo(colours[1]);setSwapOpen(v=>!v)}}>Swap teams</button></details>
+      <button type="button" disabled={!joined.length} style={{...btn,width:'100%',minHeight:44,background:'#7054b5'}} onClick={()=>{if(replaceAssignments&&assignedCount&&!window.confirm('Replace existing manual team and building assignments?'))return;autoTeams(replaceAssignments?'all':'add');}}>Auto-Balance {colours.length} Teams</button>
+    </section>
     {swapOpen&&<section aria-label="Swap teams" style={style}><strong>Swap entire teams</strong><p style={{fontSize:12,color:'#a9bfd0'}}>Players exchange colours. Buildings and colour-specific instructions stay in place.</p><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>{[[swapFrom,setSwapFrom,'First team'],[swapTo,setSwapTo,'Second team']].map(([value,set,label])=><label key={label}>{label}<select aria-label={label} style={{...btn,width:'100%'}} value={value} onChange={e=>set(e.target.value)}>{colours.map(c=><option key={c} value={c}>{c} · {active.filter(p=>teams[p.id]===c).length} players</option>)}</select></label>)}</div><div style={{display:'flex',gap:8,marginTop:12}}><button style={btn} onClick={()=>setSwapOpen(false)}>Cancel</button><button style={{...btn,background:'#f5ad38',color:'#101b28'}} disabled={swapFrom===swapTo||!colours.includes(swapFrom)||!colours.includes(swapTo)} onClick={swapTeams}>Swap {swapFrom} and {swapTo}</button></div></section>}
     <p style={{fontSize:12,color:'#9ab1c3',margin:'0 0 14px'}}>Balances troop power while considering language and preferred teammates.</p>
     {confirmGenerate&&<div style={style}><strong>Team generation</strong><p style={{fontSize:13,color:'#a9bfd0'}}>{isFoundry&&'The strongest three combatants anchor the first three colour zones. '}Adding unassigned players keeps existing assignments.</p>{missingPower.length>0&&<p style={{fontSize:12,color:'#f5bd5b'}}>{missingPower.length} player(s) have missing troop power.</p>}<div style={{display:'grid',gap:8}}><button style={{...btn,background:'#32694d'}} onClick={()=>autoTeams('add')}>Add unassigned players only</button><button style={{...btn,background:'#70521f'}} onClick={()=>{autoTeams('all')}}>Regenerate all teams{isFoundry?' and buildings':''}</button><button style={btn} onClick={()=>setConfirmGenerate(false)}>Cancel</button></div></div>}
