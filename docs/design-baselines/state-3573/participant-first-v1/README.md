@@ -25,3 +25,6 @@ Capture and approve reference screenshots R01–R10 before implementing changed 
 
 ## Status
 Existing Stage 9 PDF and eight PNGs located in repository tree. New R01–R10 screenshot assets outstanding; no visual or functional pass claimed.
+
+## Approved PDF reference
+User approved the reconstructed visual reference PDF for implementation comparison. File: `3573_participant_first_visual_reference_v1.pdf`. Verified repository Git blob SHA: `fdb4b48122ae540bd1e7031b37129a90f6f8649a`. Do not replace without explicit design approval. Individual PNG extraction and SHA256 manifest remain outstanding; PDF approval does not imply implementation acceptance.
