@@ -67,3 +67,19 @@ The row benchmark pairs OCR output with the earlier visual transcript by vertica
 The commander layout uses text labels in the right column. The reader crops below the voting badge and recognises complete English labels for Join, Substitute and No engagements. Dispatch evidence takes precedence, and unfamiliar or unreadable labels stay unknown. The older checkbox reader and the importer's existing identity, capacity and move checks are unchanged.
 
 On the 19 original RKG screenshots, all 76 row powers and all 76 registration statuses agreed with the visual transcript. The statuses were 28 combatants, 7 substitutes, 17 unassigned and 24 dispatched to Legion 2. The earlier layout-only change recognised 24 of the 76 statuses. OCR still identified 18 of the 19 legion headings, and the obscured heading requires an explicit destination selection. This verifies visible fields on this capture set. It does not independently verify player identity or translated labels.
+
+## RKG identity gate against the near-capture roster
+
+Evaluated candidate `85809ae7479512889d7e4225b1e17e41e7e971a2` against the 19 original RKG screenshots. The 76 image rows were linked to permanent IDs using a read-only workspace identity extract at revision 6306, historical roster exports, nickname and rename history, and direct screenshot checks. Visual avatar evidence disambiguated reused names where the avatars differed. The comparison held the active roster input constant at 659 records, used an empty event registration context and excluded learned OCR aliases from both matchers. No production records were edited. Private fixtures and row-level results remain outside Git.
+
+| Pipeline | Rows read | Correct automatic IDs | Wrong automatic IDs | Manual identity reviews | Missing rows |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Original OCR and matcher | 59 | 40 | 0 | 19 | 17 |
+| Candidate screenshot OCR and matcher | 76 | 51 | 0 | 25 | 0 |
+| Candidate paste using visually checked four-column text | 76 | 61 | 0 | 15 | 0 |
+
+On the same 59 rows covered by the original OCR, the screenshot candidate still required 19 manual reviews. The paste workflow required 12, a 36.8% reduction on that common set. The recovered 17 rows added six manual reviews to the screenshot workflow. Missing rows plus manual identity reviews decreased from 36 to 25, a 30.6% reduction in total exceptions. That combined measure is separate from the 30% manual-review release target.
+
+- Observed automatic identity accuracy **passed on this batch**. Both candidate methods preserved all visible powers and registration statuses. One unreadable screenshot heading still needs a legion choice.
+- Integrated screenshot manual-review reduction **failed** on the common set. Paste met the comparative review target on the common set with visually checked transcription. This run does not measure the transcription accuracy of an arbitrary external AI.
+- Keep the production gate open for the integrated screenshot workflow. Name recognition quality is the remaining bottleneck. Evaluate any name recovery changes on a separate holdout, with reused or ambiguous names kept in review.
